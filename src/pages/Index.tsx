@@ -62,7 +62,7 @@ const HeroSection = () => (
           <Button asChild size="lg" className="bg-coral hover:bg-coral/90 text-coral-foreground text-base px-8 py-6 rounded-xl shadow-lg">
             <Link to="/swim-lessons">Enroll in Swim Lessons</Link>
           </Button>
-          <Button asChild variant="outline" size="lg" className="border-secondary-foreground/30 text-secondary-foreground hover:bg-secondary-foreground/10 text-base px-8 py-6 rounded-xl">
+          <Button asChild variant="outline" size="lg" className="border-white/60 text-white hover:bg-white/10 text-base px-8 py-6 rounded-xl">
             <Link to="/scuba">Start Your PADI Journey <ChevronRight className="ml-1 w-4 h-4" /></Link>
           </Button>
         </div>
