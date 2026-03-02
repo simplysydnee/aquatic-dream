@@ -188,7 +188,7 @@ const SwimLessons = () => {
                         key={`${time}-${di}`}
                         className={`py-3 rounded-lg text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity ${level.color}`}
                       >
-                        <p className="font-semibold">{level.emoji} {level.name}</p>
+                        <p className="font-semibold">{level.name}</p>
                         <p className="opacity-70">{spots} spots left</p>
                       </div>
                     );
