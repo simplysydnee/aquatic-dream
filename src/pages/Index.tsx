@@ -7,6 +7,7 @@ import { Users, Award, MapPin, Star, ChevronRight, Waves, Anchor, Heart, Plane }
 import tripFiji from "@/assets/trip-fiji.jpg";
 import tripSocorro from "@/assets/trip-socorro.jpg";
 import tripMaldives from "@/assets/trip-maldives.jpg";
+import iCanSwimLogo from "@/assets/i-can-swim-logo.jpg";
 
 const HeroSection = () => (
   <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-secondary">
@@ -292,11 +293,8 @@ const DiveTripsPreview = () => (
 const ICanSwimCallout = () => (
   <section className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 py-12">
     <div className="container text-center">
-      <Heart className="w-8 h-8 text-primary mx-auto mb-3" />
-      <p className="text-sm text-primary font-medium mb-2 tracking-wider uppercase">Proud Partner</p>
-      <h3 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-3">
-        I Can Swim 209 — Every Swimmer Deserves a Chance
-      </h3>
+      <p className="text-sm text-primary font-medium mb-4 tracking-wider uppercase">Proud Partner</p>
+      <img src={iCanSwimLogo} alt="I Can Swim 209" className="w-32 h-32 mx-auto mb-4 rounded-full object-cover" />
       <p className="text-muted-foreground max-w-2xl mx-auto mb-6">
         I Can Swim 209 is a specialized aquatic program serving individuals with a wide range of needs — 
         right here at our facility. We're proud to support their mission.
