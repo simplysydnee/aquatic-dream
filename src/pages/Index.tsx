@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
 import { Users, Award, MapPin, Star, ChevronRight, Waves, Anchor, Heart, Plane } from "lucide-react";
+import tripFiji from "@/assets/trip-fiji.jpg";
+import tripSocorro from "@/assets/trip-socorro.jpg";
+import tripMaldives from "@/assets/trip-maldives.jpg";
 
 const HeroSection = () => (
   <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-secondary">
@@ -233,9 +236,9 @@ const TestimonialsSection = () => (
 );
 
 const upcomingTrips = [
-  { destination: "Fiji", dates: "April 2–11, 2026", emoji: "🇫🇯" },
-  { destination: "Socorro", dates: "June 7–16, 2026", emoji: "🇲🇽" },
-  { destination: "Maldives", dates: "Coming Soon", emoji: "🇲🇻" },
+  { destination: "Fiji", dates: "April 2–11, 2026", emoji: "🇫🇯", image: tripFiji },
+  { destination: "Socorro", dates: "June 7–16, 2026", emoji: "🇲🇽", image: tripSocorro },
+  { destination: "Maldives", dates: "Coming Soon", emoji: "🇲🇻", image: tripMaldives },
 ];
 
 const DiveTripsPreview = () => (
@@ -255,11 +258,18 @@ const DiveTripsPreview = () => (
             transition={{ delay: i * 0.15 }}
           >
             <Card className="group hover:shadow-lg transition-all duration-300 overflow-hidden">
-              <div className="bg-gradient-to-br from-secondary to-secondary/80 p-8 text-secondary-foreground">
-                <span className="text-4xl mb-4 block">{trip.emoji}</span>
-                <h3 className="font-display text-2xl font-bold mb-1">{trip.destination}</h3>
-                <p className="text-secondary-foreground/70 text-sm mb-4">{trip.dates}</p>
-                <Plane className="w-5 h-5 text-primary" />
+              <div className="relative h-48 overflow-hidden">
+                <img
+                  src={trip.image}
+                  alt={`Diving in ${trip.destination}`}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute bottom-4 left-4 text-white">
+                  <h3 className="font-display text-2xl font-bold">{trip.emoji} {trip.destination}</h3>
+                  <p className="text-white/80 text-sm">{trip.dates}</p>
+                </div>
               </div>
               <CardContent className="p-6">
                 <Button asChild variant="outline" className="w-full rounded-xl">
