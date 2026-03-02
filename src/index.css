@@ -6,37 +6,37 @@
 
 @layer base {
   :root {
-    /* Aquatic Dreams Brand — Ocean Teal, Coral, Navy, Warm Sand */
-    --background: 34 33% 96%;        /* Warm Sand #F7F3EE */
-    --foreground: 207 62% 16%;       /* Navy #0D2B45 */
+    /* Aquatic Dreams Brand — Teal #5badcb, Coral #f58b76, Navy #0f2343 */
+    --background: 34 33% 96%;        /* Warm Sand */
+    --foreground: 216 64% 16%;       /* Navy #0f2343 */
 
     --card: 0 0% 100%;
-    --card-foreground: 207 62% 16%;
+    --card-foreground: 216 64% 16%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 207 62% 16%;
+    --popover-foreground: 216 64% 16%;
 
-    --primary: 184 88% 36%;          /* Ocean Teal #0B9DAB */
+    --primary: 196 52% 58%;          /* Teal #5badcb */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 207 62% 16%;       /* Navy #0D2B45 */
+    --secondary: 216 64% 16%;       /* Navy #0f2343 */
     --secondary-foreground: 0 0% 100%;
 
-    --coral: 14 78% 60%;             /* Coral #E8674A */
+    --coral: 10 87% 71%;             /* Coral #f58b76 */
     --coral-foreground: 0 0% 100%;
 
     --muted: 34 20% 92%;
-    --muted-foreground: 207 20% 40%;
+    --muted-foreground: 216 20% 40%;
 
-    --accent: 184 40% 92%;
-    --accent-foreground: 207 62% 16%;
+    --accent: 196 40% 92%;
+    --accent-foreground: 216 64% 16%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 34 20% 88%;
     --input: 34 20% 88%;
-    --ring: 184 88% 36%;
+    --ring: 196 52% 58%;
 
     --radius: 0.75rem;
 
@@ -47,56 +47,56 @@
     --level-turtles: 165 70% 40%;
     --level-octopus: 270 60% 50%;
 
-    --sidebar-background: 207 62% 16%;
+    --sidebar-background: 216 64% 16%;
     --sidebar-foreground: 34 33% 96%;
-    --sidebar-primary: 184 88% 36%;
+    --sidebar-primary: 196 52% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 207 50% 22%;
+    --sidebar-accent: 216 50% 22%;
     --sidebar-accent-foreground: 34 33% 96%;
-    --sidebar-border: 207 40% 25%;
-    --sidebar-ring: 184 88% 36%;
+    --sidebar-border: 216 40% 25%;
+    --sidebar-ring: 196 52% 58%;
   }
 
   .dark {
-    --background: 207 62% 10%;
+    --background: 216 64% 10%;
     --foreground: 34 33% 96%;
 
-    --card: 207 50% 14%;
+    --card: 216 50% 14%;
     --card-foreground: 34 33% 96%;
 
-    --popover: 207 50% 14%;
+    --popover: 216 50% 14%;
     --popover-foreground: 34 33% 96%;
 
-    --primary: 184 88% 36%;
+    --primary: 196 52% 58%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 34 33% 96%;
-    --secondary-foreground: 207 62% 16%;
+    --secondary-foreground: 216 64% 16%;
 
-    --coral: 14 78% 60%;
+    --coral: 10 87% 71%;
     --coral-foreground: 0 0% 100%;
 
-    --muted: 207 40% 20%;
+    --muted: 216 40% 20%;
     --muted-foreground: 34 20% 70%;
 
-    --accent: 207 40% 20%;
+    --accent: 216 40% 20%;
     --accent-foreground: 34 33% 96%;
 
     --destructive: 0 62% 30%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 207 30% 22%;
-    --input: 207 30% 22%;
-    --ring: 184 88% 36%;
+    --border: 216 30% 22%;
+    --input: 216 30% 22%;
+    --ring: 196 52% 58%;
 
-    --sidebar-background: 207 62% 10%;
+    --sidebar-background: 216 64% 10%;
     --sidebar-foreground: 34 33% 96%;
-    --sidebar-primary: 184 88% 36%;
+    --sidebar-primary: 196 52% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 207 50% 16%;
+    --sidebar-accent: 216 50% 16%;
     --sidebar-accent-foreground: 34 33% 96%;
-    --sidebar-border: 207 40% 18%;
-    --sidebar-ring: 184 88% 36%;
+    --sidebar-border: 216 40% 18%;
+    --sidebar-ring: 196 52% 58%;
   }
 }
 
