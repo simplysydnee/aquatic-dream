@@ -293,12 +293,13 @@ const ICanSwimCallout = () => (
   <section className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 py-12">
     <div className="container text-center">
       <Heart className="w-8 h-8 text-primary mx-auto mb-3" />
+      <p className="text-sm text-primary font-medium mb-2 tracking-wider uppercase">Proud Partner</p>
       <h3 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-3">
-        Every Swimmer Deserves a Chance
+        I Can Swim 209 — Every Swimmer Deserves a Chance
       </h3>
       <p className="text-muted-foreground max-w-2xl mx-auto mb-6">
-        We're proud to partner with <strong>I Can Swim 209</strong>, an adaptive aquatic program 
-        serving individuals with diverse needs — right here at our facility.
+        I Can Swim 209 is a specialized aquatic program serving individuals with a wide range of needs — 
+        right here at our facility. We're proud to support their mission.
       </p>
       <a
         href="https://icanswim209.com"
@@ -306,7 +307,7 @@ const ICanSwimCallout = () => (
         rel="noopener noreferrer"
         className="inline-flex items-center gap-2 text-primary font-semibold hover:underline"
       >
-        Learn about I Can Swim 209 →
+        Learn more at icanswim209.com →
       </a>
     </div>
   </section>

@@ -3,11 +3,16 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, Star, ChevronRight, ArrowRight } from "lucide-react";
+import badgePearls from "@/assets/badge-pearls.png";
+import badgeReefExplorers from "@/assets/badge-reef-explorers.png";
+import badgeSharks from "@/assets/badge-sharks.png";
+import badgeSeaTurtles from "@/assets/badge-sea-turtles.png";
+import badgeOctopusElite from "@/assets/badge-octopus-elite.png";
 
 const swimLevels = [
   {
     name: "Pearls",
-    emoji: "🦪",
+    badge: badgePearls,
     ages: "Ages 3–6",
     level: "Beginner",
     color: "bg-purple-100 border-purple-300 text-purple-900",
@@ -16,7 +21,7 @@ const swimLevels = [
   },
   {
     name: "Reef Explorers",
-    emoji: "🌿",
+    badge: badgeReefExplorers,
     ages: "Ages 4–8",
     level: "Early Intermediate",
     color: "bg-emerald-100 border-emerald-300 text-emerald-900",
@@ -25,7 +30,7 @@ const swimLevels = [
   },
   {
     name: "Sharks",
-    emoji: "🦈",
+    badge: badgeSharks,
     ages: "Ages 6–12",
     level: "Intermediate",
     color: "bg-blue-100 border-blue-300 text-blue-900",
@@ -34,7 +39,7 @@ const swimLevels = [
   },
   {
     name: "Sea Turtles",
-    emoji: "🐢",
+    badge: badgeSeaTurtles,
     ages: "Ages 8–14",
     level: "Advanced",
     color: "bg-teal-100 border-teal-300 text-teal-900",
@@ -43,7 +48,7 @@ const swimLevels = [
   },
   {
     name: "Octopus Elite",
-    emoji: "🐙",
+    badge: badgeOctopusElite,
     ages: "Ages 10+",
     level: "Elite",
     color: "bg-violet-100 border-violet-300 text-violet-900",
@@ -117,7 +122,7 @@ const SwimLessons = () => {
               >
                 <Card className={`h-full border-2 hover:shadow-lg transition-all duration-300 ${level.color}`}>
                   <CardContent className="p-8">
-                    <span className="text-4xl mb-4 block">{level.emoji}</span>
+                    <img src={level.badge} alt={`${level.name} badge`} className="w-16 h-16 mb-4" />
                     <h3 className="font-display text-2xl font-bold mb-1">{level.name}</h3>
                     <p className={`text-sm font-medium mb-1 ${level.colorAccent}`}>{level.ages}</p>
                     <p className="text-xs opacity-70 mb-4">{level.level}</p>

@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Menu, X, Phone, Mail, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import logoMain from "@/assets/logo-main.png";
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -43,14 +44,7 @@ const Navbar = () => {
       <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-md border-b shadow-sm">
         <div className="container flex items-center justify-between h-16 md:h-20">
           <Link to="/" className="flex items-center gap-3">
-            <div className="flex flex-col">
-              <span className="font-display text-xl md:text-2xl font-bold text-secondary leading-tight">
-                Aquatic Dreams
-              </span>
-              <span className="text-[10px] md:text-xs text-muted-foreground tracking-widest uppercase">
-                Scuba Center
-              </span>
-            </div>
+            <img src={logoMain} alt="Aquatic Dreams" className="h-12 md:h-16 w-auto" />
           </Link>
 
           {/* Desktop nav */}
