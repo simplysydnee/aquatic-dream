@@ -4,26 +4,6 @@ import { Phone, Mail, MapPin, Facebook, Instagram, Youtube } from "lucide-react"
 const Footer = () => {
   return (
     <footer className="bg-secondary text-secondary-foreground">
-      {/* I Can Swim 209 strip */}
-      <div className="bg-primary/10 border-t border-primary/20">
-        <div className="container py-8 text-center">
-          <p className="text-sm text-primary font-medium mb-1">💜 Partner Program</p>
-          <h3 className="font-display text-2xl font-bold text-foreground mb-2">I Can Swim 209</h3>
-          <p className="text-muted-foreground max-w-xl mx-auto mb-4 text-sm">
-            A specialized adaptive aquatic program serving individuals with a wide range of needs, 
-            right here at our facility. Every swimmer deserves a chance.
-          </p>
-          <a
-            href="https://icanswim209.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-primary font-semibold hover:underline text-sm"
-          >
-            Learn more at icanswim209.com →
-          </a>
-        </div>
-      </div>
-
       <div className="container py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           <div>
