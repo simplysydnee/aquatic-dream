@@ -83,8 +83,8 @@ const SwimLessons = () => {
               Five progressive ocean-themed levels, maximum 4 students per instructor, 
               and a pathway that can take your child all the way to PADI certification.
             </p>
-            <Button className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
-              Find Your Level
+            <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
+              <Link to="/swim-enrollment">Find Your Level & Enroll</Link>
             </Button>
           </motion.div>
         </div>

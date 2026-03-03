@@ -13,6 +13,7 @@ import Safety from "./pages/Safety";
 import Equipment from "./pages/Equipment";
 import DreamDivers from "./pages/DreamDivers";
 import Community from "./pages/Community";
+import SwimEnrollment from "./pages/SwimEnrollment";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/swim-lessons" element={<SwimLessons />} />
+          <Route path="/swim-enrollment" element={<SwimEnrollment />} />
           <Route path="/scuba" element={<Scuba />} />
           <Route path="/dive-trips" element={<DiveTrips />} />
           <Route path="/safety" element={<Safety />} />
