@@ -8,7 +8,7 @@ const Footer = () => {
       <div className="container py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           <div>
-            <img src={logoMain} alt="Aquatic Dreams" className="h-14 w-auto mb-4" />
+            <img src={logoMain} alt="Aquatic Dreams" className="h-14 w-auto mb-4 brightness-0 invert" />
             <p className="text-secondary-foreground/70 text-sm mb-6">
               Modesto's only full aquatic campus — from your child's first splash to PADI certification and beyond.
             </p>
