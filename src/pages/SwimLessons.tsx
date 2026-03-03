@@ -15,8 +15,10 @@ const swimLevels = [
     badge: badgePearls,
     ages: "Ages 3–6",
     level: "Beginner",
-    color: "bg-purple-100 border-purple-300 text-purple-900",
-    colorAccent: "text-purple-600",
+    gradient: "from-purple-50 to-purple-100/60",
+    borderColor: "border-purple-200",
+    accentColor: "text-purple-600",
+    badgeBg: "bg-purple-50",
     skills: ["Water comfort & safety basics", "Bubble blowing", "Assisted floating", "Water entry & exit"],
   },
   {
@@ -24,8 +26,10 @@ const swimLevels = [
     badge: badgeReefExplorers,
     ages: "Ages 4–8",
     level: "Early Intermediate",
-    color: "bg-emerald-100 border-emerald-300 text-emerald-900",
-    colorAccent: "text-emerald-600",
+    gradient: "from-emerald-50 to-emerald-100/60",
+    borderColor: "border-emerald-200",
+    accentColor: "text-emerald-600",
+    badgeBg: "bg-emerald-50",
     skills: ["Independent floating", "Basic freestyle arm/kick", "Submersion confidence", "Back float introduction"],
   },
   {
@@ -33,8 +37,10 @@ const swimLevels = [
     badge: badgeSharks,
     ages: "Ages 6–12",
     level: "Intermediate",
-    color: "bg-blue-100 border-blue-300 text-blue-900",
-    colorAccent: "text-blue-600",
+    gradient: "from-blue-50 to-blue-100/60",
+    borderColor: "border-blue-200",
+    accentColor: "text-blue-600",
+    badgeBg: "bg-blue-50",
     skills: ["Full freestyle lap", "Backstroke introduction", "Treading water 60 seconds", "Diving fundamentals"],
   },
   {
@@ -42,8 +48,10 @@ const swimLevels = [
     badge: badgeSeaTurtles,
     ages: "Ages 8–14",
     level: "Advanced",
-    color: "bg-teal-100 border-teal-300 text-teal-900",
-    colorAccent: "text-teal-600",
+    gradient: "from-teal-50 to-teal-100/60",
+    borderColor: "border-teal-200",
+    accentColor: "text-teal-600",
+    badgeBg: "bg-teal-50",
     skills: ["Breaststroke & butterfly", "Flip turns", "Multi-lap endurance", "Stroke refinement"],
   },
   {
@@ -51,8 +59,10 @@ const swimLevels = [
     badge: badgeOctopusElite,
     ages: "Ages 10+",
     level: "Elite",
-    color: "bg-violet-100 border-violet-300 text-violet-900",
-    colorAccent: "text-violet-600",
+    gradient: "from-violet-50 to-violet-100/60",
+    borderColor: "border-violet-200",
+    accentColor: "text-violet-600",
+    badgeBg: "bg-violet-50",
     skills: ["All 4 strokes competitive-ready", "Race strategy", "Swim team preparation", "PADI intro pathway available"],
   },
 ];
@@ -111,7 +121,7 @@ const SwimLessons = () => {
               From water comfort to competitive readiness — each level builds on the last.
             </p>
           </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {swimLevels.map((level, i) => (
               <motion.div
                 key={level.name}
@@ -120,27 +130,38 @@ const SwimLessons = () => {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
               >
-                <Card className={`h-full border-2 hover:shadow-lg transition-all duration-300 ${level.color}`}>
-                  <CardContent className="p-8">
-                    <img src={level.badge} alt={`${level.name} badge`} className="w-16 h-16 mb-4" />
-                    <h3 className="font-display text-2xl font-bold mb-1">{level.name}</h3>
-                    <p className={`text-sm font-medium mb-1 ${level.colorAccent}`}>{level.ages}</p>
-                    <p className="text-xs opacity-70 mb-4">{level.level}</p>
-                    <ul className="space-y-2">
-                      {level.skills.map((skill) => (
-                        <li key={skill} className="flex items-start gap-2 text-sm">
-                          <Star className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${level.colorAccent}`} />
-                          {skill}
-                        </li>
-                      ))}
-                    </ul>
-                    {level.name === "Octopus Elite" && (
-                      <div className="mt-6 p-3 rounded-lg bg-secondary/10 border border-secondary/20">
-                        <p className="text-xs font-medium flex items-center gap-1">
-                          <ArrowRight className="w-3 h-3" /> Connects to PADI pathway
-                        </p>
+                <Card className={`h-full border ${level.borderColor} bg-gradient-to-br ${level.gradient} hover:shadow-xl transition-all duration-300 overflow-hidden`}>
+                  <CardContent className="p-0">
+                    <div className="flex flex-col items-center pt-8 pb-4 px-6">
+                      <div className={`w-28 h-28 rounded-full ${level.badgeBg} p-2 shadow-md mb-4 flex items-center justify-center`}>
+                        <img src={level.badge} alt={`${level.name} badge`} className="w-full h-full object-contain rounded-full" />
                       </div>
-                    )}
+                      <h3 className="font-display text-2xl font-bold text-foreground">{level.name}</h3>
+                      <div className="flex items-center gap-2 mt-1 mb-1">
+                        <span className={`text-sm font-semibold ${level.accentColor}`}>{level.ages}</span>
+                        <span className="text-muted-foreground/40">•</span>
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{level.level}</span>
+                      </div>
+                    </div>
+                    <div className="px-6 pb-6">
+                      <div className="border-t border-foreground/10 pt-4">
+                        <ul className="space-y-2.5">
+                          {level.skills.map((skill) => (
+                            <li key={skill} className="flex items-start gap-2.5 text-sm text-foreground/80">
+                              <Star className={`w-4 h-4 mt-0.5 shrink-0 fill-current ${level.accentColor}`} />
+                              {skill}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      {level.name === "Octopus Elite" && (
+                        <div className="mt-5 p-3 rounded-lg bg-secondary/10 border border-secondary/20">
+                          <p className="text-xs font-semibold flex items-center gap-1.5 text-foreground/80">
+                            <ArrowRight className="w-3.5 h-3.5" /> Connects to PADI pathway
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -186,7 +207,7 @@ const SwimLessons = () => {
                     return (
                       <div
                         key={`${time}-${di}`}
-                        className={`py-3 rounded-lg text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity ${level.color}`}
+                        className={`py-3 rounded-lg text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity bg-gradient-to-br ${level.gradient} ${level.borderColor} border`}
                       >
                         <p className="font-semibold">{level.name}</p>
                         <p className="opacity-70">{spots} spots left</p>
