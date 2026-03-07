@@ -3,9 +3,9 @@ export type SwimLevel = "pearls" | "reef-explorers" | "sharks" | "sea-turtles" |
 export const LEVEL_DISPLAY: Record<SwimLevel, { name: string; description: string }> = {
   pearls: { name: "Pearls", description: "Water comfort & safety basics" },
   "reef-explorers": { name: "Reef Explorers", description: "Early intermediate skills" },
-  sharks: { name: "Sharks", description: "Intermediate strokes & endurance" },
-  "sea-turtles": { name: "Sea Turtles", description: "Advanced multi-stroke" },
-  "octopus-elite": { name: "Octopus Elite", description: "Competitive-ready & PADI pathway" },
+  "sea-turtles": { name: "Sea Turtles", description: "Intermediate strokes & endurance" },
+  "octopus-elite": { name: "Octopus Elite", description: "Advanced multi-stroke" },
+  sharks: { name: "Sharks", description: "Competitive-ready & PADI pathway" },
 };
 
 export interface AssessmentAnswers {

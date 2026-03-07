@@ -33,36 +33,36 @@ const swimLevels = [
     skills: ["Independent floating", "Basic freestyle arm/kick", "Submersion confidence", "Back float introduction"],
   },
   {
-    name: "Sharks",
-    badge: badgeSharks,
-    ages: "Ages 6–12",
-    level: "Intermediate",
-    gradient: "from-blue-50 to-blue-100/60",
-    borderColor: "border-blue-200",
-    accentColor: "text-blue-600",
-    badgeBg: "bg-blue-50",
-    skills: ["Full freestyle lap", "Backstroke introduction", "Treading water 60 seconds", "Diving fundamentals"],
-  },
-  {
     name: "Sea Turtles",
     badge: badgeSeaTurtles,
-    ages: "Ages 8–14",
-    level: "Advanced",
+    ages: "Ages 6–10",
+    level: "Intermediate",
     gradient: "from-teal-50 to-teal-100/60",
     borderColor: "border-teal-200",
     accentColor: "text-teal-600",
     badgeBg: "bg-teal-50",
-    skills: ["Breaststroke & butterfly", "Flip turns", "Multi-lap endurance", "Stroke refinement"],
+    skills: ["Full freestyle lap", "Backstroke introduction", "Treading water 60 seconds", "Diving fundamentals"],
   },
   {
     name: "Octopus Elite",
     badge: badgeOctopusElite,
-    ages: "Ages 10+",
-    level: "Elite",
+    ages: "Ages 8–14",
+    level: "Advanced",
     gradient: "from-violet-50 to-violet-100/60",
     borderColor: "border-violet-200",
     accentColor: "text-violet-600",
     badgeBg: "bg-violet-50",
+    skills: ["Breaststroke & butterfly", "Flip turns", "Multi-lap endurance", "Stroke refinement"],
+  },
+  {
+    name: "Sharks",
+    badge: badgeSharks,
+    ages: "Ages 10+",
+    level: "Elite",
+    gradient: "from-blue-50 to-blue-100/60",
+    borderColor: "border-blue-200",
+    accentColor: "text-blue-600",
+    badgeBg: "bg-blue-50",
     skills: ["All 4 strokes competitive-ready", "Race strategy", "Swim team preparation", "PADI intro pathway available"],
   },
 ];
@@ -154,7 +154,7 @@ const SwimLessons = () => {
                           ))}
                         </ul>
                       </div>
-                      {level.name === "Octopus Elite" && (
+                      {level.name === "Sharks" && (
                         <div className="mt-5 p-3 rounded-lg bg-secondary/10 border border-secondary/20">
                           <p className="text-xs font-semibold flex items-center gap-1.5 text-foreground/80">
                             <ArrowRight className="w-3.5 h-3.5" /> Connects to PADI pathway
@@ -175,7 +175,7 @@ const SwimLessons = () => {
         <div className="container text-center">
           <h2 className="font-display text-3xl font-bold mb-4">From Pool to Ocean</h2>
           <p className="text-secondary-foreground/70 max-w-xl mx-auto mb-8">
-            Octopus Elite swimmers can seamlessly transition into PADI Discover Scuba and beyond. 
+            Sharks-level swimmers can seamlessly transition into PADI Discover Scuba and beyond. 
             The skills they've built in the pool are the foundation for a lifetime of underwater adventures.
           </p>
           <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground rounded-xl">
