@@ -50,9 +50,9 @@ function recommendLevel(a: AssessmentAnswers): SwimLevel {
   // Map score to level (max possible = 16)
   if (score <= 3) return "pearls";
   if (score <= 6) return "reef-explorers";
-  if (score <= 9) return "sharks";
-  if (score <= 12) return "sea-turtles";
-  return "octopus-elite";
+  if (score <= 9) return "sea-turtles";
+  if (score <= 12) return "octopus-elite";
+  return "sharks";
 }
 
 interface Props {

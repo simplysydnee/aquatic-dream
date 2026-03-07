@@ -175,7 +175,7 @@ const SwimLessons = () => {
         <div className="container text-center">
           <h2 className="font-display text-3xl font-bold mb-4">From Pool to Ocean</h2>
           <p className="text-secondary-foreground/70 max-w-xl mx-auto mb-8">
-            Octopus Elite swimmers can seamlessly transition into PADI Discover Scuba and beyond. 
+            Sharks-level swimmers can seamlessly transition into PADI Discover Scuba and beyond. 
             The skills they've built in the pool are the foundation for a lifetime of underwater adventures.
           </p>
           <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground rounded-xl">
