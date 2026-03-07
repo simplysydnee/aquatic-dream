@@ -154,7 +154,7 @@ const SwimLessons = () => {
                           ))}
                         </ul>
                       </div>
-                      {level.name === "Octopus Elite" && (
+                      {level.name === "Sharks" && (
                         <div className="mt-5 p-3 rounded-lg bg-secondary/10 border border-secondary/20">
                           <p className="text-xs font-semibold flex items-center gap-1.5 text-foreground/80">
                             <ArrowRight className="w-3.5 h-3.5" /> Connects to PADI pathway
