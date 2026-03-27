@@ -21,8 +21,10 @@ import DiveBookingsAdmin from "./pages/admin/DiveBookingsAdmin";
 import TripReservationsAdmin from "./pages/admin/TripReservationsAdmin";
 import ContactsAdmin from "./pages/admin/ContactsAdmin";
 import UsersAdmin from "./pages/admin/UsersAdmin";
+import CalendarAdmin from "./pages/admin/CalendarAdmin";
 import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
+import KioskCheckIn from "./pages/KioskCheckIn";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +38,7 @@ const App = () => (
           <Routes>
             {/* Admin routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/checkin" element={<KioskCheckIn />} />
             <Route
               path="/admin"
               element={
@@ -44,7 +47,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route index element={<SwimEnrollmentsAdmin />} />
+              <Route index element={<CalendarAdmin />} />
+              <Route path="enrollments" element={<SwimEnrollmentsAdmin />} />
               <Route path="dive-bookings" element={<DiveBookingsAdmin />} />
               <Route path="trip-reservations" element={<TripReservationsAdmin />} />
               <Route path="contacts" element={<ContactsAdmin />} />

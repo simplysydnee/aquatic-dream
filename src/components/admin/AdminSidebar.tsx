@@ -1,4 +1,4 @@
-import { Users, Waves, Ship, Anchor, MessageSquare, LogOut } from "lucide-react";
+import { Users, Waves, Ship, Anchor, MessageSquare, LogOut, CalendarDays } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
-  { title: "Swim Enrollments", url: "/admin", icon: Waves },
+  { title: "Calendar", url: "/admin", icon: CalendarDays },
+  { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves },
   { title: "Dive Bookings", url: "/admin/dive-bookings", icon: Anchor },
   { title: "Trip Reservations", url: "/admin/trip-reservations", icon: Ship },
   { title: "Contact Inquiries", url: "/admin/contacts", icon: MessageSquare },
