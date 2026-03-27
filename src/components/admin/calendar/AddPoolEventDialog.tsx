@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,15 +12,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import type { CalendarPoolEvent } from "@/hooks/useCalendarData";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultDate: Date;
   onSaved: () => void;
+  editEvent?: CalendarPoolEvent | null;
 }
 
-const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved }: Props) => {
+const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEvent }: Props) => {
   const [eventType, setEventType] = useState("i-can-swim");
   const [title, setTitle] = useState("");
   const [eventDate, setEventDate] = useState<Date>(defaultDate);
@@ -32,6 +34,23 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved }: Props)
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
+  const isEditing = !!editEvent;
+
+  useEffect(() => {
+    if (editEvent) {
+      setEventType(editEvent.event_type);
+      setTitle(editEvent.title);
+      setEventDate(new Date(editEvent.event_date + "T00:00:00"));
+      setStartTime(editEvent.start_time.slice(0, 5));
+      setEndTime(editEvent.end_time.slice(0, 5));
+      setPoolArea(editEvent.pool_area);
+      setInstructorName(editEvent.instructor_name || "");
+      setNotes(editEvent.notes || "");
+    } else {
+      resetForm();
+    }
+  }, [editEvent, open]);
+
   const handleSave = async () => {
     if (!title.trim()) {
       toast({ title: "Title required", variant: "destructive" });
@@ -39,7 +58,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved }: Props)
     }
     setSaving(true);
 
-    const { error } = await supabase.from("pool_events").insert({
+    const payload = {
       event_type: eventType,
       title: title.trim(),
       event_date: format(eventDate, "yyyy-MM-dd"),
@@ -48,7 +67,11 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved }: Props)
       pool_area: poolArea,
       instructor_name: instructorName.trim() || null,
       notes: notes.trim() || null,
-    });
+    };
+
+    const { error } = isEditing
+      ? await supabase.from("pool_events").update(payload).eq("id", editEvent!.id)
+      : await supabase.from("pool_events").insert(payload);
 
     setSaving(false);
 
@@ -57,14 +80,16 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved }: Props)
       return;
     }
 
-    toast({ title: "Event added" });
+    toast({ title: isEditing ? "Event updated" : "Event added" });
     onOpenChange(false);
     resetForm();
     onSaved();
   };
 
   const resetForm = () => {
+    setEventType("i-can-swim");
     setTitle("");
+    setEventDate(defaultDate);
     setStartTime("08:00");
     setEndTime("10:00");
     setPoolArea("shallow");
@@ -72,7 +97,6 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved }: Props)
     setNotes("");
   };
 
-  // Auto-set defaults based on type
   const handleTypeChange = (type: string) => {
     setEventType(type);
     if (type === "i-can-swim") {
@@ -97,7 +121,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved }: Props)
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Pool Event</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Pool Event" : "Add Pool Event"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -178,7 +202,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved }: Props)
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Add Event"}
+              {saving ? "Saving..." : isEditing ? "Update Event" : "Add Event"}
             </Button>
           </div>
         </div>

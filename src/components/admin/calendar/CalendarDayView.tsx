@@ -10,7 +10,18 @@ import type {
   CalendarPoolEvent,
   AttendanceRecord,
 } from "@/hooks/useCalendarData";
-import { Waves, Anchor, Users, Wrench, Calendar } from "lucide-react";
+import { Waves, Anchor, Users, Wrench, Calendar, Pencil, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   date: Date;
@@ -19,6 +30,8 @@ interface Props {
   poolEvents: CalendarPoolEvent[];
   attendance: AttendanceRecord[];
   onAttendanceChange: () => void;
+  onEditEvent?: (event: CalendarPoolEvent) => void;
+  onDeleteEvent?: (eventId: string) => void;
 }
 
 const TIME_SLOTS = [
@@ -43,7 +56,21 @@ const areaLabel = (area: string) => {
   return "Full Pool";
 };
 
-const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendance, onAttendanceChange }: Props) => {
+const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendance, onAttendanceChange, onEditEvent, onDeleteEvent }: Props) => {
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    const { error } = await supabase.from("pool_events").delete().eq("id", deleteId);
+    if (error) {
+      toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Event deleted" });
+      onDeleteEvent?.(deleteId);
+    }
+    setDeleteId(null);
+  };
   const dateStr = format(date, "yyyy-MM-dd");
   const dayName = format(date, "EEEE");
 
