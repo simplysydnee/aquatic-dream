@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,18 @@ import type {
   CalendarPoolEvent,
   AttendanceRecord,
 } from "@/hooks/useCalendarData";
-import { Waves, Anchor, Users, Wrench, Calendar } from "lucide-react";
+import { Waves, Anchor, Users, Wrench, Calendar, Pencil, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   date: Date;
@@ -19,6 +31,8 @@ interface Props {
   poolEvents: CalendarPoolEvent[];
   attendance: AttendanceRecord[];
   onAttendanceChange: () => void;
+  onEditEvent?: (event: CalendarPoolEvent) => void;
+  onDeleteEvent?: (eventId: string) => void;
 }
 
 const TIME_SLOTS = [
@@ -43,7 +57,21 @@ const areaLabel = (area: string) => {
   return "Full Pool";
 };
 
-const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendance, onAttendanceChange }: Props) => {
+const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendance, onAttendanceChange, onEditEvent, onDeleteEvent }: Props) => {
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    const { error } = await supabase.from("pool_events").delete().eq("id", deleteId);
+    if (error) {
+      toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Event deleted" });
+      onDeleteEvent?.(deleteId);
+    }
+    setDeleteId(null);
+  };
   const dateStr = format(date, "yyyy-MM-dd");
   const dayName = format(date, "EEEE");
 
@@ -196,9 +224,27 @@ const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendan
                         "border-l-gray-400"
                       }`}
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <Icon className="w-4 h-4" />
-                        <span className="font-medium text-sm">{event.title}</span>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <Icon className="w-4 h-4" />
+                          <span className="font-medium text-sm">{event.title}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => onEditEvent?.(event)}
+                            className="p-1 rounded hover:bg-muted transition-colors"
+                            title="Edit event"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteId(event.id)}
+                            className="p-1 rounded hover:bg-destructive/10 transition-colors"
+                            title="Delete event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                          </button>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>{areaLabel(event.pool_area)}</span>
@@ -224,6 +270,18 @@ const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendan
           </div>
         );
       })}
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this event?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

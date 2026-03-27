@@ -10,11 +10,13 @@ import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
 import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
 import { useCalendarData } from "@/hooks/useCalendarData";
+import type { CalendarPoolEvent } from "@/hooks/useCalendarData";
 
 const CalendarAdmin = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week">("day");
   const [showAddEvent, setShowAddEvent] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -126,6 +128,11 @@ const CalendarAdmin = () => {
           poolEvents={poolEvents}
           attendance={attendance}
           onAttendanceChange={refetch}
+          onEditEvent={(event) => {
+            setEditingEvent(event);
+            setShowAddEvent(true);
+          }}
+          onDeleteEvent={() => refetch()}
         />
       ) : (
         <CalendarWeekView
@@ -143,9 +150,13 @@ const CalendarAdmin = () => {
 
       <AddPoolEventDialog
         open={showAddEvent}
-        onOpenChange={setShowAddEvent}
+        onOpenChange={(open) => {
+          setShowAddEvent(open);
+          if (!open) setEditingEvent(null);
+        }}
         defaultDate={currentDate}
         onSaved={refetch}
+        editEvent={editingEvent}
       />
     </div>
   );
