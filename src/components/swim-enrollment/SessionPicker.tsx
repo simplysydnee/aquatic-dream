@@ -49,13 +49,16 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   const ageGroup = getAgeGroup(childAge, level);
   const levelInfo = LEVEL_DISPLAY[level];
 
+  // Yellow/Blue/Green/Stroke School all share the same session slots
+  const sessionLevel = (level === "blue" || level === "green" || level === "stroke-school") ? "yellow" : level;
+
   useEffect(() => {
     async function fetchSessions() {
       setLoading(true);
       const { data: sessionData, error } = await supabase
         .from("swim_sessions")
         .select("*")
-        .eq("swim_level", level)
+        .eq("swim_level", sessionLevel)
         .eq("age_group", ageGroup)
         .eq("is_active", true);
 
