@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/hooks/useAuth";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Index from "./pages/Index";
@@ -14,6 +15,14 @@ import Equipment from "./pages/Equipment";
 import DreamDivers from "./pages/DreamDivers";
 import Community from "./pages/Community";
 import SwimEnrollment from "./pages/SwimEnrollment";
+import AdminLogin from "./pages/AdminLogin";
+import AdminLayout from "./pages/admin/AdminLayout";
+import ProtectedRoute from "./components/admin/ProtectedRoute";
+import SwimEnrollmentsAdmin from "./pages/admin/SwimEnrollmentsAdmin";
+import DiveBookingsAdmin from "./pages/admin/DiveBookingsAdmin";
+import TripReservationsAdmin from "./pages/admin/TripReservationsAdmin";
+import ContactsAdmin from "./pages/admin/ContactsAdmin";
+import UsersAdmin from "./pages/admin/UsersAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,22 +32,51 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/swim-lessons" element={<SwimLessons />} />
-          <Route path="/swim-enrollment" element={<SwimEnrollment />} />
-          <Route path="/scuba" element={<Scuba />} />
-          <Route path="/dive-trips" element={<DiveTrips />} />
-          <Route path="/safety" element={<Safety />} />
-          <Route path="/equipment" element={<Equipment />} />
-          <Route path="/dream-divers" element={<DreamDivers />} />
-          <Route path="/community" element={<Community />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        <Footer />
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Admin routes — no Navbar/Footer */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<SwimEnrollmentsAdmin />} />
+              <Route path="dive-bookings" element={<DiveBookingsAdmin />} />
+              <Route path="trip-reservations" element={<TripReservationsAdmin />} />
+              <Route path="contacts" element={<ContactsAdmin />} />
+              <Route path="users" element={<UsersAdmin />} />
+            </Route>
+
+            {/* Public routes */}
+            <Route
+              path="*"
+              element={
+                <>
+                  <Navbar />
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/swim-lessons" element={<SwimLessons />} />
+                    <Route path="/swim-enrollment" element={<SwimEnrollment />} />
+                    <Route path="/scuba" element={<Scuba />} />
+                    <Route path="/dive-trips" element={<DiveTrips />} />
+                    <Route path="/safety" element={<Safety />} />
+                    <Route path="/equipment" element={<Equipment />} />
+                    <Route path="/dream-divers" element={<DreamDivers />} />
+                    <Route path="/community" element={<Community />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                  <Footer />
+                </>
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
