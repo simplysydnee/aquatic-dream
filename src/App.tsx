@@ -24,6 +24,7 @@ import UsersAdmin from "./pages/admin/UsersAdmin";
 import CalendarAdmin from "./pages/admin/CalendarAdmin";
 import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
+import KioskCheckIn from "./pages/KioskCheckIn";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
           <Routes>
             {/* Admin routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/checkin" element={<KioskCheckIn />} />
             <Route
               path="/admin"
               element={
