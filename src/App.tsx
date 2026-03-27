@@ -4,8 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
-import Navbar from "./components/Navbar";
-import Footer from "./components/Footer";
 import Index from "./pages/Index";
 import SwimLessons from "./pages/SwimLessons";
 import Scuba from "./pages/Scuba";
@@ -24,6 +22,7 @@ import TripReservationsAdmin from "./pages/admin/TripReservationsAdmin";
 import ContactsAdmin from "./pages/admin/ContactsAdmin";
 import UsersAdmin from "./pages/admin/UsersAdmin";
 import NotFound from "./pages/NotFound";
+import PublicLayout from "./components/PublicLayout";
 
 const queryClient = new QueryClient();
 
@@ -35,7 +34,7 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Admin routes — no Navbar/Footer */}
+            {/* Admin routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route
               path="/admin"
@@ -53,27 +52,18 @@ const App = () => (
             </Route>
 
             {/* Public routes */}
-            <Route
-              path="*"
-              element={
-                <>
-                  <Navbar />
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/swim-lessons" element={<SwimLessons />} />
-                    <Route path="/swim-enrollment" element={<SwimEnrollment />} />
-                    <Route path="/scuba" element={<Scuba />} />
-                    <Route path="/dive-trips" element={<DiveTrips />} />
-                    <Route path="/safety" element={<Safety />} />
-                    <Route path="/equipment" element={<Equipment />} />
-                    <Route path="/dream-divers" element={<DreamDivers />} />
-                    <Route path="/community" element={<Community />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                  <Footer />
-                </>
-              }
-            />
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<Index />} />
+              <Route path="/swim-lessons" element={<SwimLessons />} />
+              <Route path="/swim-enrollment" element={<SwimEnrollment />} />
+              <Route path="/scuba" element={<Scuba />} />
+              <Route path="/dive-trips" element={<DiveTrips />} />
+              <Route path="/safety" element={<Safety />} />
+              <Route path="/equipment" element={<Equipment />} />
+              <Route path="/dream-divers" element={<DreamDivers />} />
+              <Route path="/community" element={<Community />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
           </Routes>
         </BrowserRouter>
       </AuthProvider>
