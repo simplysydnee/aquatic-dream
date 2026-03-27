@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      attendance: {
+        Row: {
+          checked_in: boolean
+          checked_in_at: string | null
+          checked_in_by: string | null
+          created_at: string
+          enrollment_id: string
+          id: string
+          lesson_date: string
+          notes: string | null
+          session_id: string
+        }
+        Insert: {
+          checked_in?: boolean
+          checked_in_at?: string | null
+          checked_in_by?: string | null
+          created_at?: string
+          enrollment_id: string
+          id?: string
+          lesson_date: string
+          notes?: string | null
+          session_id: string
+        }
+        Update: {
+          checked_in?: boolean
+          checked_in_at?: string | null
+          checked_in_by?: string | null
+          created_at?: string
+          enrollment_id?: string
+          id?: string
+          lesson_date?: string
+          notes?: string | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "swim_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "swim_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_submissions: {
         Row: {
           created_at: string
@@ -91,6 +142,54 @@ export type Database = {
           phone?: string | null
           preferred_date?: string | null
           status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pool_events: {
+        Row: {
+          created_at: string
+          end_time: string
+          event_date: string
+          event_type: string
+          id: string
+          instructor_name: string | null
+          is_recurring: boolean
+          notes: string | null
+          pool_area: string
+          recurrence_day: string | null
+          start_time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          event_date: string
+          event_type: string
+          id?: string
+          instructor_name?: string | null
+          is_recurring?: boolean
+          notes?: string | null
+          pool_area?: string
+          recurrence_day?: string | null
+          start_time: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          event_date?: string
+          event_type?: string
+          id?: string
+          instructor_name?: string | null
+          is_recurring?: boolean
+          notes?: string | null
+          pool_area?: string
+          recurrence_day?: string | null
+          start_time?: string
+          title?: string
           updated_at?: string
         }
         Relationships: []
