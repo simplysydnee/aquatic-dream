@@ -1,116 +1,87 @@
+# Swim Program Overhaul — Final Plan
 
+## Summary
 
-# Aquatic Dreams — Full Aquatic Campus Web App
-
-**"Swim. Dive. Dream."** — A modern, mobile-first website for Modesto's only full aquatic campus, where a 3-year-old can start swim lessons and grow all the way to PADI Instructor.
-
----
-
-## Brand & Design System
-
-- **Colors:** Ocean Teal (#0B9DAB), Coral (#E8674A), Navy (#0D2B45), Warm Sand (#F7F3EE)
-- **Typography:** Premium serif display headings + clean sans-serif body
-- **Logo:** The uploaded Aquatic Dreams Scuba Center logo (diver variant) used in the header; the 5 ocean creature level badges (Pearls, Reef Explorers, Sharks, Sea Turtles, Octopus Elite) used in the swim section
-- **Tone:** Warm, trustworthy, adventurous, community-rooted
+Replace the ocean-themed 5-level system with the **Starfish Aquatics color-level system**, update scheduling to summer M/W format, change class size to 3, and add pricing.
 
 ---
 
-## Phase 1 — Homepage + Core Pages (Frontend)
+## New Level Structure
 
-### 🏠 Homepage
-- Full-width hero with animated wave/bubble effects, "Swim. Dive. Dream." headline
-- Dual CTAs: "Enroll in Swim Lessons" (coral) + "Start Your PADI Journey" (navy ghost)
-- Stats block (2–4 students per instructor, PADI 5★ IDC Center, etc.)
-- Two equally-weighted feature panels: Swim Lessons & Scuba
-- I Can Swim 209 adaptive program callout strip
-- Testimonials carousel
-- Upcoming dive trips preview (3 cards)
-- Full footer with contact info, social links, and I Can Swim 209
+| Level | Placement Criteria | Age Groups |
+|-------|-------------------|------------|
+| **White** | Cannot submerge relaxed 5 sec | Preschool (3–5) + School-age (5–8) |
+| **Red** | Can submerge 5 sec, can't float independently | Preschool (3–5) + School-age (5–8) |
+| **Yellow** | Can float front/back, can't tread water 10 sec | 7+ |
+| **Blue** | Can tread water 10 sec, can't side-roll-side kick 10M | 7+ |
+| **Green** | Can do side-roll-side kick, hasn't completed all skills | 7+ |
+| **Stroke School** | Completed Green / Learn to Swim | 7+ (must complete Green first) |
 
-### 🏊 Swim Lessons Page
-- "Max 4 per class" prominently featured with industry comparison callout
-- 5 color-coded swim level cards with ocean creature badges (Pearls → Octopus Elite)
-- Age ranges, skills covered, and progression pathway
-- Octopus Elite → PADI bridge callout
-- Schedule placeholder (calendar grid, color-coded by level)
-
-### 🤿 PADI / Scuba Page
-- PADI 5★ IDC Center badge featured prominently
-- Course catalog organized into 5 groups: Get Introduced, Get Certified, Improve Skills, Be a Safer Diver, Specialties (18 in filterable grid)
-- Professional / Pro Track section with certification pathway
-- "What Can I Teach?" section mapping pro certs to courses
-- Each course card: name, description, prereqs, duration, "Book This Course" CTA (linking to peek.com booking URL)
-
-### ✈️ Dive Trips Page
-- Rich destination cards (Fiji, Socorro, Maldives, Philippines x3) with imagery, dates, pricing
-- "Reserve My Spot" CTAs
-- Trip detail views with itinerary, inclusions, gear requirements
-
-### 🛡️ Safety & Certifications Page
-- Red Cross programs (Lifeguarding, Safety Training for Swim Coaches)
-- DAN programs (CPR & EFR Instructor, dive insurance link)
-- Positioned as community safety resources bridging swim + scuba
-
-### 🎽 Equipment & Gear Page
-- Brand grid (Aqua Lung, ScubaPro, Hollis, Tusa, Bare, Tilos, DUI)
-- Services: sales, rental, air fills, Nitrox, servicing
-- Contact/inquiry CTA (no e-commerce)
-
-### 🌊 Dream Divers Club Page
-- About the Club, upcoming dives, calendar
-- Community hub feel with join CTA
-
-### 🐠 Community Page
-- Monterey Dive Conditions link
-- Dive Sites guide
-- Blog/News feed
-- Testimonials carousel
-- FAQ accordion (swim + scuba tabs)
-- External links (PADI, DAN, eLearning)
-- Video Gallery
-
-### 💜 I Can Swim 209
-- Prominent callout section on homepage, swim page, and footer
-- Warm community-focused copy with link to icanswim209.com
+- White and Red are **separate levels** with their own assessment placement
+- Yellow/Blue/Green share class time but kids are placed at their specific level
+- Stroke School requires Green completion — shown in enrollment but noted as requiring completion
+- **3 students max** per group
 
 ---
 
-## Phase 2 — Backend & Enrollment Flows (Supabase)
+## Schedule & Pricing
 
-### Database & Auth
-- Supabase Cloud setup with admin authentication
-- Tables: swim enrollments, dive course bookings, trip reservations, contact/inquiry submissions, schedule/sessions
-- Max 4 students per class enforced at the database level
-- Admin role-based access
-
-### Swim Enrollment Flow
-- Multi-step: select level → select session → parent/child info → confirmation
-- Weekly calendar showing spots remaining (max 4)
-- Private lesson upsell at checkout
-
-### Trip Reservations
-- Reserve/inquiry form stored in Supabase
-- Spots remaining tracking
-
-### 🔐 Admin Dashboard
-- Protected route with Supabase auth
-- Swim lesson enrollments by level (roster view, max 4 enforced)
-- Dive course bookings
-- Trip reservations
-- Contact form submissions
-- Schedule management (add/edit/remove sessions)
+- **Days**: Monday / Wednesday only
+- **Session 1**: June 8 – July 1 | **Session 2**: July 13 – August 2
+- **8 lessons** per session at **$35/lesson = $280 total**
+- **Time slots**: 2:45, 3:15, 3:45, 4:15, 4:45, 5:30, 6:00, 6:30
 
 ---
 
-## Phase 3 — AI Swim Placement Tool & Enhancements
+## Implementation Steps
 
-### 🤖 AI Swim Placement Tool
-- Parents enter: child's age, current experience, primary goal, concerns
-- Lovable AI returns personalized level recommendation with what first sessions look like and how small group sizes benefit their child
-- If fear/sensory concerns selected → surfaces I Can Swim 209
+### 1. Database Migration
+- Add columns to `swim_sessions`: `session_name`, `session_start_date`, `session_end_date`, `age_group`, `price_per_lesson` (default 35), `total_lessons` (default 8), `session_price` (default 280)
+- Change `max_students` default from 4 → 3
+- Delete old seed data, insert new sessions: 8 time slots × 5 groups (White/Red preschool, White/Red school-age, Yellow/Blue/Green 7+) × 2 session periods = 80 session rows
+- Update `swim_level` to use new color values
 
-### Polish & Enhancements
-- Animated transitions and micro-interactions
-- SEO metadata for all pages
-- Performance optimization
+### 2. New Color-Coded Badge Assets
+- Create simple, clean SVG badges for each color level (White, Red, Yellow, Blue, Green, Stroke School) using the brand color palette
+- Replace the ocean-themed badge imports throughout
 
+### 3. Update Types & Assessment (`types.ts`, `SwimAssessment.tsx`)
+- New `SwimLevel`: `"white" | "red" | "yellow" | "blue" | "green" | "stroke-school"`
+- Replace 5-question scoring quiz with Starfish **decision tree**:
+  1. Age → determines group eligibility
+  2. "Can your child submerge relaxed for 5 seconds?" → No = **White**
+  3. "Can your child float (front & back) without support?" → No = **Red**
+  4. "Can your child tread water for 10 seconds?" → No = **Yellow**
+  5. "Can your child side-roll-side kick drill 10M/30ft?" → No = **Blue**
+  6. "Has your child completed all Green-level skills?" → No = **Green**, Yes = **Stroke School**
+
+### 4. Update Session Picker (`SessionPicker.tsx`)
+- Group sessions by Session 1 / Session 2
+- Filter by age group (preschool / school-age / 7+ based on age and level)
+- Show pricing: "$35/lesson · $280 for 8-lesson session"
+- Show "3 spots" capacity
+- Show days as "Mon & Wed" instead of individual days
+
+### 5. Update Swim Lessons Page (`SwimLessons.tsx`)
+- Replace 5 ocean-themed cards with 6 color-level cards
+- Update schedule grid to M/W only with 8 time slots
+- Change "Max 4" → "Max 3" everywhere
+- Add pricing section ($35/lesson, $280/session)
+- Update PADI bridge to reference Stroke School → PADI pathway
+
+### 6. Update Enrollment Form & Confirmation
+- Reflect new level names and colors
+- Show session period (Session 1 or 2) and pricing in confirmation
+- Note for Stroke School: "Requires completion of Green level"
+
+---
+
+## Technical Detail
+
+The assessment becomes a simple sequential elimination rather than a scored quiz. Each question maps to a Starfish criterion — the first "No" answer determines placement. This is more accurate to how swim instructors actually evaluate students and matches the official Starfish matrix exactly.
+
+The age question routes to the correct class grouping:
+- Ages 3–5 → White/Red preschool groups
+- Ages 5–8 → White/Red school-age groups  
+- Ages 7+ → Yellow/Blue/Green group (or Stroke School if qualified)
+- Ages 5–7 overlap: could qualify for either White/Red school-age or Yellow+ depending on skill
