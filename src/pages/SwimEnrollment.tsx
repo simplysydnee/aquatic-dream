@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
 import SessionPicker from "@/components/swim-enrollment/SessionPicker";
 import EnrollmentForm, { EnrollmentFormData } from "@/components/swim-enrollment/EnrollmentForm";
 import EnrollmentConfirmation from "@/components/swim-enrollment/EnrollmentConfirmation";
-import { SwimLevel, LEVEL_DISPLAY } from "@/components/swim-enrollment/types";
+import { SwimLevel } from "@/components/swim-enrollment/types";
 
 type Step = "assess" | "session" | "info" | "done";
 
@@ -38,7 +37,6 @@ const SwimEnrollment = () => {
     if (!level || !sessionId) return;
     setSubmitting(true);
 
-    // Check spots still available
     const { count } = await supabase
       .from("swim_enrollments")
       .select("*", { count: "exact", head: true })
@@ -90,7 +88,6 @@ const SwimEnrollment = () => {
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
       <section className="bg-gradient-to-br from-primary/10 to-background py-12">
         <div className="container">
           <p className="text-primary font-medium tracking-wider uppercase text-sm mb-2">
@@ -102,7 +99,6 @@ const SwimEnrollment = () => {
         </div>
       </section>
 
-      {/* Stepper */}
       <div className="container py-6">
         <div className="flex items-center justify-center gap-2 max-w-md mx-auto mb-8">
           {STEP_LABELS.map((label, i) => (
@@ -132,7 +128,6 @@ const SwimEnrollment = () => {
           ))}
         </div>
 
-        {/* Step content */}
         <div className="pb-16">
           {step === "assess" && (
             <SwimAssessment onComplete={handleAssessmentComplete} />
@@ -140,6 +135,7 @@ const SwimEnrollment = () => {
           {step === "session" && level && (
             <SessionPicker
               level={level}
+              childAge={childAge}
               onSelect={handleSessionSelect}
               onBack={() => setStep("assess")}
             />
