@@ -150,36 +150,57 @@ export type Database = {
       }
       swim_sessions: {
         Row: {
+          age_group: string | null
           created_at: string
           day_of_week: string
           end_time: string
           id: string
           is_active: boolean
           max_students: number
+          price_per_lesson: number | null
+          session_end_date: string | null
+          session_name: string | null
+          session_price: number | null
+          session_start_date: string | null
           start_time: string
           swim_level: string
+          total_lessons: number | null
           updated_at: string
         }
         Insert: {
+          age_group?: string | null
           created_at?: string
           day_of_week: string
           end_time: string
           id?: string
           is_active?: boolean
           max_students?: number
+          price_per_lesson?: number | null
+          session_end_date?: string | null
+          session_name?: string | null
+          session_price?: number | null
+          session_start_date?: string | null
           start_time: string
           swim_level: string
+          total_lessons?: number | null
           updated_at?: string
         }
         Update: {
+          age_group?: string | null
           created_at?: string
           day_of_week?: string
           end_time?: string
           id?: string
           is_active?: boolean
           max_students?: number
+          price_per_lesson?: number | null
+          session_end_date?: string | null
+          session_name?: string | null
+          session_price?: number | null
+          session_start_date?: string | null
           start_time?: string
           swim_level?: string
+          total_lessons?: number | null
           updated_at?: string
         }
         Relationships: []

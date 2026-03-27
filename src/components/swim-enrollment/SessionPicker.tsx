@@ -2,27 +2,29 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Clock, Users, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { SwimLevel, LEVEL_DISPLAY } from "./types";
+import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, AGE_GROUP_LABELS } from "./types";
 
 interface SessionWithSpots {
   id: string;
-  day_of_week: string;
+  session_name: string;
+  session_start_date: string;
+  session_end_date: string;
   start_time: string;
   end_time: string;
   max_students: number;
   enrolled_count: number;
   spots_left: number;
+  age_group: string;
 }
 
 interface Props {
   level: SwimLevel;
+  childAge: number;
   onSelect: (sessionId: string) => void;
   onBack: () => void;
 }
-
-const DAY_ORDER = ["monday", "tuesday", "wednesday", "thursday", "friday"];
 
 function formatTime(time: string) {
   const [h, m] = time.split(":");
@@ -32,23 +34,29 @@ function formatTime(time: string) {
   return `${display}:${m} ${ampm}`;
 }
 
-function capitalizeDay(day: string) {
-  return day.charAt(0).toUpperCase() + day.slice(1);
+function formatDateRange(start: string, end: string) {
+  const s = new Date(start + "T00:00:00");
+  const e = new Date(end + "T00:00:00");
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", opts)}`;
 }
 
-const SessionPicker = ({ level, onSelect, onBack }: Props) => {
+const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   const [sessions, setSessions] = useState<SessionWithSpots[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const ageGroup = getAgeGroup(childAge, level);
+  const levelInfo = LEVEL_DISPLAY[level];
+
   useEffect(() => {
     async function fetchSessions() {
       setLoading(true);
-      // Get sessions for this level
       const { data: sessionData, error } = await supabase
         .from("swim_sessions")
         .select("*")
         .eq("swim_level", level)
+        .eq("age_group", ageGroup)
         .eq("is_active", true);
 
       if (error || !sessionData) {
@@ -56,7 +64,6 @@ const SessionPicker = ({ level, onSelect, onBack }: Props) => {
         return;
       }
 
-      // Get enrollment counts per session
       const sessionIds = sessionData.map((s) => s.id);
       const { data: enrollments } = await supabase
         .from("swim_enrollments")
@@ -71,28 +78,38 @@ const SessionPicker = ({ level, onSelect, onBack }: Props) => {
         }
       });
 
-      const withSpots: SessionWithSpots[] = sessionData.map((s) => ({
+      const withSpots: SessionWithSpots[] = sessionData.map((s: any) => ({
         id: s.id,
-        day_of_week: s.day_of_week,
+        session_name: s.session_name || "Session",
+        session_start_date: s.session_start_date || "",
+        session_end_date: s.session_end_date || "",
         start_time: s.start_time,
         end_time: s.end_time,
         max_students: s.max_students,
         enrolled_count: countMap[s.id] || 0,
         spots_left: s.max_students - (countMap[s.id] || 0),
+        age_group: s.age_group || "",
       }));
 
-      // Sort by day order
-      withSpots.sort(
-        (a, b) => DAY_ORDER.indexOf(a.day_of_week) - DAY_ORDER.indexOf(b.day_of_week)
-      );
+      // Sort by session name then time
+      withSpots.sort((a, b) => {
+        if (a.session_name !== b.session_name) return a.session_name.localeCompare(b.session_name);
+        return a.start_time.localeCompare(b.start_time);
+      });
 
       setSessions(withSpots);
       setLoading(false);
     }
     fetchSessions();
-  }, [level]);
+  }, [level, ageGroup]);
 
-  const levelInfo = LEVEL_DISPLAY[level];
+  // Group sessions by session period
+  const grouped = sessions.reduce<Record<string, SessionWithSpots[]>>((acc, s) => {
+    const key = `${s.session_name}|${s.session_start_date}|${s.session_end_date}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(s);
+    return acc;
+  }, {});
 
   return (
     <motion.div
@@ -103,9 +120,19 @@ const SessionPicker = ({ level, onSelect, onBack }: Props) => {
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">
         Pick a Session
       </h3>
-      <p className="text-muted-foreground text-sm mb-6">
-        Choose a {levelInfo.name} class that works for your schedule. Max 4 students per class.
+      <p className="text-muted-foreground text-sm mb-2">
+        Choose a <strong>{levelInfo.name}</strong> class · {AGE_GROUP_LABELS[ageGroup]}
       </p>
+      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6">
+        <span className="flex items-center gap-1">
+          <DollarSign className="w-3.5 h-3.5" />
+          $35/lesson · $280 per session (8 lessons)
+        </span>
+        <span className="flex items-center gap-1">
+          <Calendar className="w-3.5 h-3.5" />
+          Mon & Wed
+        </span>
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
@@ -113,44 +140,58 @@ const SessionPicker = ({ level, onSelect, onBack }: Props) => {
         </div>
       ) : sessions.length === 0 ? (
         <Card className="p-8 text-center">
-          <p className="text-muted-foreground">No sessions available for this level right now.</p>
+          <p className="text-muted-foreground">No sessions available for this level and age group right now.</p>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {sessions.map((session) => {
-            const isFull = session.spots_left <= 0;
-            const isSelected = selectedId === session.id;
+        <div className="space-y-8">
+          {Object.entries(grouped).map(([key, groupSessions]) => {
+            const [name, startDate, endDate] = key.split("|");
             return (
-              <button
-                key={session.id}
-                disabled={isFull}
-                onClick={() => setSelectedId(session.id)}
-                className={`text-left p-4 rounded-xl border transition-all ${
-                  isFull
-                    ? "opacity-50 cursor-not-allowed border-border bg-muted"
-                    : isSelected
-                    ? "border-primary bg-accent shadow-md"
-                    : "border-border hover:border-primary/40 bg-card"
-                }`}
-              >
-                <p className="font-semibold text-foreground">
-                  {capitalizeDay(session.day_of_week)}
-                </p>
-                <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    {formatTime(session.start_time)} – {formatTime(session.end_time)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" />
-                    {isFull ? (
-                      <span className="text-destructive font-medium">Full</span>
-                    ) : (
-                      <span>{session.spots_left} spot{session.spots_left !== 1 ? "s" : ""} left</span>
-                    )}
-                  </span>
+              <div key={key}>
+                <div className="flex items-center gap-2 mb-3">
+                  <h4 className="font-semibold text-foreground">{name}</h4>
+                  {startDate && endDate && (
+                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                      {formatDateRange(startDate, endDate)}
+                    </span>
+                  )}
                 </div>
-              </button>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {groupSessions.map((session) => {
+                    const isFull = session.spots_left <= 0;
+                    const isSelected = selectedId === session.id;
+                    return (
+                      <button
+                        key={session.id}
+                        disabled={isFull}
+                        onClick={() => setSelectedId(session.id)}
+                        className={`text-left p-4 rounded-xl border transition-all ${
+                          isFull
+                            ? "opacity-50 cursor-not-allowed border-border bg-muted"
+                            : isSelected
+                            ? "border-primary bg-accent shadow-md"
+                            : "border-border hover:border-primary/40 bg-card"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            {formatTime(session.start_time)} – {formatTime(session.end_time)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3.5 h-3.5" />
+                            {isFull ? (
+                              <span className="text-destructive font-medium">Full</span>
+                            ) : (
+                              <span>{session.spots_left} spot{session.spots_left !== 1 ? "s" : ""} left</span>
+                            )}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </div>

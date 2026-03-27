@@ -41,11 +41,12 @@
     --radius: 0.75rem;
 
     /* Swim level colors */
-    --level-pearls: 280 50% 75%;
-    --level-reef: 150 60% 45%;
-    --level-sharks: 210 80% 50%;
-    --level-turtles: 165 70% 40%;
-    --level-octopus: 270 60% 50%;
+    --level-white: 0 0% 92%;
+    --level-red: 0 80% 60%;
+    --level-yellow: 45 90% 55%;
+    --level-blue: 210 80% 55%;
+    --level-green: 140 60% 45%;
+    --level-stroke-school: 270 60% 55%;
 
     --sidebar-background: 216 64% 16%;
     --sidebar-foreground: 34 33% 96%;
