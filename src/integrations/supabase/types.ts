@@ -146,6 +146,77 @@ export type Database = {
         }
         Relationships: []
       }
+      enrollment_agreements: {
+        Row: {
+          created_at: string
+          emergency_contact_name: string
+          emergency_contact_phone: string
+          emergency_contact_relationship: string
+          enrollment_id: string
+          id: string
+          photo_release_accepted: boolean
+          privacy_policy_accepted: boolean
+          privacy_policy_version: string
+          signature_text: string
+          signed_at: string
+          signer_email: string
+          signer_ip: string | null
+          signer_name: string
+          terms_accepted: boolean
+          tos_version: string
+          waiver_accepted: boolean
+          waiver_version: string
+        }
+        Insert: {
+          created_at?: string
+          emergency_contact_name: string
+          emergency_contact_phone: string
+          emergency_contact_relationship: string
+          enrollment_id: string
+          id?: string
+          photo_release_accepted?: boolean
+          privacy_policy_accepted?: boolean
+          privacy_policy_version?: string
+          signature_text: string
+          signed_at?: string
+          signer_email: string
+          signer_ip?: string | null
+          signer_name: string
+          terms_accepted?: boolean
+          tos_version?: string
+          waiver_accepted?: boolean
+          waiver_version?: string
+        }
+        Update: {
+          created_at?: string
+          emergency_contact_name?: string
+          emergency_contact_phone?: string
+          emergency_contact_relationship?: string
+          enrollment_id?: string
+          id?: string
+          photo_release_accepted?: boolean
+          privacy_policy_accepted?: boolean
+          privacy_policy_version?: string
+          signature_text?: string
+          signed_at?: string
+          signer_email?: string
+          signer_ip?: string | null
+          signer_name?: string
+          terms_accepted?: boolean
+          tos_version?: string
+          waiver_accepted?: boolean
+          waiver_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollment_agreements_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "swim_enrollments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pool_events: {
         Row: {
           created_at: string
