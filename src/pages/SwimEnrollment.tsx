@@ -4,12 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
 import SessionPicker from "@/components/swim-enrollment/SessionPicker";
 import EnrollmentForm, { EnrollmentFormData } from "@/components/swim-enrollment/EnrollmentForm";
+import LegalAgreements, { LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import EnrollmentConfirmation from "@/components/swim-enrollment/EnrollmentConfirmation";
 import { SwimLevel } from "@/components/swim-enrollment/types";
+import { WAIVER_VERSION, TOS_VERSION, PRIVACY_POLICY_VERSION } from "@/components/swim-enrollment/legal-content";
 
-type Step = "assess" | "session" | "info" | "done";
+type Step = "assess" | "session" | "info" | "legal" | "done";
 
-const STEP_LABELS = ["Assessment", "Session", "Details", "Confirmed"];
+const STEP_LABELS = ["Assessment", "Session", "Details", "Agreements", "Confirmed"];
 
 const SwimEnrollment = () => {
   const [step, setStep] = useState<Step>("assess");
@@ -17,10 +19,11 @@ const SwimEnrollment = () => {
   const [childAge, setChildAge] = useState(0);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [childName, setChildName] = useState("");
+  const [enrollmentData, setEnrollmentData] = useState<EnrollmentFormData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const stepIndex = ["assess", "session", "info", "done"].indexOf(step);
+  const stepIndex = ["assess", "session", "info", "legal", "done"].indexOf(step);
 
   const handleAssessmentComplete = (recommendedLevel: SwimLevel, age: number) => {
     setLevel(recommendedLevel);
@@ -33,10 +36,17 @@ const SwimEnrollment = () => {
     setStep("info");
   };
 
-  const handleEnrollmentSubmit = async (data: EnrollmentFormData) => {
-    if (!level || !sessionId) return;
+  const handleInfoSubmit = (data: EnrollmentFormData) => {
+    setEnrollmentData(data);
+    setChildName(data.childName);
+    setStep("legal");
+  };
+
+  const handleLegalSubmit = async (legalData: LegalAgreementData) => {
+    if (!level || !sessionId || !enrollmentData) return;
     setSubmitting(true);
 
+    // Check capacity
     const { count } = await supabase
       .from("swim_enrollments")
       .select("*", { count: "exact", head: true })
@@ -60,20 +70,66 @@ const SwimEnrollment = () => {
       return;
     }
 
-    const { error } = await supabase.from("swim_enrollments").insert({
-      swim_level: level,
-      session_id: sessionId,
-      parent_name: data.parentName,
-      parent_email: data.parentEmail,
-      parent_phone: data.parentPhone || null,
-      child_name: data.childName,
-      child_age: childAge,
-      notes: data.notes || null,
-    });
+    // Insert enrollment
+    const { data: enrollment, error: enrollError } = await supabase
+      .from("swim_enrollments")
+      .insert({
+        swim_level: level,
+        session_id: sessionId,
+        parent_name: enrollmentData.parentName,
+        parent_email: enrollmentData.parentEmail,
+        parent_phone: enrollmentData.parentPhone || null,
+        child_name: enrollmentData.childName,
+        child_age: childAge,
+        notes: enrollmentData.notes || null,
+      })
+      .select("id")
+      .single();
+
+    if (enrollError || !enrollment) {
+      toast({
+        title: "Something went wrong",
+        description: "Please try again or contact us directly.",
+        variant: "destructive",
+      });
+      setSubmitting(false);
+      return;
+    }
+
+    // Capture IP for legal compliance
+    let signerIp: string | null = null;
+    try {
+      const ipRes = await fetch("https://api.ipify.org?format=json");
+      const ipData = await ipRes.json();
+      signerIp = ipData.ip;
+    } catch {
+      // IP capture is best-effort
+    }
+
+    // Insert legal agreement
+    const { error: legalError } = await supabase
+      .from("enrollment_agreements")
+      .insert({
+        enrollment_id: enrollment.id,
+        waiver_accepted: legalData.waiverAccepted,
+        photo_release_accepted: legalData.photoReleaseAccepted,
+        privacy_policy_accepted: legalData.privacyPolicyAccepted,
+        terms_accepted: legalData.termsAccepted,
+        signature_text: legalData.signatureText,
+        signer_name: enrollmentData.parentName,
+        signer_email: enrollmentData.parentEmail,
+        signer_ip: signerIp,
+        waiver_version: WAIVER_VERSION,
+        tos_version: TOS_VERSION,
+        privacy_policy_version: PRIVACY_POLICY_VERSION,
+        emergency_contact_name: legalData.emergencyContactName,
+        emergency_contact_phone: legalData.emergencyContactPhone,
+        emergency_contact_relationship: legalData.emergencyContactRelationship,
+      });
 
     setSubmitting(false);
 
-    if (error) {
+    if (legalError) {
       toast({
         title: "Something went wrong",
         description: "Please try again or contact us directly.",
@@ -82,7 +138,6 @@ const SwimEnrollment = () => {
       return;
     }
 
-    setChildName(data.childName);
     setStep("done");
   };
 
@@ -100,7 +155,7 @@ const SwimEnrollment = () => {
       </section>
 
       <div className="container py-6">
-        <div className="flex items-center justify-center gap-2 max-w-md mx-auto mb-8">
+        <div className="flex items-center justify-center gap-2 max-w-xl mx-auto mb-8">
           {STEP_LABELS.map((label, i) => (
             <div key={label} className="flex items-center gap-2 flex-1">
               <div className="flex flex-col items-center flex-1">
@@ -143,8 +198,17 @@ const SwimEnrollment = () => {
           {step === "info" && (
             <EnrollmentForm
               childAge={childAge}
-              onSubmit={handleEnrollmentSubmit}
+              onSubmit={handleInfoSubmit}
               onBack={() => setStep("session")}
+              submitting={false}
+            />
+          )}
+          {step === "legal" && enrollmentData && (
+            <LegalAgreements
+              parentName={enrollmentData.parentName}
+              childName={enrollmentData.childName}
+              onSubmit={handleLegalSubmit}
+              onBack={() => setStep("info")}
               submitting={submitting}
             />
           )}
