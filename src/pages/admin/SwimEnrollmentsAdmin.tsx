@@ -105,6 +105,7 @@ const SwimEnrollmentsAdmin = () => {
                 <TableHead>Session</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead className="w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
