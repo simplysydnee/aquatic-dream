@@ -143,12 +143,17 @@ const SwimEnrollmentsAdmin = () => {
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(e.created_at).toLocaleDateString()}
                     </TableCell>
+                    <TableCell>
+                      <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
               {enrollments.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No enrollments yet
                   </TableCell>
                 </TableRow>
