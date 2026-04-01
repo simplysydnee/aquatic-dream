@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
+import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
+import { Eye } from "lucide-react";
 
 interface Enrollment {
   id: string;
@@ -32,6 +35,8 @@ const SwimEnrollmentsAdmin = () => {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [sessions, setSessions] = useState<Record<string, SessionInfo>>({});
   const [loading, setLoading] = useState(true);
+  const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const fetchData = async () => {
     const [enrollRes, sessionRes] = await Promise.all([
@@ -100,6 +105,7 @@ const SwimEnrollmentsAdmin = () => {
                 <TableHead>Session</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead className="w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -137,12 +143,17 @@ const SwimEnrollmentsAdmin = () => {
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(e.created_at).toLocaleDateString()}
                     </TableCell>
+                    <TableCell>
+                      <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
               {enrollments.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No enrollments yet
                   </TableCell>
                 </TableRow>
@@ -151,6 +162,14 @@ const SwimEnrollmentsAdmin = () => {
           </Table>
         </CardContent>
       </Card>
+      <EnrollmentDetailDialog
+        enrollment={selectedEnrollment}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onUpdated={(updated) => {
+          setEnrollments((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+        }}
+      />
     </div>
   );
 };
