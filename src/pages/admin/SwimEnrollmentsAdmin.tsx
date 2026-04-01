@@ -162,6 +162,14 @@ const SwimEnrollmentsAdmin = () => {
           </Table>
         </CardContent>
       </Card>
+      <EnrollmentDetailDialog
+        enrollment={selectedEnrollment}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onUpdated={(updated) => {
+          setEnrollments((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+        }}
+      />
     </div>
   );
 };
