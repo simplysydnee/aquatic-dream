@@ -35,6 +35,8 @@ const SwimEnrollmentsAdmin = () => {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [sessions, setSessions] = useState<Record<string, SessionInfo>>({});
   const [loading, setLoading] = useState(true);
+  const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const fetchData = async () => {
     const [enrollRes, sessionRes] = await Promise.all([
