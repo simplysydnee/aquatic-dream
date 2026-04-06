@@ -130,14 +130,14 @@ const FeaturePanels = () => (
               <Waves className="w-12 h-12 text-primary mb-6" />
               <h3 className="font-display text-3xl font-bold text-foreground mb-4">Swim Lessons</h3>
               <p className="text-muted-foreground mb-6 leading-relaxed">
-                5 progressive levels from Pearls (age 3) to Octopus Elite. Max 4 students per instructor — 
+                5 color-coded levels from White (age 3) to Green advanced. Max 3 students per instructor — 
                 because every child deserves to be seen in the water.
               </p>
               <ul className="space-y-2 mb-8 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Ages 3 to teen</li>
-                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> 5 ocean-themed levels</li>
-                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Private lessons available</li>
-                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Pathway to PADI</li>
+                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Ages 3–12</li>
+                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> 5 Starfish Aquatics levels</li>
+                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Private & semi-private available</li>
+                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> $30/group lesson</li>
               </ul>
               <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl">
                 <Link to="/swim-lessons">Explore Swim Levels <ChevronRight className="ml-1 w-4 h-4" /></Link>
