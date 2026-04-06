@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
@@ -6,14 +7,19 @@ import SessionPicker from "@/components/swim-enrollment/SessionPicker";
 import EnrollmentForm, { EnrollmentFormData } from "@/components/swim-enrollment/EnrollmentForm";
 import LegalAgreements, { LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import EnrollmentConfirmation from "@/components/swim-enrollment/EnrollmentConfirmation";
+import LessonRequestForm from "@/components/swim-enrollment/LessonRequestForm";
 import { SwimLevel } from "@/components/swim-enrollment/types";
 import { WAIVER_VERSION, TOS_VERSION, PRIVACY_POLICY_VERSION } from "@/components/swim-enrollment/legal-content";
+import { Button } from "@/components/ui/button";
 
 type Step = "assess" | "session" | "info" | "legal" | "done";
 
 const STEP_LABELS = ["Assessment", "Session", "Details", "Agreements", "Confirmed"];
 
 const SwimEnrollment = () => {
+  const [searchParams] = useSearchParams();
+  const isRequest = searchParams.get("type") === "request";
+
   const [step, setStep] = useState<Step>("assess");
   const [level, setLevel] = useState<SwimLevel | null>(null);
   const [childAge, setChildAge] = useState(0);
@@ -21,6 +27,7 @@ const SwimEnrollment = () => {
   const [childName, setChildName] = useState("");
   const [enrollmentData, setEnrollmentData] = useState<EnrollmentFormData | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
   const { toast } = useToast();
 
   const stepIndex = ["assess", "session", "info", "legal", "done"].indexOf(step);
@@ -46,7 +53,6 @@ const SwimEnrollment = () => {
     if (!level || !sessionId || !enrollmentData) return;
     setSubmitting(true);
 
-    // Check capacity
     const { count } = await supabase
       .from("swim_enrollments")
       .select("*", { count: "exact", head: true })
@@ -60,17 +66,12 @@ const SwimEnrollment = () => {
       .single();
 
     if (session && count !== null && count >= session.max_students) {
-      toast({
-        title: "Session is full",
-        description: "This session just filled up. Please go back and choose another.",
-        variant: "destructive",
-      });
+      toast({ title: "Session is full", description: "This session just filled up. Please go back and choose another.", variant: "destructive" });
       setSubmitting(false);
       setStep("session");
       return;
     }
 
-    // Insert enrollment
     const { data: enrollment, error: enrollError } = await supabase
       .from("swim_enrollments")
       .insert({
@@ -82,31 +83,25 @@ const SwimEnrollment = () => {
         child_name: enrollmentData.childName,
         child_age: childAge,
         notes: enrollmentData.notes || null,
+        lesson_type: "group",
+        registration_fee: 45,
       })
       .select("id")
       .single();
 
     if (enrollError || !enrollment) {
-      toast({
-        title: "Something went wrong",
-        description: "Please try again or contact us directly.",
-        variant: "destructive",
-      });
+      toast({ title: "Something went wrong", description: "Please try again or contact us directly.", variant: "destructive" });
       setSubmitting(false);
       return;
     }
 
-    // Capture IP for legal compliance
     let signerIp: string | null = null;
     try {
       const ipRes = await fetch("https://api.ipify.org?format=json");
       const ipData = await ipRes.json();
       signerIp = ipData.ip;
-    } catch {
-      // IP capture is best-effort
-    }
+    } catch { /* best-effort */ }
 
-    // Insert legal agreement
     const { error: legalError } = await supabase
       .from("enrollment_agreements")
       .insert({
@@ -128,93 +123,79 @@ const SwimEnrollment = () => {
       });
 
     setSubmitting(false);
-
     if (legalError) {
-      toast({
-        title: "Something went wrong",
-        description: "Please try again or contact us directly.",
-        variant: "destructive",
-      });
+      toast({ title: "Something went wrong", description: "Please try again or contact us directly.", variant: "destructive" });
       return;
     }
-
     setStep("done");
   };
+
+  // Request mode — simple form
+  if (mode === "request") {
+    return (
+      <main className="min-h-screen bg-background">
+        <section className="bg-gradient-to-br from-primary/10 to-background py-12">
+          <div className="container">
+            <p className="text-primary font-medium tracking-wider uppercase text-sm mb-2">Lesson Request</p>
+            <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+              Request a Private or Semi-Private Lesson
+            </h1>
+          </div>
+        </section>
+        <div className="container py-6 pb-16">
+          <div className="flex gap-2 mb-8">
+            <Button variant={mode === "group" ? "outline" : "default"} size="sm" onClick={() => setMode("group")}>Group Enrollment</Button>
+            <Button variant={mode === "request" ? "default" : "outline"} size="sm" onClick={() => setMode("request")}>Private / Semi-Private</Button>
+          </div>
+          <LessonRequestForm />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background">
       <section className="bg-gradient-to-br from-primary/10 to-background py-12">
         <div className="container">
-          <p className="text-primary font-medium tracking-wider uppercase text-sm mb-2">
-            Swim Enrollment
-          </p>
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">
-            Enroll Your Swimmer
-          </h1>
+          <p className="text-primary font-medium tracking-wider uppercase text-sm mb-2">Swim Enrollment</p>
+          <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">Enroll Your Swimmer</h1>
         </div>
       </section>
 
       <div className="container py-6">
+        <div className="flex gap-2 mb-6">
+          <Button variant={mode === "group" ? "default" : "outline"} size="sm" onClick={() => setMode("group")}>Group Enrollment</Button>
+          <Button variant={mode === "request" ? "default" : "outline"} size="sm" onClick={() => setMode("request")}>Private / Semi-Private</Button>
+        </div>
+
         <div className="flex items-center justify-center gap-2 max-w-xl mx-auto mb-8">
           {STEP_LABELS.map((label, i) => (
             <div key={label} className="flex items-center gap-2 flex-1">
               <div className="flex flex-col items-center flex-1">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                    i <= stepIndex
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${i <= stepIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                   {i + 1}
                 </div>
-                <span className="text-xs text-muted-foreground mt-1 hidden sm:block">
-                  {label}
-                </span>
+                <span className="text-xs text-muted-foreground mt-1 hidden sm:block">{label}</span>
               </div>
               {i < STEP_LABELS.length - 1 && (
-                <div
-                  className={`h-0.5 flex-1 -mt-4 sm:-mt-6 ${
-                    i < stepIndex ? "bg-primary" : "bg-muted"
-                  }`}
-                />
+                <div className={`h-0.5 flex-1 -mt-4 sm:-mt-6 ${i < stepIndex ? "bg-primary" : "bg-muted"}`} />
               )}
             </div>
           ))}
         </div>
 
         <div className="pb-16">
-          {step === "assess" && (
-            <SwimAssessment onComplete={handleAssessmentComplete} />
-          )}
+          {step === "assess" && <SwimAssessment onComplete={handleAssessmentComplete} />}
           {step === "session" && level && (
-            <SessionPicker
-              level={level}
-              childAge={childAge}
-              onSelect={handleSessionSelect}
-              onBack={() => setStep("assess")}
-            />
+            <SessionPicker level={level} childAge={childAge} onSelect={handleSessionSelect} onBack={() => setStep("assess")} />
           )}
           {step === "info" && (
-            <EnrollmentForm
-              childAge={childAge}
-              onSubmit={handleInfoSubmit}
-              onBack={() => setStep("session")}
-              submitting={false}
-            />
+            <EnrollmentForm childAge={childAge} onSubmit={handleInfoSubmit} onBack={() => setStep("session")} submitting={false} />
           )}
           {step === "legal" && enrollmentData && (
-            <LegalAgreements
-              parentName={enrollmentData.parentName}
-              childName={enrollmentData.childName}
-              onSubmit={handleLegalSubmit}
-              onBack={() => setStep("info")}
-              submitting={submitting}
-            />
+            <LegalAgreements parentName={enrollmentData.parentName} childName={enrollmentData.childName} onSubmit={handleLegalSubmit} onBack={() => setStep("info")} submitting={submitting} />
           )}
-          {step === "done" && level && (
-            <EnrollmentConfirmation level={level} childName={childName} />
-          )}
+          {step === "done" && level && <EnrollmentConfirmation level={level} childName={childName} />}
         </div>
       </div>
     </main>

@@ -50,6 +50,7 @@ const App = () => (
             >
               <Route index element={<CalendarAdmin />} />
               <Route path="enrollments" element={<SwimEnrollmentsAdmin />} />
+              <Route path="lesson-requests" element={<LessonRequestsAdmin />} />
               <Route path="dive-bookings" element={<DiveBookingsAdmin />} />
               <Route path="trip-reservations" element={<TripReservationsAdmin />} />
               <Route path="contacts" element={<ContactsAdmin />} />
