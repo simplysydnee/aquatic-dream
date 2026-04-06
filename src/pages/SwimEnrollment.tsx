@@ -144,8 +144,8 @@ const SwimEnrollment = () => {
         </section>
         <div className="container py-6 pb-16">
           <div className="flex gap-2 mb-8">
-            <Button variant={mode === "group" ? "outline" : "default"} size="sm" onClick={() => setMode("group")}>Group Enrollment</Button>
-            <Button variant={mode === "request" ? "default" : "outline"} size="sm" onClick={() => setMode("request")}>Private / Semi-Private</Button>
+            <Button variant="outline" size="sm" onClick={() => setMode("group")}>Group Enrollment</Button>
+            <Button variant="default" size="sm" onClick={() => setMode("request")}>Private / Semi-Private</Button>
           </div>
           <LessonRequestForm />
         </div>
