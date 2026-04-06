@@ -8,11 +8,8 @@ import logoMain from "@/assets/logo-main.png";
 const navLinks = [
   { to: "/", label: "Home" },
   { to: "/swim-lessons", label: "Swim Lessons" },
-  { to: "/scuba", label: "PADI / Scuba" },
-  { to: "/dive-trips", label: "Dive Trips" },
+  { to: "/swim-enrollment", label: "Enroll" },
   { to: "/safety", label: "Safety" },
-  { to: "/equipment", label: "Equipment" },
-  { to: "/dream-divers", label: "Dream Divers" },
   { to: "/community", label: "Community" },
 ];
 
