@@ -42,7 +42,7 @@ const CalendarAdmin = () => {
         <div>
           <h2 className="text-2xl font-display font-bold text-foreground">Pool Calendar</h2>
           <p className="text-sm text-muted-foreground">
-            Manage lessons, dive sessions, and pool rentals
+            Manage lessons and pool schedule
           </p>
         </div>
         <div className="flex items-center gap-2">
