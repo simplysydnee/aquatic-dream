@@ -62,11 +62,8 @@ const Navbar = () => {
           </nav>
 
           <div className="hidden lg:flex items-center gap-3">
-            <Button asChild variant="outline" size="sm">
-              <Link to="/swim-lessons">Swim Lessons</Link>
-            </Button>
             <Button asChild size="sm" className="bg-coral hover:bg-coral/90 text-coral-foreground">
-              <Link to="/scuba">Start PADI</Link>
+              <Link to="/swim-enrollment">Enroll Now</Link>
             </Button>
           </div>
 
