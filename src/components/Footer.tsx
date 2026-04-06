@@ -1,49 +1,33 @@
 import { Link } from "react-router-dom";
-import { Phone, Mail, MapPin, Facebook, Instagram, Youtube } from "lucide-react";
+import { Phone, Mail, MapPin, Instagram } from "lucide-react";
 import logoMain from "@/assets/logo-main.png";
 
 const Footer = () => {
   return (
     <footer className="bg-secondary text-secondary-foreground">
       <div className="container py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
           <div>
             <img src={logoMain} alt="Aquatic Dreams" className="h-14 w-auto mb-4 brightness-0 invert" />
             <p className="text-secondary-foreground/70 text-sm mb-6">
-              Modesto's full aquatic campus — swim lessons, PADI scuba, and dive travel all under one roof.
+              Modesto's swim lesson destination — building confident, safe swimmers from age 3 to 12.
             </p>
             <div className="flex gap-3">
-              <a href="#" className="p-2 rounded-full bg-secondary-foreground/10 hover:bg-primary transition-colors">
-                <Facebook className="w-4 h-4" />
-              </a>
               <a href="https://instagram.com/aquaticdreamswim" target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-secondary-foreground/10 hover:bg-primary transition-colors">
                 <Instagram className="w-4 h-4" />
               </a>
-              <a href="#" className="p-2 rounded-full bg-secondary-foreground/10 hover:bg-primary transition-colors">
-                <Youtube className="w-4 h-4" />
-              </a>
             </div>
+            <p className="text-xs text-secondary-foreground/50 mt-3">@aquaticdreamswim</p>
           </div>
 
           <div>
             <h5 className="font-semibold mb-4 text-sm uppercase tracking-wider text-secondary-foreground/60">Programs</h5>
             <ul className="space-y-2 text-sm text-secondary-foreground/70">
               <li><Link to="/swim-lessons" className="hover:text-primary transition-colors">Swim Lessons</Link></li>
-              <li><Link to="/scuba" className="hover:text-primary transition-colors">PADI Courses</Link></li>
-              <li><Link to="/dive-trips" className="hover:text-primary transition-colors">Dive Trips</Link></li>
-              <li><Link to="/safety" className="hover:text-primary transition-colors">Safety & Certs</Link></li>
-              <li><Link to="/dream-divers" className="hover:text-primary transition-colors">Dream Divers Club</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h5 className="font-semibold mb-4 text-sm uppercase tracking-wider text-secondary-foreground/60">Resources</h5>
-            <ul className="space-y-2 text-sm text-secondary-foreground/70">
-              <li><Link to="/equipment" className="hover:text-primary transition-colors">Equipment & Gear</Link></li>
+              <li><Link to="/swim-enrollment" className="hover:text-primary transition-colors">Enroll Now</Link></li>
+              <li><Link to="/safety" className="hover:text-primary transition-colors">Safety</Link></li>
               <li><Link to="/community" className="hover:text-primary transition-colors">Community</Link></li>
               <li><a href="https://icanswim209.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">I Can Swim 209</a></li>
-              <li><a href="https://www.padi.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">PADI Website</a></li>
-              <li><a href="https://www.diversalertnetwork.org" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">DAN</a></li>
             </ul>
           </div>
 
@@ -68,7 +52,7 @@ const Footer = () => {
 
         <div className="mt-12 pt-8 border-t border-secondary-foreground/10 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-xs text-secondary-foreground/50">
-            © {new Date().getFullYear()} Aquatic Dreams Scuba Center. All rights reserved.
+            © {new Date().getFullYear()} Aquatic Dreams. All rights reserved.
           </p>
           <p className="text-xs text-secondary-foreground/50 font-display italic">
             Swim. Dive. Dream.

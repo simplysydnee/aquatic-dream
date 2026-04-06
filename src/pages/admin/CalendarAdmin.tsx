@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
 import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
+import ICanSwimCalendar from "@/components/admin/ICanSwimCalendar";
 import { useCalendarData } from "@/hooks/useCalendarData";
 import type { CalendarPoolEvent } from "@/hooks/useCalendarData";
 
@@ -41,7 +42,7 @@ const CalendarAdmin = () => {
         <div>
           <h2 className="text-2xl font-display font-bold text-foreground">Pool Calendar</h2>
           <p className="text-sm text-muted-foreground">
-            Manage lessons, dive sessions, and pool rentals
+            Manage lessons and pool schedule
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -147,6 +148,9 @@ const CalendarAdmin = () => {
           }}
         />
       )}
+
+      {/* I Can Swim 209 Schedule */}
+      <ICanSwimCalendar />
 
       <AddPoolEventDialog
         open={showAddEvent}
