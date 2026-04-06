@@ -59,7 +59,7 @@ const HeroSection = () => (
           Dream.
         </h1>
         <p className="text-lg md:text-xl text-secondary-foreground/70 mb-10 max-w-xl leading-relaxed">
-          From your child's first splash to PADI certification and beyond — 
+          From your child's first splash to open water adventures — 
           the only place in Modesto where the whole family's aquatic journey begins.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
