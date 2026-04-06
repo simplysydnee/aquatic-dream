@@ -17,6 +17,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
 import ProtectedRoute from "./components/admin/ProtectedRoute";
 import SwimEnrollmentsAdmin from "./pages/admin/SwimEnrollmentsAdmin";
+import LessonRequestsAdmin from "./pages/admin/LessonRequestsAdmin";
 import DiveBookingsAdmin from "./pages/admin/DiveBookingsAdmin";
 import TripReservationsAdmin from "./pages/admin/TripReservationsAdmin";
 import ContactsAdmin from "./pages/admin/ContactsAdmin";
