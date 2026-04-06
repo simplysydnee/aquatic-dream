@@ -77,7 +77,7 @@ const HeroSection = () => (
 
 const StatsSection = () => {
   const stats = [
-    { icon: Users, value: "2–4", label: "Students per instructor", sub: "Industry-leading ratio" },
+    { icon: Users, value: "3 max", label: "Students per instructor", sub: "Industry-leading ratio" },
     { icon: Award, value: "PADI 5★", label: "IDC Center", sub: "Highest certification level" },
     { icon: Anchor, value: "OW → IDC", label: "Full certification path", sub: "Open Water to Instructor" },
     { icon: MapPin, value: "Modesto", label: "Local since day one", sub: "1212 Kansas Ave" },

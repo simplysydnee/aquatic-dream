@@ -10,7 +10,7 @@ const Footer = () => {
           <div>
             <img src={logoMain} alt="Aquatic Dreams" className="h-14 w-auto mb-4 brightness-0 invert" />
             <p className="text-secondary-foreground/70 text-sm mb-6">
-              Modesto's only full aquatic campus — from your child's first splash to PADI certification and beyond.
+              Modesto's full aquatic campus — swim lessons, PADI scuba, and dive travel all under one roof.
             </p>
             <div className="flex gap-3">
               <a href="#" className="p-2 rounded-full bg-secondary-foreground/10 hover:bg-primary transition-colors">
