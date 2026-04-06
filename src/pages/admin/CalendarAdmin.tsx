@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
 import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
+import ICanSwimCalendar from "@/components/admin/ICanSwimCalendar";
 import { useCalendarData } from "@/hooks/useCalendarData";
 import type { CalendarPoolEvent } from "@/hooks/useCalendarData";
 
