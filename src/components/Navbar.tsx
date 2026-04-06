@@ -102,11 +102,8 @@ const Navbar = () => {
                   </Link>
                 ))}
                 <div className="flex gap-3 mt-4 px-4">
-                  <Button asChild variant="outline" size="sm" className="flex-1">
-                    <Link to="/swim-lessons" onClick={() => setIsOpen(false)}>Swim Lessons</Link>
-                  </Button>
                   <Button asChild size="sm" className="flex-1 bg-coral hover:bg-coral/90 text-coral-foreground">
-                    <Link to="/scuba" onClick={() => setIsOpen(false)}>Start PADI</Link>
+                    <Link to="/swim-enrollment" onClick={() => setIsOpen(false)}>Enroll Now</Link>
                   </Button>
                 </div>
                 <div className="mt-4 px-4 pt-4 border-t text-xs text-muted-foreground space-y-2 md:hidden">
