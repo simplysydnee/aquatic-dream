@@ -149,6 +149,9 @@ const CalendarAdmin = () => {
         />
       )}
 
+      {/* I Can Swim 209 Schedule */}
+      <ICanSwimCalendar />
+
       <AddPoolEventDialog
         open={showAddEvent}
         onOpenChange={(open) => {
