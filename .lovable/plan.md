@@ -1,87 +1,118 @@
-# Swim Program Overhaul — Final Plan
 
-## Summary
 
-Replace the ocean-themed 5-level system with the **Starfish Aquatics color-level system**, update scheduling to summer M/W format, change class size to 3, and add pricing.
+# Aquatic Dreams Swim Program Overhaul
 
----
+## What's Changing
 
-## New Level Structure
-
-| Level | Placement Criteria | Age Groups |
-|-------|-------------------|------------|
-| **White** | Cannot submerge relaxed 5 sec | Preschool (3–5) + School-age (5–8) |
-| **Red** | Can submerge 5 sec, can't float independently | Preschool (3–5) + School-age (5–8) |
-| **Yellow** | Can float front/back, can't tread water 10 sec | 7+ |
-| **Blue** | Can tread water 10 sec, can't side-roll-side kick 10M | 7+ |
-| **Green** | Can do side-roll-side kick, hasn't completed all skills | 7+ |
-| **Stroke School** | Completed Green / Learn to Swim | 7+ (must complete Green first) |
-
-- White and Red are **separate levels** with their own assessment placement
-- Yellow/Blue/Green share class time but kids are placed at their specific level
-- Stroke School requires Green completion — shown in enrollment but noted as requiring completion
-- **3 students max** per group
+Based on the owner's updated notes, the swim program structure, pricing, enrollment flow, and site messaging all need significant updates.
 
 ---
 
-## Schedule & Pricing
+## 1. Updated Level & Group Structure
 
-- **Days**: Monday / Wednesday only
-- **Session 1**: June 8 – July 1 | **Session 2**: July 13 – August 2
-- **8 lessons** per session at **$35/lesson = $280 total**
-- **Time slots**: 2:45, 3:15, 3:45, 4:15, 4:45, 5:30, 6:00, 6:30
+**Preschool (Ages 3-5)** — separate from school-age
+- **White (Comfort)** — water comfort & safety intro
+- **Red (Swim School)** — submersion, beginning floating
+
+**School-Age (Ages 6-12)**
+- **Group 1: White/Red (Beginner)** — mixed together in one group
+- **Group 2: Yellow (Intermediate)** — independent floating, treading water
+- **Group 3: Green/Blue (Advanced)** — stroke development, endurance
+
+**Removed:** Stroke School level entirely (no more purple level cards, no PADI bridge references)
+
+---
+
+## 2. Pricing Structure
+
+| Type | Price |
+|------|-------|
+| Group lesson | $30/lesson |
+| Semi-private | $45/lesson |
+| Private | $65/lesson |
+| Registration fee | $45 (one-time) |
+
+- Registration fee includes swim bag, swim cap, goggles
+- Group lessons book through normal enrollment flow
+- Private/semi-private = request form that sends email alert + admin dashboard notification
+
+---
+
+## 3. Scheduling Updates
+
+- Preschool and school-age time slots staggered by 15 minutes (to reduce parking congestion)
+- June and July sessions, 2 days/week, plus some single-lesson options
+- Exact slot times TBD — will use the existing 8-slot structure but offset preschool vs school-age
+
+---
+
+## 4. Messaging & Branding Changes
+
+- Remove all "pathway from water comfort to PADI certification" language
+- Remove the "From Pool to Ocean" / PADI bridge section from Swim Lessons page
+- Remove Stroke School references everywhere
+- Add Instagram handle: @aquaticdreamswim
+- Add future CTA linking to aquaticdreams.swim.com (placeholder until domain is ready)
+- Keep scuba pages and links as-is, but decouple from swim curriculum
 
 ---
 
 ## Implementation Steps
 
-### 1. Database Migration
-- Add columns to `swim_sessions`: `session_name`, `session_start_date`, `session_end_date`, `age_group`, `price_per_lesson` (default 35), `total_lessons` (default 8), `session_price` (default 280)
-- Change `max_students` default from 4 → 3
-- Delete old seed data, insert new sessions: 8 time slots × 5 groups (White/Red preschool, White/Red school-age, Yellow/Blue/Green 7+) × 2 session periods = 80 session rows
-- Update `swim_level` to use new color values
+### Step 1: Database Migration
+- Remove `stroke-school` as a valid swim level across seed data
+- Update `swim_sessions` — remove Stroke School sessions, update age groups to reflect new structure (preschool 3-5, school-age 6-12 replacing the old 5-8 and 7+ groups)
+- School-age White/Red share sessions (single group), Yellow gets own group, Green/Blue share a group
+- Add `lesson_type` column to enrollment or create pricing config (group/semi-private/private)
 
-### 2. New Color-Coded Badge Assets
-- Create simple, clean SVG badges for each color level (White, Red, Yellow, Blue, Green, Stroke School) using the brand color palette
-- Replace the ocean-themed badge imports throughout
+### Step 2: Update Types & Assessment
+- Remove `stroke-school` from `SwimLevel` type
+- Update `AgeGroup` to `"preschool-3-5" | "school-age-6-12"`
+- Remove the `completedGreen` assessment question
+- Update `getAgeGroup()` — ages 3-5 = preschool, ages 6-12 = school-age
+- Assessment decision tree stops at Green/Blue (no Stroke School path)
+- Update `LEVEL_DISPLAY` and `LEVEL_BADGE_COLORS` — remove stroke-school entries
 
-### 3. Update Types & Assessment (`types.ts`, `SwimAssessment.tsx`)
-- New `SwimLevel`: `"white" | "red" | "yellow" | "blue" | "green" | "stroke-school"`
-- Replace 5-question scoring quiz with Starfish **decision tree**:
-  1. Age → determines group eligibility
-  2. "Can your child submerge relaxed for 5 seconds?" → No = **White**
-  3. "Can your child float (front & back) without support?" → No = **Red**
-  4. "Can your child tread water for 10 seconds?" → No = **Yellow**
-  5. "Can your child side-roll-side kick drill 10M/30ft?" → No = **Blue**
-  6. "Has your child completed all Green-level skills?" → No = **Green**, Yes = **Stroke School**
+### Step 3: Update Swim Lessons Page
+- Remove Stroke School card (keep 5 levels: White, Red, Yellow, Blue, Green)
+- Update age labels: White/Red = "Ages 3-12", Yellow = "Ages 6-12", Blue/Green = "Ages 6-12"
+- Remove "PADI intro pathway" from Green card skills
+- Delete the entire "From Pool to Ocean" PADI bridge section
+- Update hero text — remove "pathway from water comfort to PADI certification"
+- Update pricing stats: show $30 group / $45 semi-private / $65 private + $45 reg fee
+- Update "6 Progressive Levels" heading to "5 Progressive Levels"
+- Add note about registration fee including swim bag, cap, goggles
 
-### 4. Update Session Picker (`SessionPicker.tsx`)
-- Group sessions by Session 1 / Session 2
-- Filter by age group (preschool / school-age / 7+ based on age and level)
-- Show pricing: "$35/lesson · $280 for 8-lesson session"
-- Show "3 spots" capacity
-- Show days as "Mon & Wed" instead of individual days
+### Step 4: Update Session Picker
+- Update shared-level logic: Green/Blue share sessions (instead of Yellow/Blue/Green/Stroke School)
+- School-age White/Red also share sessions (new — currently separate)
+- Update age group filtering for new 3-5 / 6-12 split
+- Update pricing display from $35 → $30 for group lessons
+- Show registration fee ($45) as additional line item
 
-### 5. Update Swim Lessons Page (`SwimLessons.tsx`)
-- Replace 5 ocean-themed cards with 6 color-level cards
-- Update schedule grid to M/W only with 8 time slots
-- Change "Max 4" → "Max 3" everywhere
-- Add pricing section ($35/lesson, $280/session)
-- Update PADI bridge to reference Stroke School → PADI pathway
+### Step 5: Update Enrollment Flow
+- Remove Stroke School from all dropdowns and displays
+- Update age validation (3-12 range)
+- Show pricing breakdown: lesson cost + $45 registration fee
+- Group lessons → normal enrollment
+- Add "Request Private/Semi-Private Lesson" option that triggers email to admin + creates admin dashboard alert
 
-### 6. Update Enrollment Form & Confirmation
-- Reflect new level names and colors
-- Show session period (Session 1 or 2) and pricing in confirmation
-- Note for Stroke School: "Requires completion of Green level"
+### Step 6: Add Private/Semi-Private Request Form
+- New request form (simpler than full enrollment) — parent name, email, phone, child name, age, preferred type (private or semi-private), preferred times, notes
+- On submit: insert into a new `lesson_requests` table + send email notification to admin
+- Admin dashboard: new section or tab showing incoming private/semi-private requests
+
+### Step 7: Site-Wide Cleanup
+- Remove all PADI-swim bridge language across pages (Index, SwimLessons, etc.)
+- Add @aquaticdreamswim Instagram link in footer or relevant sections
+- Prepare placeholder CTA for aquaticdreams.swim.com domain
 
 ---
 
 ## Technical Detail
 
-The assessment becomes a simple sequential elimination rather than a scored quiz. Each question maps to a Starfish criterion — the first "No" answer determines placement. This is more accurate to how swim instructors actually evaluate students and matches the official Starfish matrix exactly.
+- The `SessionPicker` currently maps Yellow/Blue/Green/Stroke School → query `yellow` sessions. New logic: school-age White/Red → query `white` sessions (shared group), Green/Blue → query `green` sessions (shared group), Yellow stays standalone
+- Assessment tree shortens from 5 questions to 4 (remove `completedGreen`)
+- New `lesson_requests` table needs RLS: public INSERT, authenticated SELECT/UPDATE
+- Private/semi-private email notification uses existing transactional email infrastructure
 
-The age question routes to the correct class grouping:
-- Ages 3–5 → White/Red preschool groups
-- Ages 5–8 → White/Red school-age groups  
-- Ages 7+ → Yellow/Blue/Green group (or Stroke School if qualified)
-- Ages 5–7 overlap: could qualify for either White/Red school-age or Yellow+ depending on skill
