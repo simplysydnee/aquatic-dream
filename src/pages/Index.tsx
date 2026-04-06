@@ -59,7 +59,7 @@ const HeroSection = () => (
           Dream.
         </h1>
         <p className="text-lg md:text-xl text-secondary-foreground/70 mb-10 max-w-xl leading-relaxed">
-          From your child's first splash to PADI certification and beyond — 
+          From your child's first splash to open water adventures — 
           the only place in Modesto where the whole family's aquatic journey begins.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
@@ -77,7 +77,7 @@ const HeroSection = () => (
 
 const StatsSection = () => {
   const stats = [
-    { icon: Users, value: "2–4", label: "Students per instructor", sub: "Industry-leading ratio" },
+    { icon: Users, value: "3 max", label: "Students per instructor", sub: "Industry-leading ratio" },
     { icon: Award, value: "PADI 5★", label: "IDC Center", sub: "Highest certification level" },
     { icon: Anchor, value: "OW → IDC", label: "Full certification path", sub: "Open Water to Instructor" },
     { icon: MapPin, value: "Modesto", label: "Local since day one", sub: "1212 Kansas Ave" },
@@ -130,14 +130,14 @@ const FeaturePanels = () => (
               <Waves className="w-12 h-12 text-primary mb-6" />
               <h3 className="font-display text-3xl font-bold text-foreground mb-4">Swim Lessons</h3>
               <p className="text-muted-foreground mb-6 leading-relaxed">
-                5 progressive levels from Pearls (age 3) to Octopus Elite. Max 4 students per instructor — 
+                5 color-coded levels from White (age 3) to Green advanced. Max 3 students per instructor — 
                 because every child deserves to be seen in the water.
               </p>
               <ul className="space-y-2 mb-8 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Ages 3 to teen</li>
-                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> 5 ocean-themed levels</li>
-                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Private lessons available</li>
-                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Pathway to PADI</li>
+                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Ages 3–12</li>
+                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> 5 Starfish Aquatics levels</li>
+                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Private & semi-private available</li>
+                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> $30/group lesson</li>
               </ul>
               <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl">
                 <Link to="/swim-lessons">Explore Swim Levels <ChevronRight className="ml-1 w-4 h-4" /></Link>

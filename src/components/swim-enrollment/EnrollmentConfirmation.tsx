@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel } from "./types";
+import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING } from "./types";
 
 interface Props {
   level: SwimLevel;
@@ -32,8 +32,11 @@ const EnrollmentConfirmation = ({ level, childName }: Props) => {
               {levelInfo.name}
             </span>
           </p>
+          <p className="text-sm text-muted-foreground mb-1">
+            ${PRICING.group}/lesson (group) · Mon & Wed
+          </p>
           <p className="text-sm text-muted-foreground mb-2">
-            $280 for 8 lessons (Mon & Wed) · $35/lesson
+            + ${PRICING.registrationFee} registration fee (swim bag, cap & goggles)
           </p>
           <p className="text-muted-foreground mb-4 text-sm">
             We'll send a confirmation email with all the details.

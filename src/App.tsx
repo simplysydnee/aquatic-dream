@@ -17,6 +17,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
 import ProtectedRoute from "./components/admin/ProtectedRoute";
 import SwimEnrollmentsAdmin from "./pages/admin/SwimEnrollmentsAdmin";
+import LessonRequestsAdmin from "./pages/admin/LessonRequestsAdmin";
 import DiveBookingsAdmin from "./pages/admin/DiveBookingsAdmin";
 import TripReservationsAdmin from "./pages/admin/TripReservationsAdmin";
 import ContactsAdmin from "./pages/admin/ContactsAdmin";
@@ -49,6 +50,7 @@ const App = () => (
             >
               <Route index element={<CalendarAdmin />} />
               <Route path="enrollments" element={<SwimEnrollmentsAdmin />} />
+              <Route path="lesson-requests" element={<LessonRequestsAdmin />} />
               <Route path="dive-bookings" element={<DiveBookingsAdmin />} />
               <Route path="trip-reservations" element={<TripReservationsAdmin />} />
               <Route path="contacts" element={<ContactsAdmin />} />

@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar, ShoppingBag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, AGE_GROUP_LABELS } from "./types";
+import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, AGE_GROUP_LABELS, PRICING } from "./types";
 
 interface SessionWithSpots {
   id: string;
@@ -46,11 +46,22 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const ageGroup = getAgeGroup(childAge, level);
+  const ageGroup = getAgeGroup(childAge);
   const levelInfo = LEVEL_DISPLAY[level];
 
-  // Yellow/Blue/Green/Stroke School all share the same session slots
-  const sessionLevel = (level === "blue" || level === "green" || level === "stroke-school") ? "yellow" : level;
+  // Shared session logic:
+  // School-age White/Red share sessions → query "white"
+  // Green/Blue share sessions → query "green"
+  // Yellow standalone
+  // Preschool White and Red are separate
+  const getSessionLevel = (): string => {
+    if (ageGroup === "preschool-3-5") return level; // preschool keeps separate White/Red
+    if (level === "white" || level === "red") return "white"; // school-age beginner mixed
+    if (level === "blue") return "green"; // school-age advanced mixed
+    return level; // yellow and green as-is
+  };
+
+  const sessionLevel = getSessionLevel();
 
   useEffect(() => {
     async function fetchSessions() {
@@ -68,11 +79,13 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
       }
 
       const sessionIds = sessionData.map((s) => s.id);
-      const { data: enrollments } = await supabase
-        .from("swim_enrollments")
-        .select("session_id")
-        .in("session_id", sessionIds)
-        .in("status", ["pending", "confirmed"]);
+      const { data: enrollments } = sessionIds.length > 0
+        ? await supabase
+            .from("swim_enrollments")
+            .select("session_id")
+            .in("session_id", sessionIds)
+            .in("status", ["pending", "confirmed"])
+        : { data: [] };
 
       const countMap: Record<string, number> = {};
       enrollments?.forEach((e) => {
@@ -94,7 +107,6 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         age_group: s.age_group || "",
       }));
 
-      // Sort by session name then time
       withSpots.sort((a, b) => {
         if (a.session_name !== b.session_name) return a.session_name.localeCompare(b.session_name);
         return a.start_time.localeCompare(b.start_time);
@@ -104,9 +116,8 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
       setLoading(false);
     }
     fetchSessions();
-  }, [level, ageGroup]);
+  }, [level, ageGroup, sessionLevel]);
 
-  // Group sessions by session period
   const grouped = sessions.reduce<Record<string, SessionWithSpots[]>>((acc, s) => {
     const key = `${s.session_name}|${s.session_start_date}|${s.session_end_date}`;
     if (!acc[key]) acc[key] = [];
@@ -126,14 +137,20 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
       <p className="text-muted-foreground text-sm mb-2">
         Choose a <strong>{levelInfo.name}</strong> class · {AGE_GROUP_LABELS[ageGroup]}
       </p>
-      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6">
+      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
         <span className="flex items-center gap-1">
           <DollarSign className="w-3.5 h-3.5" />
-          $35/lesson · $280 per session (8 lessons)
+          ${PRICING.group}/lesson (group)
         </span>
         <span className="flex items-center gap-1">
           <Calendar className="w-3.5 h-3.5" />
           Mon & Wed
+        </span>
+      </div>
+      <div className="flex items-center gap-2 text-sm bg-accent/50 border border-accent rounded-lg p-3 mb-6">
+        <ShoppingBag className="w-4 h-4 text-primary shrink-0" />
+        <span className="text-foreground">
+          <strong>${PRICING.registrationFee} registration fee</strong> — includes swim bag, swim cap & goggles
         </span>
       </div>
 

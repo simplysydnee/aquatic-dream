@@ -47,13 +47,6 @@ const DECISION_STEPS: DecisionStep[] = [
     yesLabel: "Yes, they can",
     noLabel: "Not yet",
   },
-  {
-    key: "completedGreen",
-    title: "Has your child completed all Green-level / Learn to Swim skills?",
-    subtitle: "Previous swim program completion or equivalent skill mastery",
-    yesLabel: "Yes, completed",
-    noLabel: "Not yet",
-  },
 ];
 
 function determineLevel(answers: Record<string, boolean>): SwimLevel {
@@ -61,8 +54,7 @@ function determineLevel(answers: Record<string, boolean>): SwimLevel {
   if (!answers.canFloat) return "red";
   if (!answers.canTreadWater) return "yellow";
   if (!answers.canSideRollSide) return "blue";
-  if (!answers.completedGreen) return "green";
-  return "stroke-school";
+  return "green";
 }
 
 const SwimAssessment = ({ onComplete }: Props) => {
@@ -72,11 +64,11 @@ const SwimAssessment = ({ onComplete }: Props) => {
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
   const [recommendedLevel, setRecommendedLevel] = useState<SwimLevel | null>(null);
 
-  // For young kids (under 7), skip advanced questions
-  const maxQuestionIndex = age && age < 7 ? 1 : DECISION_STEPS.length - 1;
+  // Preschool (3-5) only gets White or Red questions
+  const maxQuestionIndex = age && age <= 5 ? 1 : DECISION_STEPS.length - 1;
 
   const handleAgeNext = () => {
-    if (!age || age < 2 || age > 18) return;
+    if (!age || age < 3 || age > 12) return;
     setPhase("questions");
     setQuestionIndex(0);
     setAnswers({});
@@ -88,12 +80,10 @@ const SwimAssessment = ({ onComplete }: Props) => {
     setAnswers(newAnswers);
 
     if (!answer) {
-      // First "No" determines level
       const level = determineLevel(newAnswers);
       setRecommendedLevel(level);
       setPhase("result");
     } else if (questionIndex >= maxQuestionIndex) {
-      // All yes — determine from what we have
       const level = determineLevel(newAnswers);
       setRecommendedLevel(level);
       setPhase("result");
@@ -102,7 +92,7 @@ const SwimAssessment = ({ onComplete }: Props) => {
     }
   };
 
-  const totalSteps = maxQuestionIndex + 2; // age + questions + result
+  const totalSteps = maxQuestionIndex + 2;
   const currentStep = phase === "age" ? 0 : phase === "questions" ? questionIndex + 1 : totalSteps;
 
   if (phase === "result" && recommendedLevel) {
@@ -124,7 +114,7 @@ const SwimAssessment = ({ onComplete }: Props) => {
             </p>
             <div className={`w-24 h-24 rounded-full ${badge.bg} ring-4 ${badge.ring} shadow-lg mx-auto mb-4 flex items-center justify-center`}>
               <span className={`font-display text-2xl font-bold ${badge.text}`}>
-                {levelInfo.name === "Stroke School" ? "SS" : levelInfo.name.charAt(0)}
+                {levelInfo.name.charAt(0)}
               </span>
             </div>
             <h3 className="font-display text-3xl font-bold text-foreground mb-1">
@@ -162,7 +152,6 @@ const SwimAssessment = ({ onComplete }: Props) => {
 
   return (
     <div className="max-w-lg mx-auto">
-      {/* Progress */}
       <div className="flex gap-1.5 mb-8">
         {Array.from({ length: totalSteps }).map((_, i) => (
           <div
@@ -192,18 +181,18 @@ const SwimAssessment = ({ onComplete }: Props) => {
             <div className="max-w-[200px]">
               <Input
                 type="number"
-                min={2}
-                max={18}
+                min={3}
+                max={12}
                 placeholder="Age"
                 value={age ?? ""}
                 onChange={(e) => setAge(parseInt(e.target.value) || undefined)}
                 className="text-lg h-12"
               />
-              <p className="text-xs text-muted-foreground mt-2">Ages 2–18</p>
+              <p className="text-xs text-muted-foreground mt-2">Ages 3–12</p>
             </div>
             <div className="flex justify-end mt-8">
               <Button
-                disabled={!age || age < 2 || age > 18}
+                disabled={!age || age < 3 || age > 12}
                 onClick={handleAgeNext}
                 className="bg-primary text-primary-foreground"
               >
@@ -254,7 +243,6 @@ const SwimAssessment = ({ onComplete }: Props) => {
                   if (questionIndex === 0) {
                     setPhase("age");
                   } else {
-                    // Remove last answer and go back
                     const prevKey = DECISION_STEPS[questionIndex - 1].key;
                     const newAnswers = { ...answers };
                     delete newAnswers[prevKey];

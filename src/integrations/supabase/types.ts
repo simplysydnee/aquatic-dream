@@ -217,6 +217,51 @@ export type Database = {
           },
         ]
       }
+      lesson_requests: {
+        Row: {
+          child_age: number
+          child_name: string
+          created_at: string
+          id: string
+          lesson_type: string
+          notes: string | null
+          parent_email: string
+          parent_name: string
+          parent_phone: string | null
+          preferred_times: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          child_age: number
+          child_name: string
+          created_at?: string
+          id?: string
+          lesson_type?: string
+          notes?: string | null
+          parent_email: string
+          parent_name: string
+          parent_phone?: string | null
+          preferred_times?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          child_age?: number
+          child_name?: string
+          created_at?: string
+          id?: string
+          lesson_type?: string
+          notes?: string | null
+          parent_email?: string
+          parent_name?: string
+          parent_phone?: string | null
+          preferred_times?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pool_events: {
         Row: {
           created_at: string
@@ -295,10 +340,12 @@ export type Database = {
           child_name: string
           created_at: string
           id: string
+          lesson_type: string
           notes: string | null
           parent_email: string
           parent_name: string
           parent_phone: string | null
+          registration_fee: number | null
           session_id: string | null
           status: string
           swim_level: string
@@ -309,10 +356,12 @@ export type Database = {
           child_name: string
           created_at?: string
           id?: string
+          lesson_type?: string
           notes?: string | null
           parent_email: string
           parent_name: string
           parent_phone?: string | null
+          registration_fee?: number | null
           session_id?: string | null
           status?: string
           swim_level: string
@@ -323,10 +372,12 @@ export type Database = {
           child_name?: string
           created_at?: string
           id?: string
+          lesson_type?: string
           notes?: string | null
           parent_email?: string
           parent_name?: string
           parent_phone?: string | null
+          registration_fee?: number | null
           session_id?: string | null
           status?: string
           swim_level?: string

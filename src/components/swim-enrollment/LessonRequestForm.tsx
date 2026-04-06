@@ -1,0 +1,171 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { CheckCircle, ArrowRight, DollarSign } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+import { PRICING } from "./types";
+
+const requestSchema = z.object({
+  parentName: z.string().trim().min(1, "Required").max(100),
+  parentEmail: z.string().trim().email("Invalid email").max(255),
+  parentPhone: z.string().trim().max(20).optional(),
+  childName: z.string().trim().min(1, "Required").max(100),
+  childAge: z.number().min(3).max(12),
+  lessonType: z.enum(["private", "semi-private"]),
+  preferredTimes: z.string().trim().max(500).optional(),
+  notes: z.string().trim().max(500).optional(),
+});
+
+const LessonRequestForm = () => {
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const { toast } = useToast();
+  const [form, setForm] = useState({
+    parentName: "",
+    parentEmail: "",
+    parentPhone: "",
+    childName: "",
+    childAge: "",
+    lessonType: "private" as "private" | "semi-private",
+    preferredTimes: "",
+    notes: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const update = (key: string, value: string) => {
+    setForm({ ...form, [key]: value });
+    if (errors[key]) setErrors({ ...errors, [key]: "" });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = requestSchema.safeParse({
+      ...form,
+      childAge: parseInt(form.childAge) || 0,
+    });
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string> = {};
+      parsed.error.issues.forEach((issue) => {
+        fieldErrors[issue.path[0] as string] = issue.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await supabase.from("lesson_requests").insert({
+      parent_name: parsed.data.parentName,
+      parent_email: parsed.data.parentEmail,
+      parent_phone: parsed.data.parentPhone || null,
+      child_name: parsed.data.childName,
+      child_age: parsed.data.childAge,
+      lesson_type: parsed.data.lessonType,
+      preferred_times: parsed.data.preferredTimes || null,
+      notes: parsed.data.notes || null,
+    });
+    setSubmitting(false);
+    if (error) {
+      toast({ title: "Something went wrong", description: "Please try again or contact us directly.", variant: "destructive" });
+      return;
+    }
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center max-w-md mx-auto">
+        <Card className="border-primary/20 bg-gradient-to-br from-accent to-card">
+          <CardContent className="pt-8 pb-6 px-6">
+            <CheckCircle className="w-12 h-12 text-primary mx-auto mb-4" />
+            <h3 className="font-display text-2xl font-bold text-foreground mb-2">Request Submitted!</h3>
+            <p className="text-muted-foreground mb-4">We'll reach out soon to schedule your {form.lessonType} lesson.</p>
+            <Button asChild className="bg-primary text-primary-foreground">
+              <a href="/swim-lessons">Back to Swim Lessons <ArrowRight className="ml-1 w-4 h-4" /></a>
+            </Button>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="max-w-lg mx-auto">
+      <h3 className="font-display text-2xl font-bold text-foreground mb-1">Request a Private or Semi-Private Lesson</h3>
+      <p className="text-muted-foreground text-sm mb-6">Fill out the form and we'll get back to you to schedule.</p>
+
+      <div className="flex items-center gap-4 text-sm bg-accent/50 border border-accent rounded-lg p-3 mb-6">
+        <DollarSign className="w-4 h-4 text-primary shrink-0" />
+        <span>Private: ${PRICING.private}/lesson · Semi-Private: ${PRICING.semiPrivate}/lesson</span>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label className="text-sm font-medium">Lesson Type</Label>
+          <RadioGroup value={form.lessonType} onValueChange={(v) => update("lessonType", v)} className="flex gap-4 mt-2">
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="private" id="private" />
+              <Label htmlFor="private" className="cursor-pointer">Private ($65)</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="semi-private" id="semi-private" />
+              <Label htmlFor="semi-private" className="cursor-pointer">Semi-Private ($45)</Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="parentName">Parent / Guardian Name *</Label>
+            <Input id="parentName" value={form.parentName} onChange={(e) => update("parentName", e.target.value)} className="mt-1" />
+            {errors.parentName && <p className="text-xs text-destructive mt-1">{errors.parentName}</p>}
+          </div>
+          <div>
+            <Label htmlFor="childName">Child's Name *</Label>
+            <Input id="childName" value={form.childName} onChange={(e) => update("childName", e.target.value)} className="mt-1" />
+            {errors.childName && <p className="text-xs text-destructive mt-1">{errors.childName}</p>}
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="childAge">Child's Age *</Label>
+          <Input id="childAge" type="number" min={3} max={12} value={form.childAge} onChange={(e) => update("childAge", e.target.value)} className="mt-1 max-w-[100px]" />
+          {errors.childAge && <p className="text-xs text-destructive mt-1">{errors.childAge}</p>}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="parentEmail">Email *</Label>
+            <Input id="parentEmail" type="email" value={form.parentEmail} onChange={(e) => update("parentEmail", e.target.value)} className="mt-1" />
+            {errors.parentEmail && <p className="text-xs text-destructive mt-1">{errors.parentEmail}</p>}
+          </div>
+          <div>
+            <Label htmlFor="parentPhone">Phone (optional)</Label>
+            <Input id="parentPhone" type="tel" value={form.parentPhone} onChange={(e) => update("parentPhone", e.target.value)} className="mt-1" />
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="preferredTimes">Preferred Days & Times (optional)</Label>
+          <Input id="preferredTimes" placeholder="e.g. Mon/Wed afternoons" value={form.preferredTimes} onChange={(e) => update("preferredTimes", e.target.value)} className="mt-1" />
+        </div>
+
+        <div>
+          <Label htmlFor="notes">Any notes? (optional)</Label>
+          <Textarea id="notes" value={form.notes} onChange={(e) => update("notes", e.target.value)} className="mt-1" rows={3} maxLength={500} />
+        </div>
+
+        <Button type="submit" disabled={submitting} className="w-full bg-coral hover:bg-coral/90 text-coral-foreground">
+          {submitting ? "Submitting..." : "Submit Request"}
+        </Button>
+      </form>
+    </motion.div>
+  );
+};
+
+export default LessonRequestForm;
