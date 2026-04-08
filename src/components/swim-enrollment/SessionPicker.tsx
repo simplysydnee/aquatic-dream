@@ -135,7 +135,7 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         Pick a Session
       </h3>
       <p className="text-muted-foreground text-sm mb-2">
-        Choose a <strong>{levelInfo.name}</strong> class · {AGE_GROUP_LABELS[ageGroup]}
+        Choose a <strong>{getGroupName(level, ageGroup)}</strong> ({levelInfo.name}) class · {AGE_GROUP_LABELS[ageGroup]}
       </p>
       <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
         <span className="flex items-center gap-1">

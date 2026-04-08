@@ -98,6 +98,9 @@ const SwimAssessment = ({ onComplete }: Props) => {
   if (phase === "result" && recommendedLevel) {
     const levelInfo = LEVEL_DISPLAY[recommendedLevel];
     const badge = LEVEL_BADGE_COLORS[recommendedLevel];
+    const ageGroup = getAgeGroup(age!);
+    const groupName = getGroupName(recommendedLevel, ageGroup);
+    const diveStatus = getDiveStatus(recommendedLevel, ageGroup);
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -117,9 +120,15 @@ const SwimAssessment = ({ onComplete }: Props) => {
                 {levelInfo.name.charAt(0)}
               </span>
             </div>
-            <h3 className="font-display text-3xl font-bold text-foreground mb-1">
-              {levelInfo.name}
+            <h3 className="font-display text-3xl font-bold text-foreground mb-0.5">
+              {groupName}
             </h3>
+            <p className="text-sm font-medium text-muted-foreground mb-1">
+              {levelInfo.name} Level
+            </p>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${badge.text} mb-3`}>
+              🤿 {diveStatus}
+            </p>
             <p className="text-muted-foreground text-sm mb-6">{levelInfo.description}</p>
             <p className="text-xs text-muted-foreground mb-6">
               This is a tentative placement — our instructors will confirm the best fit on day one.

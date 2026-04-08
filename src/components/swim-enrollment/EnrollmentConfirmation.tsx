@@ -11,9 +11,11 @@ interface Props {
   childAge: number;
 }
 
-const EnrollmentConfirmation = ({ level, childName }: Props) => {
+const EnrollmentConfirmation = ({ level, childName, childAge }: Props) => {
   const levelInfo = LEVEL_DISPLAY[level];
   const badge = LEVEL_BADGE_COLORS[level];
+  const ageGroup = getAgeGroup(childAge);
+  const groupName = getGroupName(level, ageGroup);
 
   return (
     <motion.div
@@ -30,7 +32,7 @@ const EnrollmentConfirmation = ({ level, childName }: Props) => {
           <p className="text-muted-foreground mb-2">
             <strong>{childName}</strong> has been enrolled in{" "}
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
-              {levelInfo.name}
+              {groupName}
             </span>
           </p>
           <p className="text-sm text-muted-foreground mb-1">
