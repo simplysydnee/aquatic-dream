@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING } from "./types";
+import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getDiveStatus, getAgeGroup } from "./types";
 
 interface Props {
   level: SwimLevel;
