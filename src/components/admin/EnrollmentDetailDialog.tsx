@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
+import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import { toast } from "@/hooks/use-toast";
 import { Save, FileCheck, ShieldCheck, Camera, AlertTriangle, User, Phone } from "lucide-react";
 
