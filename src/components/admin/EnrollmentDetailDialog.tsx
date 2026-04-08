@@ -121,7 +121,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span>{form.child_name}</span>
-            <Badge variant="outline" className={levelInfo?.color || ""}>{levelInfo?.name || form.swim_level}</Badge>
+            <Badge variant="outline" className={levelInfo?.color || ""}>{groupName} ({levelInfo?.name || form.swim_level})</Badge>
           </DialogTitle>
         </DialogHeader>
 
