@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar, ShoppingBag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, AGE_GROUP_LABELS, PRICING } from "./types";
+import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, PRICING } from "./types";
 
 interface SessionWithSpots {
   id: string;
