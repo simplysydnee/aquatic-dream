@@ -4,17 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, Star, ChevronRight, DollarSign, Calendar, Clock, ShoppingBag } from "lucide-react";
 
-const swimLevels = [
+const curriculum = [
   {
-    name: "White",
-    letter: "W",
-    ages: "Ages 3–12",
-    level: "Comfort",
+    group: "Bubble Makers",
+    level: "Preschool 1",
+    color: "White",
+    diveStatus: "Pre-Dive Prep",
+    ages: "Ages 3–5",
     gradient: "from-gray-50 to-gray-100/60",
     borderColor: "border-gray-300",
     accentColor: "text-gray-600",
     badgeBg: "bg-white",
     badgeRing: "ring-gray-300",
+    letter: "BM",
     skills: [
       "Water comfort & safety introduction",
       "Guided submersion practice",
@@ -23,15 +25,17 @@ const swimLevels = [
     ],
   },
   {
-    name: "Red",
-    letter: "R",
-    ages: "Ages 3–12",
-    level: "Swim School",
+    group: "Reef Explorers",
+    level: "Preschool 2",
+    color: "Red",
+    diveStatus: "Shallow Entry",
+    ages: "Ages 3–5",
     gradient: "from-red-50 to-red-100/60",
     borderColor: "border-red-200",
     accentColor: "text-red-600",
     badgeBg: "bg-red-50",
     badgeRing: "ring-red-300",
+    letter: "RE",
     skills: [
       "Submersion for 5+ seconds",
       "Beginning independent floating",
@@ -40,15 +44,36 @@ const swimLevels = [
     ],
   },
   {
-    name: "Yellow",
-    letter: "Y",
+    group: "Sea Scouts",
+    level: "School Age 1",
+    color: "White / Red",
+    diveStatus: "Surface Support",
     ages: "Ages 6–12",
-    level: "Intermediate",
+    gradient: "from-sky-50 to-sky-100/60",
+    borderColor: "border-sky-200",
+    accentColor: "text-sky-600",
+    badgeBg: "bg-sky-50",
+    badgeRing: "ring-sky-300",
+    letter: "SS",
+    skills: [
+      "Beginner water comfort & submersion",
+      "Independent floating introduction",
+      "Basic kick drills",
+      "Water safety fundamentals",
+    ],
+  },
+  {
+    group: "Deep Sea Divers",
+    level: "School Age 2",
+    color: "Yellow",
+    diveStatus: "Mid-Water Descent",
+    ages: "Ages 6–12",
     gradient: "from-yellow-50 to-yellow-100/60",
     borderColor: "border-yellow-200",
     accentColor: "text-yellow-600",
     badgeBg: "bg-yellow-50",
     badgeRing: "ring-yellow-300",
+    letter: "DD",
     skills: [
       "Independent front & back float",
       "Introduction to kicking drills",
@@ -57,37 +82,22 @@ const swimLevels = [
     ],
   },
   {
-    name: "Blue",
-    letter: "B",
+    group: "Ocean Masters",
+    level: "School Age 3",
+    color: "Green / Blue",
+    diveStatus: "Elite Navigator",
     ages: "Ages 6–12",
-    level: "Intermediate+",
-    gradient: "from-blue-50 to-blue-100/60",
-    borderColor: "border-blue-200",
-    accentColor: "text-blue-600",
-    badgeBg: "bg-blue-50",
-    badgeRing: "ring-blue-300",
-    skills: [
-      "Treading water 10+ seconds",
-      "Developing freestyle & backstroke",
-      "Side-roll-side kick introduction",
-      "Deep water confidence",
-    ],
-  },
-  {
-    name: "Green",
-    letter: "G",
-    ages: "Ages 6–12",
-    level: "Advanced",
     gradient: "from-green-50 to-green-100/60",
     borderColor: "border-green-200",
     accentColor: "text-green-600",
     badgeBg: "bg-green-50",
     badgeRing: "ring-green-300",
+    letter: "OM",
     skills: [
-      "Side-roll-side kick drill 10M",
+      "Treading water 10+ seconds",
+      "Side-roll-side kick drill",
       "Multiple stroke development",
-      "Endurance building",
-      "Learn to Swim completion",
+      "Endurance & swim completion",
     ],
   },
 ];
@@ -107,7 +117,7 @@ const SwimLessons = () => {
               <span className="text-primary">Thrives</span>
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed mb-8 max-w-xl">
-              Five progressive color-coded levels based on the Starfish Aquatics system,
+              Five progressive groups based on the Starfish Aquatics system,
               maximum 3 students per instructor — because every child deserves to be seen in the water.
             </p>
             <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
@@ -154,45 +164,48 @@ const SwimLessons = () => {
         </div>
       </section>
 
-      {/* Swim levels */}
+      {/* Curriculum */}
       <section className="py-20">
         <div className="container">
           <div className="text-center mb-14">
-            <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">5 Progressive Levels</h2>
+            <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">Our Curriculum</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              From water comfort to advanced strokes — each level builds on the last, following the Starfish Aquatics curriculum.
+              From Bubble Makers to Ocean Masters — each group builds on the last, following the Starfish Aquatics curriculum.
             </p>
           </div>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {swimLevels.map((level, i) => (
+            {curriculum.map((item, i) => (
               <motion.div
-                key={level.name}
+                key={item.group}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
               >
-                <Card className={`h-full border ${level.borderColor} bg-gradient-to-br ${level.gradient} hover:shadow-xl transition-all duration-300 overflow-hidden`}>
+                <Card className={`h-full border ${item.borderColor} bg-gradient-to-br ${item.gradient} hover:shadow-xl transition-all duration-300 overflow-hidden`}>
                   <CardContent className="p-0">
                     <div className="flex flex-col items-center pt-8 pb-4 px-6">
-                      <div className={`w-24 h-24 rounded-full ${level.badgeBg} ring-4 ${level.badgeRing} shadow-lg mb-4 flex items-center justify-center`}>
-                        <span className={`font-display text-3xl font-bold ${level.accentColor}`}>
-                          {level.letter}
+                      <div className={`w-24 h-24 rounded-full ${item.badgeBg} ring-4 ${item.badgeRing} shadow-lg mb-4 flex items-center justify-center`}>
+                        <span className={`font-display text-2xl font-bold ${item.accentColor}`}>
+                          {item.letter}
                         </span>
                       </div>
-                      <h3 className="font-display text-2xl font-bold text-foreground">{level.name}</h3>
-                      <div className="flex items-center gap-2 mt-1 mb-1">
-                        <span className={`text-sm font-semibold ${level.accentColor}`}>{level.ages}</span>
+                      <h3 className="font-display text-2xl font-bold text-foreground">{item.group}</h3>
+                      <div className="flex items-center gap-2 mt-1 mb-0.5">
+                        <span className={`text-sm font-semibold ${item.accentColor}`}>{item.ages}</span>
                         <span className="text-muted-foreground/40">•</span>
-                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{level.level}</span>
+                        <span className="text-xs text-muted-foreground font-medium">{item.color}</span>
                       </div>
+                      <span className={`text-[11px] font-semibold uppercase tracking-wider ${item.accentColor}`}>
+                        🤿 {item.diveStatus}
+                      </span>
                     </div>
                     <div className="px-6 pb-6">
                       <div className="border-t border-foreground/10 pt-4">
                         <ul className="space-y-2.5">
-                          {level.skills.map((skill) => (
+                          {item.skills.map((skill) => (
                             <li key={skill} className="flex items-start gap-2.5 text-sm text-foreground/80">
-                              <Star className={`w-4 h-4 mt-0.5 shrink-0 fill-current ${level.accentColor}`} />
+                              <Star className={`w-4 h-4 mt-0.5 shrink-0 fill-current ${item.accentColor}`} />
                               {skill}
                             </li>
                           ))}
@@ -242,7 +255,7 @@ const SwimLessons = () => {
                   <div key={time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50">
                     <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                     <span className="text-sm font-medium text-foreground">{time}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">All levels</span>
+                    <span className="text-xs text-muted-foreground ml-auto">All groups</span>
                   </div>
                 ))}
               </div>
@@ -259,7 +272,7 @@ const SwimLessons = () => {
                   <div key={time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50">
                     <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                     <span className="text-sm font-medium text-foreground">{time}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">All levels</span>
+                    <span className="text-xs text-muted-foreground ml-auto">All groups</span>
                   </div>
                 ))}
               </div>

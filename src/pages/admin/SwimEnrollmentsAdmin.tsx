@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
+import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
 import { Eye } from "lucide-react";
 
@@ -111,6 +111,8 @@ const SwimEnrollmentsAdmin = () => {
             <TableBody>
               {enrollments.map((e) => {
                 const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
+                const ageGroup = getAgeGroup(e.child_age);
+                const groupName = levelInfo ? getGroupName(e.swim_level as SwimLevel, ageGroup) : e.swim_level;
                 const session = e.session_id ? sessions[e.session_id] : null;
                 return (
                   <TableRow key={e.id}>
@@ -118,7 +120,7 @@ const SwimEnrollmentsAdmin = () => {
                     <TableCell>{e.child_age}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={levelInfo?.color || ""}>
-                        {levelInfo?.name || e.swim_level}
+                        {groupName}
                       </Badge>
                     </TableCell>
                     <TableCell>

@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
+import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import { toast } from "@/hooks/use-toast";
 import { Save, FileCheck, ShieldCheck, Camera, AlertTriangle, User, Phone } from "lucide-react";
 
@@ -112,6 +112,8 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
   if (!form) return null;
 
   const levelInfo = LEVEL_DISPLAY[form.swim_level as SwimLevel];
+  const ageGroup = getAgeGroup(form.child_age);
+  const groupName = levelInfo ? getGroupName(form.swim_level as SwimLevel, ageGroup) : form.swim_level;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,7 +121,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span>{form.child_name}</span>
-            <Badge variant="outline" className={levelInfo?.color || ""}>{levelInfo?.name || form.swim_level}</Badge>
+            <Badge variant="outline" className={levelInfo?.color || ""}>{groupName} ({levelInfo?.name || form.swim_level})</Badge>
           </DialogTitle>
         </DialogHeader>
 

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar, ShoppingBag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, AGE_GROUP_LABELS, PRICING } from "./types";
+import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, PRICING } from "./types";
 
 interface SessionWithSpots {
   id: string;
@@ -135,7 +135,7 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         Pick a Session
       </h3>
       <p className="text-muted-foreground text-sm mb-2">
-        Choose a <strong>{levelInfo.name}</strong> class · {AGE_GROUP_LABELS[ageGroup]}
+        Choose a <strong>{getGroupName(level, ageGroup)}</strong> ({levelInfo.name}) class · {AGE_GROUP_LABELS[ageGroup]}
       </p>
       <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
         <span className="flex items-center gap-1">
