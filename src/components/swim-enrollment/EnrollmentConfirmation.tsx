@@ -8,6 +8,7 @@ import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, ge
 interface Props {
   level: SwimLevel;
   childName: string;
+  childAge: number;
 }
 
 const EnrollmentConfirmation = ({ level, childName }: Props) => {
