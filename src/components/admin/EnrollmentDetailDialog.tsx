@@ -112,6 +112,8 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
   if (!form) return null;
 
   const levelInfo = LEVEL_DISPLAY[form.swim_level as SwimLevel];
+  const ageGroup = getAgeGroup(form.child_age);
+  const groupName = levelInfo ? getGroupName(form.swim_level as SwimLevel, ageGroup) : form.swim_level;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
