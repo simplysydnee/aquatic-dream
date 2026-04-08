@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
-import { SwimLevel, LEVEL_DISPLAY, LEVEL_BADGE_COLORS } from "./types";
+import { SwimLevel, LEVEL_DISPLAY, LEVEL_BADGE_COLORS, getGroupName, getDiveStatus, getAgeGroup } from "./types";
 
 interface Props {
   onComplete: (level: SwimLevel, age: number) => void;
