@@ -232,7 +232,7 @@ const Index = () => {
       <StatsSection />
       <SwimProgramPanel />
       <ICanSwimCallout />
-      <TestimonialsSection />
+      
     </main>
   );
 };
