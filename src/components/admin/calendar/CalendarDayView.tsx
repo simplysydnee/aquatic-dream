@@ -132,7 +132,14 @@ const CalendarDayView = ({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [detailBlock, setDetailBlock] = useState<BlockInfo | null>(null);
   const [hoverSlot, setHoverSlot] = useState<{ colId: string; y: number } | null>(null);
+  const [now, setNow] = useState(new Date());
   const { toast } = useToast();
+
+  // Update current time every 60 seconds
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const dateStr = format(date, "yyyy-MM-dd");
   const dayName = format(date, "EEEE");
