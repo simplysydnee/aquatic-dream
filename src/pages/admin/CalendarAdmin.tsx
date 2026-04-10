@@ -80,16 +80,19 @@ const CalendarAdmin = () => {
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs">
         {[
-          { label: "Swim Lessons", color: "bg-blue-400" },
-          { label: "I Can Swim", color: "bg-amber-400" },
-          { label: "Private Lesson", color: "bg-pink-400" },
-          { label: "Semi-Private", color: "bg-orange-400" },
-          { label: "Dive Session", color: "bg-emerald-500" },
-          { label: "Pool Rental", color: "bg-purple-400" },
-          { label: "Maintenance", color: "bg-gray-400" },
+          { label: "I Can Swim", border: "#085041", bg: "#E1F5EE" },
+          { label: "Swim Lessons", border: "#0C447C", bg: "#E6F1FB" },
+          { label: "Private Lesson", border: "#26215C", bg: "#EEEDFE" },
+          { label: "Semi-Private", border: "#4B1528", bg: "#FBEAF0" },
+          { label: "Dive Session", border: "#633806", bg: "#FAEEDA" },
+          { label: "Pool Rental", border: "#2C2C2A", bg: "#F1EFE8" },
+          { label: "Maintenance", border: "#666", bg: "#F3F3F3" },
         ].map((item) => (
           <div key={item.label} className="flex items-center gap-1.5">
-            <div className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
+            <div
+              className="w-2.5 h-2.5 rounded-full border-2"
+              style={{ backgroundColor: item.bg, borderColor: item.border }}
+            />
             <span className="text-muted-foreground">{item.label}</span>
           </div>
         ))}
