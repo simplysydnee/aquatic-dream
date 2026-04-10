@@ -131,83 +131,96 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
     }
   };
 
+  const showInstructor = eventType === "dive-session" || eventType === "i-can-swim" || eventType === "private-lesson" || eventType === "semi-private-lesson";
+  const showTitle = eventType === "pool-rental" || eventType === "other";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Pool Event" : "Add Pool Event"}</DialogTitle>
+      <DialogContent className="max-w-sm p-4 gap-3">
+        <DialogHeader className="pb-0">
+          <DialogTitle className="text-base">{isEditing ? "Edit Event" : "New Event"}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Event Type</Label>
-            <Select value={eventType} onValueChange={handleTypeChange}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="i-can-swim">I Can Swim 209</SelectItem>
-                <SelectItem value="private-lesson">Private Lesson</SelectItem>
-                <SelectItem value="semi-private-lesson">Semi-Private Lesson</SelectItem>
-                <SelectItem value="dive-session">Dive Session</SelectItem>
-                <SelectItem value="pool-rental">Pool Rental</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="space-y-3 text-sm">
+          {/* Event type as compact radio-style chips */}
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { value: "i-can-swim", label: "I Can Swim" },
+              { value: "private-lesson", label: "Private" },
+              { value: "semi-private-lesson", label: "Semi-Private" },
+              { value: "dive-session", label: "Dive" },
+              { value: "pool-rental", label: "Rental" },
+              { value: "maintenance", label: "Maintenance" },
+              { value: "other", label: "Other" },
+            ].map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => handleTypeChange(t.value)}
+                className={cn(
+                  "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                  eventType === t.value
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          <div className="space-y-2">
-            <Label>Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start">
-                  <CalendarIcon className="w-4 h-4 mr-2" />
-                  {format(eventDate, "PPP")}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={eventDate}
-                  onSelect={(d) => d && setEventDate(d)}
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Start Time</Label>
-              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>End Time</Label>
-              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-            </div>
-          </div>
-
-
-          {(eventType === "dive-session" || eventType === "i-can-swim" || eventType === "private-lesson" || eventType === "semi-private-lesson") && (
-            <div className="space-y-2">
-              <Label>Instructor Name</Label>
-              <Input value={instructorName} onChange={(e) => setInstructorName(e.target.value)} placeholder="Optional" />
-            </div>
+          {/* Title — only shown for types that need manual entry */}
+          {showTitle && (
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" className="h-8 text-sm" />
           )}
 
-          <div className="space-y-2">
-            <Label>Notes</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" rows={2} />
+          {/* Date + times in one row */}
+          <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8">
+                    <CalendarIcon className="w-3 h-3 mr-1.5" />
+                    {format(eventDate, "MMM d")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={eventDate}
+                    onSelect={(d) => d && setEventDate(d)}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Start</Label>
+              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-8 text-xs w-[100px]" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">End</Label>
+              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-8 text-xs w-[100px]" />
+            </div>
           </div>
 
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : isEditing ? "Update Event" : "Add Event"}
+          {/* Instructor + Notes inline */}
+          {showInstructor && (
+            <Input value={instructorName} onChange={(e) => setInstructorName(e.target.value)} placeholder="Instructor (optional)" className="h-8 text-sm" />
+          )}
+
+          <Input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            className="h-8 text-sm"
+          />
+
+          <div className="flex gap-2 justify-end pt-1">
+            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : isEditing ? "Update" : "Add"}
             </Button>
           </div>
         </div>
