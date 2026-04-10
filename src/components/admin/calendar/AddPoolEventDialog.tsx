@@ -20,9 +20,10 @@ interface Props {
   defaultDate: Date;
   onSaved: () => void;
   editEvent?: CalendarPoolEvent | null;
+  prefillStartTime?: string | null;
 }
 
-const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEvent }: Props) => {
+const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEvent, prefillStartTime }: Props) => {
   const [eventType, setEventType] = useState("i-can-swim");
   const [title, setTitle] = useState("");
   const [eventDate, setEventDate] = useState<Date>(defaultDate);
@@ -48,8 +49,15 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       setNotes(editEvent.notes || "");
     } else {
       resetForm();
+      if (prefillStartTime) {
+        setStartTime(prefillStartTime);
+        // Auto-set end time to 1 hour later
+        const [h, m] = prefillStartTime.split(":").map(Number);
+        const endH = Math.min(h + 1, 20);
+        setEndTime(`${endH.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
+      }
     }
-  }, [editEvent, open]);
+  }, [editEvent, open, prefillStartTime]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -183,17 +191,6 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Pool Area</Label>
-            <Select value={poolArea} onValueChange={setPoolArea}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="shallow">Shallow End</SelectItem>
-                <SelectItem value="deep">Deep End</SelectItem>
-                <SelectItem value="full">Full Pool</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           {(eventType === "dive-session" || eventType === "i-can-swim" || eventType === "private-lesson" || eventType === "semi-private-lesson") && (
             <div className="space-y-2">
