@@ -1,11 +1,7 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-
-const I_CAN_SWIM_URL = 'https://jtqlamkrhdfwtmaubfrc.supabase.co'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,92 +9,100 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('I_CAN_SWIM_SUPABASE_KEY')
-    if (!apiKey) {
+    const apiKey = Deno.env.get('AIRTABLE_API_KEY')
+    const baseId = Deno.env.get('AIRTABLE_BASE_ID')
+
+    if (!apiKey || !baseId) {
       return new Response(
-        JSON.stringify({ error: 'I Can Swim API key not configured' }),
+        JSON.stringify({ error: 'Airtable credentials not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const icsClient = createClient(I_CAN_SWIM_URL, apiKey)
+    const tableName = 'Individual Sessions'
+    const encodedTable = encodeURIComponent(tableName)
 
-    // Query sessions with instructor info and booking counts
-    const { data: sessions, error: sessionsError } = await icsClient
-      .from('sessions')
-      .select(`
-        id,
-        start_time,
-        end_time,
-        location,
-        session_type,
-        status,
-        max_capacity,
-        booking_count,
-        instructor_id
-      `)
-      .order('start_time', { ascending: true })
+    // Fetch records from Airtable, sorted by Start Date
+    // We use a view or filter to get recent/upcoming sessions
+    const url = new URL(`https://api.airtable.com/v0/${baseId}/${encodedTable}`)
+    url.searchParams.set('sort[0][field]', 'Start Date')
+    url.searchParams.set('sort[0][direction]', 'asc')
+    // Only fetch sessions from the last week onward
+    const oneWeekAgo = new Date()
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+    const filterFormula = `IS_AFTER({Start Date}, '${oneWeekAgo.toISOString().split('T')[0]}')`
 
-    if (sessionsError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch sessions', details: sessionsError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    // Only request the fields we need
+    const fields = [
+      'Start Date',
+      'End Date',
+      'Instructor',
+      'Booking Status',
+      'Session Type',
+      'Client Name (from Client)',
+      'Client',
+      'Day of the week',
+    ]
 
-    // Get instructor profiles
-    const instructorIds = [...new Set((sessions || []).map(s => s.instructor_id).filter(Boolean))]
-    let instructorMap: Record<string, string> = {}
+    const allRecords: any[] = []
+    let offset: string | undefined = undefined
 
-    if (instructorIds.length > 0) {
-      const { data: profiles } = await icsClient
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', instructorIds)
+    do {
+      const url = new URL(`https://api.airtable.com/v0/${baseId}/${encodedTable}`)
+      url.searchParams.set('sort[0][field]', 'Start Date')
+      url.searchParams.set('sort[0][direction]', 'asc')
+      url.searchParams.set('filterByFormula', filterFormula)
+      fields.forEach((f, i) => url.searchParams.set(`fields[${i}]`, f))
+      if (offset) url.searchParams.set('offset', offset)
 
-      if (profiles) {
-        profiles.forEach((p: any) => {
-          instructorMap[p.id] = p.full_name || 'Unknown'
-        })
+      const response = await fetch(url.toString(), {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error(`Airtable API error [${response.status}]:`, errText)
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch from Airtable', details: errText }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
-    }
 
-    // Get confirmed booking counts per session
-    const sessionIds = (sessions || []).map(s => s.id)
-    let bookingCounts: Record<string, number> = {}
+      const data = await response.json()
+      allRecords.push(...(data.records || []))
+      offset = data.offset
+    } while (offset)
 
-    if (sessionIds.length > 0) {
-      const { data: bookings } = await icsClient
-        .from('bookings')
-        .select('session_id')
-        .in('session_id', sessionIds)
-        .eq('status', 'confirmed')
+    // Map Airtable records to ICSSession format
+    const sessions = allRecords
+      .filter((r: any) => r.fields['Start Date'] && r.fields['End Date'])
+      .map((r: any) => {
+        const f = r.fields
+        const clientNameArr = f['Client Name (from Client)']
+        const clientName = Array.isArray(clientNameArr) ? clientNameArr[0] : clientNameArr || null
+        const instructor = Array.isArray(f['Instructor']) ? f['Instructor'][0] : f['Instructor'] || null
+        const status = (f['Booking Status'] || 'open').toLowerCase()
 
-      if (bookings) {
-        bookings.forEach((b: any) => {
-          bookingCounts[b.session_id] = (bookingCounts[b.session_id] || 0) + 1
-        })
-      }
-    }
-
-    // Map sessions with enriched data
-    const enriched = (sessions || []).map(s => ({
-      id: s.id,
-      start_time: s.start_time,
-      end_time: s.end_time,
-      location: s.location,
-      session_type: s.session_type,
-      status: s.status,
-      max_capacity: s.max_capacity,
-      instructor_name: s.instructor_id ? (instructorMap[s.instructor_id] || 'Unknown') : null,
-      confirmed_bookings: bookingCounts[s.id] || s.booking_count || 0,
-    }))
+        return {
+          id: r.id,
+          start_time: f['Start Date'],
+          end_time: f['End Date'],
+          location: 'Modesto',
+          session_type: f['Session Type'] || 'lesson',
+          status,
+          max_capacity: 1,
+          instructor_name: instructor,
+          confirmed_bookings: (status === 'booked' || status === 'confirmed') ? 1 : 0,
+          client_name: clientName,
+        }
+      })
 
     return new Response(
-      JSON.stringify({ sessions: enriched }),
+      JSON.stringify({ sessions }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
+    console.error('Edge function error:', err)
     return new Response(
       JSON.stringify({ error: 'Internal error', details: String(err) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
