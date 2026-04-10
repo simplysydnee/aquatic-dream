@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format, addDays, startOfWeek, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
 import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
 import type { ActivityType } from "@/components/admin/calendar/CalendarFilterBar";
-import ICanSwimCalendar from "@/components/admin/ICanSwimCalendar";
+import { Badge } from "@/components/ui/badge";
 import { useCalendarData } from "@/hooks/useCalendarData";
 import type { CalendarPoolEvent } from "@/hooks/useCalendarData";
 import {
@@ -30,6 +30,15 @@ const CalendarAdmin = () => {
   const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
   const [activeFilters, setActiveFilters] = useState<Set<ActivityType>>(new Set(ALL_FILTERS));
   const [miniCalOpen, setMiniCalOpen] = useState(false);
+  const [icsSource, setIcsSource] = useState<"airtable" | "supabase">(() => {
+    return (localStorage.getItem("ics-data-source") as "airtable" | "supabase") || "airtable";
+  });
+
+  const toggleIcsSource = () => {
+    const next = icsSource === "airtable" ? "supabase" : "airtable";
+    setIcsSource(next);
+    localStorage.setItem("ics-data-source", next);
+  };
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -68,6 +77,18 @@ const CalendarAdmin = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Badge variant={icsSource === "supabase" ? "default" : "secondary"} className="text-[10px]">
+            ICS: {icsSource === "supabase" ? "New DB" : "Airtable"}
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleIcsSource}
+            className="text-xs gap-1.5"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            Switch to {icsSource === "airtable" ? "New DB" : "Airtable"}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
             Today
           </Button>
@@ -210,8 +231,6 @@ const CalendarAdmin = () => {
         />
       )}
 
-      {/* I Can Swim 209 Schedule */}
-      <ICanSwimCalendar />
 
       <AddPoolEventDialog
         open={showAddEvent}
