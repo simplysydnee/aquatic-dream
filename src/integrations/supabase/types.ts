@@ -217,6 +217,113 @@ export type Database = {
           },
         ]
       }
+      job_applications: {
+        Row: {
+          availability: string[] | null
+          available_start_date: string | null
+          certifications: string[] | null
+          created_at: string
+          email: string
+          experience_with_children: string | null
+          first_name: string
+          id: string
+          job_posting_id: string
+          last_name: string
+          phone: string
+          resume_url: string | null
+          status: string
+          swimming_ability: string | null
+          updated_at: string
+        }
+        Insert: {
+          availability?: string[] | null
+          available_start_date?: string | null
+          certifications?: string[] | null
+          created_at?: string
+          email: string
+          experience_with_children?: string | null
+          first_name: string
+          id?: string
+          job_posting_id: string
+          last_name: string
+          phone: string
+          resume_url?: string | null
+          status?: string
+          swimming_ability?: string | null
+          updated_at?: string
+        }
+        Update: {
+          availability?: string[] | null
+          available_start_date?: string | null
+          certifications?: string[] | null
+          created_at?: string
+          email?: string
+          experience_with_children?: string | null
+          first_name?: string
+          id?: string
+          job_posting_id?: string
+          last_name?: string
+          phone?: string
+          resume_url?: string | null
+          status?: string
+          swimming_ability?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_job_posting_id_fkey"
+            columns: ["job_posting_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_postings: {
+        Row: {
+          benefits: string[] | null
+          contact_email: string | null
+          created_at: string
+          full_description: string
+          id: string
+          is_active: boolean
+          job_type: string
+          location: string
+          pay_rate: string | null
+          shift_schedule: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          benefits?: string[] | null
+          contact_email?: string | null
+          created_at?: string
+          full_description: string
+          id?: string
+          is_active?: boolean
+          job_type?: string
+          location?: string
+          pay_rate?: string | null
+          shift_schedule?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          benefits?: string[] | null
+          contact_email?: string | null
+          created_at?: string
+          full_description?: string
+          id?: string
+          is_active?: boolean
+          job_type?: string
+          location?: string
+          pay_rate?: string | null
+          shift_schedule?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lesson_requests: {
         Row: {
           child_age: number
