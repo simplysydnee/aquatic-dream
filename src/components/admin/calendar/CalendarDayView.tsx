@@ -172,16 +172,27 @@ const CalendarDayView = ({
     (e) => ["dive-session", "pool-rental", "maintenance"].includes(e.event_type)
   );
 
+  // ── Determine which groups are visible based on filters ──
+  const showICS = activeFilters.has("i-can-swim");
+  const showAD = activeFilters.has("swim") || activeFilters.has("private-lesson") || activeFilters.has("semi-private-lesson");
+  const showDive = activeFilters.has("dive-session") || activeFilters.has("pool-rental");
+
   // ── Build columns ──
   const columns = useMemo<ColumnDef[]>(() => {
     const cols: ColumnDef[] = [];
-    icsInstructors.forEach((name, i) => {
-      cols.push({ id: `ics-${i}`, label: name, group: "ics" });
-    });
-    cols.push({ id: "ad-1", label: "Group 1", group: "ad" });
-    cols.push({ id: "dive", label: "Dive / Rental", group: "dive" });
+    if (showICS) {
+      icsInstructors.forEach((name, i) => {
+        cols.push({ id: `ics-${i}`, label: name, group: "ics" });
+      });
+    }
+    if (showAD) {
+      cols.push({ id: "ad-1", label: "Group 1", group: "ad" });
+    }
+    if (showDive) {
+      cols.push({ id: "dive", label: "Dive / Rental", group: "dive" });
+    }
     return cols;
-  }, [icsInstructors]);
+  }, [icsInstructors, showICS, showAD, showDive]);
 
   const icsCount = columns.filter((c) => c.group === "ics").length;
   const adCount = columns.filter((c) => c.group === "ad").length;
@@ -386,7 +397,7 @@ const CalendarDayView = ({
                 .map((s) => {
                   const startMins = timeToMinutes(s.start_time);
                   const endMins = timeToMinutes(s.end_time);
-                  const dimmed = !activeFilters.has("i-can-swim");
+                  const dimmed = false;
                   return renderBlock(
                     s.id,
                     startMins,
@@ -408,7 +419,7 @@ const CalendarDayView = ({
                 const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
                 const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
                 const names = sessionEnrollments.map((e) => e.child_name).join(" · ");
-                const dimmed = !activeFilters.has("swim");
+                const dimmed = false;
 
                 return renderBlock(
                   s.id,
