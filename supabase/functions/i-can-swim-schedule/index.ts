@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       url.searchParams.set('sort[0][field]', 'Start Date')
       url.searchParams.set('sort[0][direction]', 'asc')
       url.searchParams.set('filterByFormula', filterFormula)
-      if (fields.length > 0) fields.forEach((f, i) => url.searchParams.set(`fields[${i}]`, f))
+      fields.forEach((f, i) => url.searchParams.set(`fields[${i}]`, f))
       if (offset) url.searchParams.set('offset', offset)
 
       const response = await fetch(url.toString(), {
@@ -76,11 +76,6 @@ Deno.serve(async (req) => {
       offset = data.offset
     } while (offset)
 
-    // Log first record's field names for debugging
-    if (allRecords.length > 0) {
-      console.log('Available fields:', Object.keys(allRecords[0].fields))
-    }
-
     // Map Airtable records to ICSSession format
     const sessions = allRecords
       .filter((r: any) => r.fields['Start Date'] && r.fields['End Date'])
@@ -91,11 +86,11 @@ Deno.serve(async (req) => {
         const instructor = Array.isArray(f['Instructor']) ? f['Instructor'][0] : f['Instructor'] || null
         const status = (f['Booking Status'] || 'open').toLowerCase()
 
-        const parentNameArr = f['Parent/Guardian (from Client)']
+        const parentNameArr = f['Parent Name (from Client)']
         const parentName = Array.isArray(parentNameArr) ? parentNameArr[0] : parentNameArr || null
         const emailArr = f['Email (from Client)']
         const email = Array.isArray(emailArr) ? emailArr[0] : emailArr || null
-        const phoneArr = f['Phone (from Client)']
+        const phoneArr = f['Phone Number (from Client) 2']
         const phone = Array.isArray(phoneArr) ? phoneArr[0] : phoneArr || null
 
         return {
