@@ -64,6 +64,9 @@ const Navbar = () => {
             <Button asChild size="sm" className="bg-coral hover:bg-coral/90 text-coral-foreground">
               <Link to="/swim-enrollment">Enroll Now</Link>
             </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/admin/login">Staff Login</Link>
+            </Button>
           </div>
 
           {/* Mobile toggle */}
