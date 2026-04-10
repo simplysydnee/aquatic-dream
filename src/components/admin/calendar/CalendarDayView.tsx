@@ -598,6 +598,7 @@ const CalendarDayView = ({
           </div>
         ))}
       </div>
+      </div>
 
       {/* ── Block detail panel ── */}
       <CalendarBlockDetail
