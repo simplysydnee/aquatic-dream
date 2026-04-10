@@ -395,7 +395,7 @@ const CalendarDayView = ({
                     s.client_name || s.session_type || "I Can Swim",
                     `${fmtTime(s.start_time)} – ${fmtTime(s.end_time)} · ${s.status}`,
                     dimmed,
-                    undefined,
+                    () => setDetailBlock({ kind: "ics", session: s }),
                     true
                   );
                 })}
