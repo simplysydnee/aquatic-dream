@@ -1,41 +1,28 @@
 
 
-# Updated Job Application — Add Qualification Questions
+# Job Applications Admin — Viewed/Archived Workflow
 
-## Context
+## Summary
 
-The job posting requires:
-- **Current Lifeguard Certification** (required prior to start)
-- **Strong swimming ability and water safety knowledge**
-- **Availability for part-time afternoons and weekends**
+Add two new columns to `job_applications` (`is_viewed` and `is_archived`) and update the admin UI with filtering tabs, a viewed indicator, and archive/unarchive actions.
 
-We should ask applicants about these so you can quickly filter qualified candidates.
+## Database Migration
 
-## Updated Application Form Fields
+Add two columns to `job_applications`:
+- `is_viewed` (boolean, default false) — marks whether admin has opened/reviewed the application
+- `is_archived` (boolean, default false) — allows archiving past applicants
 
-1. **Personal Info** (already planned): First name, last name, phone, email
-2. **Availability** (already planned): Checkboxes for weekday afternoons, weekday mornings, weekends, evenings
-3. **NEW — Certifications**: Checkboxes for certifications they currently hold:
-   - Lifeguard Certification
-   - CPR / First Aid
-   - Water Safety Instructor (WSI)
-   - None yet (planning to obtain)
-4. **NEW — Swimming ability**: "How would you rate your swimming ability?" — Beginner / Intermediate / Advanced / Competitive
-5. **NEW — Experience with children**: "Do you have experience working with children?" — Yes (with optional text to describe) / No
-6. **NEW — Start date availability**: "When are you available to start?" — date picker or free text
-7. **Resume Upload** (already planned): PDF/DOC, required
+## UI Changes (JobApplicationsAdmin.tsx)
 
-## Database Impact
+1. **Filter tabs** at the top: "Active" (default, `is_archived = false`), "Hired", "Archived" — lets you quickly switch between views
+2. **Viewed indicator**: Unviewed applications show a blue dot or bold styling. When you click the eye icon to view details, the app automatically marks `is_viewed = true`
+3. **Archive button**: Each row gets an archive icon button. Clicking it sets `is_archived = true` and removes the application from the active view. In the "Archived" tab, a button to unarchive
+4. **Hired tab**: Filters to only `status = 'hired'` for quick review of your team
 
-The `job_applications` table (from the previous plan) will include additional columns:
-- `certifications` (text array) — selected certs
-- `swimming_ability` (text) — self-rated level
-- `experience_with_children` (text) — yes/no + description
-- `available_start_date` (text) — when they can start
+## How It Works
 
-## Admin View
-
-The applications table in admin will show certification status so you can quickly see who already has their lifeguard cert vs. who still needs it.
-
-Everything else from the previous plan (tables, storage bucket, public page, admin pages, nav links, seed data) remains the same — this just adds the qualification fields to the application form.
+- Opening the detail dialog auto-marks the application as "viewed"
+- The active tab hides archived applications so the list stays clean
+- You can always find past applicants under the Archived tab
+- No data is deleted — archive is just a soft filter
 
