@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
@@ -130,6 +130,7 @@ const CalendarDayView = ({
   onDeleteEvent,
   onAddEvent,
 }: Props) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [detailBlock, setDetailBlock] = useState<BlockInfo | null>(null);
   const [hoverSlot, setHoverSlot] = useState<{ colId: string; y: number } | null>(null);
@@ -141,6 +142,16 @@ const CalendarDayView = ({
     const interval = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-scroll to 1 hour before current time on mount
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const pacificNow = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    const currentHour = pacificNow.getHours();
+    const scrollToHour = Math.max(START_HOUR, currentHour - 1);
+    const scrollTop = (scrollToHour - START_HOUR) * HOUR_HEIGHT;
+    scrollRef.current.scrollTop = scrollTop;
+  }, [date]);
 
   const dateStr = format(date, "yyyy-MM-dd");
   const dayName = format(date, "EEEE");
@@ -347,7 +358,8 @@ const CalendarDayView = ({
         ))}
       </div>
 
-      {/* ── Time grid ── */}
+      {/* ── Time grid (scrollable) ── */}
+      <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 320px)" }}>
       <div className="flex overflow-x-auto relative">
         {/* ── Current time indicator ── */}
         {(() => {
@@ -595,6 +607,7 @@ const CalendarDayView = ({
             )}
           </div>
         ))}
+      </div>
       </div>
 
       {/* ── Block detail panel ── */}
