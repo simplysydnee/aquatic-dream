@@ -377,6 +377,7 @@ export type Database = {
       }
       pool_events: {
         Row: {
+          client_name: string | null
           created_at: string
           end_time: string
           event_date: string
@@ -392,6 +393,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          client_name?: string | null
           created_at?: string
           end_time: string
           event_date: string
@@ -407,6 +409,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          client_name?: string | null
           created_at?: string
           end_time?: string
           event_date?: string
