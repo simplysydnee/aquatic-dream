@@ -110,7 +110,10 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     if (eventsRes.data) setPoolEvents(eventsRes.data);
     if (attendanceRes.data) setAttendance(attendanceRes.data);
 
-    // Fetch I Can Swim sessions from edge function
+    // Show the calendar immediately — ICS data loads in the background
+    setLoading(false);
+
+    // Fetch I Can Swim sessions from edge function (non-blocking)
     try {
       const { data } = await supabase.functions.invoke("i-can-swim-schedule");
       if (data?.sessions) {
@@ -119,8 +122,6 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     } catch {
       // silently fail — ICS data is supplementary
     }
-
-    setLoading(false);
   }, [currentDate, view]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
