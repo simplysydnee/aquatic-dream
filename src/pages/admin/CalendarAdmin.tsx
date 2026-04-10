@@ -80,8 +80,8 @@ const CalendarAdmin = () => {
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs">
         {[
-          { label: "I Can Swim", border: "#085041", bg: "#E1F5EE" },
-          { label: "Swim Lessons", border: "#0C447C", bg: "#E6F1FB" },
+          { label: "I Can Swim", border: "#2a5e84", bg: "#d4f0f8" },
+          { label: "Swim Lessons", border: "#1a3a8a", bg: "#d0ddf7" },
           { label: "Private Lesson", border: "#26215C", bg: "#EEEDFE" },
           { label: "Semi-Private", border: "#4B1528", bg: "#FBEAF0" },
           { label: "Dive Session", border: "#633806", bg: "#FAEEDA" },
