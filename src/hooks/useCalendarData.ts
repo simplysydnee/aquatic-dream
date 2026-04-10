@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { format, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { format, startOfWeek, endOfWeek } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface CalendarSwimSession {
@@ -47,11 +47,24 @@ export interface AttendanceRecord {
   checked_in_by: string | null;
 }
 
+export interface ICSSession {
+  id: string;
+  start_time: string;
+  end_time: string;
+  location: string;
+  session_type: string;
+  status: string;
+  max_capacity: number;
+  instructor_name: string | null;
+  confirmed_bookings: number;
+}
+
 export function useCalendarData(currentDate: Date, view: "day" | "week") {
   const [swimSessions, setSwimSessions] = useState<CalendarSwimSession[]>([]);
   const [enrollments, setEnrollments] = useState<CalendarEnrollment[]>([]);
   const [poolEvents, setPoolEvents] = useState<CalendarPoolEvent[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [icsSessions, setIcsSessions] = useState<ICSSession[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -61,7 +74,6 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
 
-    // Determine which days of week we need
     const dayName = format(currentDate, "EEEE");
     const daysNeeded = view === "week"
       ? ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -94,10 +106,20 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     if (eventsRes.data) setPoolEvents(eventsRes.data);
     if (attendanceRes.data) setAttendance(attendanceRes.data);
 
+    // Fetch I Can Swim sessions from edge function
+    try {
+      const { data } = await supabase.functions.invoke("i-can-swim-schedule");
+      if (data?.sessions) {
+        setIcsSessions(data.sessions);
+      }
+    } catch {
+      // silently fail — ICS data is supplementary
+    }
+
     setLoading(false);
   }, [currentDate, view]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  return { swimSessions, enrollments, poolEvents, attendance, loading, refetch: fetchData };
+  return { swimSessions, enrollments, poolEvents, attendance, icsSessions, loading, refetch: fetchData };
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
@@ -8,8 +8,7 @@ import type {
   CalendarPoolEvent,
   AttendanceRecord,
 } from "@/hooks/useCalendarData";
-import { Waves, Anchor, Users, Wrench, Calendar, Pencil, Trash2, ChevronDown } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Lock, Plus, Pencil, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,58 +20,97 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import CalendarBlockDetail from "./CalendarBlockDetail";
+import type { BlockInfo } from "./CalendarBlockDetail";
+import type { ActivityType } from "./CalendarFilterBar";
 
+/* ── ICS session from Airtable edge function ── */
+export interface ICSSession {
+  id: string;
+  start_time: string; // UTC ISO
+  end_time: string;
+  location: string;
+  session_type: string;
+  status: string;
+  max_capacity: number;
+  instructor_name: string | null;
+  confirmed_bookings: number;
+}
+
+/* ── Layout constants ── */
+const HOUR_HEIGHT = 80; // px per hour
+const START_HOUR = 7;
+const END_HOUR = 20;
+const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
+const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
+
+/* ── Color configs ── */
+const BLOCK_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  "i-can-swim":         { bg: "#E1F5EE", border: "#085041", text: "#085041" },
+  "swim":               { bg: "#E6F1FB", border: "#0C447C", text: "#0C447C" },
+  "private-lesson":     { bg: "#EEEDFE", border: "#26215C", text: "#26215C" },
+  "semi-private-lesson":{ bg: "#FBEAF0", border: "#4B1528", text: "#4B1528" },
+  "dive-session":       { bg: "#FAEEDA", border: "#633806", text: "#633806" },
+  "pool-rental":        { bg: "#F1EFE8", border: "#2C2C2A", text: "#2C2C2A" },
+  "maintenance":        { bg: "#F3F3F3", border: "#666",    text: "#333" },
+  "other":              { bg: "#F3F3F3", border: "#666",    text: "#333" },
+};
+
+/* ── Helpers ── */
+function timeToMinutes(t: string): number {
+  // handles "HH:MM", "HH:MM:SS", and ISO strings
+  if (t.includes("T")) {
+    const d = new Date(t);
+    const la = new Date(d.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    return la.getHours() * 60 + la.getMinutes();
+  }
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTop(mins: number): number {
+  return ((mins - START_HOUR * 60) / 60) * HOUR_HEIGHT;
+}
+
+function durationHeight(startMins: number, endMins: number): number {
+  return Math.max(((endMins - startMins) / 60) * HOUR_HEIGHT, 24);
+}
+
+function fmtTime(t: string): string {
+  if (t.includes("T")) {
+    const d = new Date(t);
+    return d.toLocaleTimeString("en-US", {
+      timeZone: "America/Los_Angeles",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
+  return format(new Date(`2000-01-01T${t}`), "h:mm a");
+}
+
+/* ── Props ── */
 interface Props {
   date: Date;
   swimSessions: CalendarSwimSession[];
   enrollments: CalendarEnrollment[];
   poolEvents: CalendarPoolEvent[];
   attendance: AttendanceRecord[];
+  icsSessions: ICSSession[];
+  activeFilters: Set<ActivityType>;
   onAttendanceChange: () => void;
   onEditEvent?: (event: CalendarPoolEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
+  onAddEvent?: (prefill: { startTime: string; eventType?: string }) => void;
 }
 
-const TIME_SLOTS = [
-  "07:00", "07:30", "08:00", "08:30", "09:00", "09:30",
-  "10:00", "10:30", "11:00", "11:30", "12:00", "12:30",
-  "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
-  "16:00", "16:30", "17:00", "17:30", "18:00", "18:30",
-  "19:00", "19:30",
-];
-
-const eventColorConfig: Record<string, { bg: string; border: string; dot: string }> = {
-  "swim":              { bg: "bg-blue-50",    border: "border-l-blue-400",    dot: "bg-blue-400" },
-  "i-can-swim":        { bg: "bg-amber-50",   border: "border-l-amber-400",   dot: "bg-amber-400" },
-  "private-lesson":    { bg: "bg-pink-50",    border: "border-l-pink-400",    dot: "bg-pink-400" },
-  "semi-private-lesson": { bg: "bg-orange-50", border: "border-l-orange-400", dot: "bg-orange-400" },
-  "dive-session":      { bg: "bg-emerald-50", border: "border-l-emerald-500", dot: "bg-emerald-500" },
-  "pool-rental":       { bg: "bg-purple-50",  border: "border-l-purple-400",  dot: "bg-purple-400" },
-  "maintenance":       { bg: "bg-gray-100",   border: "border-l-gray-400",    dot: "bg-gray-400" },
-  "other":             { bg: "bg-gray-50",    border: "border-l-gray-400",    dot: "bg-gray-400" },
-};
-
-const eventTypeLabel: Record<string, string> = {
-  "i-can-swim": "I Can Swim 209",
-  "private-lesson": "Private Lesson",
-  "semi-private-lesson": "Semi-Private Lesson",
-  "dive-session": "Dive Session",
-  "pool-rental": "Pool Rental",
-  "maintenance": "Maintenance",
-  "other": "Other",
-};
-
-const areaTag = (area: string) => {
-  if (area === "shallow") return "Shallow";
-  if (area === "deep") return "Deep";
-  return "Full";
-};
+/* ── Column types ── */
+interface ColumnDef {
+  id: string;
+  label: string;
+  group: "ics" | "ad" | "dive";
+}
 
 const CalendarDayView = ({
   date,
@@ -80,17 +118,71 @@ const CalendarDayView = ({
   enrollments,
   poolEvents,
   attendance,
+  icsSessions,
+  activeFilters,
   onAttendanceChange,
   onEditEvent,
   onDeleteEvent,
+  onAddEvent,
 }: Props) => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [detailBlock, setDetailBlock] = useState<BlockInfo | null>(null);
+  const [hoverSlot, setHoverSlot] = useState<{ colId: string; y: number } | null>(null);
   const { toast } = useToast();
 
   const dateStr = format(date, "yyyy-MM-dd");
   const dayName = format(date, "EEEE");
 
+  // ── I Can Swim columns (dynamic from Airtable) ──
+  const todayICS = useMemo(() => {
+    return icsSessions.filter((s) => {
+      const d = new Date(s.start_time);
+      const la = d.toLocaleDateString("en-US", { timeZone: "America/Los_Angeles" });
+      const selected = date.toLocaleDateString("en-US");
+      return la === selected;
+    });
+  }, [icsSessions, date]);
+
+  const icsInstructors = useMemo(() => {
+    const names = [...new Set(todayICS.map((s) => s.instructor_name).filter(Boolean))] as string[];
+    return names.length > 0 ? names.slice(0, 5) : ["Instructor"];
+  }, [todayICS]);
+
+  // ── Aquatic Dreams sessions for today ──
+  const todaySessions = useMemo(
+    () => swimSessions.filter((s) => s.day_of_week === dayName),
+    [swimSessions, dayName]
+  );
+
+  // ── Pool events for today (non-ICS) ──
+  const todayEvents = useMemo(
+    () => poolEvents.filter((e) => e.event_date === dateStr),
+    [poolEvents, dateStr]
+  );
+
+  const adEvents = todayEvents.filter(
+    (e) => !["dive-session", "pool-rental", "i-can-swim"].includes(e.event_type)
+  );
+  const diveRentalEvents = todayEvents.filter(
+    (e) => ["dive-session", "pool-rental", "maintenance"].includes(e.event_type)
+  );
+
+  // ── Build columns ──
+  const columns = useMemo<ColumnDef[]>(() => {
+    const cols: ColumnDef[] = [];
+    icsInstructors.forEach((name, i) => {
+      cols.push({ id: `ics-${i}`, label: name, group: "ics" });
+    });
+    cols.push({ id: "ad-1", label: "Line 1", group: "ad" });
+    cols.push({ id: "dive", label: "Dive / Rental", group: "dive" });
+    return cols;
+  }, [icsInstructors]);
+
+  const icsCount = columns.filter((c) => c.group === "ics").length;
+  const adCount = columns.filter((c) => c.group === "ad").length;
+  const diveCount = columns.filter((c) => c.group === "dive").length;
+
+  // ── Delete handler ──
   const handleDelete = async () => {
     if (!deleteId) return;
     const { error } = await supabase.from("pool_events").delete().eq("id", deleteId);
@@ -103,13 +195,10 @@ const CalendarDayView = ({
     setDeleteId(null);
   };
 
+  // ── Check-in handler ──
   const handleCheckIn = async (enrollmentId: string, sessionId: string, currentlyCheckedIn: boolean) => {
     if (currentlyCheckedIn) {
-      await supabase
-        .from("attendance")
-        .delete()
-        .eq("enrollment_id", enrollmentId)
-        .eq("lesson_date", dateStr);
+      await supabase.from("attendance").delete().eq("enrollment_id", enrollmentId).eq("lesson_date", dateStr);
     } else {
       await supabase.from("attendance").upsert(
         {
@@ -126,237 +215,314 @@ const CalendarDayView = ({
     onAttendanceChange();
   };
 
-  const toggleExpand = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  // ── Empty slot click ──
+  const handleEmptySlotClick = (colId: string, yPos: number) => {
+    const mins = Math.floor(yPos / HOUR_HEIGHT * 60) + START_HOUR * 60;
+    const roundedMins = Math.round(mins / 15) * 15;
+    const h = Math.floor(roundedMins / 60).toString().padStart(2, "0");
+    const m = (roundedMins % 60).toString().padStart(2, "0");
+    onAddEvent?.({ startTime: `${h}:${m}` });
   };
 
-  // Build unified timeline items
-  type TimelineItem =
-    | { type: "swim"; id: string; startTime: string; endTime: string; session: CalendarSwimSession }
-    | { type: "event"; id: string; startTime: string; endTime: string; event: CalendarPoolEvent };
+  // ── Render a positioned block ──
+  const renderBlock = (
+    key: string,
+    startMins: number,
+    endMins: number,
+    colorKey: string,
+    label: string,
+    subtitle: string,
+    dimmed: boolean,
+    onClick?: () => void,
+    isICS?: boolean,
+    actions?: React.ReactNode
+  ) => {
+    const top = minutesToTop(startMins);
+    const height = durationHeight(startMins, endMins);
+    const colors = BLOCK_COLORS[colorKey] || BLOCK_COLORS.other;
 
-  const todaySessions = swimSessions.filter((s) => s.day_of_week === dayName);
-  const todayEvents = poolEvents.filter((e) => e.event_date === dateStr);
-
-  const items: TimelineItem[] = [
-    ...todaySessions.map((s) => ({
-      type: "swim" as const,
-      id: s.id,
-      startTime: s.start_time,
-      endTime: s.end_time,
-      session: s,
-    })),
-    ...todayEvents.map((e) => ({
-      type: "event" as const,
-      id: e.id,
-      startTime: e.start_time,
-      endTime: e.end_time,
-      event: e,
-    })),
-  ].sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-  // Group by time slot
-  const slotMap = new Map<string, TimelineItem[]>();
-  for (const item of items) {
-    const slotKey = item.startTime.slice(0, 5);
-    if (!slotMap.has(slotKey)) slotMap.set(slotKey, []);
-    slotMap.get(slotKey)!.push(item);
-  }
-
-  const activeSlots = TIME_SLOTS.filter((s) => slotMap.has(s));
-
-  if (activeSlots.length === 0) {
     return (
-      <div className="text-center py-16 text-muted-foreground">
-        <Calendar className="w-12 h-12 mx-auto mb-3 opacity-40" />
-        <p className="font-medium">No activities scheduled</p>
-        <p className="text-sm">for {format(date, "EEEE, MMMM d")}</p>
+      <div
+        key={key}
+        className={cn(
+          "absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden transition-opacity cursor-pointer hover:shadow-md",
+          dimmed && "opacity-[0.12]"
+        )}
+        style={{
+          top: `${top}px`,
+          height: `${height}px`,
+          backgroundColor: colors.bg,
+          borderLeftColor: colors.border,
+          color: colors.text,
+        }}
+        onClick={onClick}
+      >
+        <div className="flex items-start justify-between gap-1">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold truncate leading-tight">{label}</p>
+            {height > 32 && (
+              <p className="text-[10px] truncate opacity-80 leading-tight mt-0.5">{subtitle}</p>
+            )}
+          </div>
+          {isICS && <Lock className="w-3 h-3 shrink-0 opacity-40 mt-0.5" />}
+          {actions}
+        </div>
       </div>
     );
-  }
+  };
 
   return (
-    <div className="space-y-0">
-      {/* Timeline */}
-      {activeSlots.map((slot, slotIdx) => {
-        const slotItems = slotMap.get(slot) || [];
-        const timeLabel = format(new Date(`2000-01-01T${slot}`), "h:mm a");
-
-        return (
-          <div key={slot} className="flex">
-            {/* Time gutter */}
-            <div className="w-20 shrink-0 relative">
-              <span className="text-xs font-semibold text-muted-foreground absolute top-3 right-3">
-                {timeLabel}
-              </span>
-            </div>
-
-            {/* Vertical line */}
-            <div className="w-px bg-border relative shrink-0">
-              <div className="absolute top-3 -left-1 w-2.5 h-2.5 rounded-full bg-border" />
-            </div>
-
-            {/* Activity bars */}
-            <div className="flex-1 pl-4 pb-2 pt-1 space-y-1.5">
-              {slotItems.map((item) => {
-                if (item.type === "swim") {
-                  const session = item.session;
-                  const sessionEnrollments = enrollments.filter(
-                    (e) => e.session_id === session.id
-                  );
-                  const levelInfo = LEVEL_DISPLAY[session.swim_level as SwimLevel];
-                  const colors = eventColorConfig.swim;
-                  const isExpanded = expandedIds.has(session.id);
-                  const names = sessionEnrollments.map((e) => e.child_name);
-
-                  return (
-                    <Collapsible
-                      key={session.id}
-                      open={isExpanded}
-                      onOpenChange={() => toggleExpand(session.id)}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <button
-                          className={cn(
-                            "w-full text-left rounded-lg border-l-4 px-3 py-2 transition-colors hover:brightness-95",
-                            colors.bg,
-                            colors.border
-                          )}
-                        >
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <div className={cn("w-2 h-2 rounded-full shrink-0", colors.dot)} />
-                            <span className="font-medium text-sm text-foreground">
-                              {levelInfo?.name || session.swim_level}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              ({sessionEnrollments.length}/{session.max_students})
-                            </span>
-                            {session.age_group && (
-                              <span className="text-xs text-muted-foreground">
-                                · {session.age_group === "preschool-3-5" ? "3–5y" : session.age_group === "school-5-8" ? "5–8y" : "7+"}
-                              </span>
-                            )}
-                            <span className="text-xs text-muted-foreground ml-auto hidden sm:inline">
-                              {format(new Date(`2000-01-01T${session.start_time}`), "h:mm")}–
-                              {format(new Date(`2000-01-01T${session.end_time}`), "h:mm a")}
-                            </span>
-                            {names.length > 0 && (
-                              <>
-                                <span className="text-muted-foreground hidden sm:inline">—</span>
-                                <span className="text-sm text-foreground/80 hidden sm:inline">
-                                  {names.join(" · ")}
-                                </span>
-                              </>
-                            )}
-                            <ChevronDown
-                              className={cn(
-                                "w-4 h-4 text-muted-foreground transition-transform ml-auto sm:ml-0",
-                                isExpanded && "rotate-180"
-                              )}
-                            />
-                          </div>
-                        </button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className={cn("rounded-b-lg border-l-4 px-4 py-2 space-y-1", colors.bg, colors.border)}>
-                          {sessionEnrollments.length > 0 ? (
-                            sessionEnrollments.map((enr) => {
-                              const att = attendance.find(
-                                (a) => a.enrollment_id === enr.id && a.lesson_date === dateStr
-                              );
-                              const isCheckedIn = !!att?.checked_in;
-                              return (
-                                <div key={enr.id} className="flex items-center gap-2 text-sm py-0.5">
-                                  <Checkbox
-                                    checked={isCheckedIn}
-                                    onCheckedChange={() =>
-                                      handleCheckIn(enr.id, session.id, isCheckedIn)
-                                    }
-                                  />
-                                  <span className={isCheckedIn ? "line-through text-muted-foreground" : ""}>
-                                    {enr.child_name}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">(age {enr.child_age})</span>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <p className="text-xs text-muted-foreground italic">No students enrolled</p>
-                          )}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  );
-                } else {
-                  const event = item.event;
-                  const colors = eventColorConfig[event.event_type] || eventColorConfig.other;
-                  const label = event.title || eventTypeLabel[event.event_type] || "Event";
-
-                  return (
-                    <div
-                      key={event.id}
-                      className={cn(
-                        "w-full rounded-lg border-l-4 px-3 py-2",
-                        colors.bg,
-                        colors.border
-                      )}
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className={cn("w-2 h-2 rounded-full shrink-0", colors.dot)} />
-                        <span className="font-medium text-sm text-foreground">{label}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {areaTag(event.pool_area)}
-                        </span>
-                        <span className="text-xs text-muted-foreground hidden sm:inline">
-                          {format(new Date(`2000-01-01T${event.start_time}`), "h:mm")}–
-                          {format(new Date(`2000-01-01T${event.end_time}`), "h:mm a")}
-                        </span>
-                        {event.instructor_name && (
-                          <>
-                            <span className="text-muted-foreground hidden sm:inline">—</span>
-                            <span className="text-sm text-foreground/80 hidden sm:inline">
-                              {event.instructor_name}
-                            </span>
-                          </>
-                        )}
-                        {event.notes && (
-                          <span className="text-xs text-muted-foreground hidden sm:inline">
-                            · {event.notes}
-                          </span>
-                        )}
-                        {/* Edit / Delete */}
-                        <div className="flex items-center gap-0.5 ml-auto">
-                          <button
-                            onClick={() => onEditEvent?.(event)}
-                            className="p-1 rounded hover:bg-muted transition-colors"
-                            title="Edit event"
-                          >
-                            <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteId(event.id)}
-                            className="p-1 rounded hover:bg-destructive/10 transition-colors"
-                            title="Delete event"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-              })}
-            </div>
+    <div className="border rounded-lg bg-card overflow-hidden">
+      {/* ── Group headers ── */}
+      <div className="flex border-b">
+        {/* Time gutter */}
+        <div className="w-16 shrink-0" />
+        {/* ICS group */}
+        {icsCount > 0 && (
+          <div
+            className="text-center text-xs font-semibold py-1.5 border-l"
+            style={{
+              backgroundColor: "#E1F5EE",
+              color: "#085041",
+              flex: icsCount,
+            }}
+          >
+            I Can Swim 209 — {todayICS.length > 0 ? icsInstructors.length : 0} instructor{icsInstructors.length !== 1 ? "s" : ""} today
           </div>
-        );
-      })}
+        )}
+        {/* AD group */}
+        {adCount > 0 && (
+          <div
+            className="text-center text-xs font-semibold py-1.5 border-l"
+            style={{ backgroundColor: "#E6F1FB", color: "#0C447C", flex: adCount }}
+          >
+            Aquatic Dreams — {todaySessions.length + adEvents.length} line{(todaySessions.length + adEvents.length) !== 1 ? "s" : ""}
+          </div>
+        )}
+        {/* Dive group */}
+        {diveCount > 0 && (
+          <div
+            className="text-center text-xs font-semibold py-1.5 border-l"
+            style={{ backgroundColor: "#FAEEDA", color: "#633806", flex: diveCount }}
+          >
+            Dive / Rental
+          </div>
+        )}
+      </div>
 
-      {/* Delete confirmation */}
+      {/* ── Column name headers ── */}
+      <div className="flex border-b">
+        <div className="w-16 shrink-0" />
+        {columns.map((col) => (
+          <div
+            key={col.id}
+            className="flex-1 text-center text-[11px] font-medium text-muted-foreground py-1.5 border-l truncate px-1"
+          >
+            {col.label}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Time grid ── */}
+      <div className="flex overflow-x-auto">
+        {/* Time labels */}
+        <div className="w-16 shrink-0 relative" style={{ height: `${TOTAL_HEIGHT}px` }}>
+          {HOURS.map((h) => (
+            <div
+              key={h}
+              className="absolute right-2 text-[11px] text-muted-foreground font-medium"
+              style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT - 7}px` }}
+            >
+              {h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`}
+            </div>
+          ))}
+        </div>
+
+        {/* Columns */}
+        {columns.map((col, colIdx) => (
+          <div
+            key={col.id}
+            className="flex-1 relative border-l"
+            style={{ height: `${TOTAL_HEIGHT}px`, minWidth: "120px" }}
+            onMouseMove={(e) => {
+              if (col.group !== "ics") {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setHoverSlot({ colId: col.id, y: e.clientY - rect.top });
+              }
+            }}
+            onMouseLeave={() => setHoverSlot(null)}
+            onClick={(e) => {
+              if (col.group !== "ics") {
+                const rect = e.currentTarget.getBoundingClientRect();
+                handleEmptySlotClick(col.id, e.clientY - rect.top);
+              }
+            }}
+          >
+            {/* Hour lines */}
+            {HOURS.map((h) => (
+              <div key={h}>
+                <div
+                  className="absolute left-0 right-0 border-t border-border/60"
+                  style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT}px` }}
+                />
+                {h < END_HOUR && (
+                  <div
+                    className="absolute left-0 right-0 border-t border-dashed border-border/30"
+                    style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT + HOUR_HEIGHT / 2}px` }}
+                  />
+                )}
+              </div>
+            ))}
+
+            {/* ── ICS blocks ── */}
+            {col.group === "ics" &&
+              todayICS
+                .filter((s) => (s.instructor_name || "Instructor") === col.label)
+                .map((s) => {
+                  const startMins = timeToMinutes(s.start_time);
+                  const endMins = timeToMinutes(s.end_time);
+                  const dimmed = !activeFilters.has("i-can-swim");
+                  return renderBlock(
+                    s.id,
+                    startMins,
+                    endMins,
+                    "i-can-swim",
+                    s.session_type || "I Can Swim",
+                    `${s.confirmed_bookings}/${s.max_capacity} swimmers`,
+                    dimmed,
+                    undefined,
+                    true
+                  );
+                })}
+
+            {/* ── AD swim sessions ── */}
+            {col.group === "ad" &&
+              todaySessions.map((s) => {
+                const startMins = timeToMinutes(s.start_time);
+                const endMins = timeToMinutes(s.end_time);
+                const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
+                const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
+                const names = sessionEnrollments.map((e) => e.child_name).join(" · ");
+                const dimmed = !activeFilters.has("swim");
+
+                return renderBlock(
+                  s.id,
+                  startMins,
+                  endMins,
+                  "swim",
+                  levelInfo?.name || s.swim_level,
+                  `${sessionEnrollments.length}/${s.max_students} — ${names || "No students"}`,
+                  dimmed,
+                  () =>
+                    setDetailBlock({
+                      kind: "swim",
+                      session: s,
+                      enrollments: sessionEnrollments,
+                      attendance: attendance.filter((a) => a.session_id === s.id),
+                      dateStr,
+                    })
+                );
+              })}
+
+            {/* ── AD pool events (private, semi-private) ── */}
+            {col.group === "ad" &&
+              adEvents.map((e) => {
+                const startMins = timeToMinutes(e.start_time);
+                const endMins = timeToMinutes(e.end_time);
+                const colorKey = e.event_type;
+                const dimmed = !activeFilters.has(e.event_type as ActivityType);
+
+                return renderBlock(
+                  e.id,
+                  startMins,
+                  endMins,
+                  colorKey,
+                  e.title,
+                  e.instructor_name || e.pool_area,
+                  dimmed,
+                  () => setDetailBlock({ kind: "event", event: e }),
+                  false,
+                  <div className="flex shrink-0 gap-0.5">
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); onEditEvent?.(e); }}
+                      className="p-0.5 rounded hover:bg-white/50"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); setDeleteId(e.id); }}
+                      className="p-0.5 rounded hover:bg-white/50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+
+            {/* ── Dive / Rental blocks ── */}
+            {col.group === "dive" &&
+              diveRentalEvents.map((e) => {
+                const startMins = timeToMinutes(e.start_time);
+                const endMins = timeToMinutes(e.end_time);
+                const colorKey = e.event_type;
+                const dimmed = !activeFilters.has(e.event_type as ActivityType);
+
+                return renderBlock(
+                  e.id,
+                  startMins,
+                  endMins,
+                  colorKey,
+                  e.title,
+                  e.instructor_name || e.notes || "",
+                  dimmed,
+                  () => setDetailBlock({ kind: "event", event: e }),
+                  false,
+                  <div className="flex shrink-0 gap-0.5">
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); onEditEvent?.(e); }}
+                      className="p-0.5 rounded hover:bg-white/50"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); setDeleteId(e.id); }}
+                      className="p-0.5 rounded hover:bg-white/50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+
+            {/* ── Hover "+ add" indicator ── */}
+            {hoverSlot?.colId === col.id && col.group !== "ics" && (
+              <div
+                className="absolute left-1 right-1 flex items-center justify-center text-xs text-muted-foreground/50 pointer-events-none"
+                style={{ top: `${Math.round(hoverSlot.y / (HOUR_HEIGHT / 2)) * (HOUR_HEIGHT / 2) - 10}px` }}
+              >
+                <span className="bg-muted/60 rounded px-2 py-0.5 flex items-center gap-1">
+                  <Plus className="w-3 h-3" /> add
+                </span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Block detail panel ── */}
+      <CalendarBlockDetail
+        block={detailBlock}
+        onClose={() => setDetailBlock(null)}
+        onEdit={() => {
+          if (detailBlock?.kind === "event") {
+            onEditEvent?.(detailBlock.event);
+          }
+          setDetailBlock(null);
+        }}
+        onCheckIn={handleCheckIn}
+      />
+
+      {/* ── Delete confirmation ── */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
