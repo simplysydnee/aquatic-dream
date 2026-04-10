@@ -17,6 +17,7 @@ import TripReservationsAdmin from "./pages/admin/TripReservationsAdmin";
 import ContactsAdmin from "./pages/admin/ContactsAdmin";
 import UsersAdmin from "./pages/admin/UsersAdmin";
 import CalendarAdmin from "./pages/admin/CalendarAdmin";
+import ClassRosterAdmin from "./pages/admin/ClassRosterAdmin";
 import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
 import KioskCheckIn from "./pages/KioskCheckIn";
@@ -43,6 +44,7 @@ const App = () => (
               }
             >
               <Route index element={<CalendarAdmin />} />
+              <Route path="roster" element={<ClassRosterAdmin />} />
               <Route path="enrollments" element={<SwimEnrollmentsAdmin />} />
               <Route path="lesson-requests" element={<LessonRequestsAdmin />} />
               <Route path="dive-bookings" element={<DiveBookingsAdmin />} />
