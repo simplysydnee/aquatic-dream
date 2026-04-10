@@ -1,8 +1,5 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import type {
@@ -11,7 +8,8 @@ import type {
   CalendarPoolEvent,
   AttendanceRecord,
 } from "@/hooks/useCalendarData";
-import { Waves, Anchor, Users, Wrench, Calendar, Pencil, Trash2 } from "lucide-react";
+import { Waves, Anchor, Users, Wrench, Calendar, Pencil, Trash2, ChevronDown } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +21,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 
 interface Props {
   date: Date;
@@ -43,25 +47,49 @@ const TIME_SLOTS = [
   "19:00", "19:30",
 ];
 
-const eventTypeConfig: Record<string, { color: string; icon: typeof Waves; label: string }> = {
-  "i-can-swim": { color: "bg-amber-100 border-amber-300 text-amber-800", icon: Users, label: "I Can Swim 209" },
-  "private-lesson": { color: "bg-pink-100 border-pink-300 text-pink-800", icon: Users, label: "Private Lesson" },
-  "semi-private-lesson": { color: "bg-orange-100 border-orange-300 text-orange-800", icon: Users, label: "Semi-Private Lesson" },
-  "dive-session": { color: "bg-emerald-100 border-emerald-300 text-emerald-800", icon: Anchor, label: "Dive Session" },
-  "pool-rental": { color: "bg-purple-100 border-purple-300 text-purple-800", icon: Calendar, label: "Pool Rental" },
-  "maintenance": { color: "bg-gray-100 border-gray-300 text-gray-800", icon: Wrench, label: "Maintenance" },
-  "other": { color: "bg-gray-100 border-gray-300 text-gray-700", icon: Calendar, label: "Other" },
+const eventColorConfig: Record<string, { bg: string; border: string; dot: string }> = {
+  "swim":              { bg: "bg-blue-50",    border: "border-l-blue-400",    dot: "bg-blue-400" },
+  "i-can-swim":        { bg: "bg-amber-50",   border: "border-l-amber-400",   dot: "bg-amber-400" },
+  "private-lesson":    { bg: "bg-pink-50",    border: "border-l-pink-400",    dot: "bg-pink-400" },
+  "semi-private-lesson": { bg: "bg-orange-50", border: "border-l-orange-400", dot: "bg-orange-400" },
+  "dive-session":      { bg: "bg-emerald-50", border: "border-l-emerald-500", dot: "bg-emerald-500" },
+  "pool-rental":       { bg: "bg-purple-50",  border: "border-l-purple-400",  dot: "bg-purple-400" },
+  "maintenance":       { bg: "bg-gray-100",   border: "border-l-gray-400",    dot: "bg-gray-400" },
+  "other":             { bg: "bg-gray-50",    border: "border-l-gray-400",    dot: "bg-gray-400" },
 };
 
-const areaLabel = (area: string) => {
-  if (area === "shallow") return "Shallow End";
-  if (area === "deep") return "Deep End";
-  return "Full Pool";
+const eventTypeLabel: Record<string, string> = {
+  "i-can-swim": "I Can Swim 209",
+  "private-lesson": "Private Lesson",
+  "semi-private-lesson": "Semi-Private Lesson",
+  "dive-session": "Dive Session",
+  "pool-rental": "Pool Rental",
+  "maintenance": "Maintenance",
+  "other": "Other",
 };
 
-const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendance, onAttendanceChange, onEditEvent, onDeleteEvent }: Props) => {
+const areaTag = (area: string) => {
+  if (area === "shallow") return "Shallow";
+  if (area === "deep") return "Deep";
+  return "Full";
+};
+
+const CalendarDayView = ({
+  date,
+  swimSessions,
+  enrollments,
+  poolEvents,
+  attendance,
+  onAttendanceChange,
+  onEditEvent,
+  onDeleteEvent,
+}: Props) => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  const dateStr = format(date, "yyyy-MM-dd");
+  const dayName = format(date, "EEEE");
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -74,46 +102,62 @@ const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendan
     }
     setDeleteId(null);
   };
-  const dateStr = format(date, "yyyy-MM-dd");
-  const dayName = format(date, "EEEE");
-
-  // Filter sessions for this day
-  const todaySessions = swimSessions.filter((s) => s.day_of_week === dayName);
-  const todayEvents = poolEvents.filter((e) => e.event_date === dateStr);
 
   const handleCheckIn = async (enrollmentId: string, sessionId: string, currentlyCheckedIn: boolean) => {
     if (currentlyCheckedIn) {
-      // Uncheck
       await supabase
         .from("attendance")
         .delete()
         .eq("enrollment_id", enrollmentId)
         .eq("lesson_date", dateStr);
     } else {
-      // Check in
-      await supabase.from("attendance").upsert({
-        enrollment_id: enrollmentId,
-        session_id: sessionId,
-        lesson_date: dateStr,
-        checked_in: true,
-        checked_in_at: new Date().toISOString(),
-        checked_in_by: "admin",
-      }, { onConflict: "enrollment_id,lesson_date" });
+      await supabase.from("attendance").upsert(
+        {
+          enrollment_id: enrollmentId,
+          session_id: sessionId,
+          lesson_date: dateStr,
+          checked_in: true,
+          checked_in_at: new Date().toISOString(),
+          checked_in_by: "admin",
+        },
+        { onConflict: "enrollment_id,lesson_date" }
+      );
     }
     onAttendanceChange();
   };
 
-  // Build timeline items
-  type TimelineItem = {
-    startTime: string;
-    endTime: string;
-    type: "swim" | "event";
-    data: CalendarSwimSession | CalendarPoolEvent;
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
+  // Build unified timeline items
+  type TimelineItem =
+    | { type: "swim"; id: string; startTime: string; endTime: string; session: CalendarSwimSession }
+    | { type: "event"; id: string; startTime: string; endTime: string; event: CalendarPoolEvent };
+
+  const todaySessions = swimSessions.filter((s) => s.day_of_week === dayName);
+  const todayEvents = poolEvents.filter((e) => e.event_date === dateStr);
+
   const items: TimelineItem[] = [
-    ...todaySessions.map((s) => ({ startTime: s.start_time, endTime: s.end_time, type: "swim" as const, data: s })),
-    ...todayEvents.map((e) => ({ startTime: e.start_time, endTime: e.end_time, type: "event" as const, data: e })),
+    ...todaySessions.map((s) => ({
+      type: "swim" as const,
+      id: s.id,
+      startTime: s.start_time,
+      endTime: s.end_time,
+      session: s,
+    })),
+    ...todayEvents.map((e) => ({
+      type: "event" as const,
+      id: e.id,
+      startTime: e.start_time,
+      endTime: e.end_time,
+      event: e,
+    })),
   ].sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   // Group by time slot
@@ -137,103 +181,156 @@ const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendan
   }
 
   return (
-    <div className="space-y-2">
-      {activeSlots.map((slot) => {
+    <div className="space-y-0">
+      {/* Timeline */}
+      {activeSlots.map((slot, slotIdx) => {
         const slotItems = slotMap.get(slot) || [];
+        const timeLabel = format(new Date(`2000-01-01T${slot}`), "h:mm a");
+
         return (
-          <div key={slot} className="flex gap-3">
-            {/* Time label */}
-            <div className="w-16 shrink-0 pt-2 text-right">
-              <span className="text-sm font-medium text-muted-foreground">
-                {format(new Date(`2000-01-01T${slot}`), "h:mm a")}
+          <div key={slot} className="flex">
+            {/* Time gutter */}
+            <div className="w-20 shrink-0 relative">
+              <span className="text-xs font-semibold text-muted-foreground absolute top-3 right-3">
+                {timeLabel}
               </span>
             </div>
 
-            {/* Events at this time */}
-            <div className="flex-1 flex flex-wrap gap-2">
+            {/* Vertical line */}
+            <div className="w-px bg-border relative shrink-0">
+              <div className="absolute top-3 -left-1 w-2.5 h-2.5 rounded-full bg-border" />
+            </div>
+
+            {/* Activity bars */}
+            <div className="flex-1 pl-4 pb-2 pt-1 space-y-1.5">
               {slotItems.map((item) => {
                 if (item.type === "swim") {
-                  const session = item.data as CalendarSwimSession;
+                  const session = item.session;
                   const sessionEnrollments = enrollments.filter(
                     (e) => e.session_id === session.id
                   );
                   const levelInfo = LEVEL_DISPLAY[session.swim_level as SwimLevel];
+                  const colors = eventColorConfig.swim;
+                  const isExpanded = expandedIds.has(session.id);
+                  const names = sessionEnrollments.map((e) => e.child_name);
 
                   return (
-                    <Card key={session.id} className="flex-1 min-w-[200px] max-w-[350px] p-3 border-l-4 border-l-blue-400">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Waves className="w-4 h-4 text-blue-500" />
-                          <span className="font-medium text-sm">
-                            {levelInfo?.name || session.swim_level}
-                          </span>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {sessionEnrollments.length}/{session.max_students}
-                        </Badge>
-                      </div>
-                      {session.age_group && (
-                        <p className="text-xs text-muted-foreground mb-2">
-                          {session.age_group === "preschool-3-5" ? "Preschool 3–5" : session.age_group === "school-5-8" ? "School-Age 5–8" : "Advanced 7+"}
-                        </p>
-                      )}
-                      {/* Student roster with check-in */}
-                      {sessionEnrollments.length > 0 ? (
-                        <div className="space-y-1">
-                          {sessionEnrollments.map((enr) => {
-                            const att = attendance.find(
-                              (a) => a.enrollment_id === enr.id && a.lesson_date === dateStr
-                            );
-                            const isCheckedIn = !!att?.checked_in;
-                            return (
-                              <div
-                                key={enr.id}
-                                className="flex items-center gap-2 text-sm py-0.5"
-                              >
-                                <Checkbox
-                                  checked={isCheckedIn}
-                                  onCheckedChange={() =>
-                                    handleCheckIn(enr.id, session.id, isCheckedIn)
-                                  }
-                                />
-                                <span className={isCheckedIn ? "line-through text-muted-foreground" : ""}>
-                                  {enr.child_name}
+                    <Collapsible
+                      key={session.id}
+                      open={isExpanded}
+                      onOpenChange={() => toggleExpand(session.id)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <button
+                          className={cn(
+                            "w-full text-left rounded-lg border-l-4 px-3 py-2 transition-colors hover:brightness-95",
+                            colors.bg,
+                            colors.border
+                          )}
+                        >
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className={cn("w-2 h-2 rounded-full shrink-0", colors.dot)} />
+                            <span className="font-medium text-sm text-foreground">
+                              {levelInfo?.name || session.swim_level}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              ({sessionEnrollments.length}/{session.max_students})
+                            </span>
+                            {session.age_group && (
+                              <span className="text-xs text-muted-foreground">
+                                · {session.age_group === "preschool-3-5" ? "3–5y" : session.age_group === "school-5-8" ? "5–8y" : "7+"}
+                              </span>
+                            )}
+                            <span className="text-xs text-muted-foreground ml-auto hidden sm:inline">
+                              {format(new Date(`2000-01-01T${session.start_time}`), "h:mm")}–
+                              {format(new Date(`2000-01-01T${session.end_time}`), "h:mm a")}
+                            </span>
+                            {names.length > 0 && (
+                              <>
+                                <span className="text-muted-foreground hidden sm:inline">—</span>
+                                <span className="text-sm text-foreground/80 hidden sm:inline">
+                                  {names.join(" · ")}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
-                                  (age {enr.child_age})
-                                </span>
-                              </div>
-                            );
-                          })}
+                              </>
+                            )}
+                            <ChevronDown
+                              className={cn(
+                                "w-4 h-4 text-muted-foreground transition-transform ml-auto sm:ml-0",
+                                isExpanded && "rotate-180"
+                              )}
+                            />
+                          </div>
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className={cn("rounded-b-lg border-l-4 px-4 py-2 space-y-1", colors.bg, colors.border)}>
+                          {sessionEnrollments.length > 0 ? (
+                            sessionEnrollments.map((enr) => {
+                              const att = attendance.find(
+                                (a) => a.enrollment_id === enr.id && a.lesson_date === dateStr
+                              );
+                              const isCheckedIn = !!att?.checked_in;
+                              return (
+                                <div key={enr.id} className="flex items-center gap-2 text-sm py-0.5">
+                                  <Checkbox
+                                    checked={isCheckedIn}
+                                    onCheckedChange={() =>
+                                      handleCheckIn(enr.id, session.id, isCheckedIn)
+                                    }
+                                  />
+                                  <span className={isCheckedIn ? "line-through text-muted-foreground" : ""}>
+                                    {enr.child_name}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">(age {enr.child_age})</span>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic">No students enrolled</p>
+                          )}
                         </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground italic">No students enrolled</p>
-                      )}
-                    </Card>
+                      </CollapsibleContent>
+                    </Collapsible>
                   );
                 } else {
-                  const event = item.data as CalendarPoolEvent;
-                  const config = eventTypeConfig[event.event_type] || eventTypeConfig.other;
-                  const Icon = config.icon;
+                  const event = item.event;
+                  const colors = eventColorConfig[event.event_type] || eventColorConfig.other;
+                  const label = event.title || eventTypeLabel[event.event_type] || "Event";
 
                   return (
-                    <Card
+                    <div
                       key={event.id}
-                      className={`flex-1 min-w-[200px] max-w-[350px] p-3 border-l-4 ${
-                        event.event_type === "i-can-swim" ? "border-l-amber-400" :
-                        event.event_type === "private-lesson" ? "border-l-pink-400" :
-                        event.event_type === "semi-private-lesson" ? "border-l-orange-400" :
-                        event.event_type === "dive-session" ? "border-l-emerald-500" :
-                        event.event_type === "pool-rental" ? "border-l-purple-400" :
-                        "border-l-gray-400"
-                      }`}
+                      className={cn(
+                        "w-full rounded-lg border-l-4 px-3 py-2",
+                        colors.bg,
+                        colors.border
+                      )}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4" />
-                          <span className="font-medium text-sm">{event.title}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className={cn("w-2 h-2 rounded-full shrink-0", colors.dot)} />
+                        <span className="font-medium text-sm text-foreground">{label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {areaTag(event.pool_area)}
+                        </span>
+                        <span className="text-xs text-muted-foreground hidden sm:inline">
+                          {format(new Date(`2000-01-01T${event.start_time}`), "h:mm")}–
+                          {format(new Date(`2000-01-01T${event.end_time}`), "h:mm a")}
+                        </span>
+                        {event.instructor_name && (
+                          <>
+                            <span className="text-muted-foreground hidden sm:inline">—</span>
+                            <span className="text-sm text-foreground/80 hidden sm:inline">
+                              {event.instructor_name}
+                            </span>
+                          </>
+                        )}
+                        {event.notes && (
+                          <span className="text-xs text-muted-foreground hidden sm:inline">
+                            · {event.notes}
+                          </span>
+                        )}
+                        {/* Edit / Delete */}
+                        <div className="flex items-center gap-0.5 ml-auto">
                           <button
                             onClick={() => onEditEvent?.(event)}
                             className="p-1 rounded hover:bg-muted transition-colors"
@@ -250,23 +347,7 @@ const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendan
                           </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{areaLabel(event.pool_area)}</span>
-                        <span>·</span>
-                        <span>
-                          {format(new Date(`2000-01-01T${event.start_time}`), "h:mm a")} –{" "}
-                          {format(new Date(`2000-01-01T${event.end_time}`), "h:mm a")}
-                        </span>
-                      </div>
-                      {event.instructor_name && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Instructor: {event.instructor_name}
-                        </p>
-                      )}
-                      {event.notes && (
-                        <p className="text-xs text-muted-foreground mt-1">{event.notes}</p>
-                      )}
-                    </Card>
+                    </div>
                   );
                 }
               })}
@@ -274,6 +355,8 @@ const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendan
           </div>
         );
       })}
+
+      {/* Delete confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
