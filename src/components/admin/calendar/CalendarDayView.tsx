@@ -135,11 +135,12 @@ const CalendarDayView = ({
 
   // ── I Can Swim columns (dynamic from Airtable) ──
   const todayICS = useMemo(() => {
+    const selectedDateStr = format(date, "yyyy-MM-dd");
     return icsSessions.filter((s) => {
       const d = new Date(s.start_time);
-      const la = d.toLocaleDateString("en-US", { timeZone: "America/Los_Angeles" });
-      const selected = date.toLocaleDateString("en-US");
-      return la === selected;
+      // Convert to Pacific time and format as yyyy-MM-dd for reliable comparison
+      const pacificDate = d.toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }); // en-CA = yyyy-MM-dd
+      return pacificDate === selectedDateStr;
     });
   }, [icsSessions, date]);
 
@@ -173,7 +174,7 @@ const CalendarDayView = ({
     icsInstructors.forEach((name, i) => {
       cols.push({ id: `ics-${i}`, label: name, group: "ics" });
     });
-    cols.push({ id: "ad-1", label: "Line 1", group: "ad" });
+    cols.push({ id: "ad-1", label: "Group 1", group: "ad" });
     cols.push({ id: "dive", label: "Dive / Rental", group: "dive" });
     return cols;
   }, [icsInstructors]);
@@ -296,7 +297,7 @@ const CalendarDayView = ({
             className="text-center text-xs font-semibold py-1.5 border-l"
             style={{ backgroundColor: "#E6F1FB", color: "#0C447C", flex: adCount }}
           >
-            Aquatic Dreams — {todaySessions.length + adEvents.length} line{(todaySessions.length + adEvents.length) !== 1 ? "s" : ""}
+            Aquatic Dreams — {todaySessions.length + adEvents.length} group{(todaySessions.length + adEvents.length) !== 1 ? "s" : ""}
           </div>
         )}
         {/* Dive group */}
