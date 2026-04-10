@@ -427,15 +427,22 @@ const CalendarDayView = ({
                 .map((s) => {
                   const startMins = timeToMinutes(s.start_time);
                   const endMins = timeToMinutes(s.end_time);
-                  const dimmed = false;
+                  const isClosed = s.status?.toLowerCase() === "closed";
+                  const colorKey = isClosed ? "i-can-swim-closed" : "i-can-swim";
+                  const label = isClosed
+                    ? (s.instructor_name || "Instructor")
+                    : (s.client_name || s.session_type || "I Can Swim");
+                  const subtitle = isClosed
+                    ? `${fmtTime(s.start_time)} – ${fmtTime(s.end_time)} · Closed`
+                    : `${fmtTime(s.start_time)} – ${fmtTime(s.end_time)} · ${s.status}`;
                   return renderBlock(
                     s.id,
                     startMins,
                     endMins,
-                    "i-can-swim",
-                    s.client_name || s.session_type || "I Can Swim",
-                    `${fmtTime(s.start_time)} – ${fmtTime(s.end_time)} · ${s.status}`,
-                    dimmed,
+                    colorKey,
+                    label,
+                    subtitle,
+                    false,
                     () => setDetailBlock({ kind: "ics", session: s }),
                     true
                   );
