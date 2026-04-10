@@ -77,6 +77,18 @@ const CalendarAdmin = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Badge variant={icsSource === "supabase" ? "default" : "secondary"} className="text-[10px]">
+            ICS: {icsSource === "supabase" ? "New DB" : "Airtable"}
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleIcsSource}
+            className="text-xs gap-1.5"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            Switch to {icsSource === "airtable" ? "New DB" : "Airtable"}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
             Today
           </Button>
