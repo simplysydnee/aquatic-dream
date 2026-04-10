@@ -42,9 +42,9 @@ Deno.serve(async (req) => {
       'Client Name (from Client)',
       'Client',
       'Day of the week',
-      'Parent/Guardian Name (from Client)',
+      'Parent Name (from Client)',
       'Email (from Client)',
-      'Phone (from Client)',
+      'Phone Number (from Client) 2',
     ]
 
     const allRecords: any[] = []
@@ -86,11 +86,11 @@ Deno.serve(async (req) => {
         const instructor = Array.isArray(f['Instructor']) ? f['Instructor'][0] : f['Instructor'] || null
         const status = (f['Booking Status'] || 'open').toLowerCase()
 
-        const parentNameArr = f['Parent/Guardian Name (from Client)']
+        const parentNameArr = f['Parent Name (from Client)']
         const parentName = Array.isArray(parentNameArr) ? parentNameArr[0] : parentNameArr || null
         const emailArr = f['Email (from Client)']
         const email = Array.isArray(emailArr) ? emailArr[0] : emailArr || null
-        const phoneArr = f['Phone (from Client)']
+        const phoneArr = f['Phone Number (from Client) 2']
         const phone = Array.isArray(phoneArr) ? phoneArr[0] : phoneArr || null
 
         return {
