@@ -1,28 +1,92 @@
 
 
-# Job Applications Admin — Viewed/Archived Workflow
+# Pool Calendar Day View — Redesign Options
 
-## Summary
+## What You Described
 
-Add two new columns to `job_applications` (`is_viewed` and `is_archived`) and update the admin UI with filtering tabs, a viewed indicator, and archive/unarchive actions.
+A vertical timeline where each time slot is a full-width color-coded row showing the activity type and the names of people in that slot inline, like:
 
-## Database Migration
+```text
+3:00 PM  [■ amber] I Can Swim — Lauren, Sutton, Megan
+3:00 PM  [■ blue ] Level 2 Swim — Jake, Emma
+3:30 PM  [■ pink ] Private Lesson — Riley
+4:00 PM  [■ green] Dive Session — Open
+```
 
-Add two columns to `job_applications`:
-- `is_viewed` (boolean, default false) — marks whether admin has opened/reviewed the application
-- `is_archived` (boolean, default false) — allows archiving past applicants
+Here are three layout approaches to choose from:
 
-## UI Changes (JobApplicationsAdmin.tsx)
+---
 
-1. **Filter tabs** at the top: "Active" (default, `is_archived = false`), "Hired", "Archived" — lets you quickly switch between views
-2. **Viewed indicator**: Unviewed applications show a blue dot or bold styling. When you click the eye icon to view details, the app automatically marks `is_viewed = true`
-3. **Archive button**: Each row gets an archive icon button. Clicking it sets `is_archived = true` and removes the application from the active view. In the "Archived" tab, a button to unarchive
-4. **Hired tab**: Filters to only `status = 'hired'` for quick review of your team
+### Option A — Color Bar Rows (Compact Schedule Board)
 
-## How It Works
+Each time slot is a horizontal row. Activities within that slot are color-coded bars that span the row, with names listed inline.
 
-- Opening the detail dialog auto-marks the application as "viewed"
-- The active tab hides archived applications so the list stays clean
-- You can always find past applicants under the Archived tab
-- No data is deleted — archive is just a soft filter
+```text
+ TIME        ACTIVITY
+ ─────────────────────────────────────────────────────
+ 3:00 PM   ┃ ██ I Can Swim 209    Lauren · Sutton · Megan
+           ┃ ██ Level 2 Lessons   Jake · Emma (2/6)
+ 3:30 PM   ┃ ██ Private Lesson    Riley
+ 4:00 PM   ┃ ██ Dive Session      —
+ 4:30 PM   ┃ ██ Maintenance       (Full Pool)
+```
+
+- Single column, stacked vertically
+- Each activity is a colored pill/bar with the label and names on one line
+- Most compact — good if you want a quick glance at the whole day
+- Clicking a row expands it to show check-in checkboxes
+
+---
+
+### Option B — Time Blocks with Lanes (Pool Area Columns)
+
+Vertical timeline on the left, with two columns: Shallow End and Deep End. Activities slot into their pool area.
+
+```text
+ TIME       SHALLOW END                    DEEP END
+ ─────────────────────────────────────────────────────
+ 3:00 PM    ██ I Can Swim 209              ██ Dive Session
+            Lauren · Sutton · Megan         Open
+ 3:30 PM    ██ Private Lesson              —
+            Riley
+ 4:00 PM              ██ Maintenance (Full Pool)
+```
+
+- Shows pool area usage at a glance — you can see conflicts
+- Activities span both columns when "full pool"
+- More visual but takes more space
+
+---
+
+### Option C — Gantt-Style Time Blocks (Visual Duration)
+
+Vertical time axis with blocks that visually represent duration (taller = longer). Color-coded with names inside.
+
+```text
+ 3:00 ┃ ┌──────────────────────┐  ┌─────────────────┐
+      ┃ │ I Can Swim 209       │  │ Level 2 Lessons  │
+      ┃ │ Lauren·Sutton·Megan  │  │ Jake · Emma      │
+ 3:30 ┃ ├──────────────────────┤  └─────────────────┘
+      ┃ │ (continues)          │
+ 4:00 ┃ └──────────────────────┘
+```
+
+- Most visual — block height reflects actual duration
+- Good for seeing overlaps and gaps
+- More complex to build, takes more vertical space
+
+---
+
+## Recommendation
+
+**Option A** is closest to what you described — clean vertical list, color-coded bars, names inline. It is the simplest to build and easiest to scan. Check-in can expand on click.
+
+## Implementation (whichever option you pick)
+
+- Rewrite `CalendarDayView.tsx` with the new layout
+- Keep all existing functionality (check-in, edit/delete events, attendance)
+- Color coding stays the same (amber = I Can Swim, blue = swim lessons, pink = private, etc.)
+- Clicking a row expands to show checkboxes for attendance
+
+Pick **A**, **B**, or **C** (or mix elements) and I will build it.
 
