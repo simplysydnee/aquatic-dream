@@ -19,9 +19,6 @@ Deno.serve(async (req) => {
       )
     }
 
-    // First, discover the tables in the base to find the right table name
-    // The Airtable screenshot shows "Individual Sessions" tab with columns:
-    // Start Date, Client, Email, Booking Status, Instructor, Client Name, End Date
     const tableName = 'Individual Sessions'
     const encodedTable = encodeURIComponent(tableName)
 
@@ -34,23 +31,32 @@ Deno.serve(async (req) => {
     const oneWeekAgo = new Date()
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
     const filterFormula = `IS_AFTER({Start Date}, '${oneWeekAgo.toISOString().split('T')[0]}')`
-    url.searchParams.set('filterByFormula', filterFormula)
+
+    // Only request the fields we need
+    const fields = [
+      'Start Date',
+      'End Date',
+      'Instructor',
+      'Booking Status',
+      'Session Type',
+      'Client Name (from Client)',
+      'Client',
+      'Day of the week',
+    ]
 
     const allRecords: any[] = []
     let offset: string | undefined = undefined
 
-    // Paginate through all results
     do {
-      const pageUrl = new URL(url.toString())
-      if (offset) {
-        pageUrl.searchParams.set('offset', offset)
-      }
+      const url = new URL(`https://api.airtable.com/v0/${baseId}/${encodedTable}`)
+      url.searchParams.set('sort[0][field]', 'Start Date')
+      url.searchParams.set('sort[0][direction]', 'asc')
+      url.searchParams.set('filterByFormula', filterFormula)
+      fields.forEach((f, i) => url.searchParams.set(`fields[${i}]`, f))
+      if (offset) url.searchParams.set('offset', offset)
 
-      const response = await fetch(pageUrl.toString(), {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch(url.toString(), {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
       })
 
       if (!response.ok) {
@@ -67,38 +73,32 @@ Deno.serve(async (req) => {
       offset = data.offset
     } while (offset)
 
-    console.log(`Fetched ${allRecords.length} records from Airtable`)
-
-    // Log first record's field names for debugging
-    if (allRecords.length > 0) {
-      console.log('Field names:', Object.keys(allRecords[0].fields))
-      console.log('Sample record:', JSON.stringify(allRecords[0].fields).slice(0, 500))
-    }
-
-    // Map Airtable records to our ICSSession format
-    // Field names from the screenshot: Start Date, End Date, Client, Instructor, Booking Status
+    // Map Airtable records to ICSSession format
     const sessions = allRecords
       .filter((r: any) => r.fields['Start Date'] && r.fields['End Date'])
-      .map((r: any) => ({
-        id: r.id,
-        start_time: r.fields['Start Date'],
-        end_time: r.fields['End Date'],
-        location: r.fields['Location'] || 'Modesto',
-        session_type: r.fields['Session Type'] || r.fields['Type'] || 'lesson',
-        status: (r.fields['Booking Status'] || 'open').toLowerCase(),
-        max_capacity: r.fields['Max Capacity'] || r.fields['Capacity'] || 1,
-        instructor_name: Array.isArray(r.fields['Instructor'])
-          ? r.fields['Instructor'][0]
-          : r.fields['Instructor'] || null,
-        confirmed_bookings: r.fields['Booking Status']?.toLowerCase() === 'booked' ||
-          r.fields['Booking Status']?.toLowerCase() === 'confirmed' ? 1 : 0,
-        client_name: Array.isArray(r.fields['Client'])
-          ? r.fields['Client'][0]
-          : r.fields['Client'] || null,
-      }))
+      .map((r: any) => {
+        const f = r.fields
+        const clientNameArr = f['Client Name (from Client)']
+        const clientName = Array.isArray(clientNameArr) ? clientNameArr[0] : clientNameArr || null
+        const instructor = Array.isArray(f['Instructor']) ? f['Instructor'][0] : f['Instructor'] || null
+        const status = (f['Booking Status'] || 'open').toLowerCase()
+
+        return {
+          id: r.id,
+          start_time: f['Start Date'],
+          end_time: f['End Date'],
+          location: 'Modesto',
+          session_type: f['Session Type'] || 'lesson',
+          status,
+          max_capacity: 1,
+          instructor_name: instructor,
+          confirmed_bookings: (status === 'booked' || status === 'confirmed') ? 1 : 0,
+          client_name: clientName,
+        }
+      })
 
     return new Response(
-      JSON.stringify({ sessions, _meta: { source: 'airtable', total_records: allRecords.length } }),
+      JSON.stringify({ sessions }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {
