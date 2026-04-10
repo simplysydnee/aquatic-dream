@@ -1,4 +1,4 @@
-import { Users, Waves, Ship, Anchor, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText } from "lucide-react";
+import { Users, Waves, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText, PanelLeftClose, PanelLeft } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
 
@@ -28,13 +29,24 @@ const items = [
 ];
 
 export function AdminSidebar() {
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { signOut, user } = useAuth();
 
   return (
     <Sidebar collapsible="icon">
+      <SidebarHeader className="p-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-center"
+          onClick={toggleSidebar}
+        >
+          {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          {!collapsed && <span className="ml-2">Collapse</span>}
+        </Button>
+      </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>
