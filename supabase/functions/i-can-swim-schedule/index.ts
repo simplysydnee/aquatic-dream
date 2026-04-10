@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
       'Client Name (from Client)',
       'Client',
       'Day of the week',
-      'Parent/Guardian Name (from Client)',
+      'Parent/Guardian (from Client)',
       'Email (from Client)',
       'Phone (from Client)',
     ]
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
         const instructor = Array.isArray(f['Instructor']) ? f['Instructor'][0] : f['Instructor'] || null
         const status = (f['Booking Status'] || 'open').toLowerCase()
 
-        const parentNameArr = f['Parent/Guardian Name (from Client)']
+        const parentNameArr = f['Parent/Guardian (from Client)']
         const parentName = Array.isArray(parentNameArr) ? parentNameArr[0] : parentNameArr || null
         const emailArr = f['Email (from Client)']
         const email = Array.isArray(emailArr) ? emailArr[0] : emailArr || null
