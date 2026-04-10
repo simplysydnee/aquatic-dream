@@ -52,6 +52,7 @@ const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_
 /* ── Color configs ── */
 const BLOCK_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   "i-can-swim":         { bg: "#d4f0f8", border: "#2a5e84", text: "#2a5e84" },
+  "i-can-swim-closed":  { bg: "#2c2c2c", border: "#111",    text: "#e0e0e0" },
   "swim":               { bg: "#d0ddf7", border: "#1a3a8a", text: "#1a3a8a" },
   "private-lesson":     { bg: "#EEEDFE", border: "#26215C", text: "#26215C" },
   "semi-private-lesson":{ bg: "#FBEAF0", border: "#4B1528", text: "#4B1528" },
@@ -426,15 +427,22 @@ const CalendarDayView = ({
                 .map((s) => {
                   const startMins = timeToMinutes(s.start_time);
                   const endMins = timeToMinutes(s.end_time);
-                  const dimmed = false;
+                  const isClosed = s.status?.toLowerCase() === "closed";
+                  const colorKey = isClosed ? "i-can-swim-closed" : "i-can-swim";
+                  const label = isClosed
+                    ? (s.instructor_name || "Instructor")
+                    : (s.client_name || s.session_type || "I Can Swim");
+                  const subtitle = isClosed
+                    ? `${fmtTime(s.start_time)} – ${fmtTime(s.end_time)} · Closed`
+                    : `${fmtTime(s.start_time)} – ${fmtTime(s.end_time)} · ${s.status}`;
                   return renderBlock(
                     s.id,
                     startMins,
                     endMins,
-                    "i-can-swim",
-                    s.client_name || s.session_type || "I Can Swim",
-                    `${fmtTime(s.start_time)} – ${fmtTime(s.end_time)} · ${s.status}`,
-                    dimmed,
+                    colorKey,
+                    label,
+                    subtitle,
+                    false,
                     () => setDetailBlock({ kind: "ics", session: s }),
                     true
                   );
