@@ -1,23 +1,35 @@
 import { useState } from "react";
-import { format, addDays, startOfWeek, isToday, isSameDay } from "date-fns";
+import { format, addDays, startOfWeek, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
 import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
+import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
+import type { ActivityType } from "@/components/admin/calendar/CalendarFilterBar";
 import ICanSwimCalendar from "@/components/admin/ICanSwimCalendar";
 import { useCalendarData } from "@/hooks/useCalendarData";
 import type { CalendarPoolEvent } from "@/hooks/useCalendarData";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+
+const ALL_FILTERS: ActivityType[] = [
+  "i-can-swim", "swim", "private-lesson", "semi-private-lesson", "dive-session", "pool-rental",
+];
 
 const CalendarAdmin = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week">("day");
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
+  const [activeFilters, setActiveFilters] = useState<Set<ActivityType>>(new Set(ALL_FILTERS));
+  const [miniCalOpen, setMiniCalOpen] = useState(false);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -27,12 +39,22 @@ const CalendarAdmin = () => {
     enrollments,
     poolEvents,
     attendance,
+    icsSessions,
     loading,
     refetch,
   } = useCalendarData(currentDate, view);
 
   const navigateDate = (dir: number) => {
     setCurrentDate((d) => addDays(d, view === "week" ? dir * 7 : dir));
+  };
+
+  const toggleFilter = (type: ActivityType) => {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
   };
 
   return (
@@ -55,43 +77,6 @@ const CalendarAdmin = () => {
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigateDate(-1)}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="min-w-[180px]">
-                <CalIcon className="w-4 h-4 mr-2" />
-                {view === "day"
-                  ? format(currentDate, "EEEE, MMMM d, yyyy")
-                  : `${format(weekDates[0], "MMM d")} – ${format(weekDates[6], "MMM d, yyyy")}`}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={currentDate}
-                onSelect={(d) => d && setCurrentDate(d)}
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-          <Button variant="ghost" size="icon" onClick={() => navigateDate(1)}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-
-        <Tabs value={view} onValueChange={(v) => setView(v as "day" | "week")}>
-          <TabsList>
-            <TabsTrigger value="day">Day</TabsTrigger>
-            <TabsTrigger value="week">Week</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs">
         {[
@@ -108,15 +93,81 @@ const CalendarAdmin = () => {
             <span className="text-muted-foreground">{item.label}</span>
           </div>
         ))}
-        <div className="flex items-center gap-1.5 ml-2">
-          <div className="w-2.5 h-2.5 rounded border border-dashed border-muted-foreground" />
-          <span className="text-muted-foreground">Shallow end</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded border-2 border-muted-foreground" />
-          <span className="text-muted-foreground">Deep end</span>
-        </div>
       </div>
+
+      {/* Filter bar */}
+      <CalendarFilterBar
+        activeFilters={activeFilters}
+        onToggle={toggleFilter}
+        onShowAll={() => setActiveFilters(new Set(ALL_FILTERS))}
+      />
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigateDate(-1)}>
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <Collapsible open={miniCalOpen} onOpenChange={setMiniCalOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="min-w-[180px]">
+                <CalIcon className="w-4 h-4 mr-2" />
+                {view === "day"
+                  ? format(currentDate, "EEEE, MMMM d, yyyy")
+                  : `${format(weekDates[0], "MMM d")} – ${format(weekDates[6], "MMM d, yyyy")}`}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="bg-card border rounded-lg shadow-lg p-1 w-fit">
+                <Calendar
+                  mode="single"
+                  selected={currentDate}
+                  onSelect={(d) => {
+                    if (d) {
+                      setCurrentDate(d);
+                      setMiniCalOpen(false);
+                    }
+                  }}
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+          <Button variant="ghost" size="icon" onClick={() => navigateDate(1)}>
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <Tabs value={view} onValueChange={(v) => setView(v as "day" | "week")}>
+          <TabsList>
+            <TabsTrigger value="day">Day</TabsTrigger>
+            <TabsTrigger value="week">Week</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* Week day tabs (quick day selector) */}
+      {view === "day" && (
+        <div className="flex gap-1 overflow-x-auto pb-1">
+          {weekDates.map((d) => (
+            <button
+              key={d.toISOString()}
+              onClick={() => setCurrentDate(d)}
+              className={cn(
+                "flex flex-col items-center px-3 py-1.5 rounded-lg text-xs transition-colors shrink-0",
+                format(d, "yyyy-MM-dd") === format(currentDate, "yyyy-MM-dd")
+                  ? "bg-primary text-primary-foreground"
+                  : isToday(d)
+                  ? "bg-primary/10 text-primary hover:bg-primary/20"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+              )}
+            >
+              <span className="font-medium">{format(d, "EEE")}</span>
+              <span className="font-bold text-sm">{format(d, "d")}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Calendar Body */}
       {loading ? (
@@ -130,12 +181,17 @@ const CalendarAdmin = () => {
           enrollments={enrollments}
           poolEvents={poolEvents}
           attendance={attendance}
+          icsSessions={icsSessions}
+          activeFilters={activeFilters}
           onAttendanceChange={refetch}
           onEditEvent={(event) => {
             setEditingEvent(event);
             setShowAddEvent(true);
           }}
           onDeleteEvent={() => refetch()}
+          onAddEvent={(prefill) => {
+            setShowAddEvent(true);
+          }}
         />
       ) : (
         <CalendarWeekView
