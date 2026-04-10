@@ -45,6 +45,8 @@ const TIME_SLOTS = [
 
 const eventTypeConfig: Record<string, { color: string; icon: typeof Waves; label: string }> = {
   "i-can-swim": { color: "bg-amber-100 border-amber-300 text-amber-800", icon: Users, label: "I Can Swim 209" },
+  "private-lesson": { color: "bg-pink-100 border-pink-300 text-pink-800", icon: Users, label: "Private Lesson" },
+  "semi-private-lesson": { color: "bg-orange-100 border-orange-300 text-orange-800", icon: Users, label: "Semi-Private Lesson" },
   "dive-session": { color: "bg-emerald-100 border-emerald-300 text-emerald-800", icon: Anchor, label: "Dive Session" },
   "pool-rental": { color: "bg-purple-100 border-purple-300 text-purple-800", icon: Calendar, label: "Pool Rental" },
   "maintenance": { color: "bg-gray-100 border-gray-300 text-gray-800", icon: Wrench, label: "Maintenance" },
@@ -219,6 +221,8 @@ const CalendarDayView = ({ date, swimSessions, enrollments, poolEvents, attendan
                       key={event.id}
                       className={`flex-1 min-w-[200px] max-w-[350px] p-3 border-l-4 ${
                         event.event_type === "i-can-swim" ? "border-l-amber-400" :
+                        event.event_type === "private-lesson" ? "border-l-pink-400" :
+                        event.event_type === "semi-private-lesson" ? "border-l-orange-400" :
                         event.event_type === "dive-session" ? "border-l-emerald-500" :
                         event.event_type === "pool-rental" ? "border-l-purple-400" :
                         "border-l-gray-400"

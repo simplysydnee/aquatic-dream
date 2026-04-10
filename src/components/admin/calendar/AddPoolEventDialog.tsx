@@ -102,6 +102,12 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
     if (type === "i-can-swim") {
       setTitle("I Can Swim 209");
       setPoolArea("shallow");
+    } else if (type === "private-lesson") {
+      setTitle("Private Lesson");
+      setPoolArea("shallow");
+    } else if (type === "semi-private-lesson") {
+      setTitle("Semi-Private Lesson");
+      setPoolArea("shallow");
     } else if (type === "dive-session") {
       setTitle("Dive Training");
       setPoolArea("deep");
@@ -131,6 +137,8 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="i-can-swim">I Can Swim 209</SelectItem>
+                <SelectItem value="private-lesson">Private Lesson</SelectItem>
+                <SelectItem value="semi-private-lesson">Semi-Private Lesson</SelectItem>
                 <SelectItem value="dive-session">Dive Session</SelectItem>
                 <SelectItem value="pool-rental">Pool Rental</SelectItem>
                 <SelectItem value="maintenance">Maintenance</SelectItem>
@@ -187,7 +195,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
             </Select>
           </div>
 
-          {(eventType === "dive-session" || eventType === "i-can-swim") && (
+          {(eventType === "dive-session" || eventType === "i-can-swim" || eventType === "private-lesson" || eventType === "semi-private-lesson") && (
             <div className="space-y-2">
               <Label>Instructor Name</Label>
               <Input value={instructorName} onChange={(e) => setInstructorName(e.target.value)} placeholder="Optional" />
