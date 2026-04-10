@@ -1,4 +1,4 @@
-import { Users, Waves, Ship, Anchor, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList } from "lucide-react";
+import { Users, Waves, Ship, Anchor, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,6 +24,8 @@ const items = [
   { title: "Dive Bookings", url: "/admin/dive-bookings", icon: Anchor },
   { title: "Trip Reservations", url: "/admin/trip-reservations", icon: Ship },
   { title: "Contact Inquiries", url: "/admin/contacts", icon: MessageSquare },
+  { title: "Job Postings", url: "/admin/careers", icon: Briefcase },
+  { title: "Applications", url: "/admin/applications", icon: FileText },
   { title: "User Management", url: "/admin/users", icon: Users },
 ];
 

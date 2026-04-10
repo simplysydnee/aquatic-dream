@@ -26,6 +26,7 @@ const Footer = () => {
               <li><Link to="/swim-lessons" className="hover:text-primary transition-colors">Swim Lessons</Link></li>
               <li><Link to="/swim-enrollment" className="hover:text-primary transition-colors">Enroll Now</Link></li>
               <li><a href="https://icanswim209.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">I Can Swim 209</a></li>
+              <li><Link to="/careers" className="hover:text-primary transition-colors">Careers</Link></li>
             </ul>
           </div>
 
