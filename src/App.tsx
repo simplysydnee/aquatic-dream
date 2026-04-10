@@ -6,8 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import SwimLessons from "./pages/SwimLessons";
-import Safety from "./pages/Safety";
-import Community from "./pages/Community";
 import SwimEnrollment from "./pages/SwimEnrollment";
 import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -58,8 +56,6 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/swim-lessons" element={<SwimLessons />} />
               <Route path="/swim-enrollment" element={<SwimEnrollment />} />
-              <Route path="/safety" element={<Safety />} />
-              <Route path="/community" element={<Community />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>

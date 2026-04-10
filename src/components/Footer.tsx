@@ -25,8 +25,6 @@ const Footer = () => {
             <ul className="space-y-2 text-sm text-secondary-foreground/70">
               <li><Link to="/swim-lessons" className="hover:text-primary transition-colors">Swim Lessons</Link></li>
               <li><Link to="/swim-enrollment" className="hover:text-primary transition-colors">Enroll Now</Link></li>
-              <li><Link to="/safety" className="hover:text-primary transition-colors">Safety</Link></li>
-              <li><Link to="/community" className="hover:text-primary transition-colors">Community</Link></li>
               <li><a href="https://icanswim209.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">I Can Swim 209</a></li>
             </ul>
           </div>

@@ -9,8 +9,6 @@ const navLinks = [
   { to: "/", label: "Home" },
   { to: "/swim-lessons", label: "Swim Lessons" },
   { to: "/swim-enrollment", label: "Enroll" },
-  { to: "/safety", label: "Safety" },
-  { to: "/community", label: "Community" },
 ];
 
 const Navbar = () => {
@@ -30,7 +28,7 @@ const Navbar = () => {
               <Phone className="w-3 h-3" /> (209) 577-3483
             </span>
             <span className="flex items-center gap-1.5">
-              <Mail className="w-3 h-3" /> info@aquaticdreams.com
+              <Mail className="w-3 h-3" /> generalmail@aquaticdreams.com
             </span>
           </div>
           <span className="font-display italic text-primary-foreground/80">Swim. Dive. Dream.</span>
@@ -42,6 +40,7 @@ const Navbar = () => {
         <div className="container flex items-center justify-between h-16 md:h-20">
           <Link to="/" className="flex items-center gap-3">
             <img src={logoMain} alt="Aquatic Dreams" className="h-12 md:h-16 w-auto" />
+            <span className="hidden sm:block font-display text-sm italic text-primary">Swim. Dive. Dream.</span>
           </Link>
 
           {/* Desktop nav */}
