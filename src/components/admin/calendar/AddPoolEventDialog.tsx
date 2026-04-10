@@ -80,8 +80,8 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
     };
 
     const { error } = isEditing
-      ? await supabase.from("pool_events").update(payload).eq("id", editEvent!.id)
-      : await supabase.from("pool_events").insert(payload);
+      ? await supabase.from("pool_events").update(payload as any).eq("id", editEvent!.id)
+      : await supabase.from("pool_events").insert(payload as any);
 
     setSaving(false);
 
