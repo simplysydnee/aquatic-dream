@@ -97,6 +97,8 @@ const CalendarAdmin = () => {
         {[
           { label: "Swim Lessons", color: "bg-blue-400" },
           { label: "I Can Swim", color: "bg-amber-400" },
+          { label: "Private Lesson", color: "bg-pink-400" },
+          { label: "Semi-Private", color: "bg-orange-400" },
           { label: "Dive Session", color: "bg-emerald-500" },
           { label: "Pool Rental", color: "bg-purple-400" },
           { label: "Maintenance", color: "bg-gray-400" },
