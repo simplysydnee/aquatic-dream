@@ -1,92 +1,119 @@
 
 
-# Pool Calendar Day View — Redesign Options
+# Pool Calendar Redesign — Google Calendar-Style Day View
 
-## What You Described
+## Summary
 
-A vertical timeline where each time slot is a full-width color-coded row showing the activity type and the names of people in that slot inline, like:
+A major redesign of CalendarDayView to match the reference screenshots: a Google Calendar-style columnar layout with continuous vertical time axis, dynamic I Can Swim instructor columns from Airtable, grouped column headers, activity filter chips, block detail panels, empty slot interaction, and an inline mini calendar.
 
-```text
-3:00 PM  [■ amber] I Can Swim — Lauren, Sutton, Megan
-3:00 PM  [■ blue ] Level 2 Swim — Jake, Emma
-3:30 PM  [■ pink ] Private Lesson — Riley
-4:00 PM  [■ green] Dive Session — Open
-```
+## What Does NOT Change
+- I Can Swim sync button and Airtable integration
+- Color key bar (already exists)
+- Supabase as database
+- AddPoolEventDialog flows
+- Week navigation and day tabs
+- Brand colors (#0A1628, #2A9D8F, #C9A96E)
 
-Here are three layout approaches to choose from:
-
----
-
-### Option A — Color Bar Rows (Compact Schedule Board)
-
-Each time slot is a horizontal row. Activities within that slot are color-coded bars that span the row, with names listed inline.
+## Layout
 
 ```text
- TIME        ACTIVITY
- ─────────────────────────────────────────────────────
- 3:00 PM   ┃ ██ I Can Swim 209    Lauren · Sutton · Megan
-           ┃ ██ Level 2 Lessons   Jake · Emma (2/6)
- 3:30 PM   ┃ ██ Private Lesson    Riley
- 4:00 PM   ┃ ██ Dive Session      —
- 4:30 PM   ┃ ██ Maintenance       (Full Pool)
+┌─────────────────────────────────────────────────────────────────────────┐
+│  KEY  ● I Can Swim  ● Swim lesson  ● Private  ● Semi  ● Dive  ● Pool │
+├─────────────────────────────────────────────────────────────────────────┤
+│  [+ Add lesson] [+ Dive] [+ Private/semi] [+ Pool rental] [Export]    │
+├─────────────────────────────────────────────────────────────────────────┤
+│  ‹  📅 Friday, April 10 2026 ▼  ›   Today                            │
+│     ┌──────────────────────┐  (inline mini calendar when open)        │
+│     │  April 2026          │                                          │
+│     │  Su Mo Tu We ...     │                                          │
+│     └──────────────────────┘                                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│  ● Sun 6  ● Mon 7  ● Tue 8  ● Wed 9  ● Thu 10  ● Fri 11  ● Sat 12  │
+├─────────────────────────────────────────────────────────────────────────┤
+│  FILTER: [I Can Swim] [Swim] [Private] [Semi] [Dive] [Rental] [All]  │
+│  Showing: I Can Swim 209, Swim lesson, Private lesson                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│        │ I Can Swim 209 — 3 instructors │ Aquatic Dreams │ Dive/Rental│
+│        │  ICS 1    ICS 2    ICS 3       │  AD Line 1     │            │
+│────────┼────────┬────────┬──────────────┼────────────────┼────────────│
+│ 8 am   │        │        │              │                │            │
+│ - - - -│- - - - │- - - - │- - - - - - - │ - - - - - - -  │ - - - - -  │
+│ 9 am   │ ██████ │ ██████ │  ██████      │                │            │
+│        │ Maria  │ Priya  │  Devon       │                │            │
+│        │ Adapt. │ Adapt. │  Adapt.      │                │            │
+│        │ 4 swim │ 3 swim │  4 swimmers  │                │            │
+│ - - - -│- - - - │- - - - │- - - - - - - │ - - - - - - -  │ - - - - -  │
+│ 10 am  │ ██████ │        │              │ ██████████████ │            │
+│        │ Maria  │        │              │ Level 2        │            │
+│        │ Adapt. │        │              │ Jake · Emma    │            │
+│        │ 3 swim │        │              │ (2/6)          │            │
+│────────┼────────┴────────┴──────────────┼────────────────┼────────────│
+│ 11 am  │                                │                │ ██████████ │
+│        │                                │                │ Pool Rental│
+│        │                                │                │ Modesto    │
+│        │                                │                │ Marlins    │
+└────────┴────────────────────────────────┴────────────────┴────────────┘
 ```
 
-- Single column, stacked vertically
-- Each activity is a colored pill/bar with the label and names on one line
-- Most compact — good if you want a quick glance at the whole day
-- Clicking a row expands it to show check-in checkboxes
+## Implementation Details
 
----
+### 1. Block positioning (continuous time axis)
+- Define constants: `HOUR_HEIGHT = 80px`, `START_HOUR = 7`, `END_HOUR = 20`
+- Each block's `top` = `(startMinutes - START_HOUR*60) * HOUR_HEIGHT/60`
+- Each block's `height` = `durationMinutes * HOUR_HEIGHT/60`
+- Render horizontal lines: solid at each hour, dashed at :30
+- Blocks use `position: absolute` within a `position: relative` column container
 
-### Option B — Time Blocks with Lanes (Pool Area Columns)
+### 2. Dynamic I Can Swim columns
+- The edge function already returns sessions with `instructor_name`
+- On day view load, call the I Can Swim edge function and filter sessions to the current date
+- Extract unique instructor names for that day — these become columns (min 1, max 5)
+- Each column header shows the instructor's name (e.g., "Maria R.")
 
-Vertical timeline on the left, with two columns: Shallow End and Deep End. Activities slot into their pool area.
+### 3. Group header row
+- Three spanning headers above the instructor/line columns:
+  - "I Can Swim 209 — X instructors today" (bg: #E1F5EE, text: #085041)
+  - "Aquatic Dreams — X lines" (bg: #E6F1FB, text: #0C447C)
+  - "Dive / Rental" (bg: #FAEEDA, text: #633806)
+- Aquatic Dreams lines: determined by swim_sessions + pool_events that are not I Can Swim or dive/rental
 
-```text
- TIME       SHALLOW END                    DEEP END
- ─────────────────────────────────────────────────────
- 3:00 PM    ██ I Can Swim 209              ██ Dive Session
-            Lauren · Sutton · Megan         Open
- 3:30 PM    ██ Private Lesson              —
-            Riley
- 4:00 PM              ██ Maintenance (Full Pool)
-```
+### 4. Activity filter bar
+- Row of colored chips below the key, one per type
+- Chip colors per the spec table (e.g., I Can Swim: bg #E1F5EE, text #085041)
+- Toggling off dims blocks to `opacity: 0.12` — does not remove them
+- "Show all" reset button
+- When any filter inactive, show "Showing: [active type names]"
 
-- Shows pool area usage at a glance — you can see conflicts
-- Activities span both columns when "full pool"
-- More visual but takes more space
+### 5. Block click → roster panel
+- I Can Swim blocks: show lock icon, not clickable
+- Aquatic Dreams blocks: click opens a slide-over panel (right side) with:
+  - Title + line/date subtitle
+  - Time tile + Instructor tile
+  - Roster list (initials avatar, name, age/cert, session #)
+  - "Edit", "Add swimmer", "Cancel session" buttons
+  - Edit opens existing AddPoolEventDialog
+  - Closes on X or outside click
 
----
+### 6. Empty slot interaction
+- Aquatic Dreams and Dive/Rental columns: on hover over empty space, show faint "+ add" at that position
+- Click opens AddPoolEventDialog pre-filled with the column's line context and the clicked time
 
-### Option C — Gantt-Style Time Blocks (Visual Duration)
+### 7. Mini calendar on date button
+- Replace the Popover with an inline collapsible panel below the date button
+- Shows month calendar with activity dots on days that have events
+- Click a date → navigate + collapse
+- Click date button again → collapse
 
-Vertical time axis with blocks that visually represent duration (taller = longer). Color-coded with names inside.
+### Files Changed
 
-```text
- 3:00 ┃ ┌──────────────────────┐  ┌─────────────────┐
-      ┃ │ I Can Swim 209       │  │ Level 2 Lessons  │
-      ┃ │ Lauren·Sutton·Megan  │  │ Jake · Emma      │
- 3:30 ┃ ├──────────────────────┤  └─────────────────┘
-      ┃ │ (continues)          │
- 4:00 ┃ └──────────────────────┘
-```
+| File | Change |
+|------|--------|
+| `CalendarAdmin.tsx` | Add filter state, inline mini calendar toggle, week day tabs, action buttons row, integrate I Can Swim edge function data |
+| `CalendarDayView.tsx` | Full rewrite: columnar layout with continuous time axis, dynamic columns, group headers, block positioning, click handlers, empty slot hover |
+| `useCalendarData.ts` | Add I Can Swim Airtable session fetching for the current day (call edge function) |
+| New: `CalendarBlockDetail.tsx` | Roster detail panel component (slide-over) |
+| New: `CalendarFilterBar.tsx` | Activity filter chips component |
 
-- Most visual — block height reflects actual duration
-- Good for seeing overlaps and gaps
-- More complex to build, takes more vertical space
-
----
-
-## Recommendation
-
-**Option A** is closest to what you described — clean vertical list, color-coded bars, names inline. It is the simplest to build and easiest to scan. Check-in can expand on click.
-
-## Implementation (whichever option you pick)
-
-- Rewrite `CalendarDayView.tsx` with the new layout
-- Keep all existing functionality (check-in, edit/delete events, attendance)
-- Color coding stays the same (amber = I Can Swim, blue = swim lessons, pink = private, etc.)
-- Clicking a row expands to show checkboxes for attendance
-
-Pick **A**, **B**, or **C** (or mix elements) and I will build it.
+### Edge function
+No changes to `i-can-swim-schedule/index.ts` — it already returns instructor names and session times. We just need to call it from the day view and filter to the selected date.
 
