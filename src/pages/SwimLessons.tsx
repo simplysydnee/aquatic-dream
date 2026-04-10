@@ -102,7 +102,20 @@ const curriculum = [
   },
 ];
 
-const timeSlots = ["2:45 PM", "3:15 PM", "3:45 PM", "4:15 PM", "4:45 PM", "5:30 PM", "6:00 PM", "6:30 PM"];
+const preschoolSlots = [
+  { time: "2:45 PM", groups: "Bubble Makers / Reef Explorers" },
+];
+
+const schoolAgeSlots = [
+  { time: "3:00 PM", groups: "Blue & Yellow" },
+  { time: "3:30 PM", groups: "Blue & Yellow" },
+  { time: "4:00 PM", groups: "Blue & Yellow" },
+  { time: "4:30 PM", groups: "Blue & Yellow" },
+  { time: "5:00 PM", groups: "Blue & Yellow" },
+  { time: "5:45 PM", groups: "Blue & Yellow" },
+  { time: "6:15 PM", groups: "Yellow & Green" },
+  { time: "6:45 PM", groups: "Yellow & Green" },
+];
 
 const SwimLessons = () => {
   return (
@@ -137,6 +150,11 @@ const SwimLessons = () => {
               <p className="text-sm text-secondary-foreground/70">students per instructor</p>
             </div>
             <div className="text-center">
+              <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Lesson Duration</p>
+              <p className="font-display text-5xl font-bold text-primary">30</p>
+              <p className="text-sm text-secondary-foreground/70">minutes per lesson</p>
+            </div>
+            <div className="text-center">
               <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Group Lesson</p>
               <p className="font-display text-5xl font-bold text-primary">$30</p>
               <p className="text-sm text-secondary-foreground/70">per lesson</p>
@@ -161,7 +179,6 @@ const SwimLessons = () => {
               $45 registration fee — includes swim bag, swim cap & goggles
             </p>
           </div>
-        </div>
       </section>
 
       {/* Curriculum */}
