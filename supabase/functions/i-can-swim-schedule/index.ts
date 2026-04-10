@@ -19,20 +19,26 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Accept date range from request body
+    let startDate: string
+    let endDate: string
+
+    try {
+      const body = await req.json()
+      startDate = body.startDate || new Date().toISOString().split('T')[0]
+      endDate = body.endDate || startDate
+    } catch {
+      // Default to today only
+      startDate = new Date().toISOString().split('T')[0]
+      endDate = startDate
+    }
+
     const tableName = 'Individual Sessions'
     const encodedTable = encodeURIComponent(tableName)
 
-    // Fetch records from Airtable, sorted by Start Date
-    // We use a view or filter to get recent/upcoming sessions
-    const url = new URL(`https://api.airtable.com/v0/${baseId}/${encodedTable}`)
-    url.searchParams.set('sort[0][field]', 'Start Date')
-    url.searchParams.set('sort[0][direction]', 'asc')
-    // Only fetch sessions from the last week onward
-    const oneWeekAgo = new Date()
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-    const filterFormula = `IS_AFTER({Start Date}, '${oneWeekAgo.toISOString().split('T')[0]}')`
+    // Filter to only the requested date range
+    const filterFormula = `AND(IS_AFTER({Start Date}, '${startDate}'), IS_BEFORE({Start Date}, DATEADD('${endDate}', 1, 'days')))`
 
-    // Only request the fields we need
     const fields = [
       'Start Date',
       'End Date',
