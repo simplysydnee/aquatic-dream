@@ -217,6 +217,36 @@ export type Database = {
           },
         ]
       }
+      instructors: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       job_applications: {
         Row: {
           availability: string[] | null
@@ -516,9 +546,11 @@ export type Database = {
           day_of_week: string
           end_time: string
           id: string
+          instructor_id: string | null
           is_active: boolean
           max_students: number
           price_per_lesson: number | null
+          registration_status: string
           session_end_date: string | null
           session_name: string | null
           session_price: number | null
@@ -534,9 +566,11 @@ export type Database = {
           day_of_week: string
           end_time: string
           id?: string
+          instructor_id?: string | null
           is_active?: boolean
           max_students?: number
           price_per_lesson?: number | null
+          registration_status?: string
           session_end_date?: string | null
           session_name?: string | null
           session_price?: number | null
@@ -552,9 +586,11 @@ export type Database = {
           day_of_week?: string
           end_time?: string
           id?: string
+          instructor_id?: string | null
           is_active?: boolean
           max_students?: number
           price_per_lesson?: number | null
+          registration_status?: string
           session_end_date?: string | null
           session_name?: string | null
           session_price?: number | null
@@ -564,7 +600,15 @@ export type Database = {
           total_lessons?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "swim_sessions_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trip_reservations: {
         Row: {
