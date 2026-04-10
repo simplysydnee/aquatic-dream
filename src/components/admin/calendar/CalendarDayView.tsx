@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
