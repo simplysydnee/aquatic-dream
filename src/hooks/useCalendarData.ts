@@ -57,6 +57,7 @@ export interface ICSSession {
   max_capacity: number;
   instructor_name: string | null;
   confirmed_bookings: number;
+  client_name?: string | null;
 }
 
 export function useCalendarData(currentDate: Date, view: "day" | "week") {

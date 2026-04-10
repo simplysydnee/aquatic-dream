@@ -36,6 +36,7 @@ export interface ICSSession {
   max_capacity: number;
   instructor_name: string | null;
   confirmed_bookings: number;
+  client_name?: string | null;
 }
 
 /* ── Layout constants ── */
@@ -388,8 +389,8 @@ const CalendarDayView = ({
                     startMins,
                     endMins,
                     "i-can-swim",
-                    s.session_type || "I Can Swim",
-                    `${s.confirmed_bookings}/${s.max_capacity} swimmers`,
+                    s.client_name || s.session_type || "I Can Swim",
+                    `${fmtTime(s.start_time)} – ${fmtTime(s.end_time)} · ${s.status}`,
                     dimmed,
                     undefined,
                     true
