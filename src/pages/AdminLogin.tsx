@@ -11,32 +11,42 @@ const AdminLogin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const { signIn, user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect once auth state settles and user is admin
   useEffect(() => {
-    if (!authLoading && user && isAdmin) {
+    if (authLoading) return;
+
+    if (user && isAdmin) {
+      setSubmitting(false);
       navigate("/admin", { replace: true });
+      return;
     }
-  }, [user, isAdmin, authLoading, navigate]);
+
+    if (submitting) {
+      setSubmitting(false);
+
+      if (user && !isAdmin) {
+        setError("This account does not have admin access.");
+      }
+    }
+  }, [user, isAdmin, authLoading, submitting, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
+    setSubmitting(true);
 
     const { error } = await signIn(email, password);
-    
+
     if (error) {
-      setLoading(false);
+      setSubmitting(false);
       setError("Invalid email or password");
-      return;
     }
-    // Don't navigate here — the useEffect above handles it
-    // once onAuthStateChange + checkAdmin finish
   };
+
+  const isBusy = submitting || authLoading;
 
   return (
     <main className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -71,8 +81,8 @@ const AdminLogin = () => {
               />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
+            <Button type="submit" className="w-full" disabled={isBusy}>
+              {isBusy ? "Signing in..." : "Sign In"}
             </Button>
           </form>
         </CardContent>
