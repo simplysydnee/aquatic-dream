@@ -227,6 +227,8 @@ export type Database = {
           experience_with_children: string | null
           first_name: string
           id: string
+          is_archived: boolean
+          is_viewed: boolean
           job_posting_id: string
           last_name: string
           phone: string
@@ -244,6 +246,8 @@ export type Database = {
           experience_with_children?: string | null
           first_name: string
           id?: string
+          is_archived?: boolean
+          is_viewed?: boolean
           job_posting_id: string
           last_name: string
           phone: string
@@ -261,6 +265,8 @@ export type Database = {
           experience_with_children?: string | null
           first_name?: string
           id?: string
+          is_archived?: boolean
+          is_viewed?: boolean
           job_posting_id?: string
           last_name?: string
           phone?: string

@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Download, Eye, CheckCircle, Shield } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Download, Eye, CheckCircle, Shield, Archive, ArchiveRestore } from "lucide-react";
 import { format } from "date-fns";
 
 const STATUS_OPTIONS = ["new", "reviewing", "interview", "hired", "rejected"];
@@ -24,10 +25,13 @@ const statusColor = (s: string) => {
   }
 };
 
+type TabFilter = "active" | "hired" | "archived";
+
 const JobApplicationsAdmin = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [viewing, setViewing] = useState<any>(null);
+  const [tab, setTab] = useState<TabFilter>("active");
 
   const { data: applications, isLoading } = useQuery({
     queryKey: ["admin-job-applications"],
@@ -52,6 +56,32 @@ const JobApplicationsAdmin = () => {
     },
   });
 
+  const markViewed = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("job_applications").update({ is_viewed: true }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-job-applications"] }),
+  });
+
+  const toggleArchive = useMutation({
+    mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
+      const { error } = await supabase.from("job_applications").update({ is_archived: archived }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-job-applications"] });
+      toast({ title: "Application updated" });
+    },
+  });
+
+  const openDetail = (app: any) => {
+    setViewing(app);
+    if (!app.is_viewed) {
+      markViewed.mutate(app.id);
+    }
+  };
+
   const downloadResume = async (path: string, name: string) => {
     const { data, error } = await supabase.storage.from("resumes").download(path);
     if (error) {
@@ -68,15 +98,30 @@ const JobApplicationsAdmin = () => {
 
   const hasCert = (certs: string[] | null, cert: string) => certs?.includes(cert);
 
+  const filtered = applications?.filter((app) => {
+    if (tab === "archived") return app.is_archived;
+    if (tab === "hired") return app.status === "hired" && !app.is_archived;
+    return !app.is_archived; // active
+  });
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-display font-bold">Job Applications</h1>
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabFilter)}>
+        <TabsList>
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="hired">Hired</TabsTrigger>
+          <TabsTrigger value="archived">Archived</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8"></TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Position</TableHead>
                 <TableHead>Email</TableHead>
@@ -88,12 +133,17 @@ const JobApplicationsAdmin = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
-              ) : !applications?.length ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No applications yet</TableCell></TableRow>
-              ) : applications.map((app) => (
-                <TableRow key={app.id}>
-                  <TableCell className="font-medium">{app.first_name} {app.last_name}</TableCell>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+              ) : !filtered?.length ? (
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No applications</TableCell></TableRow>
+              ) : filtered.map((app) => (
+                <TableRow key={app.id} className={!app.is_viewed ? "font-semibold" : ""}>
+                  <TableCell className="px-2">
+                    {!app.is_viewed && (
+                      <span className="inline-block w-2.5 h-2.5 rounded-full bg-primary" title="Not viewed" />
+                    )}
+                  </TableCell>
+                  <TableCell>{app.first_name} {app.last_name}</TableCell>
                   <TableCell className="text-sm">{(app as any).job_postings?.title}</TableCell>
                   <TableCell className="text-sm">{app.email}</TableCell>
                   <TableCell>
@@ -121,10 +171,21 @@ const JobApplicationsAdmin = () => {
                   <TableCell className="text-sm text-muted-foreground">{format(new Date(app.created_at), "MMM d, yyyy")}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => setViewing(app)}><Eye className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => openDetail(app)}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
                       {app.resume_url && (
                         <Button variant="ghost" size="sm" onClick={() => downloadResume(app.resume_url!, `${app.last_name}.pdf`)}>
                           <Download className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {tab === "archived" ? (
+                        <Button variant="ghost" size="sm" title="Unarchive" onClick={() => toggleArchive.mutate({ id: app.id, archived: false })}>
+                          <ArchiveRestore className="w-4 h-4" />
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="sm" title="Archive" onClick={() => toggleArchive.mutate({ id: app.id, archived: true })}>
+                          <Archive className="w-4 h-4" />
                         </Button>
                       )}
                     </div>
