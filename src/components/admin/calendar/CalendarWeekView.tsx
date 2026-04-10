@@ -21,6 +21,8 @@ interface Props {
 
 const eventTypeIcon: Record<string, typeof Waves> = {
   "i-can-swim": Users,
+  "private-lesson": Users,
+  "semi-private-lesson": Users,
   "dive-session": Anchor,
   "pool-rental": Calendar,
   "maintenance": Wrench,
@@ -28,6 +30,8 @@ const eventTypeIcon: Record<string, typeof Waves> = {
 
 const eventTypeColor: Record<string, string> = {
   "i-can-swim": "bg-amber-100 border-amber-300",
+  "private-lesson": "bg-pink-100 border-pink-300",
+  "semi-private-lesson": "bg-orange-100 border-orange-300",
   "dive-session": "bg-emerald-100 border-emerald-300",
   "pool-rental": "bg-purple-100 border-purple-300",
   "maintenance": "bg-gray-100 border-gray-300",
