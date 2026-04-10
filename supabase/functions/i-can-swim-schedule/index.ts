@@ -33,19 +33,8 @@ Deno.serve(async (req) => {
     const filterFormula = `IS_AFTER({Start Date}, '${oneWeekAgo.toISOString().split('T')[0]}')`
 
     // Only request the fields we need
-    const fields = [
-      'Start Date',
-      'End Date',
-      'Instructor',
-      'Booking Status',
-      'Session Type',
-      'Client Name (from Client)',
-      'Client',
-      'Day of the week',
-      'Parent/Guardian (from Client)',
-      'Email (from Client)',
-      'Phone (from Client)',
-    ]
+    // First fetch without field filtering to discover available fields
+    const fields: string[] = []
 
     const allRecords: any[] = []
     let offset: string | undefined = undefined
@@ -55,7 +44,7 @@ Deno.serve(async (req) => {
       url.searchParams.set('sort[0][field]', 'Start Date')
       url.searchParams.set('sort[0][direction]', 'asc')
       url.searchParams.set('filterByFormula', filterFormula)
-      fields.forEach((f, i) => url.searchParams.set(`fields[${i}]`, f))
+      if (fields.length > 0) fields.forEach((f, i) => url.searchParams.set(`fields[${i}]`, f))
       if (offset) url.searchParams.set('offset', offset)
 
       const response = await fetch(url.toString(), {
