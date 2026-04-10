@@ -51,8 +51,8 @@ const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_
 
 /* ── Color configs ── */
 const BLOCK_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  "i-can-swim":         { bg: "#E1F5EE", border: "#085041", text: "#085041" },
-  "swim":               { bg: "#E6F1FB", border: "#0C447C", text: "#0C447C" },
+  "i-can-swim":         { bg: "#d4f0f8", border: "#2a5e84", text: "#2a5e84" },
+  "swim":               { bg: "#d0ddf7", border: "#1a3a8a", text: "#1a3a8a" },
   "private-lesson":     { bg: "#EEEDFE", border: "#26215C", text: "#26215C" },
   "semi-private-lesson":{ bg: "#FBEAF0", border: "#4B1528", text: "#4B1528" },
   "dive-session":       { bg: "#FAEEDA", border: "#633806", text: "#633806" },
