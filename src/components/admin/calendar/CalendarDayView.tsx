@@ -416,27 +416,62 @@ const CalendarDayView = ({
               todaySessions.map((s) => {
                 const startMins = timeToMinutes(s.start_time);
                 const endMins = timeToMinutes(s.end_time);
+                const top = minutesToTop(startMins);
+                const height = durationHeight(startMins, endMins);
                 const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
                 const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
-                const names = sessionEnrollments.map((e) => e.child_name).join(" · ");
-                const dimmed = false;
+                const colors = BLOCK_COLORS["swim"];
 
-                return renderBlock(
-                  s.id,
-                  startMins,
-                  endMins,
-                  "swim",
-                  levelInfo?.name || s.swim_level,
-                  `${sessionEnrollments.length}/${s.max_students} — ${names || "No students"}`,
-                  dimmed,
-                  () =>
-                    setDetailBlock({
-                      kind: "swim",
-                      session: s,
-                      enrollments: sessionEnrollments,
-                      attendance: attendance.filter((a) => a.session_id === s.id),
-                      dateStr,
-                    })
+                return (
+                  <div
+                    key={s.id}
+                    className="absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden cursor-pointer hover:shadow-md"
+                    style={{
+                      top: `${top}px`,
+                      height: `${height}px`,
+                      backgroundColor: colors.bg,
+                      borderLeftColor: colors.border,
+                      color: colors.text,
+                    }}
+                    onClick={() =>
+                      setDetailBlock({
+                        kind: "swim",
+                        session: s,
+                        enrollments: sessionEnrollments,
+                        attendance: attendance.filter((a) => a.session_id === s.id),
+                        dateStr,
+                      })
+                    }
+                  >
+                    <p className="text-xs font-semibold truncate leading-tight">
+                      {levelInfo?.name || s.swim_level}
+                    </p>
+                    {height > 28 && s.session_name && (
+                      <p className="text-[10px] opacity-70 truncate leading-tight">
+                        {s.session_name}
+                      </p>
+                    )}
+                    {height > 40 && (
+                      <p className="text-[10px] truncate leading-tight mt-0.5 opacity-60">
+                        {sessionEnrollments.length}/{s.max_students} swimmers
+                      </p>
+                    )}
+                    {height > 56 && sessionEnrollments.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {sessionEnrollments.slice(0, Math.floor((height - 56) / 14)).map((enr) => (
+                          <p key={enr.id} className="text-[10px] truncate leading-tight flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 shrink-0" />
+                            {enr.child_name}
+                          </p>
+                        ))}
+                        {sessionEnrollments.length > Math.floor((height - 56) / 14) && (
+                          <p className="text-[10px] opacity-50 truncate">
+                            +{sessionEnrollments.length - Math.floor((height - 56) / 14)} more
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
 
