@@ -31,6 +31,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
   const [endTime, setEndTime] = useState("10:00");
   const [poolArea, setPoolArea] = useState("shallow");
   const [instructorName, setInstructorName] = useState("");
+  const [clientName, setClientName] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -66,7 +67,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
     }
     setSaving(true);
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       event_type: eventType,
       title: title.trim(),
       event_date: format(eventDate, "yyyy-MM-dd"),
@@ -74,6 +75,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       end_time: endTime,
       pool_area: poolArea,
       instructor_name: instructorName.trim() || null,
+      client_name: clientName.trim() || null,
       notes: notes.trim() || null,
     };
 
@@ -102,6 +104,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
     setEndTime("10:00");
     setPoolArea("shallow");
     setInstructorName("");
+    setClientName("");
     setNotes("");
   };
 
@@ -132,6 +135,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
   };
 
   const showInstructor = eventType === "dive-session" || eventType === "i-can-swim" || eventType === "private-lesson" || eventType === "semi-private-lesson";
+  const showClient = eventType === "pool-rental" || eventType === "dive-session" || eventType === "private-lesson" || eventType === "semi-private-lesson";
   const showTitle = eventType === "pool-rental" || eventType === "other";
 
   return (
@@ -206,6 +210,10 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
           </div>
 
           {/* Instructor + Notes inline */}
+          {showClient && (
+            <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Client name" className="h-8 text-sm" />
+          )}
+
           {showInstructor && (
             <Input value={instructorName} onChange={(e) => setInstructorName(e.target.value)} placeholder="Instructor (optional)" className="h-8 text-sm" />
           )}
