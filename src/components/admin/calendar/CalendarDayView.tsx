@@ -347,7 +347,29 @@ const CalendarDayView = ({
       </div>
 
       {/* ── Time grid ── */}
-      <div className="flex overflow-x-auto">
+      <div className="flex overflow-x-auto relative">
+        {/* ── Current time indicator ── */}
+        {(() => {
+          const isToday = format(date, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
+          if (!isToday) return null;
+          const pacificNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+          const nowMins = pacificNow.getHours() * 60 + pacificNow.getMinutes();
+          if (nowMins < START_HOUR * 60 || nowMins > END_HOUR * 60) return null;
+          const top = minutesToTop(nowMins);
+          return (
+            <div
+              className="absolute left-0 right-0 z-30 pointer-events-none"
+              style={{ top: `${top}px` }}
+            >
+              <div className="flex items-center">
+                <div className="w-16 shrink-0 flex justify-end pr-1">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                </div>
+                <div className="flex-1 h-[2px] bg-red-500" />
+              </div>
+            </div>
+          );
+        })()}
         {/* Time labels */}
         <div className="w-16 shrink-0 relative" style={{ height: `${TOTAL_HEIGHT}px` }}>
           {HOURS.map((h) => (
