@@ -114,8 +114,12 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     setLoading(false);
 
     // Fetch I Can Swim sessions from edge function (non-blocking)
+    const icsStartDate = view === "week" ? format(weekStart, "yyyy-MM-dd") : dateStr;
+    const icsEndDate = view === "week" ? format(weekEnd, "yyyy-MM-dd") : dateStr;
     try {
-      const { data } = await supabase.functions.invoke("i-can-swim-schedule");
+      const { data } = await supabase.functions.invoke("i-can-swim-schedule", {
+        body: { startDate: icsStartDate, endDate: icsEndDate },
+      });
       if (data?.sessions) {
         setIcsSessions(data.sessions);
       }
