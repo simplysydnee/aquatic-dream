@@ -107,6 +107,9 @@ const Navbar = () => {
                   <Button asChild size="sm" className="flex-1 bg-coral hover:bg-coral/90 text-coral-foreground">
                     <Link to="/swim-enrollment" onClick={() => setIsOpen(false)}>Enroll Now</Link>
                   </Button>
+                  <Button asChild variant="outline" size="sm" className="flex-1">
+                    <Link to="/admin/login" onClick={() => setIsOpen(false)}>Staff Login</Link>
+                  </Button>
                 </div>
                 <div className="mt-4 px-4 pt-4 border-t text-xs text-muted-foreground space-y-2 md:hidden">
                   <p className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> 1212 Kansas Ave, Modesto, CA</p>
