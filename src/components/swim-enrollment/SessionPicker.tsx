@@ -49,19 +49,11 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   const ageGroup = getAgeGroup(childAge);
   const levelInfo = LEVEL_DISPLAY[level];
 
-  // Shared session logic:
-  // School-age White/Red share sessions → query "white"
-  // Green/Blue share sessions → query "green"
-  // Yellow standalone
-  // Preschool White and Red are separate
-  const getSessionLevel = (): string => {
-    if (ageGroup === "preschool-3-5") return level; // preschool keeps separate White/Red
-    if (level === "white" || level === "red") return "white"; // school-age beginner mixed
-    if (level === "blue") return "green"; // school-age advanced mixed
-    return level; // yellow and green as-is
-  };
-
-  const sessionLevel = getSessionLevel();
+  // Session query logic:
+  // Preschool: White → white sessions, Red → red sessions
+  // School-age: query by exact level (blue, yellow, green)
+  // The database has separate session rows per level per time slot
+  const sessionLevel = level;
 
   useEffect(() => {
     async function fetchSessions() {
