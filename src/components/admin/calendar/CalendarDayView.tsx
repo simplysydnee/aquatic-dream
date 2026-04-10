@@ -143,6 +143,16 @@ const CalendarDayView = ({
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-scroll to 1 hour before current time on mount
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const pacificNow = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    const currentHour = pacificNow.getHours();
+    const scrollToHour = Math.max(START_HOUR, currentHour - 1);
+    const scrollTop = (scrollToHour - START_HOUR) * HOUR_HEIGHT;
+    scrollRef.current.scrollTop = scrollTop;
+  }, [date]);
+
   const dateStr = format(date, "yyyy-MM-dd");
   const dayName = format(date, "EEEE");
 
