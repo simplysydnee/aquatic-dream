@@ -298,8 +298,8 @@ const CalendarDayView = ({
           <div
             className="text-center text-xs font-semibold py-1.5 border-l"
             style={{
-              backgroundColor: "#E1F5EE",
-              color: "#085041",
+              backgroundColor: "#d4f0f8",
+              color: "#2a5e84",
               flex: icsCount,
             }}
           >
@@ -310,7 +310,7 @@ const CalendarDayView = ({
         {adCount > 0 && (
           <div
             className="text-center text-xs font-semibold py-1.5 border-l"
-            style={{ backgroundColor: "#E6F1FB", color: "#0C447C", flex: adCount }}
+            style={{ backgroundColor: "#d0ddf7", color: "#1a3a8a", flex: adCount }}
           >
             Aquatic Dreams — {todaySessions.length + adEvents.length} group{(todaySessions.length + adEvents.length) !== 1 ? "s" : ""}
           </div>
