@@ -36,15 +36,14 @@ export function AdminSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-2">
+      <SidebarHeader className="p-2 flex justify-end">
         <Button
           variant="ghost"
-          size="sm"
-          className="w-full justify-center"
+          size="icon"
+          className="h-7 w-7 ml-auto"
           onClick={toggleSidebar}
         >
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          {!collapsed && <span className="ml-2">Collapse</span>}
         </Button>
       </SidebarHeader>
       <SidebarContent>
