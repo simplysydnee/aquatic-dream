@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
+import Careers from "./pages/Careers";
 import SwimLessons from "./pages/SwimLessons";
 import SwimEnrollment from "./pages/SwimEnrollment";
 import AdminLogin from "./pages/AdminLogin";
@@ -18,6 +19,8 @@ import ContactsAdmin from "./pages/admin/ContactsAdmin";
 import UsersAdmin from "./pages/admin/UsersAdmin";
 import CalendarAdmin from "./pages/admin/CalendarAdmin";
 import ClassRosterAdmin from "./pages/admin/ClassRosterAdmin";
+import JobPostingsAdmin from "./pages/admin/JobPostingsAdmin";
+import JobApplicationsAdmin from "./pages/admin/JobApplicationsAdmin";
 import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
 import KioskCheckIn from "./pages/KioskCheckIn";
@@ -50,6 +53,8 @@ const App = () => (
               <Route path="dive-bookings" element={<DiveBookingsAdmin />} />
               <Route path="trip-reservations" element={<TripReservationsAdmin />} />
               <Route path="contacts" element={<ContactsAdmin />} />
+              <Route path="careers" element={<JobPostingsAdmin />} />
+              <Route path="applications" element={<JobApplicationsAdmin />} />
               <Route path="users" element={<UsersAdmin />} />
             </Route>
 
@@ -58,6 +63,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/swim-lessons" element={<SwimLessons />} />
               <Route path="/swim-enrollment" element={<SwimEnrollment />} />
+              <Route path="/careers" element={<Careers />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
