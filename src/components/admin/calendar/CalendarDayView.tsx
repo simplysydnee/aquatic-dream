@@ -51,8 +51,8 @@ const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_
 
 /* ── Color configs ── */
 const BLOCK_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  "i-can-swim":         { bg: "#E1F5EE", border: "#085041", text: "#085041" },
-  "swim":               { bg: "#E6F1FB", border: "#0C447C", text: "#0C447C" },
+  "i-can-swim":         { bg: "#d4f0f8", border: "#2a5e84", text: "#2a5e84" },
+  "swim":               { bg: "#d0ddf7", border: "#1a3a8a", text: "#1a3a8a" },
   "private-lesson":     { bg: "#EEEDFE", border: "#26215C", text: "#26215C" },
   "semi-private-lesson":{ bg: "#FBEAF0", border: "#4B1528", text: "#4B1528" },
   "dive-session":       { bg: "#FAEEDA", border: "#633806", text: "#633806" },
@@ -298,8 +298,8 @@ const CalendarDayView = ({
           <div
             className="text-center text-xs font-semibold py-1.5 border-l"
             style={{
-              backgroundColor: "#E1F5EE",
-              color: "#085041",
+              backgroundColor: "#d4f0f8",
+              color: "#2a5e84",
               flex: icsCount,
             }}
           >
@@ -310,7 +310,7 @@ const CalendarDayView = ({
         {adCount > 0 && (
           <div
             className="text-center text-xs font-semibold py-1.5 border-l"
-            style={{ backgroundColor: "#E6F1FB", color: "#0C447C", flex: adCount }}
+            style={{ backgroundColor: "#d0ddf7", color: "#1a3a8a", flex: adCount }}
           >
             Aquatic Dreams — {todaySessions.length + adEvents.length} group{(todaySessions.length + adEvents.length) !== 1 ? "s" : ""}
           </div>
