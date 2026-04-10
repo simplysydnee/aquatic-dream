@@ -65,6 +65,11 @@ Deno.serve(async (req) => {
       offset = data.offset
     } while (offset)
 
+    // Log first record's field names for debugging
+    if (allRecords.length > 0) {
+      console.log('Available fields:', Object.keys(allRecords[0].fields))
+    }
+
     // Map Airtable records to ICSSession format
     const sessions = allRecords
       .filter((r: any) => r.fields['Start Date'] && r.fields['End Date'])
