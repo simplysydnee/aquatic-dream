@@ -1,0 +1,1 @@
+ALTER TABLE public.pool_events ADD COLUMN client_name text;
