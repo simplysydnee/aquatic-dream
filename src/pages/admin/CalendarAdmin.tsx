@@ -28,6 +28,7 @@ const CalendarAdmin = () => {
   const [view, setView] = useState<"day" | "week">("day");
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
+  const [prefillStartTime, setPrefillStartTime] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<Set<ActivityType>>(new Set(ALL_FILTERS));
   const [miniCalOpen, setMiniCalOpen] = useState(false);
   const [icsSource, setIcsSource] = useState<"airtable" | "supabase">(() => {
@@ -214,6 +215,7 @@ const CalendarAdmin = () => {
           }}
           onDeleteEvent={() => refetch()}
           onAddEvent={(prefill) => {
+            setPrefillStartTime(prefill.startTime);
             setShowAddEvent(true);
           }}
         />
@@ -236,11 +238,15 @@ const CalendarAdmin = () => {
         open={showAddEvent}
         onOpenChange={(open) => {
           setShowAddEvent(open);
-          if (!open) setEditingEvent(null);
+          if (!open) {
+            setEditingEvent(null);
+            setPrefillStartTime(null);
+          }
         }}
         defaultDate={currentDate}
         onSaved={refetch}
         editEvent={editingEvent}
+        prefillStartTime={prefillStartTime}
       />
     </div>
   );
