@@ -397,7 +397,7 @@ const CalendarDayView = ({
                 .map((s) => {
                   const startMins = timeToMinutes(s.start_time);
                   const endMins = timeToMinutes(s.end_time);
-                  const dimmed = !activeFilters.has("i-can-swim");
+                  const dimmed = false;
                   return renderBlock(
                     s.id,
                     startMins,
@@ -419,7 +419,7 @@ const CalendarDayView = ({
                 const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
                 const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
                 const names = sessionEnrollments.map((e) => e.child_name).join(" · ");
-                const dimmed = !activeFilters.has("swim");
+                const dimmed = false;
 
                 return renderBlock(
                   s.id,
