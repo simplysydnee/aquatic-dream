@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format, addDays, startOfWeek, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
 import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
 import type { ActivityType } from "@/components/admin/calendar/CalendarFilterBar";
-import ICanSwimCalendar from "@/components/admin/ICanSwimCalendar";
+import { Badge } from "@/components/ui/badge";
 import { useCalendarData } from "@/hooks/useCalendarData";
 import type { CalendarPoolEvent } from "@/hooks/useCalendarData";
 import {
@@ -210,8 +210,6 @@ const CalendarAdmin = () => {
         />
       )}
 
-      {/* I Can Swim 209 Schedule */}
-      <ICanSwimCalendar />
 
       <AddPoolEventDialog
         open={showAddEvent}
