@@ -37,6 +37,9 @@ export interface ICSSession {
   instructor_name: string | null;
   confirmed_bookings: number;
   client_name?: string | null;
+  parent_name?: string | null;
+  parent_email?: string | null;
+  parent_phone?: string | null;
 }
 
 /* ── Layout constants ── */
@@ -392,7 +395,7 @@ const CalendarDayView = ({
                     s.client_name || s.session_type || "I Can Swim",
                     `${fmtTime(s.start_time)} – ${fmtTime(s.end_time)} · ${s.status}`,
                     dimmed,
-                    undefined,
+                    () => setDetailBlock({ kind: "ics", session: s }),
                     true
                   );
                 })}

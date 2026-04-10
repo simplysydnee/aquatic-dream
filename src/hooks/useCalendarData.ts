@@ -58,6 +58,9 @@ export interface ICSSession {
   instructor_name: string | null;
   confirmed_bookings: number;
   client_name?: string | null;
+  parent_name?: string | null;
+  parent_email?: string | null;
+  parent_phone?: string | null;
 }
 
 export function useCalendarData(currentDate: Date, view: "day" | "week") {
