@@ -99,10 +99,10 @@ const JobApplicationsAdmin = () => {
                   <TableCell>
                     <div className="flex gap-1">
                       {hasCert(app.certifications, "Lifeguard Certification") && (
-                        <Shield className="w-4 h-4 text-green-600" title="Lifeguard Cert" />
+                        <span title="Lifeguard Cert"><Shield className="w-4 h-4 text-primary" /></span>
                       )}
                       {hasCert(app.certifications, "CPR / First Aid") && (
-                        <CheckCircle className="w-4 h-4 text-blue-600" title="CPR/First Aid" />
+                        <span title="CPR/First Aid"><CheckCircle className="w-4 h-4 text-primary" /></span>
                       )}
                     </div>
                   </TableCell>
