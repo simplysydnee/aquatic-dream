@@ -33,8 +33,19 @@ Deno.serve(async (req) => {
     const filterFormula = `IS_AFTER({Start Date}, '${oneWeekAgo.toISOString().split('T')[0]}')`
 
     // Only request the fields we need
-    // First fetch without field filtering to discover available fields
-    const fields: string[] = []
+    const fields = [
+      'Start Date',
+      'End Date',
+      'Instructor',
+      'Booking Status',
+      'Session Type',
+      'Client Name (from Client)',
+      'Client',
+      'Day of the week',
+      'Parent Name (from Client)',
+      'Email (from Client)',
+      'Phone Number (from Client) 2',
+    ]
 
     const allRecords: any[] = []
     let offset: string | undefined = undefined
