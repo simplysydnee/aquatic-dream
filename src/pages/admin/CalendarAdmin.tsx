@@ -93,7 +93,7 @@ const CalendarAdmin = () => {
           <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
             Today
           </Button>
-          <Button size="sm" onClick={() => setShowAddEvent(true)}>
+          <Button size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
             <Plus className="w-4 h-4 mr-1" /> Add Event
           </Button>
         </div>
