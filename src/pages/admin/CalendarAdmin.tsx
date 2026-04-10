@@ -30,6 +30,15 @@ const CalendarAdmin = () => {
   const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
   const [activeFilters, setActiveFilters] = useState<Set<ActivityType>>(new Set(ALL_FILTERS));
   const [miniCalOpen, setMiniCalOpen] = useState(false);
+  const [icsSource, setIcsSource] = useState<"airtable" | "supabase">(() => {
+    return (localStorage.getItem("ics-data-source") as "airtable" | "supabase") || "airtable";
+  });
+
+  const toggleIcsSource = () => {
+    const next = icsSource === "airtable" ? "supabase" : "airtable";
+    setIcsSource(next);
+    localStorage.setItem("ics-data-source", next);
+  };
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
