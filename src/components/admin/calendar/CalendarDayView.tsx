@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
@@ -132,7 +132,14 @@ const CalendarDayView = ({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [detailBlock, setDetailBlock] = useState<BlockInfo | null>(null);
   const [hoverSlot, setHoverSlot] = useState<{ colId: string; y: number } | null>(null);
+  const [now, setNow] = useState(new Date());
   const { toast } = useToast();
+
+  // Update current time every 60 seconds
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const dateStr = format(date, "yyyy-MM-dd");
   const dayName = format(date, "EEEE");
@@ -340,7 +347,29 @@ const CalendarDayView = ({
       </div>
 
       {/* ── Time grid ── */}
-      <div className="flex overflow-x-auto">
+      <div className="flex overflow-x-auto relative">
+        {/* ── Current time indicator ── */}
+        {(() => {
+          const isToday = format(date, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
+          if (!isToday) return null;
+          const pacificNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+          const nowMins = pacificNow.getHours() * 60 + pacificNow.getMinutes();
+          if (nowMins < START_HOUR * 60 || nowMins > END_HOUR * 60) return null;
+          const top = minutesToTop(nowMins);
+          return (
+            <div
+              className="absolute left-0 right-0 z-30 pointer-events-none"
+              style={{ top: `${top}px` }}
+            >
+              <div className="flex items-center">
+                <div className="w-16 shrink-0 flex justify-end pr-1">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                </div>
+                <div className="flex-1 h-[2px] bg-red-500" />
+              </div>
+            </div>
+          );
+        })()}
         {/* Time labels */}
         <div className="w-16 shrink-0 relative" style={{ height: `${TOTAL_HEIGHT}px` }}>
           {HOURS.map((h) => (
