@@ -21,8 +21,6 @@ const items = [
   { title: "Class Roster", url: "/admin/roster", icon: ClipboardList },
   { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves },
   { title: "Lesson Requests", url: "/admin/lesson-requests", icon: BookOpen },
-  { title: "Dive Bookings", url: "/admin/dive-bookings", icon: Anchor },
-  { title: "Trip Reservations", url: "/admin/trip-reservations", icon: Ship },
   { title: "Contact Inquiries", url: "/admin/contacts", icon: MessageSquare },
   { title: "Job Postings", url: "/admin/careers", icon: Briefcase },
   { title: "Applications", url: "/admin/applications", icon: FileText },
