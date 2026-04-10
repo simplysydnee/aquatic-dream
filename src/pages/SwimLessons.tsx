@@ -179,6 +179,7 @@ const SwimLessons = () => {
               $45 registration fee — includes swim bag, swim cap & goggles
             </p>
           </div>
+        </div>
       </section>
 
       {/* Curriculum */}
