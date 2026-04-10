@@ -14,10 +14,10 @@ import { Badge } from "@/components/ui/badge";
 import { useCalendarData } from "@/hooks/useCalendarData";
 import type { CalendarPoolEvent } from "@/hooks/useCalendarData";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const ALL_FILTERS: ActivityType[] = [
   "i-can-swim", "swim", "private-lesson", "semi-private-lesson", "dive-session", "pool-rental",
@@ -133,31 +133,34 @@ const CalendarAdmin = () => {
           <Button variant="ghost" size="icon" onClick={() => navigateDate(-1)}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <Collapsible open={miniCalOpen} onOpenChange={setMiniCalOpen}>
-            <CollapsibleTrigger asChild>
+          <Popover open={miniCalOpen} onOpenChange={setMiniCalOpen}>
+            <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="min-w-[180px]">
                 <CalIcon className="w-4 h-4 mr-2" />
                 {view === "day"
                   ? format(currentDate, "EEEE, MMMM d, yyyy")
                   : `${format(weekDates[0], "MMM d")} – ${format(weekDates[6], "MMM d, yyyy")}`}
               </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2">
-              <div className="bg-card border rounded-lg shadow-lg p-1 w-fit">
-                <Calendar
-                  mode="single"
-                  selected={currentDate}
-                  onSelect={(d) => {
-                    if (d) {
-                      setCurrentDate(d);
-                      setMiniCalOpen(false);
-                    }
-                  }}
-                  className={cn("p-3 pointer-events-auto")}
-                />
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <div className="flex gap-1 p-2 border-b">
+                <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { setCurrentDate(new Date()); setMiniCalOpen(false); }}>Today</Button>
+                <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { setCurrentDate(addDays(currentDate, -30)); }}>← Month</Button>
+                <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { setCurrentDate(addDays(currentDate, 30)); }}>Month →</Button>
               </div>
-            </CollapsibleContent>
-          </Collapsible>
+              <Calendar
+                mode="single"
+                selected={currentDate}
+                onSelect={(d) => {
+                  if (d) {
+                    setCurrentDate(d);
+                    setMiniCalOpen(false);
+                  }
+                }}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
           <Button variant="ghost" size="icon" onClick={() => navigateDate(1)}>
             <ChevronRight className="w-4 h-4" />
           </Button>
