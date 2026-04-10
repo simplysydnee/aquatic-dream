@@ -102,7 +102,20 @@ const curriculum = [
   },
 ];
 
-const timeSlots = ["2:45 PM", "3:15 PM", "3:45 PM", "4:15 PM", "4:45 PM", "5:30 PM", "6:00 PM", "6:30 PM"];
+const preschoolSlots = [
+  { time: "2:45 PM", groups: "Bubble Makers / Reef Explorers" },
+];
+
+const schoolAgeSlots = [
+  { time: "3:00 PM", groups: "Blue & Yellow" },
+  { time: "3:30 PM", groups: "Blue & Yellow" },
+  { time: "4:00 PM", groups: "Blue & Yellow" },
+  { time: "4:30 PM", groups: "Blue & Yellow" },
+  { time: "5:00 PM", groups: "Blue & Yellow" },
+  { time: "5:45 PM", groups: "Blue & Yellow" },
+  { time: "6:15 PM", groups: "Yellow & Green" },
+  { time: "6:45 PM", groups: "Yellow & Green" },
+];
 
 const SwimLessons = () => {
   return (
@@ -135,6 +148,11 @@ const SwimLessons = () => {
               <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Max Class Size</p>
               <p className="font-display text-5xl font-bold text-primary">3</p>
               <p className="text-sm text-secondary-foreground/70">students per instructor</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Lesson Duration</p>
+              <p className="font-display text-5xl font-bold text-primary">30</p>
+              <p className="text-sm text-secondary-foreground/70">minutes per lesson</p>
             </div>
             <div className="text-center">
               <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Group Lesson</p>
@@ -239,8 +257,8 @@ const SwimLessons = () => {
         <div className="container">
           <div className="text-center mb-12">
             <h2 className="font-display text-3xl font-bold text-foreground mb-3">Summer Schedule</h2>
-            <p className="text-muted-foreground">Monday & Wednesday · Max 3 students per class</p>
-            <p className="text-xs text-muted-foreground mt-1">Preschool and school-age times staggered by 15 min to ease parking</p>
+            <p className="text-muted-foreground">Monday & Wednesday · 30 minute lessons · Max 3 students per class</p>
+            <p className="text-xs text-muted-foreground mt-1">Preschool and school-age times staggered to ease parking</p>
           </div>
 
           <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
@@ -249,16 +267,23 @@ const SwimLessons = () => {
                 <Calendar className="w-5 h-5 text-primary" />
                 <h3 className="font-display text-xl font-bold text-foreground">Session 1</h3>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">June & July · 2 days/week</p>
-              <div className="space-y-2">
-                {timeSlots.map((time) => (
-                  <div key={time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50">
-                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">{time}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">All groups</span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-sm text-muted-foreground mb-4">June 6 – June 29 · 8 lessons</p>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Preschool (Ages 3–5)</h4>
+              {preschoolSlots.map((slot) => (
+                <div key={slot.time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50 mb-2">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">{slot.time}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">{slot.groups}</span>
+                </div>
+              ))}
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 mt-4">School-Age (Ages 6–12)</h4>
+              {schoolAgeSlots.map((slot) => (
+                <div key={slot.time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50 mb-2">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">{slot.time}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">{slot.groups}</span>
+                </div>
+              ))}
             </Card>
 
             <Card className="p-6">
@@ -266,16 +291,23 @@ const SwimLessons = () => {
                 <Calendar className="w-5 h-5 text-primary" />
                 <h3 className="font-display text-xl font-bold text-foreground">Session 2</h3>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">July & August · 2 days/week</p>
-              <div className="space-y-2">
-                {timeSlots.map((time) => (
-                  <div key={time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50">
-                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">{time}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">All groups</span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-sm text-muted-foreground mb-4">July 13 – August 5 · 8 lessons</p>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Preschool (Ages 3–5)</h4>
+              {preschoolSlots.map((slot) => (
+                <div key={slot.time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50 mb-2">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">{slot.time}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">{slot.groups}</span>
+                </div>
+              ))}
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 mt-4">School-Age (Ages 6–12)</h4>
+              {schoolAgeSlots.map((slot) => (
+                <div key={slot.time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50 mb-2">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">{slot.time}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">{slot.groups}</span>
+                </div>
+              ))}
             </Card>
           </div>
 
