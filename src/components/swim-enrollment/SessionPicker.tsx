@@ -7,16 +7,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, PRICING } from "./types";
 
 interface SlotInfo {
-  /** The session ID matching the child's assessed level (used for enrollment) */
   assignSessionId: string;
   session_name: string;
   session_start_date: string;
   session_end_date: string;
   start_time: string;
   end_time: string;
-  /** Capacity is per time slot (shared across levels) */
   max_students: number;
-  /** Total enrolled across ALL level rows at this time slot */
   total_enrolled: number;
   spots_left: number;
 }
@@ -43,10 +40,17 @@ function formatDateRange(start: string, end: string) {
   return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", opts)}`;
 }
 
+function formatClassDate(d: string) {
+  const date = new Date(d + "T00:00:00");
+  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
 const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [classDates, setClassDates] = useState<string[]>([]);
+  const [loadingDates, setLoadingDates] = useState(false);
 
   const ageGroup = getAgeGroup(childAge);
   const levelInfo = LEVEL_DISPLAY[level];
@@ -54,8 +58,6 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   useEffect(() => {
     async function fetchSessions() {
       setLoading(true);
-
-      // Fetch ALL sessions for this age group so we can count cross-level enrollment
       const { data: allSessions, error } = await supabase
         .from("swim_sessions")
         .select("*")
@@ -69,14 +71,11 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         return;
       }
 
-      // For school-age, only show slots that include the child's level
-      // For preschool, show all (mixed white/red)
       const levelCompatible = (swimLevel: string) => {
         if (ageGroup === "preschool-3-5") return true;
         return swimLevel === level;
       };
 
-      // Group by session_name + start_time to find time-slot siblings
       const slotGroups: Record<string, typeof allSessions> = {};
       for (const s of allSessions) {
         const key = `${s.session_name}|${s.start_time}`;
@@ -84,7 +83,6 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         slotGroups[key].push(s);
       }
 
-      // Only keep slots where at least one session matches the child's level
       const relevantSlots = Object.entries(slotGroups).filter(([, group]) =>
         group.some(s => levelCompatible(s.swim_level))
       );
@@ -95,7 +93,6 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         return;
       }
 
-      // Get ALL session IDs to count enrollments across the whole age group
       const allIds = allSessions.map(s => s.id);
       const { data: enrollments } = await supabase
         .from("swim_enrollments")
@@ -109,11 +106,9 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
       });
 
       const result: SlotInfo[] = relevantSlots.map(([, group]) => {
-        // Find the session row matching the child's level to use as the enrollment target
         const matchingSession = group.find(s => levelCompatible(s.swim_level)) || group[0];
-        // Count ALL enrollments across every level row at this time slot
         const totalEnrolled = group.reduce((sum, s) => sum + (countMap[s.id] || 0), 0);
-        const capacity = matchingSession.max_students; // 3 per slot
+        const capacity = matchingSession.max_students;
 
         return {
           assignSessionId: matchingSession.id,
@@ -138,6 +133,26 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
     }
     fetchSessions();
   }, [level, ageGroup]);
+
+  // Fetch class dates when a slot is selected
+  useEffect(() => {
+    if (!selectedId) {
+      setClassDates([]);
+      return;
+    }
+    async function fetchDates() {
+      setLoadingDates(true);
+      const { data } = await supabase
+        .from("session_lesson_dates")
+        .select("lesson_date, is_cancelled")
+        .eq("session_id", selectedId)
+        .eq("is_cancelled", false)
+        .order("lesson_date");
+      setClassDates(data?.map(d => d.lesson_date) || []);
+      setLoadingDates(false);
+    }
+    fetchDates();
+  }, [selectedId]);
 
   const grouped = slots.reduce<Record<string, SlotInfo[]>>((acc, s) => {
     const key = `${s.session_name}|${s.session_start_date}|${s.session_end_date}`;
@@ -235,6 +250,28 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Show class dates for selected slot */}
+      {selectedId && classDates.length > 0 && (
+        <div className="mt-4 p-4 rounded-xl border border-primary/20 bg-accent/30">
+          <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-1.5">
+            <Calendar className="w-4 h-4 text-primary" />
+            Class Dates ({classDates.length} classes)
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {classDates.map(d => (
+              <span key={d} className="text-xs bg-background border border-border rounded-md px-2 py-1 text-muted-foreground">
+                {formatClassDate(d)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {selectedId && loadingDates && (
+        <div className="mt-4 flex justify-center">
+          <Loader2 className="w-4 h-4 animate-spin text-primary" />
         </div>
       )}
 
