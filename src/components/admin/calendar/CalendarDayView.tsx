@@ -682,6 +682,7 @@ const CalendarDayView = ({
           setDetailBlock(null);
         }}
         onCheckIn={handleCheckIn}
+        onRefetch={onAttendanceChange}
       />
 
       {/* ── Delete confirmation ── */}
