@@ -49,16 +49,8 @@ const SwimEnrollment = () => {
     setEnrollmentData(data);
     setChildName(data.childName);
 
-    // Check if returning swimmer by parent email
-    const { data: existing } = await supabase
-      .from("swim_enrollments")
-      .select("id")
-      .eq("parent_email", data.parentEmail)
-      .eq("payment_status", "paid")
-      .limit(1);
-
-    const returning = existing && existing.length > 0;
-    setIsFirstTime(!returning);
+    const firstTime = data.isFirstTime === "yes";
+    setIsFirstTime(firstTime);
 
     // Get session price
     if (sessionId) {
@@ -68,7 +60,7 @@ const SwimEnrollment = () => {
         .eq("id", sessionId)
         .single();
       const sessionFee = session?.session_price ?? 280;
-      const regFee = returning ? 0 : PRICING.registrationFee;
+      const regFee = firstTime ? PRICING.registrationFee : 0;
       setTotalDue(sessionFee + regFee);
     }
 
