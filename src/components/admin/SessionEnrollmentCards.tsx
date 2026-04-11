@@ -33,6 +33,7 @@ interface Enrollment {
 interface SessionPeriod {
   id: string;
   name: string;
+  start_date: string;
 }
 
 function formatDayOfWeek(dow: string) {
