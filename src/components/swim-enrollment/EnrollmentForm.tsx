@@ -15,18 +15,22 @@ const enrollmentSchema = z.object({
   childName: z.string().trim().min(1, "Required").max(100),
   notes: z.string().trim().max(500).optional(),
   isFirstTime: z.enum(["yes", "no"], { required_error: "Please select one" }),
-});
+  hasMedical: z.enum(["yes", "no"], { required_error: "Please select one" }),
+  medicalNotes: z.string().trim().max(1000).optional(),
+}).refine(
+  (data) => data.hasMedical !== "yes" || (data.medicalNotes && data.medicalNotes.length > 0),
+  { message: "Please describe the medical conditions or allergies", path: ["medicalNotes"] }
+);
 
 export type EnrollmentFormData = z.infer<typeof enrollmentSchema>;
 
 interface Props {
-  childAge: number;
   onSubmit: (data: EnrollmentFormData) => void;
   onBack: () => void;
   submitting: boolean;
 }
 
-const EnrollmentForm = ({ childAge, onSubmit, onBack, submitting }: Props) => {
+const EnrollmentForm = ({ onSubmit, onBack, submitting }: Props) => {
   const [form, setForm] = useState({
     parentName: "",
     parentEmail: "",
@@ -34,6 +38,8 @@ const EnrollmentForm = ({ childAge, onSubmit, onBack, submitting }: Props) => {
     childName: "",
     notes: "",
     isFirstTime: "" as "" | "yes" | "no",
+    hasMedical: "" as "" | "yes" | "no",
+    medicalNotes: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -94,11 +100,6 @@ const EnrollmentForm = ({ childAge, onSubmit, onBack, submitting }: Props) => {
           </div>
         </div>
 
-        <div>
-          <Label htmlFor="childAge">Child's Age</Label>
-          <Input id="childAge" value={childAge} disabled className="mt-1 max-w-[100px]" />
-        </div>
-
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="parentEmail">Email *</Label>
@@ -146,6 +147,46 @@ const EnrollmentForm = ({ childAge, onSubmit, onBack, submitting }: Props) => {
             </div>
           </RadioGroup>
           {errors.isFirstTime && <p className="text-xs text-destructive mt-1">{errors.isFirstTime}</p>}
+        </div>
+
+        {/* Medical / Allergy question */}
+        <div className="p-4 rounded-lg border border-border bg-muted/30">
+          <Label className="text-sm font-semibold">
+            Does your child have any medical conditions or allergies we should know about? *
+          </Label>
+          <RadioGroup
+            value={form.hasMedical}
+            onValueChange={(val) => update("hasMedical", val)}
+            className="flex gap-6 mt-3"
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="yes" id="hasMedicalYes" />
+              <Label htmlFor="hasMedicalYes" className="font-normal cursor-pointer">Yes</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="no" id="hasMedicalNo" />
+              <Label htmlFor="hasMedicalNo" className="font-normal cursor-pointer">No</Label>
+            </div>
+          </RadioGroup>
+          {errors.hasMedical && <p className="text-xs text-destructive mt-1">{errors.hasMedical}</p>}
+
+          {form.hasMedical === "yes" && (
+            <div className="mt-3">
+              <Label htmlFor="medicalNotes" className="text-sm">
+                Please describe the conditions or allergies *
+              </Label>
+              <Textarea
+                id="medicalNotes"
+                value={form.medicalNotes}
+                onChange={(e) => update("medicalNotes", e.target.value)}
+                className="mt-1"
+                rows={3}
+                maxLength={1000}
+                placeholder="e.g., asthma, bee sting allergy, seizure disorder..."
+              />
+              {errors.medicalNotes && <p className="text-xs text-destructive mt-1">{errors.medicalNotes}</p>}
+            </div>
+          )}
         </div>
 
         <div>
