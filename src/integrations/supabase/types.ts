@@ -515,6 +515,36 @@ export type Database = {
           },
         ]
       }
+      session_periods: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          is_active: boolean
+          name: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          is_active?: boolean
+          name: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       swim_enrollments: {
         Row: {
           child_age: number
@@ -588,6 +618,7 @@ export type Database = {
           registration_status: string
           session_end_date: string | null
           session_name: string | null
+          session_period_id: string | null
           session_price: number | null
           session_start_date: string | null
           start_time: string
@@ -608,6 +639,7 @@ export type Database = {
           registration_status?: string
           session_end_date?: string | null
           session_name?: string | null
+          session_period_id?: string | null
           session_price?: number | null
           session_start_date?: string | null
           start_time: string
@@ -628,6 +660,7 @@ export type Database = {
           registration_status?: string
           session_end_date?: string | null
           session_name?: string | null
+          session_period_id?: string | null
           session_price?: number | null
           session_start_date?: string | null
           start_time?: string
@@ -641,6 +674,13 @@ export type Database = {
             columns: ["instructor_id"]
             isOneToOne: false
             referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swim_sessions_session_period_id_fkey"
+            columns: ["session_period_id"]
+            isOneToOne: false
+            referencedRelation: "session_periods"
             referencedColumns: ["id"]
           },
         ]
