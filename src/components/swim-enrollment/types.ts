@@ -11,11 +11,11 @@ export interface LevelInfo {
 }
 
 export const LEVEL_DISPLAY: Record<SwimLevel, LevelInfo> = {
-  white: { name: "White", groupName: "Bubble Makers", diveStatus: "Pre-Dive Prep", description: "Water comfort & safety introduction", color: "bg-gray-100 text-gray-700 border-gray-300" },
-  red: { name: "Red", groupName: "Reef Explorers", diveStatus: "Shallow Entry", description: "Submersion confidence, beginning floating", color: "bg-red-100 text-red-700 border-red-300" },
-  yellow: { name: "Yellow", groupName: "Sea Scouts", diveStatus: "Mid-Water Descent", description: "Independent floating, intro to kicks", color: "bg-yellow-100 text-yellow-700 border-yellow-300" },
-  blue: { name: "Blue", groupName: "Deep Sea Divers", diveStatus: "Elite Navigator", description: "Treading water, developing strokes", color: "bg-blue-100 text-blue-700 border-blue-300" },
-  green: { name: "Green", groupName: "Ocean Masters", diveStatus: "Elite Navigator", description: "Side-roll-side kick, stroke development", color: "bg-green-100 text-green-700 border-green-300" },
+  white: { name: "White", groupName: "Bubble Makers", diveStatus: "Beginner", description: "Water comfort & safety introduction", color: "bg-gray-100 text-gray-700 border-gray-300" },
+  red: { name: "Red", groupName: "Reef Explorers", diveStatus: "Foundations", description: "Submersion confidence, beginning floating", color: "bg-red-100 text-red-700 border-red-300" },
+  yellow: { name: "Yellow", groupName: "Sea Scouts", diveStatus: "Intermediate", description: "Independent floating, intro to kicks", color: "bg-yellow-100 text-yellow-700 border-yellow-300" },
+  blue: { name: "Blue", groupName: "Deep Sea Divers", diveStatus: "Advanced", description: "Treading water, developing strokes", color: "bg-blue-100 text-blue-700 border-blue-300" },
+  green: { name: "Green", groupName: "Ocean Masters", diveStatus: "Expert", description: "Side-roll-side kick, stroke development", color: "bg-green-100 text-green-700 border-green-300" },
 };
 
 /** Maps level to its group display name based on age group */
@@ -33,11 +33,12 @@ export function getGroupName(level: SwimLevel, ageGroup: AgeGroup): string {
 /** Maps level to its dive status based on age group */
 export function getDiveStatus(level: SwimLevel, ageGroup: AgeGroup): string {
   if (ageGroup === "preschool-3-5") {
-    if (level === "white") return "Pre-Dive Prep";
-    if (level === "red") return "Shallow Entry";
+    if (level === "white") return "Beginner";
+    if (level === "red") return "Foundations";
   }
-  if (level === "yellow") return "Mid-Water Descent";
-  return "Elite Navigator";
+  if (level === "yellow") return "Intermediate";
+  if (level === "blue") return "Advanced";
+  return "Expert";
 }
 
 export const LEVEL_BADGE_COLORS: Record<SwimLevel, { bg: string; ring: string; text: string }> = {
