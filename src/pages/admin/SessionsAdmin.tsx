@@ -104,11 +104,6 @@ const LEVEL_BORDER: Record<string, string> = {
   green: "border-l-green-400",
 };
 
-const COMBINED_GROUPS: Record<string, string> = {
-  "Bubble Makers": "Bubble Makers / Reef Explorers",
-  "Reef Explorers": "Bubble Makers / Reef Explorers",
-};
-const getDisplayGroup = (name: string) => COMBINED_GROUPS[name] || name;
 
 const SessionsAdmin = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -399,7 +394,7 @@ const SessionsAdmin = () => {
     if (!periodGroupMap[pId]) {
       periodGroupMap[pId] = { period: periods.find(p => p.id === pId) || null, subgroups: {} };
     }
-    const displayName = getDisplayGroup(s.session_name || "Unnamed");
+    const displayName = s.session_name || "Unnamed";
     if (!periodGroupMap[pId].subgroups[displayName]) {
       periodGroupMap[pId].subgroups[displayName] = { ageGroup: s.age_group || "unknown", slots: [] };
     }
