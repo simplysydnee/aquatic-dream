@@ -23,6 +23,7 @@ const SwimEnrollment = () => {
   const [step, setStep] = useState<Step>("assess");
   const [level, setLevel] = useState<SwimLevel | null>(null);
   const [childAge, setChildAge] = useState(0);
+  const [childDob, setChildDob] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [childName, setChildName] = useState("");
   const [enrollmentData, setEnrollmentData] = useState<EnrollmentFormData | null>(null);
