@@ -277,7 +277,23 @@ const SessionsAdmin = () => {
             <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{editingId ? "Edit Session" : "Create Session"}</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                <div><Label>Session Name *</Label><Input placeholder="e.g. Session 3" value={form.session_name} onChange={e => setForm(f => ({ ...f, session_name: e.target.value }))} /></div>
+                <div>
+                  <Label>Session Name *</Label>
+                  <Select value={form.session_name || "custom"} onValueChange={v => setForm(f => ({ ...f, session_name: v === "custom" ? "" : v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select group name" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Bubble Makers">Bubble Makers</SelectItem>
+                      <SelectItem value="Reef Explorers">Reef Explorers</SelectItem>
+                      <SelectItem value="Sea Scouts">Sea Scouts</SelectItem>
+                      <SelectItem value="Deep Sea Divers">Deep Sea Divers</SelectItem>
+                      <SelectItem value="Ocean Masters">Ocean Masters</SelectItem>
+                      <SelectItem value="custom">Custom...</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {form.session_name === "" && (
+                    <Input className="mt-1" placeholder="Custom session name" value="" onChange={e => setForm(f => ({ ...f, session_name: e.target.value }))} />
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Start Date</Label>
