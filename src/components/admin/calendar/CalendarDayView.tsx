@@ -583,8 +583,8 @@ const CalendarDayView = ({
                 );
               })}
 
-            {/* ── AD pool events (private, semi-private) ── */}
-            {col.group === "ad" &&
+            {/* ── AD pool events (private, semi-private) — only in first AD column ── */}
+            {col.group === "ad" && col.id === columns.find(c => c.group === "ad")?.id &&
               adEvents.map((e) => {
                 const startMins = timeToMinutes(e.start_time);
                 const endMins = timeToMinutes(e.end_time);
