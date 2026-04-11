@@ -574,6 +574,27 @@ const SessionsAdmin = () => {
                   </div>
                 </div>
 
+                {/* Frequency */}
+                {createForm.days.length >= 2 && (
+                  <div>
+                    <Label className="text-sm font-semibold">Frequency</Label>
+                    <RadioGroup
+                      value={createForm.frequency}
+                      onValueChange={(v: "weekly" | "twice_weekly") => setCreateForm(f => ({ ...f, frequency: v }))}
+                      className="flex gap-4 mt-1"
+                    >
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                        <RadioGroupItem value="weekly" />
+                        Weekly <span className="text-muted-foreground">(separate class per day)</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                        <RadioGroupItem value="twice_weekly" />
+                        {createForm.days.length}x/week <span className="text-muted-foreground">(combined)</span>
+                      </label>
+                    </RadioGroup>
+                  </div>
+                )}
+
                 {/* Instructor */}
                 <div>
                   <Label className="text-sm font-semibold">Instructor</Label>
@@ -587,10 +608,13 @@ const SessionsAdmin = () => {
                 </div>
 
                 {/* Summary + Submit */}
-                {totalClassCount(createForm.timeSlots, createForm.swim_levels, createForm.days) > 0 && (
+                {computeClassCount() > 0 && (
                   <div className="rounded-md bg-muted/50 border p-3 text-sm text-muted-foreground">
-                    Will create <span className="font-semibold text-foreground">{totalClassCount(createForm.timeSlots, createForm.swim_levels, createForm.days)}</span> classes:
-                    {" "}{createForm.timeSlots.filter(ts => ts.start && ts.end).length} time slot(s) × {createForm.swim_levels.length} level(s) × {createForm.days.length} day(s)
+                    Will create <span className="font-semibold text-foreground">{computeClassCount()}</span> class(es)
+                    {createForm.frequency === "twice_weekly" && createForm.days.length >= 2
+                      ? `: ${createForm.timeSlots.filter(ts => ts.start && ts.end).length} time slot(s) × ${createForm.swim_levels.length} level(s), meeting ${createForm.days.map(d => d.slice(0, 3)).join(" & ")}`
+                      : `: ${createForm.timeSlots.filter(ts => ts.start && ts.end).length} time slot(s) × ${createForm.swim_levels.length} level(s) × ${createForm.days.length} day(s)`
+                    }
                   </div>
                 )}
 
