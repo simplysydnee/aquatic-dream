@@ -22,16 +22,31 @@ interface Props {
   sessionStartDate: string;
   sessionEndDate: string;
   sessionLabel: string;
+  /** e.g. "monday_wednesday", "tuesday_thursday", "saturday" */
+  daysOfWeek: string;
 }
 
-function generateMonWedDates(start: string, end: string): string[] {
+const DAY_NAME_TO_NUM: Record<string, number> = {
+  sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+  thursday: 4, friday: 5, saturday: 6,
+};
+
+function parseDaysOfWeek(daysOfWeek: string): number[] {
+  return daysOfWeek
+    .split("_")
+    .map(d => DAY_NAME_TO_NUM[d.toLowerCase()])
+    .filter(n => n !== undefined);
+}
+
+function generateLessonDates(start: string, end: string, daysOfWeek: string): string[] {
+  const allowedDays = parseDaysOfWeek(daysOfWeek);
+  if (allowedDays.length === 0) return [];
   const dates: string[] = [];
   const s = new Date(start + "T00:00:00");
   const e = new Date(end + "T00:00:00");
   const cur = new Date(s);
   while (cur <= e) {
-    const dow = cur.getDay(); // 0=Sun, 1=Mon, 3=Wed
-    if (dow === 1 || dow === 3) {
+    if (allowedDays.includes(cur.getDay())) {
       dates.push(cur.toISOString().slice(0, 10));
     }
     cur.setDate(cur.getDate() + 1);
