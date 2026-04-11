@@ -393,17 +393,25 @@ const CalendarDayView = ({
         )}
       </div>
 
-      {/* ── Column name headers ── */}
+      {/* ── Column name headers (color-coded for AD) ── */}
       <div className="flex border-b">
         <div className="w-16 shrink-0" />
-        {columns.map((col) => (
-          <div
-            key={col.id}
-            className="flex-1 text-center text-[11px] font-medium text-muted-foreground py-1.5 border-l truncate px-1"
-          >
-            {col.label}
-          </div>
-        ))}
+        {columns.map((col) => {
+          const levelColor = col.swimLevel ? LEVEL_COLORS[col.swimLevel] : null;
+          return (
+            <div
+              key={col.id}
+              className="flex-1 text-center text-[11px] font-semibold py-1.5 border-l truncate px-1"
+              style={levelColor ? {
+                backgroundColor: levelColor.headerBg,
+                color: levelColor.text,
+                borderBottom: `2px solid ${levelColor.border}`,
+              } : undefined}
+            >
+              {col.label}
+            </div>
+          );
+        })}
       </div>
 
       {/* ── Time grid (scrollable) ── */}
@@ -508,16 +516,18 @@ const CalendarDayView = ({
                   );
                 })}
 
-            {/* ── AD swim sessions ── */}
+            {/* ── AD swim sessions (filtered to this column) ── */}
             {col.group === "ad" &&
-              todaySessions.map((s) => {
+              todaySessions
+                .filter((s) => (s.session_name || s.swim_level) === col.sessionName)
+                .map((s) => {
                 const startMins = timeToMinutes(s.start_time);
                 const endMins = timeToMinutes(s.end_time);
                 const top = minutesToTop(startMins);
                 const height = durationHeight(startMins, endMins);
                 const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
                 const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
-                const colors = BLOCK_COLORS["swim"];
+                const levelColor = LEVEL_COLORS[s.swim_level] || BLOCK_COLORS["swim"];
 
                 return (
                   <div
@@ -526,9 +536,9 @@ const CalendarDayView = ({
                     style={{
                       top: `${top}px`,
                       height: `${height}px`,
-                      backgroundColor: colors.bg,
-                      borderLeftColor: colors.border,
-                      color: colors.text,
+                      backgroundColor: levelColor.bg,
+                      borderLeftColor: levelColor.border,
+                      color: levelColor.text,
                     }}
                     onClick={() =>
                       setDetailBlock({
