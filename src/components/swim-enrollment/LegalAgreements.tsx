@@ -87,7 +87,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting }
     privacyPolicyAccepted: false,
     termsAccepted: false,
     photoReleaseAccepted: false,
-    signatureText: "",
+    signatureText: parentName || "",
     emergencyContactName: "",
     emergencyContactPhone: "",
     emergencyContactRelationship: "",
