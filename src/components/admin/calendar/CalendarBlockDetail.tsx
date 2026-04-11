@@ -179,7 +179,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
         {!isICS && (
           <>
             {/* Info tiles */}
-            <div className="grid grid-cols-2 gap-3 p-4">
+            <div className={cn("grid gap-3 p-4", isSwim && block.session.instructors ? "grid-cols-3" : "grid-cols-2")}>
               <div className="rounded-lg bg-muted/50 p-3">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                   <Clock className="w-3.5 h-3.5" /> Time
@@ -200,6 +200,14 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
                     : block.event.instructor_name || "—"}
                 </p>
               </div>
+              {isSwim && block.session.instructors && (
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <User className="w-3.5 h-3.5" /> Instructor
+                  </div>
+                  <p className="text-sm font-medium">{block.session.instructors.name}</p>
+                </div>
+              )}
             </div>
 
             {/* Roster with contact info */}
