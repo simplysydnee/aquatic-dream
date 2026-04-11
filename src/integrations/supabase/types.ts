@@ -480,6 +480,41 @@ export type Database = {
         }
         Relationships: []
       }
+      session_lesson_dates: {
+        Row: {
+          cancel_reason: string | null
+          created_at: string
+          id: string
+          is_cancelled: boolean
+          lesson_date: string
+          session_id: string
+        }
+        Insert: {
+          cancel_reason?: string | null
+          created_at?: string
+          id?: string
+          is_cancelled?: boolean
+          lesson_date: string
+          session_id: string
+        }
+        Update: {
+          cancel_reason?: string | null
+          created_at?: string
+          id?: string
+          is_cancelled?: boolean
+          lesson_date?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_lesson_dates_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "swim_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       swim_enrollments: {
         Row: {
           child_age: number
