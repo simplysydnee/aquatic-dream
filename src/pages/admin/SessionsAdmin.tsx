@@ -189,9 +189,30 @@ const SessionsAdmin = () => {
       const rows = form.days.flatMap(day =>
         form.swim_levels.map(lvl => ({ ...basePayload, day_of_week: day, swim_level: lvl }))
       );
-      const { error } = await supabase.from("swim_sessions").insert(rows);
+      const { data: inserted, error } = await supabase.from("swim_sessions").insert(rows).select("id");
       if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-      toast({ title: `${rows.length} session row(s) created` });
+
+      // Auto-generate Mon/Wed class dates for new sessions
+      if (inserted && form.session_start_date && form.session_end_date) {
+        const startStr = format(form.session_start_date, "yyyy-MM-dd");
+        const endStr = format(form.session_end_date, "yyyy-MM-dd");
+        const monWedDates: string[] = [];
+        const cur = new Date(startStr + "T00:00:00");
+        const endD = new Date(endStr + "T00:00:00");
+        while (cur <= endD) {
+          const dow = cur.getDay();
+          if (dow === 1 || dow === 3) monWedDates.push(cur.toISOString().slice(0, 10));
+          cur.setDate(cur.getDate() + 1);
+        }
+        if (monWedDates.length > 0) {
+          const dateRows = inserted.flatMap(s =>
+            monWedDates.map(d => ({ session_id: s.id, lesson_date: d }))
+          );
+          await supabase.from("session_lesson_dates").upsert(dateRows, { onConflict: "session_id,lesson_date" });
+        }
+      }
+
+      toast({ title: `${rows.length} session(s) created with class dates` });
     }
     setDialogOpen(false);
     resetForm();
