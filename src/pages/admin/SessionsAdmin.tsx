@@ -437,7 +437,7 @@ const SessionsAdmin = () => {
       {/* Session periods */}
       {sortedPeriods.map(([periodKey, period], idx) => {
         const firstSubSlot = Object.values(period.subgroups)[0]?.slots[0]?.first;
-        const classCount = firstSubSlot ? getClassCount(firstSubSlot.session_start_date, firstSubSlot.session_end_date) : null;
+        
 
         return (
           <div key={periodKey} className="space-y-4">
@@ -448,9 +448,8 @@ const SessionsAdmin = () => {
                 <CalendarIcon className="w-3.5 h-3.5" />
                 {period.label}
               </span>
-              {classCount && (
-                <span className="text-sm text-muted-foreground">· {classCount} classes</span>
-              )}
+
+
             </div>
 
             {/* Subgroups within this period */}
@@ -486,7 +485,7 @@ const SessionsAdmin = () => {
                                 {formatTime(s.start_time)} – {formatTime(s.end_time)}
                               </span>
                             </div>
-                            <div className="flex gap-1 w-[120px] shrink-0">
+                            <div className="flex gap-1 w-[160px] shrink-0 flex-wrap">
                               {slot.levels.map(l => {
                                 const lc = LEVEL_BADGE_COLORS[l as SwimLevel];
                                 return lc ? (
