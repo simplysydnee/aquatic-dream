@@ -1,63 +1,51 @@
 
 
-## Fix Session Dates + Add Session Periods Table
+## Rename & Restructure: Sessions → Classes
 
-### Current State
+### Terminology Fix
+The current naming is backwards. Here's the correction:
 
-The database has no dedicated "session periods" table. Session dates are stored directly on each `swim_sessions` row. Current values:
+| Current (confusing) | New (correct) | Meaning |
+|---------------------|---------------|---------|
+| "Session Period" | **Session** | Date range (e.g., June 8 – July 1) |
+| "Session" / "Swim Session" | **Class** | A group of kids at a specific time/level (e.g., White at 2:45, cap 3) |
 
-| Age Group | Session 1 Dates | Session 2 Dates |
-|-----------|----------------|----------------|
-| School-age | Jun 6 – Jun 29 (WRONG) | Jul 13 – Aug 5 (WRONG) |
-| Preschool | Jun 8 – Jul 1 (correct) | Jul 13 – Aug 2 (correct) |
+### Changes to `SessionsAdmin.tsx`
 
-**Correct dates per owner:**
-- Session 1: **June 8 – July 1** (both age groups)
-- Session 2: **July 13 – August 2** (both age groups)
+**1. Rename everything in the UI**
+- Page title: "Swim Sessions" → "Sessions & Classes"
+- "Session Periods" card → "Sessions" card
+- "Add Period" button → "Add Session"
+- Period dialog title → "New Session" / "Edit Session"
+- "Create Session" button (for classes) → "Create Classes"
+- All dialog labels, toasts, and placeholders updated accordingly
+- The `session_periods` table stays the same in the DB — only UI labels change
 
-### What's Changing
+**2. Redesign the "Create Classes" dialog for bulk creation**
+Replace the current single-class form with a streamlined flow:
+- **Select Session**: Dropdown of sessions (formerly "periods") — e.g., "Session 1 (Jun 8 – Jul 1)"
+- **Add Class Times**: Array of start/end time rows with a `+ Add Time Slot` button. Each row has a remove button. Quick way to add many slots.
+- **Select Levels**: Checkbox chips (White, Red, Yellow, Blue, Green) — each selected level creates a separate class row with its own capacity
+- **Age Group**: Preschool or School-Age dropdown
+- **Capacity**: Per class (default 3)
+- **Days**: Mon/Wed checkboxes (same as now)
+- On submit: creates `timeSlots × levels × days` class rows. E.g., 3 time slots × 2 levels (White + Red) × 1 day-combo = 6 classes
+- `session_name` auto-derived from level (White → "Bubble Makers", Red → "Reef Explorers", etc.)
 
-**1. Fix existing session dates (data update)**
-- Update all school-age Session 1 rows: `session_start_date` → `2025-06-08`, `session_end_date` → `2025-07-01`
-- Update all school-age Session 2 rows: `session_end_date` → `2025-08-02`
-- Regenerate `session_lesson_dates` for affected sessions if needed
+**3. Keep existing class display and inline controls**
+- The grouped display (Session → subgroups → time slots) stays the same
+- Edit, duplicate, toggle status, assign instructor, manage dates — all unchanged
+- Subgroup headers still show "Bubble Makers / Reef Explorers" etc. with age badge
 
-**2. Create a `session_periods` table (new table)**
-- Columns: `id`, `name` (e.g. "Session 1"), `start_date`, `end_date`, `is_active`, `created_at`
-- Seed with two rows: Session 1 (Jun 8 – Jul 1) and Session 2 (Jul 13 – Aug 2)
-- Add RLS: public can read, authenticated can manage
+**4. Capacity label fix**
+- Change "Max Students (per slot)" → "Max Students (per class)" to clarify that White gets 3 and Red gets 3 separately
 
-**3. Link `swim_sessions` to `session_periods`**
-- Add `session_period_id` column to `swim_sessions` (nullable UUID)
-- Backfill existing rows based on their `session_start_date`
-- The roster and booking pages will derive period labels from this relationship instead of guessing from dates
-
-**4. Build a simple "Manage Session Periods" UI in the admin**
-- Add a section (or separate admin page) where the owner can create/edit session periods (name, start date, end date)
-- When creating a new session period, the system can optionally bulk-create all the standard time slots automatically
-
-**5. Update ClassRosterAdmin.tsx**
-- Use `session_period_id` to group cards by period instead of the tolerance-based date logic
-- Period label comes from the `session_periods` table name field
-
-**6. Update SessionPicker.tsx (booking)**
-- Filter available sessions by active session periods
-- Display period name to parents during enrollment
-
-### Files Affected
-
-| Action | Target |
-|--------|--------|
-| DB migration | Create `session_periods` table, add `session_period_id` to `swim_sessions` |
-| DB data update | Fix school-age dates, backfill `session_period_id`, seed period rows |
-| Modify | `src/pages/admin/SessionsAdmin.tsx` — add period management UI |
-| Modify | `src/pages/admin/ClassRosterAdmin.tsx` — group by period via FK |
-| Modify | `src/components/swim-enrollment/SessionPicker.tsx` — filter by active period |
-| Update | `session_lesson_dates` — regenerate for corrected date ranges |
+### File
+`src/pages/admin/SessionsAdmin.tsx` — single file, all changes
 
 ### Expected Result
-- Owner can create/edit session periods from the admin
-- All session rows link to a period, eliminating date-guessing bugs
-- Roster and booking dynamically reflect the correct period groupings
-- Session 1: June 8 – July 1, Session 2: July 13 – August 2
+- Owner sees "Sessions" (date ranges) at top, creates them with name + dates
+- Below, clicks "Create Classes" → picks a session → adds time slots rapidly → picks levels + age + capacity → bulk creates
+- Each level is its own class row in the DB with independent capacity of 3
+- Preschool White at 2:45 = one class (3 kids), Preschool Red at 2:45 = another class (3 kids)
 
