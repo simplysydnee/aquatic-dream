@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
-import { Eye, DollarSign, Send, CheckCircle } from "lucide-react";
+import SessionEnrollmentCards from "@/components/admin/SessionEnrollmentCards";
+import { Eye, CheckCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Enrollment {
@@ -33,24 +35,44 @@ interface Enrollment {
 interface SessionInfo {
   id: string;
   start_time: string;
+  end_time?: string;
   session_name: string | null;
   age_group: string | null;
   swim_level: string;
+  max_students: number;
+  day_of_week: string;
+  session_period_id: string | null;
+}
+
+interface SessionPeriod {
+  id: string;
+  name: string;
+}
+
+function formatDayOfWeek(dow: string) {
+  const map: Record<string, string> = {
+    monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu",
+    friday: "Fri", saturday: "Sat", sunday: "Sun",
+  };
+  return dow.toLowerCase().split("_").map(p => map[p] || p).join(" & ");
 }
 
 const SwimEnrollmentsAdmin = () => {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [sessions, setSessions] = useState<Record<string, SessionInfo>>({});
+  const [sessionPeriods, setSessionPeriods] = useState<SessionPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [sessionFilter, setSessionFilter] = useState<string>("all");
 
   const fetchData = async () => {
-    const [enrollRes, sessionRes] = await Promise.all([
+    const [enrollRes, sessionRes, periodRes] = await Promise.all([
       supabase.from("swim_enrollments").select("*").order("created_at", { ascending: false }),
-      supabase.from("swim_sessions").select("id, start_time, session_name, age_group, swim_level"),
+      supabase.from("swim_sessions").select("id, start_time, end_time, session_name, age_group, swim_level, max_students, day_of_week, session_period_id"),
+      supabase.from("session_periods").select("id, name").order("start_date", { ascending: false }),
     ]);
 
     if (enrollRes.data) setEnrollments(enrollRes.data as Enrollment[]);
@@ -59,6 +81,7 @@ const SwimEnrollmentsAdmin = () => {
       sessionRes.data.forEach((s: any) => (map[s.id] = s));
       setSessions(map);
     }
+    if (periodRes.data) setSessionPeriods(periodRes.data);
     setLoading(false);
   };
 
@@ -97,7 +120,8 @@ const SwimEnrollmentsAdmin = () => {
       e.parent_name.toLowerCase().includes(search.toLowerCase()) ||
       e.parent_email.toLowerCase().includes(search.toLowerCase());
     const matchPayment = paymentFilter === "all" || e.payment_status === paymentFilter;
-    return matchSearch && matchPayment;
+    const matchSession = sessionFilter === "all" || e.session_id === sessionFilter;
+    return matchSearch && matchPayment && matchSession;
   });
 
   const unpaidCount = enrollments.filter((e) => e.payment_status === "unpaid" && e.status === "enrolled").length;
@@ -105,6 +129,12 @@ const SwimEnrollmentsAdmin = () => {
   const cancelledCount = enrollments.filter((e) => e.status === "cancelled").length;
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
+
+  // Build session options for the filter dropdown
+  const sessionOptions = Object.values(sessions).map((s) => ({
+    id: s.id,
+    label: `${s.session_name || s.swim_level} – ${formatDayOfWeek(s.day_of_week)} ${s.start_time}`,
+  }));
 
   return (
     <div className="space-y-6">
@@ -140,122 +170,151 @@ const SwimEnrollmentsAdmin = () => {
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 items-center">
-        <Input
-          placeholder="Search by name or email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
-        <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Payment" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="unpaid">Unpaid</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="refunded">Refunded</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Tabs defaultValue="all">
+        <TabsList>
+          <TabsTrigger value="all">All Enrollments</TabsTrigger>
+          <TabsTrigger value="by-session">By Session</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Child</TableHead>
-                <TableHead>Age</TableHead>
-                <TableHead>Level</TableHead>
-                <TableHead>Parent</TableHead>
-                <TableHead>Session</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="w-[100px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((e) => {
-                const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
-                const ageGroup = getAgeGroup(e.child_age);
-                const groupName = levelInfo ? getGroupName(e.swim_level as SwimLevel, ageGroup) : e.swim_level;
-                const session = e.session_id ? sessions[e.session_id] : null;
-                return (
-                  <TableRow key={e.id}>
-                    <TableCell className="font-medium">{e.child_name}</TableCell>
-                    <TableCell>{e.child_age}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={levelInfo?.color || ""}>
-                        {groupName}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div>{e.parent_name}</div>
-                      <div className="text-xs text-muted-foreground">{e.parent_email}</div>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {session ? `${session.session_name || ""} ${session.start_time}` : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
-                        {e.payment_status}
-                      </Badge>
-                      {e.is_first_time && (
-                        <span className="block text-[10px] text-muted-foreground mt-0.5">1st time</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm font-medium">
-                      {e.payment_amount ? `$${e.payment_amount}` : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
-                        <SelectTrigger className="w-[110px] h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="enrolled">Enrolled</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(e.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {e.payment_status === "unpaid" && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="Mark as paid (cash/check)"
-                            onClick={() => markAsPaid(e)}
-                          >
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                          </Button>
-                        )}
-                        <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+        <TabsContent value="all" className="space-y-4">
+          {/* Filters */}
+          <div className="flex gap-3 items-center flex-wrap">
+            <Input
+              placeholder="Search by name or email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-xs"
+            />
+            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Payment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payments</SelectItem>
+                <SelectItem value="unpaid">Unpaid</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="refunded">Refunded</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sessionFilter} onValueChange={setSessionFilter}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="All Sessions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sessions</SelectItem>
+                {sessionOptions.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Child</TableHead>
+                    <TableHead>Age</TableHead>
+                    <TableHead>Level</TableHead>
+                    <TableHead>Parent</TableHead>
+                    <TableHead>Session</TableHead>
+                    <TableHead>Payment</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="w-[100px]"></TableHead>
                   </TableRow>
-                );
-              })}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                    No enrollments found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((e) => {
+                    const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
+                    const ageGroup = getAgeGroup(e.child_age);
+                    const groupName = levelInfo ? getGroupName(e.swim_level as SwimLevel, ageGroup) : e.swim_level;
+                    const session = e.session_id ? sessions[e.session_id] : null;
+                    return (
+                      <TableRow key={e.id}>
+                        <TableCell className="font-medium">{e.child_name}</TableCell>
+                        <TableCell>{e.child_age}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={levelInfo?.color || ""}>
+                            {groupName}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div>{e.parent_name}</div>
+                          <div className="text-xs text-muted-foreground">{e.parent_email}</div>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${session.start_time}` : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
+                            {e.payment_status}
+                          </Badge>
+                          {e.is_first_time && (
+                            <span className="block text-[10px] text-muted-foreground mt-0.5">1st time</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm font-medium">
+                          {e.payment_amount ? `$${e.payment_amount}` : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
+                            <SelectTrigger className="w-[110px] h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="enrolled">Enrolled</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(e.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {e.payment_status === "unpaid" && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                title="Mark as paid (cash/check)"
+                                onClick={() => markAsPaid(e)}
+                              >
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                              </Button>
+                            )}
+                            <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {filtered.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        No enrollments found
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="by-session">
+          <SessionEnrollmentCards
+            sessions={sessions}
+            enrollments={enrollments}
+            sessionPeriods={sessionPeriods}
+          />
+        </TabsContent>
+      </Tabs>
+
       <EnrollmentDetailDialog
         enrollment={selectedEnrollment}
         open={dialogOpen}
