@@ -26,6 +26,11 @@ interface Enrollment {
   notes: string | null;
   created_at: string;
   session_id: string | null;
+  payment_status: string;
+  payment_amount: number | null;
+  stripe_payment_id: string | null;
+  is_first_time: boolean;
+  payment_due_date: string | null;
 }
 
 interface Agreement {
