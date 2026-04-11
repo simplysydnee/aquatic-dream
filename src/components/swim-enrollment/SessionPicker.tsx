@@ -45,6 +45,14 @@ function formatClassDate(d: string) {
   const date = new Date(d + "T00:00:00");
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
+function formatDayOfWeek(dow: string) {
+  const map: Record<string, string> = {
+    monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu",
+    friday: "Fri", saturday: "Sat", sunday: "Sun",
+  };
+  const parts = dow.toLowerCase().split("_");
+  return parts.map(p => map[p] || p).join(" & ");
+}
 
 const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   const [slots, setSlots] = useState<SlotInfo[]>([]);
