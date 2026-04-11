@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel, AGE_GROUP_LABELS, type AgeGroup } from "@/components/swim-enrollment/types";
+import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
 import { Plus, Pencil, Copy, Loader2, CalendarIcon, ToggleLeft, ToggleRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -39,6 +39,7 @@ interface Instructor {
 }
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const ALL_LEVELS: SwimLevel[] = ["white", "red", "yellow", "blue", "green"];
 
 function formatTime(time: string) {
   const [h, m] = time.split(":");
@@ -46,6 +47,14 @@ function formatTime(time: string) {
   const ampm = hour >= 12 ? "PM" : "AM";
   const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
   return `${display}:${m} ${ampm}`;
+}
+
+function formatDateRange(start: string | null, end: string | null) {
+  if (!start || !end) return "";
+  const s = new Date(start + "T00:00:00");
+  const e = new Date(end + "T00:00:00");
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", opts)}`;
 }
 
 const SessionsAdmin = () => {
@@ -61,7 +70,7 @@ const SessionsAdmin = () => {
     days: [] as string[],
     start_time: "",
     end_time: "",
-    swim_level: "white" as string,
+    swim_levels: ["white"] as string[],
     age_group: "preschool-3-5" as string,
     max_students: "3",
     instructor_id: "",
@@ -83,13 +92,19 @@ const SessionsAdmin = () => {
   const resetForm = () => {
     setForm({
       session_name: "", session_start_date: undefined, session_end_date: undefined,
-      days: [], start_time: "", end_time: "", swim_level: "white",
+      days: [], start_time: "", end_time: "", swim_levels: ["white"],
       age_group: "preschool-3-5", max_students: "3", instructor_id: "", registration_status: "open",
     });
     setEditingId(null);
   };
 
   const openEdit = (s: Session) => {
+    // Find sibling sessions at same slot (same session_name + start_time + age_group)
+    const siblings = sessions.filter(
+      ss => ss.session_name === s.session_name && ss.start_time === s.start_time && ss.age_group === s.age_group
+    );
+    const levels = [...new Set(siblings.map(ss => ss.swim_level))];
+
     setEditingId(s.id);
     setForm({
       session_name: s.session_name || "",
@@ -98,7 +113,7 @@ const SessionsAdmin = () => {
       days: [s.day_of_week],
       start_time: s.start_time.slice(0, 5),
       end_time: s.end_time.slice(0, 5),
-      swim_level: s.swim_level,
+      swim_levels: levels,
       age_group: s.age_group || "preschool-3-5",
       max_students: String(s.max_students),
       instructor_id: s.instructor_id || "",
@@ -108,6 +123,11 @@ const SessionsAdmin = () => {
   };
 
   const duplicateSession = (s: Session) => {
+    const siblings = sessions.filter(
+      ss => ss.session_name === s.session_name && ss.start_time === s.start_time && ss.age_group === s.age_group
+    );
+    const levels = [...new Set(siblings.map(ss => ss.swim_level))];
+
     setEditingId(null);
     setForm({
       session_name: s.session_name || "",
@@ -116,7 +136,7 @@ const SessionsAdmin = () => {
       days: [s.day_of_week],
       start_time: s.start_time.slice(0, 5),
       end_time: s.end_time.slice(0, 5),
-      swim_level: s.swim_level,
+      swim_levels: levels,
       age_group: s.age_group || "preschool-3-5",
       max_students: String(s.max_students),
       instructor_id: s.instructor_id || "",
@@ -126,8 +146,8 @@ const SessionsAdmin = () => {
   };
 
   const handleSave = async () => {
-    if (!form.session_name || !form.start_time || !form.end_time || form.days.length === 0) {
-      toast({ title: "Missing required fields", description: "Name, days, start & end times are required", variant: "destructive" });
+    if (!form.session_name || !form.start_time || !form.end_time || form.days.length === 0 || form.swim_levels.length === 0) {
+      toast({ title: "Missing required fields", description: "Name, days, times, and at least one level are required", variant: "destructive" });
       return;
     }
 
@@ -137,7 +157,6 @@ const SessionsAdmin = () => {
       session_end_date: form.session_end_date ? format(form.session_end_date, "yyyy-MM-dd") : null,
       start_time: form.start_time,
       end_time: form.end_time,
-      swim_level: form.swim_level,
       age_group: form.age_group,
       max_students: parseInt(form.max_students) || 3,
       instructor_id: form.instructor_id || null,
@@ -145,17 +164,20 @@ const SessionsAdmin = () => {
     };
 
     if (editingId) {
+      // Update the edited session
       const { error } = await supabase.from("swim_sessions")
-        .update({ ...basePayload, day_of_week: form.days[0] })
+        .update({ ...basePayload, day_of_week: form.days[0], swim_level: form.swim_levels[0] })
         .eq("id", editingId);
       if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
       toast({ title: "Session updated" });
     } else {
-      // Create one row per day selected
-      const rows = form.days.map(day => ({ ...basePayload, day_of_week: day }));
+      // Create one row per day × level combination
+      const rows = form.days.flatMap(day =>
+        form.swim_levels.map(lvl => ({ ...basePayload, day_of_week: day, swim_level: lvl }))
+      );
       const { error } = await supabase.from("swim_sessions").insert(rows);
       if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-      toast({ title: `${rows.length} session(s) created` });
+      toast({ title: `${rows.length} session row(s) created` });
     }
     setDialogOpen(false);
     resetForm();
@@ -163,8 +185,14 @@ const SessionsAdmin = () => {
   };
 
   const toggleStatus = async (s: Session) => {
+    // Toggle all sibling sessions at the same slot
+    const siblings = sessions.filter(
+      ss => ss.session_name === s.session_name && ss.start_time === s.start_time && ss.age_group === s.age_group
+    );
     const next = s.registration_status === "open" ? "closed" : "open";
-    const { error } = await supabase.from("swim_sessions").update({ registration_status: next }).eq("id", s.id);
+    const { error } = await supabase.from("swim_sessions")
+      .update({ registration_status: next })
+      .in("id", siblings.map(ss => ss.id));
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     toast({ title: `Session ${next}` });
     fetchData();
@@ -177,13 +205,35 @@ const SessionsAdmin = () => {
     }));
   };
 
-  // Group sessions by session_name
-  const grouped = sessions.reduce<Record<string, Session[]>>((acc, s) => {
-    const key = s.session_name || "Unnamed";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(s);
-    return acc;
-  }, {});
+  const toggleLevel = (lvl: string) => {
+    setForm(f => ({
+      ...f,
+      swim_levels: f.swim_levels.includes(lvl) ? f.swim_levels.filter(l => l !== lvl) : [...f.swim_levels, lvl],
+    }));
+  };
+
+  // Group sessions by session_name, then by time slot to show paired levels
+  interface SlotGroup {
+    key: string;
+    sessions: Session[];
+    levels: string[];
+    first: Session;
+  }
+
+  const sessionGroups: Record<string, SlotGroup[]> = {};
+  for (const s of sessions) {
+    const groupName = s.session_name || "Unnamed";
+    if (!sessionGroups[groupName]) sessionGroups[groupName] = [];
+
+    const slotKey = `${s.start_time}|${s.age_group}|${s.day_of_week}`;
+    let slot = sessionGroups[groupName].find(sg => sg.key === slotKey);
+    if (!slot) {
+      slot = { key: slotKey, sessions: [], levels: [], first: s };
+      sessionGroups[groupName].push(slot);
+    }
+    slot.sessions.push(s);
+    if (!slot.levels.includes(s.swim_level)) slot.levels.push(s.swim_level);
+  }
 
   const getInstructorName = (id: string | null) => {
     if (!id) return null;
@@ -253,18 +303,25 @@ const SessionsAdmin = () => {
                 <div><Label>End Time *</Label><Input type="time" value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value }))} /></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Swim Level *</Label>
-                  <Select value={form.swim_level} onValueChange={v => setForm(f => ({ ...f, swim_level: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(["white", "red", "yellow", "blue", "green"] as SwimLevel[]).map(l => (
-                        <SelectItem key={l} value={l}>{LEVEL_DISPLAY[l].name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div>
+                <Label>Swim Levels * (select all that apply)</Label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {ALL_LEVELS.map(lvl => {
+                    const lc = LEVEL_BADGE_COLORS[lvl];
+                    const isChecked = form.swim_levels.includes(lvl);
+                    return (
+                      <label key={lvl} className={`flex items-center gap-1.5 text-sm cursor-pointer px-2.5 py-1 rounded-full ring-1 transition-all ${
+                        isChecked ? `${lc.bg} ${lc.text} ${lc.ring} font-medium` : "bg-muted text-muted-foreground ring-border"
+                      }`}>
+                        <Checkbox checked={isChecked} onCheckedChange={() => toggleLevel(lvl)} className="h-3.5 w-3.5" />
+                        {LEVEL_DISPLAY[lvl].name}
+                      </label>
+                    );
+                  })}
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Age Group *</Label>
                   <Select value={form.age_group} onValueChange={v => setForm(f => ({ ...f, age_group: v }))}>
@@ -275,10 +332,10 @@ const SessionsAdmin = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                <div><Label>Max Students (per slot)</Label><Input type="number" value={form.max_students} onChange={e => setForm(f => ({ ...f, max_students: e.target.value }))} /></div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>Max Students</Label><Input type="number" value={form.max_students} onChange={e => setForm(f => ({ ...f, max_students: e.target.value }))} /></div>
                 <div>
                   <Label>Status</Label>
                   <Select value={form.registration_status} onValueChange={v => setForm(f => ({ ...f, registration_status: v }))}>
@@ -289,17 +346,16 @@ const SessionsAdmin = () => {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div>
-                <Label>Instructor</Label>
-                <Select value={form.instructor_id || "none"} onValueChange={v => setForm(f => ({ ...f, instructor_id: v === "none" ? "" : v }))}>
-                  <SelectTrigger><SelectValue placeholder="None (assign later)" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {instructors.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <div>
+                  <Label>Instructor</Label>
+                  <Select value={form.instructor_id || "none"} onValueChange={v => setForm(f => ({ ...f, instructor_id: v === "none" ? "" : v }))}>
+                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {instructors.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <Button onClick={handleSave} className="w-full">{editingId ? "Save Changes" : "Create Session"}</Button>
@@ -308,10 +364,17 @@ const SessionsAdmin = () => {
         </Dialog>
       </div>
 
-      {Object.entries(grouped).map(([name, groupSessions]) => (
+      {Object.entries(sessionGroups).map(([name, slotGroups]) => (
         <Card key={name}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">{name}</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">{name}</CardTitle>
+              {slotGroups[0]?.first && (
+                <span className="text-xs text-muted-foreground">
+                  {formatDateRange(slotGroups[0].first.session_start_date, slotGroups[0].first.session_end_date)}
+                </span>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="pt-0">
             <Table>
@@ -319,7 +382,7 @@ const SessionsAdmin = () => {
                 <TableRow>
                   <TableHead className="text-xs">Day</TableHead>
                   <TableHead className="text-xs">Time</TableHead>
-                  <TableHead className="text-xs">Level</TableHead>
+                  <TableHead className="text-xs">Levels</TableHead>
                   <TableHead className="text-xs">Age Group</TableHead>
                   <TableHead className="text-xs">Cap</TableHead>
                   <TableHead className="text-xs">Instructor</TableHead>
@@ -328,20 +391,25 @@ const SessionsAdmin = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {groupSessions.map(s => {
-                  const levelColors = LEVEL_BADGE_COLORS[s.swim_level as SwimLevel];
+                {slotGroups.map(slot => {
+                  const s = slot.first;
                   return (
-                    <TableRow key={s.id}>
+                    <TableRow key={slot.key}>
                       <TableCell className="text-sm">{s.day_of_week}</TableCell>
                       <TableCell className="text-sm">{formatTime(s.start_time)} – {formatTime(s.end_time)}</TableCell>
                       <TableCell>
-                        {levelColors ? (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${levelColors.bg} ${levelColors.text} ${levelColors.ring}`}>
-                            {LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level}
-                          </span>
-                        ) : (
-                          <span className="text-sm">{s.swim_level}</span>
-                        )}
+                        <div className="flex gap-1 flex-wrap">
+                          {slot.levels.map(l => {
+                            const lc = LEVEL_BADGE_COLORS[l as SwimLevel];
+                            return lc ? (
+                              <span key={l} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${lc.bg} ${lc.text} ${lc.ring}`}>
+                                {LEVEL_DISPLAY[l as SwimLevel]?.name || l}
+                              </span>
+                            ) : (
+                              <span key={l} className="text-xs">{l}</span>
+                            );
+                          })}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={`text-xs ${s.age_group === "preschool-3-5" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-teal-50 text-teal-700 border-teal-200"}`}>

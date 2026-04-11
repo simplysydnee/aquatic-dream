@@ -6,17 +6,19 @@ import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar,
 import { supabase } from "@/integrations/supabase/client";
 import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, PRICING } from "./types";
 
-interface SessionWithSpots {
-  id: string;
+interface SlotInfo {
+  /** The session ID matching the child's assessed level (used for enrollment) */
+  assignSessionId: string;
   session_name: string;
   session_start_date: string;
   session_end_date: string;
   start_time: string;
   end_time: string;
+  /** Capacity is per time slot (shared across levels) */
   max_students: number;
-  enrolled_count: number;
+  /** Total enrolled across ALL level rows at this time slot */
+  total_enrolled: number;
   spots_left: number;
-  age_group: string;
 }
 
 interface Props {
@@ -42,80 +44,102 @@ function formatDateRange(start: string, end: string) {
 }
 
 const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
-  const [sessions, setSessions] = useState<SessionWithSpots[]>([]);
+  const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const ageGroup = getAgeGroup(childAge);
   const levelInfo = LEVEL_DISPLAY[level];
 
-  // Preschool classes are mixed (white/red together, 3 total).
-  // All preschool sessions are stored as "white" level.
-  // School-age: query by exact level.
-
   useEffect(() => {
     async function fetchSessions() {
       setLoading(true);
-      let query = supabase
+
+      // Fetch ALL sessions for this age group so we can count cross-level enrollment
+      const { data: allSessions, error } = await supabase
         .from("swim_sessions")
         .select("*")
         .eq("age_group", ageGroup)
         .eq("is_active", true)
         .eq("registration_status", "open");
 
-      // For school-age, filter by exact level; for preschool, show all preschool sessions
-      if (ageGroup === "school-age-6-12") {
-        query = query.eq("swim_level", level);
-      }
-
-      const { data: sessionData, error } = await query;
-
-      if (error || !sessionData) {
+      if (error || !allSessions || allSessions.length === 0) {
+        setSlots([]);
         setLoading(false);
         return;
       }
 
-      const sessionIds = sessionData.map((s) => s.id);
-      const { data: enrollments } = sessionIds.length > 0
-        ? await supabase
-            .from("swim_enrollments")
-            .select("session_id")
-            .in("session_id", sessionIds)
-            .in("status", ["pending", "confirmed"])
-        : { data: [] };
+      // For school-age, only show slots that include the child's level
+      // For preschool, show all (mixed white/red)
+      const levelCompatible = (swimLevel: string) => {
+        if (ageGroup === "preschool-3-5") return true;
+        return swimLevel === level;
+      };
+
+      // Group by session_name + start_time to find time-slot siblings
+      const slotGroups: Record<string, typeof allSessions> = {};
+      for (const s of allSessions) {
+        const key = `${s.session_name}|${s.start_time}`;
+        if (!slotGroups[key]) slotGroups[key] = [];
+        slotGroups[key].push(s);
+      }
+
+      // Only keep slots where at least one session matches the child's level
+      const relevantSlots = Object.entries(slotGroups).filter(([, group]) =>
+        group.some(s => levelCompatible(s.swim_level))
+      );
+
+      if (relevantSlots.length === 0) {
+        setSlots([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get ALL session IDs to count enrollments across the whole age group
+      const allIds = allSessions.map(s => s.id);
+      const { data: enrollments } = await supabase
+        .from("swim_enrollments")
+        .select("session_id")
+        .in("session_id", allIds)
+        .in("status", ["pending", "confirmed"]);
 
       const countMap: Record<string, number> = {};
-      enrollments?.forEach((e) => {
-        if (e.session_id) {
-          countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
-        }
+      enrollments?.forEach(e => {
+        if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
       });
 
-      const withSpots: SessionWithSpots[] = sessionData.map((s: any) => ({
-        id: s.id,
-        session_name: s.session_name || "Session",
-        session_start_date: s.session_start_date || "",
-        session_end_date: s.session_end_date || "",
-        start_time: s.start_time,
-        end_time: s.end_time,
-        max_students: s.max_students,
-        enrolled_count: countMap[s.id] || 0,
-        spots_left: s.max_students - (countMap[s.id] || 0),
-        age_group: s.age_group || "",
-      }));
+      const result: SlotInfo[] = relevantSlots.map(([, group]) => {
+        // Find the session row matching the child's level to use as the enrollment target
+        const matchingSession = group.find(s => levelCompatible(s.swim_level)) || group[0];
+        // Count ALL enrollments across every level row at this time slot
+        const totalEnrolled = group.reduce((sum, s) => sum + (countMap[s.id] || 0), 0);
+        const capacity = matchingSession.max_students; // 3 per slot
 
-      withSpots.sort((a, b) => {
+        return {
+          assignSessionId: matchingSession.id,
+          session_name: matchingSession.session_name || "Session",
+          session_start_date: matchingSession.session_start_date || "",
+          session_end_date: matchingSession.session_end_date || "",
+          start_time: matchingSession.start_time,
+          end_time: matchingSession.end_time,
+          max_students: capacity,
+          total_enrolled: totalEnrolled,
+          spots_left: capacity - totalEnrolled,
+        };
+      });
+
+      result.sort((a, b) => {
         if (a.session_name !== b.session_name) return a.session_name.localeCompare(b.session_name);
         return a.start_time.localeCompare(b.start_time);
       });
 
-      setSessions(withSpots);
+      setSlots(result);
       setLoading(false);
     }
     fetchSessions();
   }, [level, ageGroup]);
 
-  const grouped = sessions.reduce<Record<string, SessionWithSpots[]>>((acc, s) => {
+  const grouped = slots.reduce<Record<string, SlotInfo[]>>((acc, s) => {
     const key = `${s.session_name}|${s.session_start_date}|${s.session_end_date}`;
     if (!acc[key]) acc[key] = [];
     acc[key].push(s);
@@ -155,13 +179,13 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         <div className="flex justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
-      ) : sessions.length === 0 ? (
+      ) : slots.length === 0 ? (
         <Card className="p-8 text-center">
           <p className="text-muted-foreground">No sessions available for this level and age group right now.</p>
         </Card>
       ) : (
         <div className="space-y-8">
-          {Object.entries(grouped).map(([key, groupSessions]) => {
+          {Object.entries(grouped).map(([key, groupSlots]) => {
             const [name, startDate, endDate] = key.split("|");
             return (
               <div key={key}>
@@ -174,14 +198,14 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
                   )}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {groupSessions.map((session) => {
-                    const isFull = session.spots_left <= 0;
-                    const isSelected = selectedId === session.id;
+                  {groupSlots.map((slot) => {
+                    const isFull = slot.spots_left <= 0;
+                    const isSelected = selectedId === slot.assignSessionId;
                     return (
                       <button
-                        key={session.id}
+                        key={slot.assignSessionId}
                         disabled={isFull}
-                        onClick={() => setSelectedId(session.id)}
+                        onClick={() => setSelectedId(slot.assignSessionId)}
                         className={`text-left p-4 rounded-xl border transition-all ${
                           isFull
                             ? "opacity-50 cursor-not-allowed border-border bg-muted"
@@ -193,14 +217,14 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5" />
-                            {formatTime(session.start_time)} – {formatTime(session.end_time)}
+                            {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
                           </span>
                           <span className="flex items-center gap-1">
                             <Users className="w-3.5 h-3.5" />
                             {isFull ? (
                               <span className="text-destructive font-medium">Full</span>
                             ) : (
-                              <span>{session.spots_left} spot{session.spots_left !== 1 ? "s" : ""} left</span>
+                              <span>{slot.spots_left} spot{slot.spots_left !== 1 ? "s" : ""} left</span>
                             )}
                           </span>
                         </div>
