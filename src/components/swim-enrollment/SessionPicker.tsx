@@ -113,7 +113,7 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
       setLoading(false);
     }
     fetchSessions();
-  }, [level, ageGroup, sessionLevel]);
+  }, [level, ageGroup]);
 
   const grouped = sessions.reduce<Record<string, SessionWithSpots[]>>((acc, s) => {
     const key = `${s.session_name}|${s.session_start_date}|${s.session_end_date}`;
