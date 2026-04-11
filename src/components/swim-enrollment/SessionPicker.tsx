@@ -11,6 +11,7 @@ interface SlotInfo {
   periodName: string;
   start_time: string;
   end_time: string;
+  day_of_week: string;
   max_students: number;
   total_enrolled: number;
   spots_left: number;
@@ -44,6 +45,14 @@ function formatClassDate(d: string) {
   const date = new Date(d + "T00:00:00");
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
+function formatDayOfWeek(dow: string) {
+  const map: Record<string, string> = {
+    monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu",
+    friday: "Fri", saturday: "Sat", sunday: "Sun",
+  };
+  const parts = dow.toLowerCase().split("_");
+  return parts.map(p => map[p] || p).join(" & ");
+}
 
 const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   const [slots, setSlots] = useState<SlotInfo[]>([]);
@@ -58,73 +67,77 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   useEffect(() => {
     async function fetchSessions() {
       setLoading(true);
+      try {
+        const [periodsRes, sessionsRes] = await Promise.all([
+          supabase.from("session_periods").select("*").eq("is_active", true).order("start_date"),
+          supabase.from("swim_sessions").select("*")
+            .eq("age_group", ageGroup)
+            .eq("swim_level", level)
+            .eq("is_active", true)
+            .eq("registration_status", "open"),
+        ]);
 
-      // Fetch active session periods and matching sessions in parallel
-      const [periodsRes, sessionsRes] = await Promise.all([
-        supabase.from("session_periods").select("*").eq("is_active", true).order("start_date"),
-        supabase.from("swim_sessions").select("*")
-          .eq("age_group", ageGroup)
-          .eq("swim_level", level)
-          .eq("is_active", true)
-          .eq("registration_status", "open"),
-      ]);
+        const periods = periodsRes.data || [];
+        const sessions = sessionsRes.data || [];
 
-      const periods = periodsRes.data || [];
-      const sessions = sessionsRes.data || [];
+        if (sessions.length === 0) {
+          setSlots([]);
+          setLoading(false);
+          return;
+        }
 
-      if (sessions.length === 0) {
+        const activePeriodIds = new Set(periods.map(p => p.id));
+        const activeSessions = sessions.filter(s => s.session_period_id && activePeriodIds.has(s.session_period_id));
+
+        if (activeSessions.length === 0) {
+          setSlots([]);
+          setLoading(false);
+          return;
+        }
+
+        const allIds = activeSessions.map(s => s.id);
+        const { data: enrollments } = await supabase
+          .from("swim_enrollments")
+          .select("session_id")
+          .in("session_id", allIds)
+          .in("status", ["pending", "confirmed"]);
+
+        const countMap: Record<string, number> = {};
+        enrollments?.forEach(e => {
+          if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
+        });
+
+        const periodMap = Object.fromEntries(periods.map(p => [p.id, p]));
+
+        const result: SlotInfo[] = activeSessions.map(s => {
+          const totalEnrolled = countMap[s.id] || 0;
+          const period = periodMap[s.session_period_id!];
+          return {
+            assignSessionId: s.id,
+            periodName: period?.name || "Session",
+            start_time: s.start_time,
+            end_time: s.end_time,
+            day_of_week: s.day_of_week,
+            max_students: s.max_students,
+            total_enrolled: totalEnrolled,
+            spots_left: s.max_students - totalEnrolled,
+            session_start_date: s.session_start_date || "",
+            session_end_date: s.session_end_date || "",
+          };
+        });
+
+        result.sort((a, b) => {
+          if (a.periodName !== b.periodName) return a.periodName.localeCompare(b.periodName);
+          return a.start_time.localeCompare(b.start_time);
+        });
+
+        setSlots(result);
+      } catch (err) {
+        console.error("Error fetching sessions:", err);
         setSlots([]);
+      } finally {
         setLoading(false);
-        return;
       }
-
-      // Only show sessions linked to active periods
-      const activePeriodIds = new Set(periods.map(p => p.id));
-      const activeSessions = sessions.filter(s => s.session_period_id && activePeriodIds.has(s.session_period_id));
-
-      if (activeSessions.length === 0) {
-        setSlots([]);
-        setLoading(false);
-        return;
-      }
-
-      const allIds = activeSessions.map(s => s.id);
-      const { data: enrollments } = await supabase
-        .from("swim_enrollments")
-        .select("session_id")
-        .in("session_id", allIds)
-        .in("status", ["pending", "confirmed"]);
-
-      const countMap: Record<string, number> = {};
-      enrollments?.forEach(e => {
-        if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
-      });
-
-      const periodMap = Object.fromEntries(periods.map(p => [p.id, p]));
-
-      const result: SlotInfo[] = activeSessions.map(s => {
-        const totalEnrolled = countMap[s.id] || 0;
-        const period = periodMap[s.session_period_id!];
-        return {
-          assignSessionId: s.id,
-          periodName: period?.name || "Session",
-          start_time: s.start_time,
-          end_time: s.end_time,
-          max_students: s.max_students,
-          total_enrolled: totalEnrolled,
-          spots_left: s.max_students - totalEnrolled,
-          session_start_date: s.session_start_date || "",
-          session_end_date: s.session_end_date || "",
-        };
-      });
-
-      result.sort((a, b) => {
-        if (a.periodName !== b.periodName) return a.periodName.localeCompare(b.periodName);
-        return a.start_time.localeCompare(b.start_time);
-      });
-
-      setSlots(result);
-      setLoading(false);
     }
     fetchSessions();
   }, [level, ageGroup]);
@@ -166,16 +179,18 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
       <p className="text-muted-foreground text-sm mb-2">
         Choose a <strong>{getGroupName(level, ageGroup)}</strong> ({levelInfo.name}) class · {AGE_GROUP_LABELS[ageGroup]}
       </p>
-      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-        <span className="flex items-center gap-1">
-          <DollarSign className="w-3.5 h-3.5" />
-          ${PRICING.group}/lesson (group)
-        </span>
-        <span className="flex items-center gap-1">
-          <Calendar className="w-3.5 h-3.5" />
-          Mon & Wed
-        </span>
-      </div>
+      {slots.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
+          <span className="flex items-center gap-1">
+            <DollarSign className="w-3.5 h-3.5" />
+            ${PRICING.group}/lesson (group)
+          </span>
+          <span className="flex items-center gap-1">
+            <Calendar className="w-3.5 h-3.5" />
+            {formatDayOfWeek(slots[0].day_of_week)}
+          </span>
+        </div>
+      )}
       <div className="flex items-center gap-2 text-sm bg-accent/50 border border-accent rounded-lg p-3 mb-6">
         <ShoppingBag className="w-4 h-4 text-primary shrink-0" />
         <span className="text-foreground">
