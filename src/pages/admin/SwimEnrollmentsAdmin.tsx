@@ -67,6 +67,7 @@ const SwimEnrollmentsAdmin = () => {
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [sessionFilter, setSessionFilter] = useState<string>("all");
+  const [periodFilter, setPeriodFilter] = useState<string>("all");
 
   const fetchData = async () => {
     const [enrollRes, sessionRes, periodRes] = await Promise.all([
@@ -121,7 +122,8 @@ const SwimEnrollmentsAdmin = () => {
       e.parent_email.toLowerCase().includes(search.toLowerCase());
     const matchPayment = paymentFilter === "all" || e.payment_status === paymentFilter;
     const matchSession = sessionFilter === "all" || e.session_id === sessionFilter;
-    return matchSearch && matchPayment && matchSession;
+    const matchPeriod = periodFilter === "all" || (e.session_id && sessions[e.session_id]?.session_period_id === periodFilter);
+    return matchSearch && matchPayment && matchSession && matchPeriod;
   });
 
   const unpaidCount = enrollments.filter((e) => e.payment_status === "unpaid" && e.status === "enrolled").length;
@@ -196,13 +198,26 @@ const SwimEnrollmentsAdmin = () => {
                 <SelectItem value="refunded">Refunded</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={sessionFilter} onValueChange={setSessionFilter}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="All Sessions" />
+            <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Periods" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Sessions</SelectItem>
-                {sessionOptions.map((s) => (
+                <SelectItem value="all">All Periods</SelectItem>
+                {sessionPeriods.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={sessionFilter} onValueChange={setSessionFilter}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="All Classes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Classes</SelectItem>
+                {sessionOptions
+                  .filter(s => periodFilter === "all" || sessions[s.id]?.session_period_id === periodFilter)
+                  .map((s) => (
                   <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
                 ))}
               </SelectContent>
