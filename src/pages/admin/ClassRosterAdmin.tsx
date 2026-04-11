@@ -320,7 +320,7 @@ const ClassRosterAdmin = () => {
         </Select>
       </div>
 
-      {Object.entries(grouped).map(([key, slotSessions]) => {
+      {sortedGroupEntries.map(([key, slotSessions]) => {
         const first = slotSessions[0];
         const sessionName = first.session_name || "Session";
         const startTime = first.start_time;
@@ -328,6 +328,7 @@ const ClassRosterAdmin = () => {
         const ageGroup = first.age_group || "";
         const dayOfWeek = first.day_of_week;
         const dateRange = formatDateRange(first.session_start_date, first.session_end_date);
+        const periodLabel = getSessionPeriodLabel(first.session_start_date);
 
         // Capacity is per time slot (3 total), NOT summed across levels
         const slotCapacity = first.max_students;
@@ -359,9 +360,12 @@ const ClassRosterAdmin = () => {
                       </span>
                     ) : null;
                   })}
-                  <Badge variant="outline" className={`text-xs ${ageGroup === "preschool-3-5" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-teal-50 text-teal-700 border-teal-200"}`}>
-                    {ageGroup === "preschool-3-5" ? "Preschool" : "School-Age"}
-                  </Badge>
+                   <Badge variant="outline" className={`text-xs ${ageGroup === "preschool-3-5" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-teal-50 text-teal-700 border-teal-200"}`}>
+                     {ageGroup === "preschool-3-5" ? "Preschool" : "School-Age"}
+                   </Badge>
+                   <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                     {periodLabel}
+                   </Badge>
                 </div>
                 <div className="flex items-center gap-3">
                   <Select
