@@ -377,6 +377,7 @@ const SessionsAdmin = () => {
       max_students: String(s.max_students),
       days: [s.day_of_week],
       instructor_id: s.instructor_id || "",
+      frequency: "weekly",
     });
     setCreateDialogOpen(true);
   };
