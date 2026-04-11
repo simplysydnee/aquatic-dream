@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -144,6 +145,7 @@ const SessionsAdmin = () => {
     max_students: "3",
     days: [] as string[],
     instructor_id: "",
+    frequency: "weekly" as "weekly" | "twice_weekly",
   });
 
   const fetchData = async () => {
@@ -212,6 +214,7 @@ const SessionsAdmin = () => {
       max_students: "3",
       days: [],
       instructor_id: "",
+      frequency: "weekly",
     });
   };
 
@@ -245,17 +248,25 @@ const SessionsAdmin = () => {
   };
 
   const handleCreateClasses = async () => {
-    const { session_period_id, timeSlots, swim_levels, age_group, max_students, days, instructor_id } = createForm;
+    const { session_period_id, timeSlots, swim_levels, age_group, max_students, days, instructor_id, frequency } = createForm;
 
     if (!session_period_id) { toast({ title: "Select a session", variant: "destructive" }); return; }
     if (timeSlots.some(ts => !ts.start || !ts.end)) { toast({ title: "Fill in all time slots", variant: "destructive" }); return; }
     if (swim_levels.length === 0) { toast({ title: "Select at least one level", variant: "destructive" }); return; }
     if (days.length === 0) { toast({ title: "Select at least one day", variant: "destructive" }); return; }
+    if (frequency === "twice_weekly" && days.length < 2) { toast({ title: "Select at least 2 days for 2x/week", variant: "destructive" }); return; }
 
     const period = periods.find(p => p.id === session_period_id);
+    const dayMap: Record<string, number> = {
+      Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6,
+    };
 
-    const rows = days.flatMap(day =>
-      timeSlots.flatMap(ts =>
+    let rows: any[];
+
+    if (frequency === "twice_weekly") {
+      // Combine days into one day_of_week string, one class per time slot per level
+      const combinedDay = days.map(d => d.toLowerCase()).join("_");
+      rows = timeSlots.flatMap(ts =>
         swim_levels.map(lvl => ({
           session_name: LEVEL_TO_GROUP[lvl] || lvl,
           session_period_id,
@@ -263,41 +274,60 @@ const SessionsAdmin = () => {
           session_end_date: period?.end_date || null,
           start_time: ts.start,
           end_time: ts.end,
-          day_of_week: day,
+          day_of_week: combinedDay,
           swim_level: lvl,
           age_group,
           max_students: parseInt(max_students) || 3,
           instructor_id: instructor_id || null,
           registration_status: "open",
         }))
-      )
-    );
+      );
+    } else {
+      // Weekly: separate class per day
+      rows = days.flatMap(day =>
+        timeSlots.flatMap(ts =>
+          swim_levels.map(lvl => ({
+            session_name: LEVEL_TO_GROUP[lvl] || lvl,
+            session_period_id,
+            session_start_date: period?.start_date || null,
+            session_end_date: period?.end_date || null,
+            start_time: ts.start,
+            end_time: ts.end,
+            day_of_week: day,
+            swim_level: lvl,
+            age_group,
+            max_students: parseInt(max_students) || 3,
+            instructor_id: instructor_id || null,
+            registration_status: "open",
+          }))
+        )
+      );
+    }
 
     const { data: inserted, error } = await supabase.from("swim_sessions").insert(rows).select("id");
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
 
-    // Auto-generate class dates based on selected days
+    // Auto-generate class dates
     if (inserted && period) {
-      const dayMap: Record<string, number> = {
-        Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6,
-      };
-      const selectedDayNums = days.map(d => dayMap[d]).filter(n => n !== undefined);
-      const classDates: string[] = [];
-      const cur = new Date(period.start_date + "T00:00:00");
-      const endD = new Date(period.end_date + "T00:00:00");
-      while (cur <= endD) {
-        if (selectedDayNums.includes(cur.getDay())) classDates.push(cur.toISOString().slice(0, 10));
-        cur.setDate(cur.getDate() + 1);
-      }
-      if (classDates.length > 0) {
-        const dateRows = inserted.flatMap(s =>
-          classDates.map(d => ({ session_id: s.id, lesson_date: d }))
-        );
-        await supabase.from("session_lesson_dates").upsert(dateRows, { onConflict: "session_id,lesson_date" });
+      for (const [idx, insertedRow] of inserted.entries()) {
+        const rowDow = rows[idx].day_of_week as string;
+        // Parse day nums from the day_of_week string (works for both "Monday" and "monday_wednesday")
+        const dayNums = rowDow.split("_").map(d => dayMap[d.charAt(0).toUpperCase() + d.slice(1)] ?? -1).filter(n => n >= 0);
+        const classDates: string[] = [];
+        const cur = new Date(period.start_date + "T00:00:00");
+        const endD = new Date(period.end_date + "T00:00:00");
+        while (cur <= endD) {
+          if (dayNums.includes(cur.getDay())) classDates.push(cur.toISOString().slice(0, 10));
+          cur.setDate(cur.getDate() + 1);
+        }
+        if (classDates.length > 0) {
+          const dateRows = classDates.map(d => ({ session_id: insertedRow.id, lesson_date: d }));
+          await supabase.from("session_lesson_dates").upsert(dateRows, { onConflict: "session_id,lesson_date" });
+        }
       }
     }
 
-    toast({ title: `${rows.length} class(es) created`, description: `${timeSlots.length} time slots × ${swim_levels.length} levels × ${days.length} days` });
+    toast({ title: `${rows.length} class(es) created` });
     setCreateDialogOpen(false);
     resetCreateForm();
     fetchData();
@@ -374,6 +404,7 @@ const SessionsAdmin = () => {
       max_students: String(s.max_students),
       days: [s.day_of_week],
       instructor_id: s.instructor_id || "",
+      frequency: "weekly",
     });
     setCreateDialogOpen(true);
   };
@@ -424,8 +455,13 @@ const SessionsAdmin = () => {
     return instructors.find(i => i.id === id)?.name || null;
   };
 
-  const totalClassCount = (timeSlots: TimeSlot[], levels: string[], days: string[]) =>
-    timeSlots.filter(ts => ts.start && ts.end).length * levels.length * days.length;
+  const computeClassCount = () => {
+    const validSlots = createForm.timeSlots.filter(ts => ts.start && ts.end).length;
+    const levels = createForm.swim_levels.length;
+    const dayCount = createForm.days.length;
+    if (createForm.frequency === "twice_weekly") return validSlots * levels; // days combined into one class
+    return validSlots * levels * dayCount;
+  };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
@@ -538,6 +574,27 @@ const SessionsAdmin = () => {
                   </div>
                 </div>
 
+                {/* Frequency */}
+                {createForm.days.length >= 2 && (
+                  <div>
+                    <Label className="text-sm font-semibold">Frequency</Label>
+                    <RadioGroup
+                      value={createForm.frequency}
+                      onValueChange={(v: "weekly" | "twice_weekly") => setCreateForm(f => ({ ...f, frequency: v }))}
+                      className="flex gap-4 mt-1"
+                    >
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                        <RadioGroupItem value="weekly" />
+                        Weekly <span className="text-muted-foreground">(separate class per day)</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                        <RadioGroupItem value="twice_weekly" />
+                        {createForm.days.length}x/week <span className="text-muted-foreground">(combined)</span>
+                      </label>
+                    </RadioGroup>
+                  </div>
+                )}
+
                 {/* Instructor */}
                 <div>
                   <Label className="text-sm font-semibold">Instructor</Label>
@@ -551,10 +608,13 @@ const SessionsAdmin = () => {
                 </div>
 
                 {/* Summary + Submit */}
-                {totalClassCount(createForm.timeSlots, createForm.swim_levels, createForm.days) > 0 && (
+                {computeClassCount() > 0 && (
                   <div className="rounded-md bg-muted/50 border p-3 text-sm text-muted-foreground">
-                    Will create <span className="font-semibold text-foreground">{totalClassCount(createForm.timeSlots, createForm.swim_levels, createForm.days)}</span> classes:
-                    {" "}{createForm.timeSlots.filter(ts => ts.start && ts.end).length} time slot(s) × {createForm.swim_levels.length} level(s) × {createForm.days.length} day(s)
+                    Will create <span className="font-semibold text-foreground">{computeClassCount()}</span> class(es)
+                    {createForm.frequency === "twice_weekly" && createForm.days.length >= 2
+                      ? `: ${createForm.timeSlots.filter(ts => ts.start && ts.end).length} time slot(s) × ${createForm.swim_levels.length} level(s), meeting ${createForm.days.map(d => d.slice(0, 3)).join(" & ")}`
+                      : `: ${createForm.timeSlots.filter(ts => ts.start && ts.end).length} time slot(s) × ${createForm.swim_levels.length} level(s) × ${createForm.days.length} day(s)`
+                    }
                   </div>
                 )}
 
