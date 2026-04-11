@@ -8,7 +8,7 @@ import EnrollmentForm, { EnrollmentFormData } from "@/components/swim-enrollment
 import LegalAgreements, { LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import EnrollmentConfirmation from "@/components/swim-enrollment/EnrollmentConfirmation";
 import LessonRequestForm from "@/components/swim-enrollment/LessonRequestForm";
-import { SwimLevel } from "@/components/swim-enrollment/types";
+import { SwimLevel, PRICING } from "@/components/swim-enrollment/types";
 import { WAIVER_VERSION, TOS_VERSION, PRIVACY_POLICY_VERSION } from "@/components/swim-enrollment/legal-content";
 import { Button } from "@/components/ui/button";
 
@@ -28,6 +28,8 @@ const SwimEnrollment = () => {
   const [enrollmentData, setEnrollmentData] = useState<EnrollmentFormData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
+  const [isFirstTime, setIsFirstTime] = useState(true);
+  const [totalDue, setTotalDue] = useState(0);
   const { toast } = useToast();
 
   const stepIndex = ["assess", "session", "info", "legal", "done"].indexOf(step);
@@ -43,9 +45,33 @@ const SwimEnrollment = () => {
     setStep("info");
   };
 
-  const handleInfoSubmit = (data: EnrollmentFormData) => {
+  const handleInfoSubmit = async (data: EnrollmentFormData) => {
     setEnrollmentData(data);
     setChildName(data.childName);
+
+    // Check if returning swimmer by parent email
+    const { data: existing } = await supabase
+      .from("swim_enrollments")
+      .select("id")
+      .eq("parent_email", data.parentEmail)
+      .eq("payment_status", "paid")
+      .limit(1);
+
+    const returning = existing && existing.length > 0;
+    setIsFirstTime(!returning);
+
+    // Get session price
+    if (sessionId) {
+      const { data: session } = await supabase
+        .from("swim_sessions")
+        .select("session_price")
+        .eq("id", sessionId)
+        .single();
+      const sessionFee = session?.session_price ?? 280;
+      const regFee = returning ? 0 : PRICING.registrationFee;
+      setTotalDue(sessionFee + regFee);
+    }
+
     setStep("legal");
   };
 
@@ -57,11 +83,11 @@ const SwimEnrollment = () => {
       .from("swim_enrollments")
       .select("*", { count: "exact", head: true })
       .eq("session_id", sessionId)
-      .in("status", ["pending", "confirmed"]);
+      .in("status", ["enrolled"]);
 
     const { data: session } = await supabase
       .from("swim_sessions")
-      .select("max_students")
+      .select("max_students, session_price, session_start_date")
       .eq("id", sessionId)
       .single();
 
@@ -71,6 +97,10 @@ const SwimEnrollment = () => {
       setStep("session");
       return;
     }
+
+    const sessionFee = session?.session_price ?? 280;
+    const regFee = isFirstTime ? PRICING.registrationFee : 0;
+    const paymentDueDate = session?.session_start_date || null;
 
     const { data: enrollment, error: enrollError } = await supabase
       .from("swim_enrollments")
@@ -84,7 +114,12 @@ const SwimEnrollment = () => {
         child_age: childAge,
         notes: enrollmentData.notes || null,
         lesson_type: "group",
-        registration_fee: 45,
+        registration_fee: regFee,
+        status: "enrolled",
+        payment_status: isFirstTime ? "unpaid" : "unpaid",
+        payment_amount: sessionFee + regFee,
+        is_first_time: isFirstTime,
+        payment_due_date: paymentDueDate,
       })
       .select("id")
       .single();
@@ -195,7 +230,16 @@ const SwimEnrollment = () => {
           {step === "legal" && enrollmentData && (
             <LegalAgreements parentName={enrollmentData.parentName} childName={enrollmentData.childName} onSubmit={handleLegalSubmit} onBack={() => setStep("info")} submitting={submitting} />
           )}
-          {step === "done" && level && <EnrollmentConfirmation level={level} childName={childName} childAge={childAge} sessionId={sessionId} />}
+          {step === "done" && level && (
+            <EnrollmentConfirmation
+              level={level}
+              childName={childName}
+              childAge={childAge}
+              sessionId={sessionId}
+              isFirstTime={isFirstTime}
+              totalDue={totalDue}
+            />
+          )}
         </div>
       </div>
     </main>
