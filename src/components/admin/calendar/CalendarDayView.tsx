@@ -7,6 +7,7 @@ import type {
   CalendarEnrollment,
   CalendarPoolEvent,
   AttendanceRecord,
+  EnrollmentAgreement,
 } from "@/hooks/useCalendarData";
 import { Lock, Plus, Pencil, Trash2 } from "lucide-react";
 import {
@@ -102,6 +103,7 @@ interface Props {
   enrollments: CalendarEnrollment[];
   poolEvents: CalendarPoolEvent[];
   attendance: AttendanceRecord[];
+  agreements: EnrollmentAgreement[];
   icsSessions: ICSSession[];
   activeFilters: Set<ActivityType>;
   onAttendanceChange: () => void;
@@ -123,6 +125,7 @@ const CalendarDayView = ({
   enrollments,
   poolEvents,
   attendance,
+  agreements,
   icsSessions,
   activeFilters,
   onAttendanceChange,
@@ -174,7 +177,7 @@ const CalendarDayView = ({
 
   // ── Aquatic Dreams sessions for today ──
   const todaySessions = useMemo(
-    () => swimSessions.filter((s) => s.day_of_week === dayName),
+    () => swimSessions.filter((s) => s.day_of_week.toLowerCase().includes(dayName.toLowerCase())),
     [swimSessions, dayName]
   );
 
@@ -488,6 +491,7 @@ const CalendarDayView = ({
                         session: s,
                         enrollments: sessionEnrollments,
                         attendance: attendance.filter((a) => a.session_id === s.id),
+                        agreements,
                         dateStr,
                       })
                     }

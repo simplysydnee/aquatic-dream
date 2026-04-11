@@ -49,6 +49,7 @@ const CalendarAdmin = () => {
     enrollments,
     poolEvents,
     attendance,
+    agreements,
     icsSessions,
     loading,
     refetch,
@@ -209,6 +210,7 @@ const CalendarAdmin = () => {
           enrollments={enrollments}
           poolEvents={poolEvents}
           attendance={attendance}
+          agreements={agreements}
           icsSessions={icsSessions}
           activeFilters={activeFilters}
           onAttendanceChange={refetch}
