@@ -57,6 +57,7 @@ function fmtICSTime(iso: string) {
 }
 
 const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
+  const [showAddSwimmer, setShowAddSwimmer] = useState(false);
   if (!block) return null;
 
   const isSwim = block.kind === "swim";
@@ -305,11 +306,23 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
                 <Pencil className="w-3.5 h-3.5" /> Edit
               </Button>
               {isSwim && (
-                <Button size="sm" variant="outline" className="flex-1 gap-1.5">
+                <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => setShowAddSwimmer(true)}>
                   <UserPlus className="w-3.5 h-3.5" /> Add Swimmer
                 </Button>
               )}
             </div>
+
+            {isSwim && (
+              <AddSwimmerDialog
+                open={showAddSwimmer}
+                onOpenChange={setShowAddSwimmer}
+                sessionId={block.session.id}
+                sessionName={block.session.session_name || block.session.swim_level}
+                swimLevel={block.session.swim_level}
+                dateStr={block.dateStr}
+                onSaved={onCheckIn ? () => onCheckIn("", "", false) : () => {}}
+              />
+            )}
           </>
         )}
       </div>
