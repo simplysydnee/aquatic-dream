@@ -13,8 +13,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
-import { Plus, Pencil, Copy, Loader2, CalendarIcon, ToggleLeft, ToggleRight, Clock, Users } from "lucide-react";
+import { Plus, Pencil, Copy, Loader2, CalendarIcon, ToggleLeft, ToggleRight, Clock, Users, CalendarDays } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import ManageDatesModal from "@/components/admin/ManageDatesModal";
 
 interface Session {
   id: string;
@@ -87,6 +88,8 @@ const SessionsAdmin = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterAgeGroup, setFilterAgeGroup] = useState<string>("all");
+  const [manageDatesOpen, setManageDatesOpen] = useState(false);
+  const [manageDatesSlot, setManageDatesSlot] = useState<{ sessionIds: string[]; startDate: string; endDate: string; label: string } | null>(null);
   const [form, setForm] = useState({
     session_name: "",
     session_start_date: undefined as Date | undefined,
@@ -273,8 +276,8 @@ const SessionsAdmin = () => {
   // Sort periods by start date
   const sortedPeriods = Object.entries(periodMap).sort(([, a], [, b]) => a.startDate.localeCompare(b.startDate));
 
-  // Calculate total lessons from date range
-  const getLessonCount = (startDate: string | null, endDate: string | null) => {
+  // Calculate total classes from date range
+  const getClassCount = (startDate: string | null, endDate: string | null) => {
     if (!startDate || !endDate) return null;
     const s = new Date(startDate + "T00:00:00");
     const e = new Date(endDate + "T00:00:00");
@@ -434,7 +437,7 @@ const SessionsAdmin = () => {
       {/* Session periods */}
       {sortedPeriods.map(([periodKey, period], idx) => {
         const firstSubSlot = Object.values(period.subgroups)[0]?.slots[0]?.first;
-        const lessonCount = firstSubSlot ? getLessonCount(firstSubSlot.session_start_date, firstSubSlot.session_end_date) : null;
+        const classCount = firstSubSlot ? getClassCount(firstSubSlot.session_start_date, firstSubSlot.session_end_date) : null;
 
         return (
           <div key={periodKey} className="space-y-4">
@@ -445,8 +448,8 @@ const SessionsAdmin = () => {
                 <CalendarIcon className="w-3.5 h-3.5" />
                 {period.label}
               </span>
-              {lessonCount && (
-                <span className="text-sm text-muted-foreground">· {lessonCount} lessons</span>
+              {classCount && (
+                <span className="text-sm text-muted-foreground">· {classCount} classes</span>
               )}
             </div>
 
@@ -520,6 +523,17 @@ const SessionsAdmin = () => {
                               {s.registration_status}
                             </Badge>
                             <div className="flex items-center gap-1 ml-auto shrink-0">
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => {
+                                setManageDatesSlot({
+                                  sessionIds: slot.sessions.map(ss => ss.id),
+                                  startDate: s.session_start_date || "",
+                                  endDate: s.session_end_date || "",
+                                  label: `${formatTime(s.start_time)} – ${formatTime(s.end_time)} · ${slot.levels.map(l => LEVEL_DISPLAY[l as SwimLevel]?.name).join("/")}`,
+                                });
+                                setManageDatesOpen(true);
+                              }} title="Manage Dates">
+                                <CalendarDays className="w-3.5 h-3.5" />
+                              </Button>
                               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(s, slot.sessions)} title="Edit">
                                 <Pencil className="w-3.5 h-3.5" />
                               </Button>
@@ -538,6 +552,17 @@ const SessionsAdmin = () => {
           </div>
         );
       })}
+
+      {manageDatesSlot && (
+        <ManageDatesModal
+          open={manageDatesOpen}
+          onOpenChange={setManageDatesOpen}
+          sessionIds={manageDatesSlot.sessionIds}
+          sessionStartDate={manageDatesSlot.startDate}
+          sessionEndDate={manageDatesSlot.endDate}
+          sessionLabel={manageDatesSlot.label}
+        />
+      )}
 
       {sortedPeriods.length === 0 && (
         <Card className="p-8 text-center">

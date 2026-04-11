@@ -195,7 +195,7 @@ const SwimEnrollment = () => {
           {step === "legal" && enrollmentData && (
             <LegalAgreements parentName={enrollmentData.parentName} childName={enrollmentData.childName} onSubmit={handleLegalSubmit} onBack={() => setStep("info")} submitting={submitting} />
           )}
-          {step === "done" && level && <EnrollmentConfirmation level={level} childName={childName} childAge={childAge} />}
+          {step === "done" && level && <EnrollmentConfirmation level={level} childName={childName} childAge={childAge} sessionId={sessionId} />}
         </div>
       </div>
     </main>

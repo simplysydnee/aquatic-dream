@@ -1,21 +1,47 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle, ArrowRight } from "lucide-react";
+import { CheckCircle, ArrowRight, Calendar, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getDiveStatus, getAgeGroup } from "./types";
+import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getAgeGroup } from "./types";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   level: SwimLevel;
   childName: string;
   childAge: number;
+  sessionId?: string | null;
 }
 
-const EnrollmentConfirmation = ({ level, childName, childAge }: Props) => {
+function formatClassDate(d: string) {
+  const date = new Date(d + "T00:00:00");
+  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+const EnrollmentConfirmation = ({ level, childName, childAge, sessionId }: Props) => {
   const levelInfo = LEVEL_DISPLAY[level];
   const badge = LEVEL_BADGE_COLORS[level];
   const ageGroup = getAgeGroup(childAge);
   const groupName = getGroupName(level, ageGroup);
+  const [classDates, setClassDates] = useState<string[]>([]);
+  const [loadingDates, setLoadingDates] = useState(false);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    async function fetchDates() {
+      setLoadingDates(true);
+      const { data } = await supabase
+        .from("session_lesson_dates")
+        .select("lesson_date")
+        .eq("session_id", sessionId!)
+        .eq("is_cancelled", false)
+        .order("lesson_date");
+      setClassDates(data?.map(d => d.lesson_date) || []);
+      setLoadingDates(false);
+    }
+    fetchDates();
+  }, [sessionId]);
 
   return (
     <motion.div
@@ -41,6 +67,29 @@ const EnrollmentConfirmation = ({ level, childName, childAge }: Props) => {
           <p className="text-sm text-muted-foreground mb-2">
             + ${PRICING.registrationFee} registration fee (swim bag, cap & goggles)
           </p>
+
+          {/* Class dates */}
+          {loadingDates && (
+            <div className="flex justify-center my-3">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            </div>
+          )}
+          {classDates.length > 0 && (
+            <div className="my-4 p-3 rounded-lg border border-primary/20 bg-background/50 text-left">
+              <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-primary" />
+                Your Class Dates ({classDates.length} classes)
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {classDates.map(d => (
+                  <span key={d} className="text-xs bg-muted border border-border rounded px-1.5 py-0.5 text-muted-foreground">
+                    {formatClassDate(d)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <p className="text-muted-foreground mb-4 text-sm">
             We'll send a confirmation email with all the details.
           </p>
