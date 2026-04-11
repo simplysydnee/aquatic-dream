@@ -248,17 +248,25 @@ const SessionsAdmin = () => {
   };
 
   const handleCreateClasses = async () => {
-    const { session_period_id, timeSlots, swim_levels, age_group, max_students, days, instructor_id } = createForm;
+    const { session_period_id, timeSlots, swim_levels, age_group, max_students, days, instructor_id, frequency } = createForm;
 
     if (!session_period_id) { toast({ title: "Select a session", variant: "destructive" }); return; }
     if (timeSlots.some(ts => !ts.start || !ts.end)) { toast({ title: "Fill in all time slots", variant: "destructive" }); return; }
     if (swim_levels.length === 0) { toast({ title: "Select at least one level", variant: "destructive" }); return; }
     if (days.length === 0) { toast({ title: "Select at least one day", variant: "destructive" }); return; }
+    if (frequency === "twice_weekly" && days.length < 2) { toast({ title: "Select at least 2 days for 2x/week", variant: "destructive" }); return; }
 
     const period = periods.find(p => p.id === session_period_id);
+    const dayMap: Record<string, number> = {
+      Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6,
+    };
 
-    const rows = days.flatMap(day =>
-      timeSlots.flatMap(ts =>
+    let rows: any[];
+
+    if (frequency === "twice_weekly") {
+      // Combine days into one day_of_week string, one class per time slot per level
+      const combinedDay = days.map(d => d.toLowerCase()).join("_");
+      rows = timeSlots.flatMap(ts =>
         swim_levels.map(lvl => ({
           session_name: LEVEL_TO_GROUP[lvl] || lvl,
           session_period_id,
@@ -266,41 +274,60 @@ const SessionsAdmin = () => {
           session_end_date: period?.end_date || null,
           start_time: ts.start,
           end_time: ts.end,
-          day_of_week: day,
+          day_of_week: combinedDay,
           swim_level: lvl,
           age_group,
           max_students: parseInt(max_students) || 3,
           instructor_id: instructor_id || null,
           registration_status: "open",
         }))
-      )
-    );
+      );
+    } else {
+      // Weekly: separate class per day
+      rows = days.flatMap(day =>
+        timeSlots.flatMap(ts =>
+          swim_levels.map(lvl => ({
+            session_name: LEVEL_TO_GROUP[lvl] || lvl,
+            session_period_id,
+            session_start_date: period?.start_date || null,
+            session_end_date: period?.end_date || null,
+            start_time: ts.start,
+            end_time: ts.end,
+            day_of_week: day,
+            swim_level: lvl,
+            age_group,
+            max_students: parseInt(max_students) || 3,
+            instructor_id: instructor_id || null,
+            registration_status: "open",
+          }))
+        )
+      );
+    }
 
     const { data: inserted, error } = await supabase.from("swim_sessions").insert(rows).select("id");
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
 
-    // Auto-generate class dates based on selected days
+    // Auto-generate class dates
     if (inserted && period) {
-      const dayMap: Record<string, number> = {
-        Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6,
-      };
-      const selectedDayNums = days.map(d => dayMap[d]).filter(n => n !== undefined);
-      const classDates: string[] = [];
-      const cur = new Date(period.start_date + "T00:00:00");
-      const endD = new Date(period.end_date + "T00:00:00");
-      while (cur <= endD) {
-        if (selectedDayNums.includes(cur.getDay())) classDates.push(cur.toISOString().slice(0, 10));
-        cur.setDate(cur.getDate() + 1);
-      }
-      if (classDates.length > 0) {
-        const dateRows = inserted.flatMap(s =>
-          classDates.map(d => ({ session_id: s.id, lesson_date: d }))
-        );
-        await supabase.from("session_lesson_dates").upsert(dateRows, { onConflict: "session_id,lesson_date" });
+      for (const [idx, insertedRow] of inserted.entries()) {
+        const rowDow = rows[idx].day_of_week as string;
+        // Parse day nums from the day_of_week string (works for both "Monday" and "monday_wednesday")
+        const dayNums = rowDow.split("_").map(d => dayMap[d.charAt(0).toUpperCase() + d.slice(1)] ?? -1).filter(n => n >= 0);
+        const classDates: string[] = [];
+        const cur = new Date(period.start_date + "T00:00:00");
+        const endD = new Date(period.end_date + "T00:00:00");
+        while (cur <= endD) {
+          if (dayNums.includes(cur.getDay())) classDates.push(cur.toISOString().slice(0, 10));
+          cur.setDate(cur.getDate() + 1);
+        }
+        if (classDates.length > 0) {
+          const dateRows = classDates.map(d => ({ session_id: insertedRow.id, lesson_date: d }));
+          await supabase.from("session_lesson_dates").upsert(dateRows, { onConflict: "session_id,lesson_date" });
+        }
       }
     }
 
-    toast({ title: `${rows.length} class(es) created`, description: `${timeSlots.length} time slots × ${swim_levels.length} levels × ${days.length} days` });
+    toast({ title: `${rows.length} class(es) created` });
     setCreateDialogOpen(false);
     resetCreateForm();
     fetchData();
