@@ -270,7 +270,11 @@ const SessionsAdmin = () => {
       sub.slots.push(slot);
     }
     slot.sessions.push(s);
-    if (!slot.levels.includes(s.swim_level)) slot.levels.push(s.swim_level);
+    if (!slot.levels.includes(s.swim_level)) {
+      slot.levels.push(s.swim_level);
+      const ORDER: string[] = ["white", "red", "yellow", "blue", "green"];
+      slot.levels.sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+    }
   }
 
   // Sort periods by start date
