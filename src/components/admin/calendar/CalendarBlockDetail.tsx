@@ -255,10 +255,10 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
                                 {enr.parent_phone}
                               </a>
                             )}
-                            {(enr as any).parent_email && (
-                              <a href={`mailto:${(enr as any).parent_email}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+                            {enr.parent_email && (
+                              <a href={`mailto:${enr.parent_email}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline">
                                 <Mail className="w-3 h-3 shrink-0" />
-                                {(enr as any).parent_email}
+                                {enr.parent_email}
                               </a>
                             )}
                           </div>
