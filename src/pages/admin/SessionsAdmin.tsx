@@ -221,29 +221,37 @@ const SessionsAdmin = () => {
     setForm(f => ({ ...f, swim_levels: f.swim_levels.includes(lvl) ? f.swim_levels.filter(l => l !== lvl) : [...f.swim_levels, lvl] }));
   };
 
-  // Build structure: Session Name → Age Group → Slot[]
+  // Combine related session names for display (e.g. Bubble Makers + Reef Explorers)
+  const COMBINED_GROUPS: Record<string, string> = {
+    "Bubble Makers": "Bubble Makers / Reef Explorers",
+    "Reef Explorers": "Bubble Makers / Reef Explorers",
+  };
+  const getDisplayGroup = (name: string) => COMBINED_GROUPS[name] || name;
+
+  // Build structure: Display Group → Age Group → Slot[]
   const activeSessions = sessions.filter(s => s.is_active);
   const filtered = filterAgeGroup === "all" ? activeSessions : activeSessions.filter(s => s.age_group === filterAgeGroup);
 
   const sessionNameGroups: Record<string, { dateRange: string; dayLabel: string; ageGroups: Record<string, SlotGroup[]> }> = {};
 
   for (const s of filtered) {
-    const name = s.session_name || "Unnamed";
-    if (!sessionNameGroups[name]) {
-      sessionNameGroups[name] = {
+    const displayName = getDisplayGroup(s.session_name || "Unnamed");
+    if (!sessionNameGroups[displayName]) {
+      sessionNameGroups[displayName] = {
         dateRange: formatDateRange(s.session_start_date, s.session_end_date),
         dayLabel: formatDayLabel(s.day_of_week),
         ageGroups: {},
       };
     }
     const ag = s.age_group || "unknown";
-    if (!sessionNameGroups[name].ageGroups[ag]) sessionNameGroups[name].ageGroups[ag] = [];
+    if (!sessionNameGroups[displayName].ageGroups[ag]) sessionNameGroups[displayName].ageGroups[ag] = [];
 
+    // Group by time slot — sessions at the same time merge (e.g. white+red at 2:45)
     const slotKey = `${s.start_time}|${s.day_of_week}`;
-    let slot = sessionNameGroups[name].ageGroups[ag].find(sg => sg.key === slotKey);
+    let slot = sessionNameGroups[displayName].ageGroups[ag].find(sg => sg.key === slotKey);
     if (!slot) {
       slot = { key: slotKey, sessions: [], levels: [], first: s };
-      sessionNameGroups[name].ageGroups[ag].push(slot);
+      sessionNameGroups[displayName].ageGroups[ag].push(slot);
     }
     slot.sessions.push(s);
     if (!slot.levels.includes(s.swim_level)) slot.levels.push(s.swim_level);
