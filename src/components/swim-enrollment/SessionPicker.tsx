@@ -49,22 +49,26 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   const ageGroup = getAgeGroup(childAge);
   const levelInfo = LEVEL_DISPLAY[level];
 
-  // Session query logic:
-  // Preschool: White → white sessions, Red → red sessions
-  // School-age: query by exact level (blue, yellow, green)
-  // The database has separate session rows per level per time slot
-  const sessionLevel = level;
+  // Preschool classes are mixed (white/red together, 3 total).
+  // All preschool sessions are stored as "white" level.
+  // School-age: query by exact level.
 
   useEffect(() => {
     async function fetchSessions() {
       setLoading(true);
-      const { data: sessionData, error } = await supabase
+      let query = supabase
         .from("swim_sessions")
         .select("*")
-        .eq("swim_level", sessionLevel)
         .eq("age_group", ageGroup)
         .eq("is_active", true)
         .eq("registration_status", "open");
+
+      // For school-age, filter by exact level; for preschool, show all preschool sessions
+      if (ageGroup === "school-age-6-12") {
+        query = query.eq("swim_level", level);
+      }
+
+      const { data: sessionData, error } = await query;
 
       if (error || !sessionData) {
         setLoading(false);
