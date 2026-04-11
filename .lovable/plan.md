@@ -1,103 +1,39 @@
 
 
-## Payment-Gated Enrollment with First-Session Grace Period
+## Add Weekly Frequency Option to Class Creation
 
-### Understanding the Flow
+### Current Behavior
+When you select multiple days (e.g., Monday + Wednesday) in the Create Classes wizard, it already creates **separate class records** per day. However, the existing sessions use combined `day_of_week` values like `"monday_wednesday"` which means one class meets twice per week.
 
-There are two distinct paths:
+### What Changes
 
-| | **First-Time Swimmer** | **Returning Swimmer** |
-|---|---|---|
-| **At enrollment** | Completes form → enrolled, no payment yet | Must pay session fee to complete enrollment |
-| **Payment due** | First day of lessons (reg fee $45 + session fee) | At enrollment time (session fee only) |
-| **Reminder** | Day before first lesson — email with Stripe pay link | N/A (already paid) |
-| **Confirmation** | Shows enrollment confirmed, payment due on first day | Shows confirmation only after payment |
+Add a **Frequency** toggle to the Create Classes dialog:
 
-### Database Changes
+| Frequency | Example: Tue + Thu selected | `day_of_week` stored | Class dates generated |
+|---|---|---|---|
+| **2x/week** (current default) | 1 class per level, meets Tue AND Thu | `"tuesday_thursday"` | Both Tue and Thu dates |
+| **Weekly** (new) | 2 separate classes per level, one on Tue, one on Thu | `"Tuesday"` / `"Thursday"` | Only that day's dates per class |
 
-**Add columns to `swim_enrollments`:**
-- `payment_status` — `unpaid`, `paid`, `refunded` (default: `unpaid`)
-- `payment_amount` — total amount paid
-- `stripe_payment_id` — Stripe reference for reconciliation
-- `is_first_time` — boolean, whether this was their first enrollment (used for reporting)
-- `payment_due_date` — date payment is due (first lesson date for new swimmers)
-- `payment_reminder_sent_at` — timestamp when reminder email was sent
+### Implementation
 
-**Returning swimmer detection:** Query `swim_enrollments` by `parent_email` where `payment_status = 'paid'` to check if any prior paid enrollment exists.
+**`src/pages/admin/SessionsAdmin.tsx`:**
+- Add `frequency: "twice_weekly" | "weekly"` to `createForm` state
+- Add a radio/toggle UI between "2x/week" and "Weekly" in the Create Classes dialog
+- When **2x/week**: combine selected days into one `day_of_week` string (e.g., `"tuesday_thursday"`), create one class per time slot per level, generate dates for all selected days
+- When **weekly**: create one class per day per time slot per level (current behavior), each with its own single-day `day_of_week`, dates generated only for that day
 
-### Stripe Integration
+**`src/components/admin/ManageDatesModal.tsx`:** Already handles dynamic day parsing — no changes needed.
 
-Enable Stripe via the Lovable Stripe tool. This creates the infrastructure for payment links and checkout sessions.
+**`src/components/admin/calendar/CalendarDayView.tsx` and `CalendarWeekView.tsx`:** Already use `.includes()` matching — works for both formats.
 
-**Edge function: `create-swim-checkout`**
-- Receives: enrollment data (or enrollment ID for returning swimmers)
-- Checks if returning swimmer (has prior paid enrollment by parent_email)
-- First-time: calculates reg fee ($45) + session fee
-- Returning: session fee only
-- Creates Stripe Checkout Session → returns URL
+**`src/components/swim-enrollment/SessionPicker.tsx`:** Already works with both formats since it queries by level/age_group, not day_of_week.
 
-**Edge function: `handle-swim-payment`**
-- Stripe webhook for `checkout.session.completed`
-- Updates `swim_enrollments.payment_status` to `paid`
-- Stores Stripe payment ID and amount
+**Summary preview in dialog:** Update the class count calculation:
+- 2x/week: `time slots × levels × 1` (days are combined)
+- Weekly: `time slots × levels × days` (current math)
 
-### Reminder Email (Day Before First Lesson)
+### Files Modified
+- `src/pages/admin/SessionsAdmin.tsx` — add frequency toggle + adjust creation logic
 
-- Set up a scheduled edge function or pg_cron job that runs daily
-- Queries enrollments where `payment_status = 'unpaid'` and first lesson date is tomorrow
-- Sends reminder email with Stripe payment link to each parent
-- Records `payment_reminder_sent_at`
-
-This requires email infrastructure setup (email domain + transactional email scaffolding).
-
-### Enrollment Flow Changes
-
-**First-time swimmer (`SwimEnrollment.tsx`):**
-1. Assessment → Session → Details → Legal → **Confirmation page** (no payment step)
-2. Confirmation says: "You're enrolled! Payment of $[reg + session fee] is due on your first lesson day. You'll receive a reminder email with a payment link."
-3. Enrollment inserted with `status: 'enrolled'`, `payment_status: 'unpaid'`
-
-**Returning swimmer (`SwimEnrollment.tsx`):**
-1. Assessment → Session → Details → Legal → **Stripe Checkout redirect**
-2. After payment → redirect to confirmation page showing "Paid & enrolled"
-3. Enrollment only inserted after successful payment (via webhook)
-
-### Admin Enrollments Page Updates
-
-**`SwimEnrollmentsAdmin.tsx`:**
-- Replace pending/confirmed/cancelled status cards with: `Enrolled (Unpaid)`, `Paid`, `Cancelled`
-- Add payment status column showing paid/unpaid with amount
-- Add "Send Payment Link" button per row — generates Stripe link and emails parent
-- Add "Mark as Paid" for cash/check payments (manual override)
-- Add filters: payment status, swim level, session, text search
-
-### Implementation Order
-
-1. Enable Stripe (collects your Stripe secret key)
-2. Database migration — add payment columns
-3. Create `create-swim-checkout` edge function
-4. Create `handle-swim-payment` webhook edge function
-5. Update `SwimEnrollment.tsx` — split flow for first-time vs returning
-6. Update confirmation page — show payment info
-7. Set up email domain + transactional email for payment reminders
-8. Create daily reminder cron job
-9. Update `SwimEnrollmentsAdmin.tsx` — payment tracking, send link, mark paid
-10. Update `EnrollmentDetailDialog.tsx` — payment details tab
-
-### Files to Create/Modify
-
-- `supabase/functions/create-swim-checkout/index.ts` (new)
-- `supabase/functions/handle-swim-payment/index.ts` (new)
-- `supabase/functions/send-payment-reminders/index.ts` (new)
-- `src/pages/SwimEnrollment.tsx`
-- `src/pages/EnrollmentSuccess.tsx` (new — Stripe return page)
-- `src/pages/admin/SwimEnrollmentsAdmin.tsx`
-- `src/components/admin/EnrollmentDetailDialog.tsx`
-- `src/components/swim-enrollment/EnrollmentConfirmation.tsx`
-- Database migration for payment columns
-
-### Prerequisites
-
-- Stripe secret key (will be requested when enabling Stripe)
-- Email domain setup (for payment reminder emails)
+No database changes needed — `day_of_week` is already a flexible text field.
 
