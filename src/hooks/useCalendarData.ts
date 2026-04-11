@@ -11,6 +11,8 @@ export interface CalendarSwimSession {
   max_students: number;
   session_name: string | null;
   day_of_week: string;
+  instructor_id: string | null;
+  instructors: { name: string } | null;
 }
 
 export interface CalendarEnrollment {
@@ -96,7 +98,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     const [sessionsRes, enrollmentsRes, eventsRes, attendanceRes, agreementsRes] = await Promise.all([
       supabase
         .from("swim_sessions")
-        .select("id, swim_level, age_group, start_time, end_time, max_students, session_name, day_of_week")
+        .select("id, swim_level, age_group, start_time, end_time, max_students, session_name, day_of_week, instructor_id, instructors(name)")
         .eq("is_active", true),
       supabase
         .from("swim_enrollments")

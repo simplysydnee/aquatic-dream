@@ -532,7 +532,8 @@ const CalendarDayView = ({
                 return (
                   <div
                     key={s.id}
-                    className="absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden cursor-pointer hover:shadow-md"
+                    className="absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden cursor-pointer hover:shadow-md z-10"
+                    onMouseMove={(e) => e.stopPropagation()}
                     style={{
                       top: `${top}px`,
                       height: `${height}px`,
