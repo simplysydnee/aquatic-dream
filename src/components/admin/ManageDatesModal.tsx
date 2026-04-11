@@ -59,7 +59,7 @@ function formatDate(d: string) {
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
-const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, sessionEndDate, sessionLabel }: Props) => {
+const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, sessionEndDate, sessionLabel, daysOfWeek }: Props) => {
   const [dates, setDates] = useState<LessonDate[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
