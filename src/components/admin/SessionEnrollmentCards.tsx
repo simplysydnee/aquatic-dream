@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import { ChevronDown, Users } from "lucide-react";
 import { useState } from "react";
@@ -60,6 +61,7 @@ export default function SessionEnrollmentCards({
   enrollments: Enrollment[];
   sessionPeriods: SessionPeriod[];
 }) {
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
   const enrollmentsBySession: Record<string, Enrollment[]> = {};
   enrollments.forEach((e) => {
     if (e.session_id && e.status !== "cancelled") {
@@ -80,10 +82,27 @@ export default function SessionEnrollmentCards({
   });
 
   const periodOrder = sessionPeriods.filter(p => sessionsByPeriod[p.id]);
+  const filteredPeriods = selectedPeriod === "all"
+    ? periodOrder
+    : periodOrder.filter(p => p.id === selectedPeriod);
 
   return (
-    <div className="space-y-8">
-      {periodOrder.map((period) => (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="All Periods" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Periods</SelectItem>
+            {periodOrder.map((p) => (
+              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {filteredPeriods.map((period) => (
         <div key={period.id} className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground">{period.name}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
