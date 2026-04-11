@@ -47,6 +47,7 @@ interface SessionInfo {
 interface SessionPeriod {
   id: string;
   name: string;
+  start_date: string;
 }
 
 function formatDayOfWeek(dow: string) {
@@ -74,7 +75,7 @@ const SwimEnrollmentsAdmin = () => {
     const [enrollRes, sessionRes, periodRes] = await Promise.all([
       supabase.from("swim_enrollments").select("*").order("created_at", { ascending: false }),
       supabase.from("swim_sessions").select("id, start_time, end_time, session_name, age_group, swim_level, max_students, day_of_week, session_period_id"),
-      supabase.from("session_periods").select("id, name").order("start_date", { ascending: false }),
+      supabase.from("session_periods").select("id, name, start_date").order("start_date", { ascending: true }),
     ]);
 
     if (enrollRes.data) setEnrollments(enrollRes.data as Enrollment[]);
