@@ -104,6 +104,13 @@ const curriculum = [
 
 const preschoolSlots = [
   { time: "2:45 PM", groups: "Bubble Makers / Reef Explorers" },
+  { time: "3:15 PM", groups: "Bubble Makers / Reef Explorers" },
+  { time: "3:45 PM", groups: "Bubble Makers / Reef Explorers" },
+  { time: "4:15 PM", groups: "Bubble Makers / Reef Explorers" },
+  { time: "4:45 PM", groups: "Bubble Makers / Reef Explorers" },
+  { time: "5:30 PM", groups: "Bubble Makers / Reef Explorers" },
+  { time: "6:00 PM", groups: "Bubble Makers / Reef Explorers" },
+  { time: "6:30 PM", groups: "Bubble Makers / Reef Explorers" },
 ];
 
 const schoolAgeSlots = [
