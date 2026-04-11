@@ -540,7 +540,8 @@ const CalendarDayView = ({
                       borderLeftColor: levelColor.border,
                       color: levelColor.text,
                     }}
-                    onClick={() =>
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setDetailBlock({
                         kind: "swim",
                         session: s,
@@ -548,8 +549,8 @@ const CalendarDayView = ({
                         attendance: attendance.filter((a) => a.session_id === s.id),
                         agreements,
                         dateStr,
-                      })
-                    }
+                      });
+                    }}
                   >
                     <p className="text-xs font-semibold truncate leading-tight">
                       {levelInfo?.name || s.swim_level}
