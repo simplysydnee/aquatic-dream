@@ -214,6 +214,7 @@ const SessionsAdmin = () => {
       max_students: "3",
       days: [],
       instructor_id: "",
+      frequency: "weekly",
     });
   };
 
