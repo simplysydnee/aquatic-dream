@@ -34,9 +34,10 @@ const SwimEnrollment = () => {
 
   const stepIndex = ["assess", "session", "info", "legal", "done"].indexOf(step);
 
-  const handleAssessmentComplete = (recommendedLevel: SwimLevel, age: number) => {
+  const handleAssessmentComplete = (recommendedLevel: SwimLevel, age: number, dob: string) => {
     setLevel(recommendedLevel);
     setChildAge(age);
+    setChildDob(dob);
     setStep("session");
   };
 
@@ -104,11 +105,13 @@ const SwimEnrollment = () => {
         parent_phone: enrollmentData.parentPhone || null,
         child_name: enrollmentData.childName,
         child_age: childAge,
+        child_dob: childDob || null,
+        medical_notes: enrollmentData.hasMedical === "yes" ? (enrollmentData.medicalNotes || null) : null,
         notes: enrollmentData.notes || null,
         lesson_type: "group",
         registration_fee: regFee,
         status: "enrolled",
-        payment_status: isFirstTime ? "unpaid" : "unpaid",
+        payment_status: "unpaid",
         payment_amount: sessionFee + regFee,
         is_first_time: isFirstTime,
         payment_due_date: paymentDueDate,
@@ -217,7 +220,7 @@ const SwimEnrollment = () => {
             <SessionPicker level={level} childAge={childAge} onSelect={handleSessionSelect} onBack={() => setStep("assess")} />
           )}
           {step === "info" && (
-            <EnrollmentForm childAge={childAge} onSubmit={handleInfoSubmit} onBack={() => setStep("session")} submitting={false} />
+            <EnrollmentForm onSubmit={handleInfoSubmit} onBack={() => setStep("session")} submitting={false} />
           )}
           {step === "legal" && enrollmentData && (
             <LegalAgreements parentName={enrollmentData.parentName} childName={enrollmentData.childName} onSubmit={handleLegalSubmit} onBack={() => setStep("info")} submitting={submitting} />
