@@ -221,7 +221,7 @@ const SessionsAdmin = () => {
     setForm(f => ({ ...f, swim_levels: f.swim_levels.includes(lvl) ? f.swim_levels.filter(l => l !== lvl) : [...f.swim_levels, lvl] }));
   };
 
-  // Combine related session names for display (e.g. Bubble Makers + Reef Explorers)
+  // Combine related session names for display
   const COMBINED_GROUPS: Record<string, string> = {
     "Bubble Makers": "Bubble Makers / Reef Explorers",
     "Reef Explorers": "Bubble Makers / Reef Explorers",
@@ -230,34 +230,57 @@ const SessionsAdmin = () => {
   };
   const getDisplayGroup = (name: string) => COMBINED_GROUPS[name] || name;
 
-  // Build structure: Display Group → Age Group → Slot[]
   const activeSessions = sessions.filter(s => s.is_active);
   const filtered = filterAgeGroup === "all" ? activeSessions : activeSessions.filter(s => s.age_group === filterAgeGroup);
 
-  const sessionNameGroups: Record<string, { dateRange: string; dayLabel: string; ageGroups: Record<string, SlotGroup[]> }> = {};
+  // Group by session period (date range) → display group → slots
+  interface SessionPeriod {
+    label: string;
+    startDate: string;
+    subgroups: Record<string, { ageGroup: string; slots: SlotGroup[] }>;
+  }
+
+  const periodMap: Record<string, SessionPeriod> = {};
+
+  // Determine session period key from dates — sessions with close start dates belong together
+  const getSessionPeriodKey = (s: Session) => `${s.session_start_date || "none"}`;
 
   for (const s of filtered) {
-    const displayName = getDisplayGroup(s.session_name || "Unnamed");
-    if (!sessionNameGroups[displayName]) {
-      sessionNameGroups[displayName] = {
-        dateRange: formatDateRange(s.session_start_date, s.session_end_date),
-        dayLabel: formatDayLabel(s.day_of_week),
-        ageGroups: {},
+    const periodKey = getSessionPeriodKey(s);
+    if (!periodMap[periodKey]) {
+      periodMap[periodKey] = {
+        label: formatDateRange(s.session_start_date, s.session_end_date),
+        startDate: s.session_start_date || "",
+        subgroups: {},
       };
     }
-    const ag = s.age_group || "unknown";
-    if (!sessionNameGroups[displayName].ageGroups[ag]) sessionNameGroups[displayName].ageGroups[ag] = [];
+    const displayName = getDisplayGroup(s.session_name || "Unnamed");
+    if (!periodMap[periodKey].subgroups[displayName]) {
+      periodMap[periodKey].subgroups[displayName] = { ageGroup: s.age_group || "unknown", slots: [] };
+    }
+    const sub = periodMap[periodKey].subgroups[displayName];
 
-    // Group by time slot — sessions at the same time merge (e.g. white+red at 2:45)
     const slotKey = `${s.start_time}|${s.day_of_week}`;
-    let slot = sessionNameGroups[displayName].ageGroups[ag].find(sg => sg.key === slotKey);
+    let slot = sub.slots.find(sg => sg.key === slotKey);
     if (!slot) {
       slot = { key: slotKey, sessions: [], levels: [], first: s };
-      sessionNameGroups[displayName].ageGroups[ag].push(slot);
+      sub.slots.push(slot);
     }
     slot.sessions.push(s);
     if (!slot.levels.includes(s.swim_level)) slot.levels.push(s.swim_level);
   }
+
+  // Sort periods by start date
+  const sortedPeriods = Object.entries(periodMap).sort(([, a], [, b]) => a.startDate.localeCompare(b.startDate));
+
+  // Calculate total lessons from date range
+  const getLessonCount = (startDate: string | null, endDate: string | null) => {
+    if (!startDate || !endDate) return null;
+    const s = new Date(startDate + "T00:00:00");
+    const e = new Date(endDate + "T00:00:00");
+    const weeks = Math.round((e.getTime() - s.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    return weeks * 2; // Mon & Wed = 2 per week
+  };
 
   const getInstructorName = (id: string | null) => {
     if (!id) return null;
