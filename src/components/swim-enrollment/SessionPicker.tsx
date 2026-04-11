@@ -179,16 +179,18 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
       <p className="text-muted-foreground text-sm mb-2">
         Choose a <strong>{getGroupName(level, ageGroup)}</strong> ({levelInfo.name}) class · {AGE_GROUP_LABELS[ageGroup]}
       </p>
-      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-        <span className="flex items-center gap-1">
-          <DollarSign className="w-3.5 h-3.5" />
-          ${PRICING.group}/lesson (group)
-        </span>
-        <span className="flex items-center gap-1">
-          <Calendar className="w-3.5 h-3.5" />
-          Mon & Wed
-        </span>
-      </div>
+      {slots.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
+          <span className="flex items-center gap-1">
+            <DollarSign className="w-3.5 h-3.5" />
+            ${PRICING.group}/lesson (group)
+          </span>
+          <span className="flex items-center gap-1">
+            <Calendar className="w-3.5 h-3.5" />
+            {formatDayOfWeek(slots[0].day_of_week)}
+          </span>
+        </div>
+      )}
       <div className="flex items-center gap-2 text-sm bg-accent/50 border border-accent rounded-lg p-3 mb-6">
         <ShoppingBag className="w-4 h-4 text-primary shrink-0" />
         <span className="text-foreground">
