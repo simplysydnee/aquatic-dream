@@ -81,6 +81,7 @@ export default function SessionEnrollmentCards({
     }
   });
 
+  const periodOrder = sessionPeriods.filter(p => sessionsByPeriod[p.id]);
   const filteredPeriods = selectedPeriod === "all"
     ? periodOrder
     : periodOrder.filter(p => p.id === selectedPeriod);
