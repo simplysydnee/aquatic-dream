@@ -11,6 +11,7 @@ interface SlotInfo {
   periodName: string;
   start_time: string;
   end_time: string;
+  day_of_week: string;
   max_students: number;
   total_enrolled: number;
   spots_left: number;
