@@ -63,7 +63,8 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         .select("*")
         .eq("swim_level", sessionLevel)
         .eq("age_group", ageGroup)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("registration_status", "open");
 
       if (error || !sessionData) {
         setLoading(false);

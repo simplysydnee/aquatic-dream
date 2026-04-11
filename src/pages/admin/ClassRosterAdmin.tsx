@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup, AGE_GROUP_LABELS } from "@/components/swim-enrollment/types";
+import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel, getGroupName, getAgeGroup, AGE_GROUP_LABELS } from "@/components/swim-enrollment/types";
 import { Users, Plus, ArrowRightLeft, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -24,6 +24,8 @@ interface Session {
   age_group: string | null;
   max_students: number;
   is_active: boolean;
+  instructor_id: string | null;
+  registration_status: string;
 }
 
 interface Enrollment {
@@ -40,6 +42,11 @@ interface Enrollment {
   created_at: string;
 }
 
+interface Instructor {
+  id: string;
+  name: string;
+}
+
 function formatTime(time: string) {
   const [h, m] = time.split(":");
   const hour = parseInt(h);
@@ -48,9 +55,18 @@ function formatTime(time: string) {
   return `${display}:${m} ${ampm}`;
 }
 
+const LEVEL_BORDER_COLORS: Record<string, string> = {
+  white: "border-l-gray-400",
+  red: "border-l-red-400",
+  yellow: "border-l-yellow-400",
+  blue: "border-l-blue-400",
+  green: "border-l-green-400",
+};
+
 const ClassRosterAdmin = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterSession, setFilterSession] = useState<string>("all");
   const [filterAgeGroup, setFilterAgeGroup] = useState<string>("all");
@@ -64,12 +80,14 @@ const ClassRosterAdmin = () => {
   });
 
   const fetchData = async () => {
-    const [sessRes, enrRes] = await Promise.all([
+    const [sessRes, enrRes, instrRes] = await Promise.all([
       supabase.from("swim_sessions").select("*").eq("is_active", true).order("start_time"),
       supabase.from("swim_enrollments").select("*").in("status", ["pending", "confirmed"]),
+      supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
     ]);
     if (sessRes.data) setSessions(sessRes.data);
     if (enrRes.data) setEnrollments(enrRes.data);
+    if (instrRes.data) setInstructors(instrRes.data);
     setLoading(false);
   };
 
@@ -83,7 +101,6 @@ const ClassRosterAdmin = () => {
     return true;
   });
 
-  // Group by time slot
   const grouped = filteredSessions.reduce<Record<string, Session[]>>((acc, s) => {
     const key = `${s.session_name}|${s.start_time}|${s.age_group}`;
     if (!acc[key]) acc[key] = [];
@@ -96,6 +113,24 @@ const ClassRosterAdmin = () => {
 
   const getSessionEnrollments = (sessionId: string) =>
     enrollments.filter(e => e.session_id === sessionId);
+
+  const getInstructorName = (id: string | null) => {
+    if (!id) return null;
+    return instructors.find(i => i.id === id)?.name || null;
+  };
+
+  const assignInstructor = async (sessionId: string, instructorId: string) => {
+    const { error } = await supabase
+      .from("swim_sessions")
+      .update({ instructor_id: instructorId || null })
+      .eq("id", sessionId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Instructor assigned" });
+      fetchData();
+    }
+  };
 
   const handleManualEnroll = async () => {
     const { child_name, child_age, parent_name, parent_email, swim_level, session_id } = manualForm;
@@ -202,24 +237,52 @@ const ClassRosterAdmin = () => {
 
       {Object.entries(grouped).map(([key, slotSessions]) => {
         const [sessionName, startTime, ageGroup] = key.split("|");
-        const levels = slotSessions.map(s => LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level).join(" / ");
         const totalCapacity = slotSessions.reduce((sum, s) => sum + s.max_students, 0);
         const totalEnrolled = slotSessions.reduce((sum, s) => sum + getEnrolledCount(s.id), 0);
+        // Use first session's level for the border color
+        const primaryLevel = slotSessions[0]?.swim_level || "white";
+        const borderColor = LEVEL_BORDER_COLORS[primaryLevel] || "border-l-gray-300";
 
         return (
-          <Card key={key}>
+          <Card key={key} className={`border-l-4 ${borderColor}`}>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <CardTitle className="text-base">{sessionName} · {formatTime(startTime)}</CardTitle>
-                  <Badge variant="outline" className="text-xs">{levels}</Badge>
-                  <Badge variant="secondary" className="text-xs">{ageGroup === "preschool-3-5" ? "Preschool" : "School-Age"}</Badge>
+                  {slotSessions.map(s => {
+                    const lc = LEVEL_BADGE_COLORS[s.swim_level as SwimLevel];
+                    return lc ? (
+                      <span key={s.id} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${lc.bg} ${lc.text} ${lc.ring}`}>
+                        {LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name}
+                      </span>
+                    ) : null;
+                  })}
+                  <Badge variant="outline" className={`text-xs ${ageGroup === "preschool-3-5" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-teal-50 text-teal-700 border-teal-200"}`}>
+                    {ageGroup === "preschool-3-5" ? "Preschool" : "School-Age"}
+                  </Badge>
                 </div>
-                <div className="flex items-center gap-1.5 text-sm">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                  <span className={totalEnrolled >= totalCapacity ? "text-destructive font-semibold" : "text-foreground"}>
-                    {totalEnrolled}/{totalCapacity}
-                  </span>
+                <div className="flex items-center gap-3">
+                  {/* Instructor assignment */}
+                  {slotSessions.map(s => {
+                    const instrName = getInstructorName(s.instructor_id);
+                    return (
+                      <Select key={s.id} value={s.instructor_id || ""} onValueChange={v => assignInstructor(s.id, v)}>
+                        <SelectTrigger className="h-7 text-xs w-[130px]">
+                          <SelectValue placeholder="Assign instructor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Unassigned</SelectItem>
+                          {instructors.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    );
+                  }).filter((_, i) => i === 0 /* show one dropdown per slot */)}
+                  <div className="flex items-center gap-1.5 text-sm">
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                    <span className={totalEnrolled >= totalCapacity ? "text-destructive font-semibold" : "text-foreground"}>
+                      {totalEnrolled}/{totalCapacity}
+                    </span>
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -227,9 +290,11 @@ const ClassRosterAdmin = () => {
               {slotSessions.map(session => {
                 const enrolled = getSessionEnrollments(session.id);
                 if (enrolled.length === 0) return null;
+                const lc = LEVEL_BADGE_COLORS[session.swim_level as SwimLevel];
                 return (
                   <div key={session.id} className="mb-3">
                     <p className="text-xs font-medium text-muted-foreground mb-1">
+                      {lc && <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${lc.bg} ring-1 ${lc.ring}`} />}
                       {LEVEL_DISPLAY[session.swim_level as SwimLevel]?.name} ({enrolled.length}/{session.max_students})
                     </p>
                     <Table>
@@ -272,7 +337,6 @@ const ClassRosterAdmin = () => {
         );
       })}
 
-      {/* Move Swimmer Dialog */}
       <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Move {movingEnrollment?.child_name}</DialogTitle></DialogHeader>

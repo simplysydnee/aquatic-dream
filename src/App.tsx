@@ -13,9 +13,9 @@ import AdminLayout from "./pages/admin/AdminLayout";
 import ProtectedRoute from "./components/admin/ProtectedRoute";
 import SwimEnrollmentsAdmin from "./pages/admin/SwimEnrollmentsAdmin";
 import LessonRequestsAdmin from "./pages/admin/LessonRequestsAdmin";
-import DiveBookingsAdmin from "./pages/admin/DiveBookingsAdmin";
-import TripReservationsAdmin from "./pages/admin/TripReservationsAdmin";
 import ContactsAdmin from "./pages/admin/ContactsAdmin";
+import InstructorsAdmin from "./pages/admin/InstructorsAdmin";
+import SessionsAdmin from "./pages/admin/SessionsAdmin";
 import UsersAdmin from "./pages/admin/UsersAdmin";
 import CalendarAdmin from "./pages/admin/CalendarAdmin";
 import ClassRosterAdmin from "./pages/admin/ClassRosterAdmin";
@@ -50,9 +50,9 @@ const App = () => (
               <Route path="roster" element={<ClassRosterAdmin />} />
               <Route path="enrollments" element={<SwimEnrollmentsAdmin />} />
               <Route path="lesson-requests" element={<LessonRequestsAdmin />} />
-              <Route path="dive-bookings" element={<DiveBookingsAdmin />} />
-              <Route path="trip-reservations" element={<TripReservationsAdmin />} />
               <Route path="contacts" element={<ContactsAdmin />} />
+              <Route path="instructors" element={<InstructorsAdmin />} />
+              <Route path="sessions" element={<SessionsAdmin />} />
               <Route path="careers" element={<JobPostingsAdmin />} />
               <Route path="applications" element={<JobApplicationsAdmin />} />
               <Route path="users" element={<UsersAdmin />} />
