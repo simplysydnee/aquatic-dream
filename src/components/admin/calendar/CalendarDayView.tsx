@@ -63,6 +63,15 @@ const BLOCK_COLORS: Record<string, { bg: string; border: string; text: string }>
   "other":              { bg: "#F3F3F3", border: "#666",    text: "#333" },
 };
 
+/* ── Swim level colors (Starfish palette) ── */
+const LEVEL_COLORS: Record<string, { bg: string; border: string; text: string; headerBg: string }> = {
+  white:  { bg: "#f5f5f0", border: "#b0a890", text: "#5a5240", headerBg: "#eae8e0" },
+  red:    { bg: "#fde8e8", border: "#c53030", text: "#9b2c2c", headerBg: "#fed7d7" },
+  yellow: { bg: "#fefcbf", border: "#d69e2e", text: "#975a16", headerBg: "#fef9c3" },
+  blue:   { bg: "#dbeafe", border: "#2563eb", text: "#1e40af", headerBg: "#bfdbfe" },
+  green:  { bg: "#dcfce7", border: "#16a34a", text: "#166534", headerBg: "#bbf7d0" },
+};
+
 /* ── Helpers ── */
 function timeToMinutes(t: string): number {
   // handles "HH:MM", "HH:MM:SS", and ISO strings
@@ -117,6 +126,8 @@ interface ColumnDef {
   id: string;
   label: string;
   group: "ics" | "ad" | "dive";
+  sessionName?: string;
+  swimLevel?: string;
 }
 
 const CalendarDayView = ({
@@ -199,6 +210,25 @@ const CalendarDayView = ({
   const showAD = activeFilters.has("swim") || activeFilters.has("private-lesson") || activeFilters.has("semi-private-lesson");
   const showDive = activeFilters.has("dive-session") || activeFilters.has("pool-rental");
 
+  // ── Build unique AD session-name columns from today's sessions ──
+  const adSessionColumns = useMemo(() => {
+    const seen = new Map<string, { sessionName: string; swimLevel: string }>();
+    // Sort by curriculum order: white, red, yellow, blue, green
+    const levelOrder = ["white", "red", "yellow", "blue", "green"];
+    const sorted = [...todaySessions].sort((a, b) => {
+      const ai = levelOrder.indexOf(a.swim_level);
+      const bi = levelOrder.indexOf(b.swim_level);
+      return ai - bi;
+    });
+    for (const s of sorted) {
+      const name = s.session_name || s.swim_level;
+      if (!seen.has(name)) {
+        seen.set(name, { sessionName: name, swimLevel: s.swim_level });
+      }
+    }
+    return [...seen.values()];
+  }, [todaySessions]);
+
   // ── Build columns ──
   const columns = useMemo<ColumnDef[]>(() => {
     const cols: ColumnDef[] = [];
@@ -208,13 +238,28 @@ const CalendarDayView = ({
       });
     }
     if (showAD) {
-      cols.push({ id: "ad-1", label: "Group 1", group: "ad" });
+      if (adSessionColumns.length > 0) {
+        adSessionColumns.forEach((col, i) => {
+          cols.push({
+            id: `ad-${i}`,
+            label: col.sessionName,
+            group: "ad",
+            sessionName: col.sessionName,
+            swimLevel: col.swimLevel,
+          });
+        });
+      } else {
+        // Fallback if no swim sessions today but there are ad events
+        if (adEvents.length > 0) {
+          cols.push({ id: "ad-0", label: "Lessons", group: "ad" });
+        }
+      }
     }
     if (showDive) {
       cols.push({ id: "dive", label: "Dive / Rental", group: "dive" });
     }
     return cols;
-  }, [icsInstructors, showICS, showAD, showDive]);
+  }, [icsInstructors, showICS, showAD, showDive, adSessionColumns, adEvents.length]);
 
   const icsCount = columns.filter((c) => c.group === "ics").length;
   const adCount = columns.filter((c) => c.group === "ad").length;
