@@ -63,9 +63,11 @@ export default function SessionEnrollmentCards({
   sessionPeriods: SessionPeriod[];
 }) {
   const getDefaultPeriod = () => {
+    if (sessionPeriods.length === 0) return "all";
     const today = new Date().toISOString().split("T")[0];
+    // Pick the next upcoming session, or if all are past, pick the first one (earliest)
     const upcoming = sessionPeriods.find(p => p.start_date >= today);
-    return upcoming?.id || (sessionPeriods.length > 0 ? sessionPeriods[sessionPeriods.length - 1].id : "all");
+    return upcoming?.id || sessionPeriods[0].id;
   };
   const [selectedPeriod, setSelectedPeriod] = useState<string>(getDefaultPeriod);
   const enrollmentsBySession: Record<string, Enrollment[]> = {};
