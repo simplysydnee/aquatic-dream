@@ -112,7 +112,7 @@ const SessionsAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [filterAgeGroup, setFilterAgeGroup] = useState<string>("all");
   const [manageDatesOpen, setManageDatesOpen] = useState(false);
-  const [manageDatesSlot, setManageDatesSlot] = useState<{ sessionIds: string[]; startDate: string; endDate: string; label: string } | null>(null);
+  const [manageDatesSlot, setManageDatesSlot] = useState<{ sessionIds: string[]; startDate: string; endDate: string; label: string; daysOfWeek: string } | null>(null);
 
   // Session (period) management
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
@@ -811,6 +811,7 @@ const SessionsAdmin = () => {
                                 startDate: s.session_start_date || "",
                                 endDate: s.session_end_date || "",
                                 label: `${formatTime(s.start_time)} – ${formatTime(s.end_time)} · ${slot.levels.map(l => LEVEL_DISPLAY[l as SwimLevel]?.name).join("/")}`,
+                                daysOfWeek: s.day_of_week,
                               });
                               setManageDatesOpen(true);
                             }} title="Manage Dates">
@@ -842,6 +843,7 @@ const SessionsAdmin = () => {
           sessionStartDate={manageDatesSlot.startDate}
           sessionEndDate={manageDatesSlot.endDate}
           sessionLabel={manageDatesSlot.label}
+          daysOfWeek={manageDatesSlot.daysOfWeek}
         />
       )}
 
