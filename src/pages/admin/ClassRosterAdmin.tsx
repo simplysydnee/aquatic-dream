@@ -266,12 +266,12 @@ const ClassRosterAdmin = () => {
                   {slotSessions.map(s => {
                     const instrName = getInstructorName(s.instructor_id);
                     return (
-                      <Select key={s.id} value={s.instructor_id || ""} onValueChange={v => assignInstructor(s.id, v)}>
+                      <Select key={s.id} value={s.instructor_id || "unassigned"} onValueChange={v => assignInstructor(s.id, v === "unassigned" ? "" : v)}>
                         <SelectTrigger className="h-7 text-xs w-[130px]">
                           <SelectValue placeholder="Assign instructor" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Unassigned</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
                           {instructors.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
