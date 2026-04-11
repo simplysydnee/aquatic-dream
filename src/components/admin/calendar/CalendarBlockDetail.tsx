@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { format } from "date-fns";
 import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import type { CalendarSwimSession, CalendarEnrollment, CalendarPoolEvent, Attend
 import type { ICSSession } from "./CalendarDayView";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import { Checkbox } from "@/components/ui/checkbox";
+import AddSwimmerDialog from "./AddSwimmerDialog";
 
 interface SwimBlockInfo {
   kind: "swim";
