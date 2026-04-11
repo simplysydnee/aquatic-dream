@@ -455,8 +455,13 @@ const SessionsAdmin = () => {
     return instructors.find(i => i.id === id)?.name || null;
   };
 
-  const totalClassCount = (timeSlots: TimeSlot[], levels: string[], days: string[]) =>
-    timeSlots.filter(ts => ts.start && ts.end).length * levels.length * days.length;
+  const computeClassCount = () => {
+    const validSlots = createForm.timeSlots.filter(ts => ts.start && ts.end).length;
+    const levels = createForm.swim_levels.length;
+    const dayCount = createForm.days.length;
+    if (createForm.frequency === "twice_weekly") return validSlots * levels; // days combined into one class
+    return validSlots * levels * dayCount;
+  };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
