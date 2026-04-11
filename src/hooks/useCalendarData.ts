@@ -47,6 +47,14 @@ export interface AttendanceRecord {
   checked_in_by: string | null;
 }
 
+export interface EnrollmentAgreement {
+  id: string;
+  enrollment_id: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relationship: string;
+}
+
 export interface ICSSession {
   id: string;
   start_time: string;
@@ -68,6 +76,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
   const [enrollments, setEnrollments] = useState<CalendarEnrollment[]>([]);
   const [poolEvents, setPoolEvents] = useState<CalendarPoolEvent[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [agreements, setAgreements] = useState<EnrollmentAgreement[]>([]);
   const [icsSessions, setIcsSessions] = useState<ICSSession[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -83,15 +92,14 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
       ? ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
       : [dayName];
 
-    const [sessionsRes, enrollmentsRes, eventsRes, attendanceRes] = await Promise.all([
+    const [sessionsRes, enrollmentsRes, eventsRes, attendanceRes, agreementsRes] = await Promise.all([
       supabase
         .from("swim_sessions")
         .select("id, swim_level, age_group, start_time, end_time, max_students, session_name, day_of_week")
-        .eq("is_active", true)
-        .in("day_of_week", daysNeeded),
+        .eq("is_active", true),
       supabase
         .from("swim_enrollments")
-        .select("id, child_name, child_age, parent_name, parent_phone, swim_level, session_id, status")
+        .select("id, child_name, child_age, parent_name, parent_phone, parent_email, swim_level, session_id, status")
         .in("status", ["pending", "confirmed"]),
       supabase
         .from("pool_events")
@@ -103,12 +111,16 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .select("*")
         .gte("lesson_date", view === "week" ? format(weekStart, "yyyy-MM-dd") : dateStr)
         .lte("lesson_date", view === "week" ? format(weekEnd, "yyyy-MM-dd") : dateStr),
+      supabase
+        .from("enrollment_agreements")
+        .select("id, enrollment_id, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship"),
     ]);
 
     if (sessionsRes.data) setSwimSessions(sessionsRes.data);
     if (enrollmentsRes.data) setEnrollments(enrollmentsRes.data);
     if (eventsRes.data) setPoolEvents(eventsRes.data);
     if (attendanceRes.data) setAttendance(attendanceRes.data);
+    if (agreementsRes.data) setAgreements(agreementsRes.data);
 
     // Show the calendar immediately — ICS data loads in the background
     setLoading(false);
@@ -130,5 +142,5 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  return { swimSessions, enrollments, poolEvents, attendance, icsSessions, loading, refetch: fetchData };
+  return { swimSessions, enrollments, poolEvents, attendance, agreements, icsSessions, loading, refetch: fetchData };
 }
