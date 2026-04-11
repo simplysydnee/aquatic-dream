@@ -43,7 +43,7 @@ const CalendarWeekView = ({ weekDates, currentDate, swimSessions, enrollments, p
       {weekDates.map((date) => {
         const dayName = format(date, "EEEE");
         const dateStr = format(date, "yyyy-MM-dd");
-        const daySessions = swimSessions.filter((s) => s.day_of_week === dayName);
+        const daySessions = swimSessions.filter((s) => s.day_of_week.toLowerCase().includes(dayName.toLowerCase()));
         const dayEvents = poolEvents.filter((e) => e.event_date === dateStr);
         const totalItems = daySessions.length + dayEvents.length;
 
