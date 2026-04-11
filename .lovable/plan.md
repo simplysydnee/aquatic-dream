@@ -1,60 +1,67 @@
 
 
-## Combined Plan: Fix Missing Levels + Class Dates System
+## Fix Class Structure: Correct Levels Per Time Slot + Update Group Names
 
-Two things to execute: (A) insert missing swim_session rows so every school-age time slot has yellow/blue/green, and (B) build the class dates system with manage-dates modal, parent-facing dates, and confirmation dates.
+### Problem
 
----
+The database currently has **5 levels at every school-age time slot** (white, red, yellow, blue, green) and uses group names like "Sea Scouts" for school-age white/red. The owner clarified:
 
-### Part A: Insert Missing Session Rows
+- **School-age slots should NOT have white or red levels** — only yellow + blue (or yellow + green for the last two evening slots)
+- Each level is its own independent class with **3 max capacity per level** (not shared across levels)
+- Preschool is correct: white + red at each slot
+- **Group names need updating** to match the owner's naming convention
 
-From the database audit, school-age time slots currently have:
-- **3:00–5:30 PM slots**: yellow + blue, but **no green**
-- **6:15+ PM slots**: yellow + green, but **no blue**
+### What's Changing
 
-**Action**: Insert ~16 missing `swim_sessions` rows (green for early slots, blue for late slots) across both Session 1 (Jun 6–29) and Session 2 (Jul 13–Aug) so every school-age slot has all three levels under Deep Sea Divers (yellow) + Ocean Masters (blue, green). No code changes needed for this part.
+**1. Database cleanup — delete wrong session rows**
+- Delete all school-age `white` and `red` session rows — roughly 28 rows
+- Delete school-age `green` sessions at the first 6 time slots (3:00, 3:30, 4:00, 4:30, 5:00, 5:45) — roughly 12 rows
+- Delete school-age `blue` sessions at the last 2 time slots (6:15, 6:45) — roughly 4 rows
+- Delete orphaned `session_lesson_dates` for removed sessions
 
----
+**2. Update types.ts — fix group names and remove school-age white/red**
 
-### Part B: Class Dates System
+Updated group name mapping:
 
-**Step 1 — Database migration**: Create `session_lesson_dates` table
+| Level | Old Name | Correct Name |
+|-------|----------|-------------|
+| White (preschool) | Bubble Makers | **Bubble Makers** (no change) |
+| Red (preschool) | Reef Explorers | **Reef Explorers** (no change) |
+| Yellow | Deep Sea Divers | **Sea Scouts** |
+| Blue | Ocean Masters | **Deep Sea Divers** |
+| Green | Ocean Masters | **Ocean Masters** (no change) |
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK, default gen_random_uuid() |
-| session_id | uuid | FK to swim_sessions ON DELETE CASCADE |
-| lesson_date | date | NOT NULL |
-| is_cancelled | boolean | DEFAULT false |
-| cancel_reason | text | nullable |
-| created_at | timestamptz | DEFAULT now() |
+- Update `LEVEL_DISPLAY` record: yellow groupName → "Sea Scouts", blue groupName → "Deep Sea Divers"
+- Update `getGroupName()` function: yellow → "Sea Scouts", blue → "Deep Sea Divers", green → "Ocean Masters"
+- Remove school-age white/red cases ("Sea Scouts" / "Surface Support" for those levels)
+- School-age levels are now only: yellow (Sea Scouts), blue (Deep Sea Divers), green (Ocean Masters)
 
-RLS: public SELECT, authenticated ALL.
+**3. Update SwimAssessment.tsx — fix school-age level recommendations**
+- If a school-age child (6-12) answers "no" to submerge or float, recommend **yellow** instead of white/red
+- Assessment tree for school-age: no submerge → yellow, no float → yellow, no tread → yellow, no side-roll → blue, yes all → green
 
-**Step 2 — SessionsAdmin.tsx changes**:
-- Rename `getLessonCount` to `getClassCount`, change label from "lessons" to "classes"
-- Add a "Manage Dates" button (calendar icon) on each session period header
-- New `ManageDatesModal` component:
-  - "Generate Dates" button auto-computes all Mon/Wed dates within the session date range and inserts them
-  - Shows a checklist of dates; each row has a cancel toggle + optional reason (e.g. "4th of July")
-  - Active date count displayed in the period header
+**4. Update SessionPicker.tsx — simplify slot grouping**
+- Remove the `levelCompatible` function that assumed preschool shares all levels
+- Group time slots properly: each slot shows available sessions for the child's recommended level
+- Capacity is per-level (3 per level), not shared across the whole time slot
 
-**Step 3 — SessionPicker.tsx**: After selecting a time slot, show the list of active (non-cancelled) class dates below the card (e.g. "Mon Jun 9, Wed Jun 11, ..."). Fetch from `session_lesson_dates` using the slot's session period dates.
+**5. SessionsAdmin.tsx + ClassRosterAdmin.tsx**
+- Both read dynamically from `swim_sessions` and use the shared types — should reflect DB and naming changes automatically
+- No code changes expected
 
-**Step 4 — EnrollmentConfirmation.tsx**: Fetch and display the active class dates for the enrolled session. Pass `sessionId` from `SwimEnrollment.tsx` to the confirmation component.
+### Files Affected
 
-**Step 5 — SwimEnrollment.tsx**: Pass `sessionId` state to `EnrollmentConfirmation`.
+| Action | File/Target |
+|--------|-------------|
+| DB delete | Remove ~44 incorrect `swim_sessions` rows + their `session_lesson_dates` |
+| Modify | `src/components/swim-enrollment/types.ts` — update group names, remove school-age white/red |
+| Modify | `src/components/swim-enrollment/SwimAssessment.tsx` — cap school-age minimum at yellow |
+| Modify | `src/components/swim-enrollment/SessionPicker.tsx` — simplify level filtering |
 
----
-
-### Files affected
-
-| Action | Target |
-|--------|--------|
-| DB insert | ~16 new `swim_sessions` rows (missing green/blue levels) |
-| DB migration | Create `session_lesson_dates` table with RLS |
-| Modify | `src/pages/admin/SessionsAdmin.tsx` — rename to "classes", add Manage Dates modal |
-| Modify | `src/components/swim-enrollment/SessionPicker.tsx` — show class dates |
-| Modify | `src/components/swim-enrollment/EnrollmentConfirmation.tsx` — list class dates |
-| Modify | `src/pages/SwimEnrollment.tsx` — pass sessionId to confirmation |
+### Expected Result
+- **Preschool slots**: 2:45, 3:15, 3:45, 4:15, 4:45, 5:30, 6:00, 6:30 — each with White (3) + Red (3)
+- **School-age slots**: 3:00, 3:30, 4:00, 4:30, 5:00, 5:45 — each with Yellow (3) + Blue (3)
+- **School-age evening**: 6:15, 6:45 — each with Yellow (3) + Green (3)
+- Group names everywhere: Bubble Makers, Reef Explorers, Sea Scouts, Deep Sea Divers, Ocean Masters
+- Admin sessions page, class roster, and enrollment booking all reflect this automatically
 
