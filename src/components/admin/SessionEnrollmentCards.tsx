@@ -62,7 +62,12 @@ export default function SessionEnrollmentCards({
   enrollments: Enrollment[];
   sessionPeriods: SessionPeriod[];
 }) {
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
+  const getDefaultPeriod = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const upcoming = sessionPeriods.find(p => p.start_date >= today);
+    return upcoming?.id || (sessionPeriods.length > 0 ? sessionPeriods[sessionPeriods.length - 1].id : "all");
+  };
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(getDefaultPeriod);
   const enrollmentsBySession: Record<string, Enrollment[]> = {};
   enrollments.forEach((e) => {
     if (e.session_id && e.status !== "cancelled") {
