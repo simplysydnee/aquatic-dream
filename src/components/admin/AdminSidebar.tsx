@@ -1,4 +1,4 @@
-import { Users, Waves, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Users, Waves, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText, PanelLeftClose, PanelLeft, UserCheck, Layers } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +20,8 @@ import {
 const items = [
   { title: "Calendar", url: "/admin", icon: CalendarDays },
   { title: "Class Roster", url: "/admin/roster", icon: ClipboardList },
+  { title: "Sessions", url: "/admin/sessions", icon: Layers },
+  { title: "Instructors", url: "/admin/instructors", icon: UserCheck },
   { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves },
   { title: "Lesson Requests", url: "/admin/lesson-requests", icon: BookOpen },
   { title: "Contact Inquiries", url: "/admin/contacts", icon: MessageSquare },
