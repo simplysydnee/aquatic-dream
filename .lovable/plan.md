@@ -1,70 +1,60 @@
 
 
-## Plan: Instructors Page, Session Management, and Roster Color-Coding
+## Combined Plan: Fix Missing Levels + Class Dates System
 
-Keep all existing swim sessions, groups, ages, and schedule data exactly as they are. Build new admin tools on top.
-
----
-
-### 1. Database migration
-
-- **Create `instructors` table**: `id` (uuid PK), `name` (text, required), `email` (text), `phone` (text), `is_active` (boolean, default true), `created_at`, `updated_at`
-- **Add columns to `swim_sessions`**: `instructor_id` (uuid, nullable FK to instructors), `registration_status` (text, default `'open'` — values: open, closed, archived)
-- RLS: public can SELECT instructors, authenticated can manage all
-
-### 2. Instructors admin page (`/admin/instructors`)
-
-- Table listing all instructors: name, email, phone, active status
-- "Add Instructor" dialog with name (required), email, phone
-- Edit and deactivate/reactivate actions per row
-- Add route in `App.tsx` and sidebar entry in `AdminSidebar.tsx`
-
-### 3. Session Management admin page (`/admin/sessions`)
-
-- List all sessions grouped by session name, showing time, level, age group, capacity, instructor, open/closed
-- **"Create Session" dialog** with:
-  - Session name, start/end dates
-  - Days of week (checkboxes)
-  - Start/end time, swim level, age group, max students
-  - Instructor (optional dropdown from instructors table)
-  - Status: Open / Closed
-- Edit session, toggle open/closed inline, duplicate session
-- Add route and sidebar entry
-
-### 4. Color-code the Class Roster page
-
-- **Level badges**: Use existing `LEVEL_BADGE_COLORS` — White=gray, Red=red, Yellow=yellow, Blue=blue, Green=green backgrounds
-- **Age group badges**: Preschool=purple tint, School-Age=teal tint
-- **Colored left border** on each session card matching the primary level color
-- **Instructor display**: Show assigned instructor name on card header
-- **Instructor assignment dropdown** per session card (updates `swim_sessions.instructor_id`)
-
-### 5. Enrollment flow update
-
-- `SessionPicker.tsx`: Also filter by `registration_status = 'open'` so closed sessions don't appear for booking
-
-### 6. Route cleanup
-
-- Remove unused `/admin/dive-bookings` and `/admin/trip-reservations` routes and imports from `App.tsx`
+Two things to execute: (A) insert missing swim_session rows so every school-age time slot has yellow/blue/green, and (B) build the class dates system with manage-dates modal, parent-facing dates, and confirmation dates.
 
 ---
 
-### What stays the same
+### Part A: Insert Missing Session Rows
 
-- All existing `swim_sessions` rows and their data (times, levels, age groups, capacities, dates)
-- Public `SwimLessons.tsx` schedule display (hardcoded slots match the DB)
-- Enrollment flow logic and assessment
-- Pricing ($30 group, $45 semi-private, $65 private, $45 registration fee)
+From the database audit, school-age time slots currently have:
+- **3:00–5:30 PM slots**: yellow + blue, but **no green**
+- **6:15+ PM slots**: yellow + green, but **no blue**
+
+**Action**: Insert ~16 missing `swim_sessions` rows (green for early slots, blue for late slots) across both Session 1 (Jun 6–29) and Session 2 (Jul 13–Aug) so every school-age slot has all three levels under Deep Sea Divers (yellow) + Ocean Masters (blue, green). No code changes needed for this part.
+
+---
+
+### Part B: Class Dates System
+
+**Step 1 — Database migration**: Create `session_lesson_dates` table
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK, default gen_random_uuid() |
+| session_id | uuid | FK to swim_sessions ON DELETE CASCADE |
+| lesson_date | date | NOT NULL |
+| is_cancelled | boolean | DEFAULT false |
+| cancel_reason | text | nullable |
+| created_at | timestamptz | DEFAULT now() |
+
+RLS: public SELECT, authenticated ALL.
+
+**Step 2 — SessionsAdmin.tsx changes**:
+- Rename `getLessonCount` to `getClassCount`, change label from "lessons" to "classes"
+- Add a "Manage Dates" button (calendar icon) on each session period header
+- New `ManageDatesModal` component:
+  - "Generate Dates" button auto-computes all Mon/Wed dates within the session date range and inserts them
+  - Shows a checklist of dates; each row has a cancel toggle + optional reason (e.g. "4th of July")
+  - Active date count displayed in the period header
+
+**Step 3 — SessionPicker.tsx**: After selecting a time slot, show the list of active (non-cancelled) class dates below the card (e.g. "Mon Jun 9, Wed Jun 11, ..."). Fetch from `session_lesson_dates` using the slot's session period dates.
+
+**Step 4 — EnrollmentConfirmation.tsx**: Fetch and display the active class dates for the enrolled session. Pass `sessionId` from `SwimEnrollment.tsx` to the confirmation component.
+
+**Step 5 — SwimEnrollment.tsx**: Pass `sessionId` state to `EnrollmentConfirmation`.
+
+---
 
 ### Files affected
 
-| Action | File |
-|--------|------|
-| Create | `src/pages/admin/InstructorsAdmin.tsx` |
-| Create | `src/pages/admin/SessionsAdmin.tsx` |
-| Modify | `src/App.tsx` — add 2 routes, remove 2 unused routes |
-| Modify | `src/components/admin/AdminSidebar.tsx` — add Instructors + Sessions links |
-| Modify | `src/pages/admin/ClassRosterAdmin.tsx` — color-coding + instructor display/assignment |
-| Modify | `src/components/swim-enrollment/SessionPicker.tsx` — filter by registration_status |
-| Migration | Create instructors table, add instructor_id + registration_status to swim_sessions |
+| Action | Target |
+|--------|--------|
+| DB insert | ~16 new `swim_sessions` rows (missing green/blue levels) |
+| DB migration | Create `session_lesson_dates` table with RLS |
+| Modify | `src/pages/admin/SessionsAdmin.tsx` — rename to "classes", add Manage Dates modal |
+| Modify | `src/components/swim-enrollment/SessionPicker.tsx` — show class dates |
+| Modify | `src/components/swim-enrollment/EnrollmentConfirmation.tsx` — list class dates |
+| Modify | `src/pages/SwimEnrollment.tsx` — pass sessionId to confirmation |
 
