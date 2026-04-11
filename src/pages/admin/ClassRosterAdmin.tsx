@@ -136,13 +136,33 @@ const ClassRosterAdmin = () => {
     return true;
   });
 
-  // Group by session_name + start_time + age_group (same time slot)
+  // Group by session_name + start_time + age_group + session_start_date (same time slot within same period)
   const grouped = filteredSessions.reduce<Record<string, Session[]>>((acc, s) => {
-    const key = `${s.session_name}|${s.start_time}|${s.age_group}`;
+    const key = `${s.session_name}|${s.start_time}|${s.age_group}|${s.session_start_date}`;
     if (!acc[key]) acc[key] = [];
     acc[key].push(s);
     return acc;
   }, {});
+
+  // Determine session period label from start date
+  const sessionPeriods = [...new Set(sessions.map(s => s.session_start_date).filter(Boolean))].sort();
+  const getSessionPeriodLabel = (startDate: string | null) => {
+    if (!startDate) return "Session";
+    const idx = sessionPeriods.indexOf(startDate);
+    return idx >= 0 ? `Session ${idx + 1}` : "Session";
+  };
+
+  // Sort grouped entries: session period first, then level order
+  const LEVEL_ORDER: Record<string, number> = { red: 0, white: 1, yellow: 2, blue: 3, green: 4 };
+  const sortedGroupEntries = Object.entries(grouped).sort(([, a], [, b]) => {
+    const aDate = a[0].session_start_date || "";
+    const bDate = b[0].session_start_date || "";
+    if (aDate !== bDate) return aDate.localeCompare(bDate);
+    const aLevel = Math.min(...a.map(s => LEVEL_ORDER[s.swim_level] ?? 99));
+    const bLevel = Math.min(...b.map(s => LEVEL_ORDER[s.swim_level] ?? 99));
+    if (aLevel !== bLevel) return aLevel - bLevel;
+    return a[0].start_time.localeCompare(b[0].start_time);
+  });
 
   const getEnrolledForSlot = (slotSessions: Session[]) => {
     const ids = new Set(slotSessions.map(s => s.id));
