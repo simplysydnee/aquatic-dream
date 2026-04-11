@@ -50,9 +50,11 @@ const DECISION_STEPS: DecisionStep[] = [
 ];
 
 function determineLevel(answers: Record<string, boolean>, age: number): SwimLevel {
-  const isSchoolAge = age >= 6;
-  if (!answers.canSubmerge) return isSchoolAge ? "yellow" : "white";
-  if (!answers.canFloat) return isSchoolAge ? "yellow" : "red";
+  const isPreschool = age <= 5;
+  // Preschool: White or Red only. School-age: Yellow, Blue, or Green only.
+  if (!answers.canSubmerge) return isPreschool ? "white" : "yellow";
+  if (!answers.canFloat) return isPreschool ? "red" : "yellow";
+  if (isPreschool) return "red"; // Preschool caps at Red
   if (!answers.canTreadWater) return "yellow";
   if (!answers.canSideRollSide) return "blue";
   return "green";
