@@ -35,6 +35,7 @@ interface Props {
   onClose: () => void;
   onEdit: () => void;
   onCheckIn?: (enrollmentId: string, sessionId: string, isCheckedIn: boolean) => void;
+  onRefetch?: () => void;
 }
 
 function getInitials(name: string) {
@@ -56,7 +57,7 @@ function fmtICSTime(iso: string) {
   });
 }
 
-const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
+const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: Props) => {
   const [showAddSwimmer, setShowAddSwimmer] = useState(false);
   if (!block) return null;
 
@@ -320,7 +321,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
                 sessionName={block.session.session_name || block.session.swim_level}
                 swimLevel={block.session.swim_level}
                 dateStr={block.dateStr}
-                onSaved={onCheckIn ? () => onCheckIn("", "", false) : () => {}}
+                onSaved={onRefetch || (() => {})}
               />
             )}
           </>
