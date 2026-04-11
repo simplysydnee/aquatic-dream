@@ -1,67 +1,63 @@
 
 
-## Fix Class Structure: Correct Levels Per Time Slot + Update Group Names
+## Fix Session Dates + Add Session Periods Table
 
-### Problem
+### Current State
 
-The database currently has **5 levels at every school-age time slot** (white, red, yellow, blue, green) and uses group names like "Sea Scouts" for school-age white/red. The owner clarified:
+The database has no dedicated "session periods" table. Session dates are stored directly on each `swim_sessions` row. Current values:
 
-- **School-age slots should NOT have white or red levels** — only yellow + blue (or yellow + green for the last two evening slots)
-- Each level is its own independent class with **3 max capacity per level** (not shared across levels)
-- Preschool is correct: white + red at each slot
-- **Group names need updating** to match the owner's naming convention
+| Age Group | Session 1 Dates | Session 2 Dates |
+|-----------|----------------|----------------|
+| School-age | Jun 6 – Jun 29 (WRONG) | Jul 13 – Aug 5 (WRONG) |
+| Preschool | Jun 8 – Jul 1 (correct) | Jul 13 – Aug 2 (correct) |
+
+**Correct dates per owner:**
+- Session 1: **June 8 – July 1** (both age groups)
+- Session 2: **July 13 – August 2** (both age groups)
 
 ### What's Changing
 
-**1. Database cleanup — delete wrong session rows**
-- Delete all school-age `white` and `red` session rows — roughly 28 rows
-- Delete school-age `green` sessions at the first 6 time slots (3:00, 3:30, 4:00, 4:30, 5:00, 5:45) — roughly 12 rows
-- Delete school-age `blue` sessions at the last 2 time slots (6:15, 6:45) — roughly 4 rows
-- Delete orphaned `session_lesson_dates` for removed sessions
+**1. Fix existing session dates (data update)**
+- Update all school-age Session 1 rows: `session_start_date` → `2025-06-08`, `session_end_date` → `2025-07-01`
+- Update all school-age Session 2 rows: `session_end_date` → `2025-08-02`
+- Regenerate `session_lesson_dates` for affected sessions if needed
 
-**2. Update types.ts — fix group names and remove school-age white/red**
+**2. Create a `session_periods` table (new table)**
+- Columns: `id`, `name` (e.g. "Session 1"), `start_date`, `end_date`, `is_active`, `created_at`
+- Seed with two rows: Session 1 (Jun 8 – Jul 1) and Session 2 (Jul 13 – Aug 2)
+- Add RLS: public can read, authenticated can manage
 
-Updated group name mapping:
+**3. Link `swim_sessions` to `session_periods`**
+- Add `session_period_id` column to `swim_sessions` (nullable UUID)
+- Backfill existing rows based on their `session_start_date`
+- The roster and booking pages will derive period labels from this relationship instead of guessing from dates
 
-| Level | Old Name | Correct Name |
-|-------|----------|-------------|
-| White (preschool) | Bubble Makers | **Bubble Makers** (no change) |
-| Red (preschool) | Reef Explorers | **Reef Explorers** (no change) |
-| Yellow | Deep Sea Divers | **Sea Scouts** |
-| Blue | Ocean Masters | **Deep Sea Divers** |
-| Green | Ocean Masters | **Ocean Masters** (no change) |
+**4. Build a simple "Manage Session Periods" UI in the admin**
+- Add a section (or separate admin page) where the owner can create/edit session periods (name, start date, end date)
+- When creating a new session period, the system can optionally bulk-create all the standard time slots automatically
 
-- Update `LEVEL_DISPLAY` record: yellow groupName → "Sea Scouts", blue groupName → "Deep Sea Divers"
-- Update `getGroupName()` function: yellow → "Sea Scouts", blue → "Deep Sea Divers", green → "Ocean Masters"
-- Remove school-age white/red cases ("Sea Scouts" / "Surface Support" for those levels)
-- School-age levels are now only: yellow (Sea Scouts), blue (Deep Sea Divers), green (Ocean Masters)
+**5. Update ClassRosterAdmin.tsx**
+- Use `session_period_id` to group cards by period instead of the tolerance-based date logic
+- Period label comes from the `session_periods` table name field
 
-**3. Update SwimAssessment.tsx — fix school-age level recommendations**
-- If a school-age child (6-12) answers "no" to submerge or float, recommend **yellow** instead of white/red
-- Assessment tree for school-age: no submerge → yellow, no float → yellow, no tread → yellow, no side-roll → blue, yes all → green
-
-**4. Update SessionPicker.tsx — simplify slot grouping**
-- Remove the `levelCompatible` function that assumed preschool shares all levels
-- Group time slots properly: each slot shows available sessions for the child's recommended level
-- Capacity is per-level (3 per level), not shared across the whole time slot
-
-**5. SessionsAdmin.tsx + ClassRosterAdmin.tsx**
-- Both read dynamically from `swim_sessions` and use the shared types — should reflect DB and naming changes automatically
-- No code changes expected
+**6. Update SessionPicker.tsx (booking)**
+- Filter available sessions by active session periods
+- Display period name to parents during enrollment
 
 ### Files Affected
 
-| Action | File/Target |
-|--------|-------------|
-| DB delete | Remove ~44 incorrect `swim_sessions` rows + their `session_lesson_dates` |
-| Modify | `src/components/swim-enrollment/types.ts` — update group names, remove school-age white/red |
-| Modify | `src/components/swim-enrollment/SwimAssessment.tsx` — cap school-age minimum at yellow |
-| Modify | `src/components/swim-enrollment/SessionPicker.tsx` — simplify level filtering |
+| Action | Target |
+|--------|--------|
+| DB migration | Create `session_periods` table, add `session_period_id` to `swim_sessions` |
+| DB data update | Fix school-age dates, backfill `session_period_id`, seed period rows |
+| Modify | `src/pages/admin/SessionsAdmin.tsx` — add period management UI |
+| Modify | `src/pages/admin/ClassRosterAdmin.tsx` — group by period via FK |
+| Modify | `src/components/swim-enrollment/SessionPicker.tsx` — filter by active period |
+| Update | `session_lesson_dates` — regenerate for corrected date ranges |
 
 ### Expected Result
-- **Preschool slots**: 2:45, 3:15, 3:45, 4:15, 4:45, 5:30, 6:00, 6:30 — each with White (3) + Red (3)
-- **School-age slots**: 3:00, 3:30, 4:00, 4:30, 5:00, 5:45 — each with Yellow (3) + Blue (3)
-- **School-age evening**: 6:15, 6:45 — each with Yellow (3) + Green (3)
-- Group names everywhere: Bubble Makers, Reef Explorers, Sea Scouts, Deep Sea Divers, Ocean Masters
-- Admin sessions page, class roster, and enrollment booking all reflect this automatically
+- Owner can create/edit session periods from the admin
+- All session rows link to a period, eliminating date-guessing bugs
+- Roster and booking dynamically reflect the correct period groupings
+- Session 1: June 8 – July 1, Session 2: July 13 – August 2
 
