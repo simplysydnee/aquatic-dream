@@ -145,6 +145,7 @@ const SessionsAdmin = () => {
     max_students: "3",
     days: [] as string[],
     instructor_id: "",
+    frequency: "weekly" as "weekly" | "twice_weekly",
   });
 
   const fetchData = async () => {
