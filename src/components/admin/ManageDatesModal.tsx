@@ -103,7 +103,7 @@ const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, se
 
     // Insert for each session_id at this slot
     for (const sid of sessionIds) {
-      const rows = monWed.map(d => ({ session_id: sid, lesson_date: d }));
+      const rows = lessonDates.map(d => ({ session_id: sid, lesson_date: d }));
       const { error } = await supabase
         .from("session_lesson_dates")
         .upsert(rows, { onConflict: "session_id,lesson_date" });
@@ -116,7 +116,7 @@ const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, se
       }
     }
 
-    toast({ title: `${monWed.length} class dates generated` });
+    toast({ title: `${lessonDates.length} class dates generated` });
     setGenerating(false);
     fetchDates();
   };
