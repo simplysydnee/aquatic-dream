@@ -293,10 +293,10 @@ const SessionsAdmin = () => {
 
               <div>
                 <Label>Instructor</Label>
-                <Select value={form.instructor_id} onValueChange={v => setForm(f => ({ ...f, instructor_id: v }))}>
+                <Select value={form.instructor_id || "none"} onValueChange={v => setForm(f => ({ ...f, instructor_id: v === "none" ? "" : v }))}>
                   <SelectTrigger><SelectValue placeholder="None (assign later)" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {instructors.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
