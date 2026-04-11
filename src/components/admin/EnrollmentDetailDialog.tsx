@@ -26,6 +26,11 @@ interface Enrollment {
   notes: string | null;
   created_at: string;
   session_id: string | null;
+  payment_status: string;
+  payment_amount: number | null;
+  stripe_payment_id: string | null;
+  is_first_time: boolean;
+  payment_due_date: string | null;
 }
 
 interface Agreement {
@@ -165,12 +170,42 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                       <Select value={form.status} onValueChange={(v) => update("status", v)}>
                         <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="confirmed">Confirmed</SelectItem>
+                          <SelectItem value="enrolled">Enrolled</SelectItem>
                           <SelectItem value="cancelled">Cancelled</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Payment Info */}
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3">Payment</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-md border">
+                      <p className="text-[11px] text-muted-foreground">Status</p>
+                      <p className="text-sm font-medium capitalize">{form.payment_status}</p>
+                    </div>
+                    <div className="p-3 rounded-md border">
+                      <p className="text-[11px] text-muted-foreground">Amount Due</p>
+                      <p className="text-sm font-medium">{form.payment_amount ? `$${form.payment_amount}` : "—"}</p>
+                    </div>
+                    <div className="p-3 rounded-md border">
+                      <p className="text-[11px] text-muted-foreground">First-Time Swimmer</p>
+                      <p className="text-sm font-medium">{form.is_first_time ? "Yes" : "No (returning)"}</p>
+                    </div>
+                    <div className="p-3 rounded-md border">
+                      <p className="text-[11px] text-muted-foreground">Payment Due Date</p>
+                      <p className="text-sm font-medium">{form.payment_due_date ? new Date(form.payment_due_date + "T00:00:00").toLocaleDateString() : "—"}</p>
+                    </div>
+                    {form.stripe_payment_id && (
+                      <div className="col-span-2 p-3 rounded-md border">
+                        <p className="text-[11px] text-muted-foreground">Stripe Reference</p>
+                        <p className="text-sm font-mono">{form.stripe_payment_id}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

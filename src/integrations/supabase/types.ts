@@ -551,14 +551,20 @@ export type Database = {
           child_name: string
           created_at: string
           id: string
+          is_first_time: boolean
           lesson_type: string
           notes: string | null
           parent_email: string
           parent_name: string
           parent_phone: string | null
+          payment_amount: number | null
+          payment_due_date: string | null
+          payment_reminder_sent_at: string | null
+          payment_status: string
           registration_fee: number | null
           session_id: string | null
           status: string
+          stripe_payment_id: string | null
           swim_level: string
           updated_at: string
         }
@@ -567,14 +573,20 @@ export type Database = {
           child_name: string
           created_at?: string
           id?: string
+          is_first_time?: boolean
           lesson_type?: string
           notes?: string | null
           parent_email: string
           parent_name: string
           parent_phone?: string | null
+          payment_amount?: number | null
+          payment_due_date?: string | null
+          payment_reminder_sent_at?: string | null
+          payment_status?: string
           registration_fee?: number | null
           session_id?: string | null
           status?: string
+          stripe_payment_id?: string | null
           swim_level: string
           updated_at?: string
         }
@@ -583,14 +595,20 @@ export type Database = {
           child_name?: string
           created_at?: string
           id?: string
+          is_first_time?: boolean
           lesson_type?: string
           notes?: string | null
           parent_email?: string
           parent_name?: string
           parent_phone?: string | null
+          payment_amount?: number | null
+          payment_due_date?: string | null
+          payment_reminder_sent_at?: string | null
+          payment_status?: string
           registration_fee?: number | null
           session_id?: string | null
           status?: string
+          stripe_payment_id?: string | null
           swim_level?: string
           updated_at?: string
         }

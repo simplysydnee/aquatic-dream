@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle, ArrowRight, Calendar, Loader2 } from "lucide-react";
+import { CheckCircle, ArrowRight, Calendar, Loader2, DollarSign } from "lucide-react";
 import { Link } from "react-router-dom";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getAgeGroup } from "./types";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,8 @@ interface Props {
   childName: string;
   childAge: number;
   sessionId?: string | null;
+  isFirstTime?: boolean;
+  totalDue?: number;
 }
 
 function formatClassDate(d: string) {
@@ -19,7 +21,7 @@ function formatClassDate(d: string) {
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
-const EnrollmentConfirmation = ({ level, childName, childAge, sessionId }: Props) => {
+const EnrollmentConfirmation = ({ level, childName, childAge, sessionId, isFirstTime = true, totalDue = 0 }: Props) => {
   const levelInfo = LEVEL_DISPLAY[level];
   const badge = LEVEL_BADGE_COLORS[level];
   const ageGroup = getAgeGroup(childAge);
@@ -43,6 +45,8 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionId }: Props
     fetchDates();
   }, [sessionId]);
 
+  const firstClassDate = classDates.length > 0 ? formatClassDate(classDates[0]) : "your first class";
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -61,12 +65,30 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionId }: Props
               {groupName}
             </span>
           </p>
-          <p className="text-sm text-muted-foreground mb-1">
-            ${PRICING.group}/lesson (group) · Mon & Wed
-          </p>
-          <p className="text-sm text-muted-foreground mb-2">
-            + ${PRICING.registrationFee} registration fee (swim bag, cap & goggles)
-          </p>
+
+          {/* Payment Due Info */}
+          <div className="my-4 p-3 rounded-lg border border-yellow-300 bg-yellow-50 text-left">
+            <p className="text-sm font-semibold text-yellow-800 flex items-center gap-1.5 mb-1">
+              <DollarSign className="w-4 h-4" />
+              Payment Due {isFirstTime ? `on ${firstClassDate}` : "Now"}
+            </p>
+            <div className="text-sm text-yellow-700 space-y-0.5">
+              {isFirstTime && (
+                <p>Registration fee: <strong>${PRICING.registrationFee}</strong> <span className="text-xs">(swim bag, cap & goggles)</span></p>
+              )}
+              <p>Session fee: <strong>${totalDue - (isFirstTime ? PRICING.registrationFee : 0)}</strong></p>
+              <p className="font-semibold border-t border-yellow-200 pt-1 mt-1">Total: ${totalDue}</p>
+            </div>
+            {isFirstTime ? (
+              <p className="text-xs text-yellow-600 mt-2">
+                You'll receive a payment link by email the day before your first class.
+              </p>
+            ) : (
+              <p className="text-xs text-yellow-600 mt-2">
+                A payment link will be sent to your email shortly.
+              </p>
+            )}
+          </div>
 
           {/* Class dates */}
           {loadingDates && (
