@@ -7,7 +7,7 @@ import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
 import { SwimLevel, LEVEL_DISPLAY, LEVEL_BADGE_COLORS, getGroupName, getDiveStatus, getAgeGroup } from "./types";
 
 interface Props {
-  onComplete: (level: SwimLevel, age: number) => void;
+  onComplete: (level: SwimLevel, age: number, dob: string) => void;
 }
 
 interface DecisionStep {
@@ -60,8 +60,18 @@ function determineLevel(answers: Record<string, boolean>, age: number): SwimLeve
   return "green";
 }
 
+const calculateAge = (dob: string): number => {
+  const birthDate = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+  return age;
+};
+
 const SwimAssessment = ({ onComplete }: Props) => {
   const [phase, setPhase] = useState<"age" | "questions" | "result">("age");
+  const [dob, setDob] = useState("");
   const [age, setAge] = useState<number | undefined>();
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
@@ -70,8 +80,18 @@ const SwimAssessment = ({ onComplete }: Props) => {
   // Preschool (3-5) only gets White or Red questions
   const maxQuestionIndex = age && age <= 5 ? 1 : DECISION_STEPS.length - 1;
 
+  const handleDobChange = (value: string) => {
+    setDob(value);
+    if (value) {
+      const calculated = calculateAge(value);
+      setAge(calculated);
+    } else {
+      setAge(undefined);
+    }
+  };
+
   const handleAgeNext = () => {
-    if (!age || age < 3 || age > 12) return;
+    if (!age || age < 3 || age > 12 || !dob) return;
     setPhase("questions");
     setQuestionIndex(0);
     setAnswers({});
@@ -141,6 +161,7 @@ const SwimAssessment = ({ onComplete }: Props) => {
                 variant="outline"
                 onClick={() => {
                   setPhase("age");
+                  setDob("");
                   setAge(undefined);
                   setAnswers({});
                   setQuestionIndex(0);
@@ -151,7 +172,7 @@ const SwimAssessment = ({ onComplete }: Props) => {
               </Button>
               <Button
                 className="bg-coral hover:bg-coral/90 text-coral-foreground"
-                onClick={() => onComplete(recommendedLevel, age!)}
+                onClick={() => onComplete(recommendedLevel, age!, dob)}
               >
                 Continue to Sessions <ChevronRight className="ml-1 w-4 h-4" />
               </Button>
@@ -185,26 +206,30 @@ const SwimAssessment = ({ onComplete }: Props) => {
             transition={{ duration: 0.2 }}
           >
             <h3 className="font-display text-2xl font-bold text-foreground mb-1">
-              How old is your child?
+              What is your child's date of birth?
             </h3>
             <p className="text-muted-foreground text-sm mb-6">
-              This helps us find the right group
+              This helps us find the right group (ages 3–12)
             </p>
-            <div className="max-w-[200px]">
+            <div className="max-w-[240px]">
               <Input
-                type="number"
-                min={3}
-                max={12}
-                placeholder="Age"
-                value={age ?? ""}
-                onChange={(e) => setAge(parseInt(e.target.value) || undefined)}
+                type="date"
+                value={dob}
+                onChange={(e) => handleDobChange(e.target.value)}
                 className="text-lg h-12"
               />
-              <p className="text-xs text-muted-foreground mt-2">Ages 3–12</p>
+              {dob && age !== undefined && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Age: <strong>{age}</strong> years old
+                  {(age < 3 || age > 12) && (
+                    <span className="text-destructive ml-1">(must be 3–12)</span>
+                  )}
+                </p>
+              )}
             </div>
             <div className="flex justify-end mt-8">
               <Button
-                disabled={!age || age < 3 || age > 12}
+                disabled={!age || age < 3 || age > 12 || !dob}
                 onClick={handleAgeNext}
                 className="bg-primary text-primary-foreground"
               >
