@@ -249,8 +249,6 @@ const SessionsAdmin = () => {
   const COMBINED_GROUPS: Record<string, string> = {
     "Bubble Makers": "Bubble Makers / Reef Explorers",
     "Reef Explorers": "Bubble Makers / Reef Explorers",
-    "Deep Sea Divers": "Deep Sea Divers / Ocean Masters",
-    "Ocean Masters": "Deep Sea Divers / Ocean Masters",
   };
   const getDisplayGroup = (name: string) => COMBINED_GROUPS[name] || name;
 
