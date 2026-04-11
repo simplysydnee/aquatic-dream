@@ -19,6 +19,7 @@ export interface CalendarEnrollment {
   child_age: number;
   parent_name: string;
   parent_phone: string | null;
+  parent_email: string;
   swim_level: string;
   session_id: string | null;
   status: string;
