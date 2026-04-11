@@ -8,14 +8,14 @@ import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, 
 
 interface SlotInfo {
   assignSessionId: string;
-  session_name: string;
-  session_start_date: string;
-  session_end_date: string;
+  periodName: string;
   start_time: string;
   end_time: string;
   max_students: number;
   total_enrolled: number;
   spots_left: number;
+  session_start_date: string;
+  session_end_date: string;
 }
 
 interface Props {
@@ -58,39 +58,37 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   useEffect(() => {
     async function fetchSessions() {
       setLoading(true);
-      const { data: allSessions, error } = await supabase
-        .from("swim_sessions")
-        .select("*")
-        .eq("age_group", ageGroup)
-        .eq("is_active", true)
-        .eq("registration_status", "open");
 
-      if (error || !allSessions || allSessions.length === 0) {
+      // Fetch active session periods and matching sessions in parallel
+      const [periodsRes, sessionsRes] = await Promise.all([
+        supabase.from("session_periods").select("*").eq("is_active", true).order("start_date"),
+        supabase.from("swim_sessions").select("*")
+          .eq("age_group", ageGroup)
+          .eq("swim_level", level)
+          .eq("is_active", true)
+          .eq("registration_status", "open"),
+      ]);
+
+      const periods = periodsRes.data || [];
+      const sessions = sessionsRes.data || [];
+
+      if (sessions.length === 0) {
         setSlots([]);
         setLoading(false);
         return;
       }
 
-      const levelCompatible = (swimLevel: string) => swimLevel === level;
+      // Only show sessions linked to active periods
+      const activePeriodIds = new Set(periods.map(p => p.id));
+      const activeSessions = sessions.filter(s => s.session_period_id && activePeriodIds.has(s.session_period_id));
 
-      const slotGroups: Record<string, typeof allSessions> = {};
-      for (const s of allSessions) {
-        const key = `${s.session_name}|${s.start_time}`;
-        if (!slotGroups[key]) slotGroups[key] = [];
-        slotGroups[key].push(s);
-      }
-
-      const relevantSlots = Object.entries(slotGroups).filter(([, group]) =>
-        group.some(s => levelCompatible(s.swim_level))
-      );
-
-      if (relevantSlots.length === 0) {
+      if (activeSessions.length === 0) {
         setSlots([]);
         setLoading(false);
         return;
       }
 
-      const allIds = allSessions.map(s => s.id);
+      const allIds = activeSessions.map(s => s.id);
       const { data: enrollments } = await supabase
         .from("swim_enrollments")
         .select("session_id")
@@ -102,26 +100,26 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
       });
 
-      const result: SlotInfo[] = relevantSlots.map(([, group]) => {
-        const matchingSession = group.find(s => s.swim_level === level) || group[0];
-        const totalEnrolled = countMap[matchingSession.id] || 0;
-        const capacity = matchingSession.max_students;
+      const periodMap = Object.fromEntries(periods.map(p => [p.id, p]));
 
+      const result: SlotInfo[] = activeSessions.map(s => {
+        const totalEnrolled = countMap[s.id] || 0;
+        const period = periodMap[s.session_period_id!];
         return {
-          assignSessionId: matchingSession.id,
-          session_name: matchingSession.session_name || "Session",
-          session_start_date: matchingSession.session_start_date || "",
-          session_end_date: matchingSession.session_end_date || "",
-          start_time: matchingSession.start_time,
-          end_time: matchingSession.end_time,
-          max_students: capacity,
+          assignSessionId: s.id,
+          periodName: period?.name || "Session",
+          start_time: s.start_time,
+          end_time: s.end_time,
+          max_students: s.max_students,
           total_enrolled: totalEnrolled,
-          spots_left: capacity - totalEnrolled,
+          spots_left: s.max_students - totalEnrolled,
+          session_start_date: s.session_start_date || "",
+          session_end_date: s.session_end_date || "",
         };
       });
 
       result.sort((a, b) => {
-        if (a.session_name !== b.session_name) return a.session_name.localeCompare(b.session_name);
+        if (a.periodName !== b.periodName) return a.periodName.localeCompare(b.periodName);
         return a.start_time.localeCompare(b.start_time);
       });
 
@@ -133,10 +131,7 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
 
   // Fetch class dates when a slot is selected
   useEffect(() => {
-    if (!selectedId) {
-      setClassDates([]);
-      return;
-    }
+    if (!selectedId) { setClassDates([]); return; }
     async function fetchDates() {
       setLoadingDates(true);
       const { data } = await supabase
@@ -151,8 +146,9 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
     fetchDates();
   }, [selectedId]);
 
+  // Group by period
   const grouped = slots.reduce<Record<string, SlotInfo[]>>((acc, s) => {
-    const key = `${s.session_name}|${s.session_start_date}|${s.session_end_date}`;
+    const key = `${s.periodName}|${s.session_start_date}|${s.session_end_date}`;
     if (!acc[key]) acc[key] = [];
     acc[key].push(s);
     return acc;
@@ -250,7 +246,6 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         </div>
       )}
 
-      {/* Show class dates for selected slot */}
       {selectedId && classDates.length > 0 && (
         <div className="mt-4 p-4 rounded-xl border border-primary/20 bg-accent/30">
           <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-1.5">

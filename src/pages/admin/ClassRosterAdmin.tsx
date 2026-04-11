@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel, getGroupName, getAgeGroup, AGE_GROUP_LABELS } from "@/components/swim-enrollment/types";
+import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
 import { Users, Plus, ArrowRightLeft, Loader2, Calendar, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -27,6 +27,14 @@ interface Session {
   is_active: boolean;
   instructor_id: string | null;
   registration_status: string;
+  session_period_id: string | null;
+}
+
+interface SessionPeriod {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
 }
 
 interface Enrollment {
@@ -66,15 +74,9 @@ function formatDateRange(start: string | null, end: string | null) {
 
 function formatDayOfWeek(dow: string) {
   const map: Record<string, string> = {
-    monday: "Monday",
-    tuesday: "Tuesday",
-    wednesday: "Wednesday",
-    thursday: "Thursday",
-    friday: "Friday",
-    saturday: "Saturday",
-    sunday: "Sunday",
-    monday_wednesday: "Mon & Wed",
-    tuesday_thursday: "Tue & Thu",
+    monday: "Monday", tuesday: "Tuesday", wednesday: "Wednesday",
+    thursday: "Thursday", friday: "Friday", saturday: "Saturday",
+    sunday: "Sunday", monday_wednesday: "Mon & Wed", tuesday_thursday: "Tue & Thu",
   };
   return map[dow] || dow;
 }
@@ -89,10 +91,11 @@ const LEVEL_BORDER_COLORS: Record<string, string> = {
 
 const ClassRosterAdmin = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [periods, setPeriods] = useState<SessionPeriod[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterSession, setFilterSession] = useState<string>("all");
+  const [filterPeriod, setFilterPeriod] = useState<string>("all");
   const [filterAgeGroup, setFilterAgeGroup] = useState<string>("all");
   const [filterLevel, setFilterLevel] = useState<string>("all");
   const [filterInstructor, setFilterInstructor] = useState<string>("all");
@@ -107,25 +110,26 @@ const ClassRosterAdmin = () => {
   });
 
   const fetchData = async () => {
-    const [sessRes, enrRes, instrRes] = await Promise.all([
+    const [sessRes, enrRes, instrRes, periodRes] = await Promise.all([
       supabase.from("swim_sessions").select("*").eq("is_active", true).order("start_time"),
       supabase.from("swim_enrollments").select("*").in("status", ["pending", "confirmed"]),
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("session_periods").select("*").order("start_date"),
     ]);
-    if (sessRes.data) setSessions(sessRes.data);
+    if (sessRes.data) setSessions(sessRes.data as Session[]);
     if (enrRes.data) setEnrollments(enrRes.data);
     if (instrRes.data) setInstructors(instrRes.data);
+    if (periodRes.data) setPeriods(periodRes.data);
     setLoading(false);
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  const sessionNames = [...new Set(sessions.map(s => s.session_name).filter(Boolean))];
   const uniqueTimes = [...new Set(sessions.map(s => s.start_time))].sort();
 
   // Apply filters
   const filteredSessions = sessions.filter(s => {
-    if (filterSession !== "all" && s.session_name !== filterSession) return false;
+    if (filterPeriod !== "all" && s.session_period_id !== filterPeriod) return false;
     if (filterAgeGroup !== "all" && s.age_group !== filterAgeGroup) return false;
     if (filterLevel !== "all" && s.swim_level !== filterLevel) return false;
     if (filterInstructor !== "all") {
@@ -136,28 +140,25 @@ const ClassRosterAdmin = () => {
     return true;
   });
 
-  // Group by session_name + start_time + age_group + session_start_date (same time slot within same period)
+  // Group by session_name + start_time + age_group + session_period_id
   const grouped = filteredSessions.reduce<Record<string, Session[]>>((acc, s) => {
-    const key = `${s.session_name}|${s.start_time}|${s.age_group}|${s.session_start_date}`;
+    const key = `${s.session_name}|${s.start_time}|${s.age_group}|${s.session_period_id}`;
     if (!acc[key]) acc[key] = [];
     acc[key].push(s);
     return acc;
   }, {});
 
-  // Determine session period label from start date
-  const sessionPeriods = [...new Set(sessions.map(s => s.session_start_date).filter(Boolean))].sort();
-  const getSessionPeriodLabel = (startDate: string | null) => {
-    if (!startDate) return "Session";
-    const idx = sessionPeriods.indexOf(startDate);
-    return idx >= 0 ? `Session ${idx + 1}` : "Session";
+  const getPeriodName = (periodId: string | null) => {
+    if (!periodId) return "Unlinked";
+    return periods.find(p => p.id === periodId)?.name || "Unknown";
   };
 
-  // Sort grouped entries: session period first, then level order
+  // Sort: period first, then level order, then time
   const LEVEL_ORDER: Record<string, number> = { red: 0, white: 1, yellow: 2, blue: 3, green: 4 };
   const sortedGroupEntries = Object.entries(grouped).sort(([, a], [, b]) => {
-    const aDate = a[0].session_start_date || "";
-    const bDate = b[0].session_start_date || "";
-    if (aDate !== bDate) return aDate.localeCompare(bDate);
+    const aPeriod = periods.find(p => p.id === a[0].session_period_id)?.start_date || "9999";
+    const bPeriod = periods.find(p => p.id === b[0].session_period_id)?.start_date || "9999";
+    if (aPeriod !== bPeriod) return aPeriod.localeCompare(bPeriod);
     const aLevel = Math.min(...a.map(s => LEVEL_ORDER[s.swim_level] ?? 99));
     const bLevel = Math.min(...b.map(s => LEVEL_ORDER[s.swim_level] ?? 99));
     if (aLevel !== bLevel) return aLevel - bLevel;
@@ -169,16 +170,12 @@ const ClassRosterAdmin = () => {
     return enrollments.filter(e => e.session_id && ids.has(e.session_id));
   };
 
-  const getSessionEnrollments = (sessionId: string) =>
-    enrollments.filter(e => e.session_id === sessionId);
-
   const getInstructorName = (id: string | null) => {
     if (!id) return null;
     return instructors.find(i => i.id === id)?.name || null;
   };
 
   const assignInstructor = async (sessionIds: string[], instructorId: string) => {
-    // Assign to all sessions in the slot at once
     const { error } = await supabase
       .from("swim_sessions")
       .update({ instructor_id: instructorId || null })
@@ -264,7 +261,7 @@ const ClassRosterAdmin = () => {
                   <SelectContent>
                     {sessions.map(s => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.session_name} · {formatTime(s.start_time)} · {LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level} · {s.age_group === "preschool-3-5" ? "Pre" : "SA"}
+                        {getPeriodName(s.session_period_id)} · {s.session_name} · {formatTime(s.start_time)} · {LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -279,11 +276,11 @@ const ClassRosterAdmin = () => {
 
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Select value={filterSession} onValueChange={setFilterSession}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Session" /></SelectTrigger>
+        <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Period" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Sessions</SelectItem>
-            {sessionNames.map(n => <SelectItem key={n!} value={n!}>{n}</SelectItem>)}
+            <SelectItem value="all">All Periods</SelectItem>
+            {periods.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterAgeGroup} onValueChange={setFilterAgeGroup}>
@@ -328,19 +325,16 @@ const ClassRosterAdmin = () => {
         const ageGroup = first.age_group || "";
         const dayOfWeek = first.day_of_week;
         const dateRange = formatDateRange(first.session_start_date, first.session_end_date);
-        const periodLabel = getSessionPeriodLabel(first.session_start_date);
+        const periodLabel = getPeriodName(first.session_period_id);
 
-        // Capacity is per time slot (3 total), NOT summed across levels
         const slotCapacity = first.max_students;
         const slotEnrollments = getEnrolledForSlot(slotSessions);
         const totalEnrolled = slotEnrollments.length;
 
-        // Levels present in this slot
         const levels = [...new Set(slotSessions.map(s => s.swim_level))];
         const primaryLevel = levels[0] || "white";
         const borderColor = LEVEL_BORDER_COLORS[primaryLevel] || "border-l-gray-300";
 
-        // Instructor (use first session — all in same slot should share)
         const instrId = first.instructor_id;
         const instrName = getInstructorName(instrId);
 
@@ -388,7 +382,6 @@ const ClassRosterAdmin = () => {
                   </div>
                 </div>
               </div>
-              {/* Day of week & date range */}
               <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
@@ -473,7 +466,7 @@ const ClassRosterAdmin = () => {
               <SelectContent>
                 {sessions.filter(s => s.id !== movingEnrollment?.session_id).map(s => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.session_name} · {formatTime(s.start_time)} · {LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level}
+                    {getPeriodName(s.session_period_id)} · {s.session_name} · {formatTime(s.start_time)} · {LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level}
                   </SelectItem>
                 ))}
               </SelectContent>
