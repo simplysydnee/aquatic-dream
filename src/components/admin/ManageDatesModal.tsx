@@ -22,16 +22,31 @@ interface Props {
   sessionStartDate: string;
   sessionEndDate: string;
   sessionLabel: string;
+  /** e.g. "monday_wednesday", "tuesday_thursday", "saturday" */
+  daysOfWeek: string;
 }
 
-function generateMonWedDates(start: string, end: string): string[] {
+const DAY_NAME_TO_NUM: Record<string, number> = {
+  sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+  thursday: 4, friday: 5, saturday: 6,
+};
+
+function parseDaysOfWeek(daysOfWeek: string): number[] {
+  return daysOfWeek
+    .split("_")
+    .map(d => DAY_NAME_TO_NUM[d.toLowerCase()])
+    .filter(n => n !== undefined);
+}
+
+function generateLessonDates(start: string, end: string, daysOfWeek: string): string[] {
+  const allowedDays = parseDaysOfWeek(daysOfWeek);
+  if (allowedDays.length === 0) return [];
   const dates: string[] = [];
   const s = new Date(start + "T00:00:00");
   const e = new Date(end + "T00:00:00");
   const cur = new Date(s);
   while (cur <= e) {
-    const dow = cur.getDay(); // 0=Sun, 1=Mon, 3=Wed
-    if (dow === 1 || dow === 3) {
+    if (allowedDays.includes(cur.getDay())) {
       dates.push(cur.toISOString().slice(0, 10));
     }
     cur.setDate(cur.getDate() + 1);
@@ -44,7 +59,7 @@ function formatDate(d: string) {
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
-const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, sessionEndDate, sessionLabel }: Props) => {
+const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, sessionEndDate, sessionLabel, daysOfWeek }: Props) => {
   const [dates, setDates] = useState<LessonDate[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -78,17 +93,17 @@ const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, se
       return;
     }
     setGenerating(true);
-    const monWed = generateMonWedDates(sessionStartDate, sessionEndDate);
+    const lessonDates = generateLessonDates(sessionStartDate, sessionEndDate, daysOfWeek);
     
-    if (monWed.length === 0) {
-      toast({ title: "No Mon/Wed dates found in range", variant: "destructive" });
+    if (lessonDates.length === 0) {
+      toast({ title: "No class dates found in range", variant: "destructive" });
       setGenerating(false);
       return;
     }
 
     // Insert for each session_id at this slot
     for (const sid of sessionIds) {
-      const rows = monWed.map(d => ({ session_id: sid, lesson_date: d }));
+      const rows = lessonDates.map(d => ({ session_id: sid, lesson_date: d }));
       const { error } = await supabase
         .from("session_lesson_dates")
         .upsert(rows, { onConflict: "session_id,lesson_date" });
@@ -101,7 +116,7 @@ const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, se
       }
     }
 
-    toast({ title: `${monWed.length} class dates generated` });
+    toast({ title: `${lessonDates.length} class dates generated` });
     setGenerating(false);
     fetchDates();
   };
@@ -154,7 +169,7 @@ const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, se
             <p className="text-sm text-muted-foreground">No class dates generated yet.</p>
             <Button onClick={handleGenerate} disabled={generating}>
               {generating && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
-              Generate Mon/Wed Dates
+              Generate Class Dates
             </Button>
           </div>
         ) : (
