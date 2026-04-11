@@ -68,6 +68,7 @@ const SwimEnrollmentsAdmin = () => {
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [sessionFilter, setSessionFilter] = useState<string>("all");
   const [periodFilter, setPeriodFilter] = useState<string>("all");
+  const [ageFilter, setAgeFilter] = useState<string>("all");
 
   const fetchData = async () => {
     const [enrollRes, sessionRes, periodRes] = await Promise.all([
@@ -123,7 +124,8 @@ const SwimEnrollmentsAdmin = () => {
     const matchPayment = paymentFilter === "all" || e.payment_status === paymentFilter;
     const matchSession = sessionFilter === "all" || e.session_id === sessionFilter;
     const matchPeriod = periodFilter === "all" || (e.session_id && sessions[e.session_id]?.session_period_id === periodFilter);
-    return matchSearch && matchPayment && matchSession && matchPeriod;
+    const matchAge = ageFilter === "all" || (e.session_id && sessions[e.session_id]?.age_group === ageFilter);
+    return matchSearch && matchPayment && matchSession && matchPeriod && matchAge;
   });
 
   const unpaidCount = enrollments.filter((e) => e.payment_status === "unpaid" && e.status === "enrolled").length;
@@ -200,13 +202,23 @@ const SwimEnrollmentsAdmin = () => {
             </Select>
             <Select value={periodFilter} onValueChange={setPeriodFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All Periods" />
+                <SelectValue placeholder="All Sessions" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Periods</SelectItem>
+                <SelectItem value="all">All Sessions</SelectItem>
                 {sessionPeriods.map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Select value={ageFilter} onValueChange={setAgeFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Ages" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Ages</SelectItem>
+                <SelectItem value="preschool-3-5">Preschool (3–5)</SelectItem>
+                <SelectItem value="school-age-6-12">School Age (6–12)</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sessionFilter} onValueChange={setSessionFilter}>
@@ -217,6 +229,7 @@ const SwimEnrollmentsAdmin = () => {
                 <SelectItem value="all">All Classes</SelectItem>
                 {sessionOptions
                   .filter(s => periodFilter === "all" || sessions[s.id]?.session_period_id === periodFilter)
+                  .filter(s => ageFilter === "all" || sessions[s.id]?.age_group === ageFilter)
                   .map((s) => (
                   <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
                 ))}
