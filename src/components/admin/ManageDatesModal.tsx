@@ -169,7 +169,7 @@ const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, se
             <p className="text-sm text-muted-foreground">No class dates generated yet.</p>
             <Button onClick={handleGenerate} disabled={generating}>
               {generating && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
-              Generate Mon/Wed Dates
+              Generate Class Dates
             </Button>
           </div>
         ) : (
