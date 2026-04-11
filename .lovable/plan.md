@@ -1,39 +1,31 @@
 
 
-## Add Weekly Frequency Option to Class Creation
+## Add Session-Based View to Enrollments Admin
 
-### Current Behavior
-When you select multiple days (e.g., Monday + Wednesday) in the Create Classes wizard, it already creates **separate class records** per day. However, the existing sessions use combined `day_of_week` values like `"monday_wednesday"` which means one class meets twice per week.
-
-### What Changes
-
-Add a **Frequency** toggle to the Create Classes dialog:
-
-| Frequency | Example: Tue + Thu selected | `day_of_week` stored | Class dates generated |
-|---|---|---|---|
-| **2x/week** (current default) | 1 class per level, meets Tue AND Thu | `"tuesday_thursday"` | Both Tue and Thu dates |
-| **Weekly** (new) | 2 separate classes per level, one on Tue, one on Thu | `"Tuesday"` / `"Thursday"` | Only that day's dates per class |
+### What It Does
+Adds a **tabbed view** to the Enrollments page: the existing "All Enrollments" list plus a new "By Session" view that shows each session as a card with its enrollment count, capacity, and the list of enrolled swimmers.
 
 ### Implementation
 
-**`src/pages/admin/SessionsAdmin.tsx`:**
-- Add `frequency: "twice_weekly" | "weekly"` to `createForm` state
-- Add a radio/toggle UI between "2x/week" and "Weekly" in the Create Classes dialog
-- When **2x/week**: combine selected days into one `day_of_week` string (e.g., `"tuesday_thursday"`), create one class per time slot per level, generate dates for all selected days
-- When **weekly**: create one class per day per time slot per level (current behavior), each with its own single-day `day_of_week`, dates generated only for that day
+**`src/pages/admin/SwimEnrollmentsAdmin.tsx`:**
 
-**`src/components/admin/ManageDatesModal.tsx`:** Already handles dynamic day parsing — no changes needed.
+1. Add a `Tabs` component at the top with two tabs: **All Enrollments** (current table) and **By Session**
 
-**`src/components/admin/calendar/CalendarDayView.tsx` and `CalendarWeekView.tsx`:** Already use `.includes()` matching — works for both formats.
+2. The "By Session" tab groups sessions by session period, then by time slot. Each session card shows:
+   - Session name (e.g., "Bubble Makers"), time, days, age group
+   - Enrollment count vs max capacity as a progress indicator (e.g., "2 / 3")
+   - Color-coded level badge
+   - Expandable list of enrolled children with parent name, payment status
 
-**`src/components/swim-enrollment/SessionPicker.tsx`:** Already works with both formats since it queries by level/age_group, not day_of_week.
+3. Add a **session filter dropdown** to the existing "All Enrollments" tab so you can filter the table by a specific session
 
-**Summary preview in dialog:** Update the class count calculation:
-- 2x/week: `time slots × levels × 1` (days are combined)
-- Weekly: `time slots × levels × days` (current math)
+4. Fetch session period names by joining `session_periods` in the existing query (add `session_period_id` and period name to `SessionInfo`)
+
+### Data Flow
+- Already fetching all sessions and enrollments — just need to add `session_period_id`, `max_students`, `day_of_week` to the session query
+- Group enrollments client-side by `session_id`
+- Group sessions by `session_period_id` for the period headers
 
 ### Files Modified
-- `src/pages/admin/SessionsAdmin.tsx` — add frequency toggle + adjust creation logic
-
-No database changes needed — `day_of_week` is already a flexible text field.
+- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — add Tabs, session cards view, session filter
 
