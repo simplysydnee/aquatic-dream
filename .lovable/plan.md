@@ -1,31 +1,38 @@
 
 
-## Add Session-Based View to Enrollments Admin
+## Changes to Enrollment Form
 
-### What It Does
-Adds a **tabbed view** to the Enrollments page: the existing "All Enrollments" list plus a new "By Session" view that shows each session as a card with its enrollment count, capacity, and the list of enrolled swimmers.
+### Summary
+Three changes: (1) replace age input with date of birth, calculating age automatically, (2) add medical/allergy conditional question, (3) add `child_dob` and `medical_notes` columns to the database.
 
-### Implementation
+### Database Migration
+Add two columns to `swim_enrollments`:
+- `child_dob` (date, nullable) — child's date of birth
+- `medical_notes` (text, nullable) — medical conditions/allergies description
 
-**`src/pages/admin/SwimEnrollmentsAdmin.tsx`:**
+### Assessment (`SwimAssessment.tsx`)
+- Replace the age number input with a **date of birth** date picker (simple `<Input type="date">`)
+- Calculate age from DOB automatically
+- Validate age is 3-12
+- Pass both `age` and `dob` string to `onComplete`
 
-1. Add a `Tabs` component at the top with two tabs: **All Enrollments** (current table) and **By Session**
+### Enrollment Form (`EnrollmentForm.tsx`)
+- Remove the disabled "Child's Age" field (age is already captured in assessment)
+- Add a new section: **"Does your child have any medical conditions or allergies we should know about?"** with Yes/No radio buttons
+- If "Yes" is selected, show a textarea for details (required if yes)
+- Add `medicalNotes` to the form schema (required when hasMedical is "yes")
+- Phone remains optional (already is)
 
-2. The "By Session" tab groups sessions by session period, then by time slot. Each session card shows:
-   - Session name (e.g., "Bubble Makers"), time, days, age group
-   - Enrollment count vs max capacity as a progress indicator (e.g., "2 / 3")
-   - Color-coded level badge
-   - Expandable list of enrolled children with parent name, payment status
-
-3. Add a **session filter dropdown** to the existing "All Enrollments" tab so you can filter the table by a specific session
-
-4. Fetch session period names by joining `session_periods` in the existing query (add `session_period_id` and period name to `SessionInfo`)
-
-### Data Flow
-- Already fetching all sessions and enrollments — just need to add `session_period_id`, `max_students`, `day_of_week` to the session query
-- Group enrollments client-side by `session_id`
-- Group sessions by `session_period_id` for the period headers
+### Parent Page (`SwimEnrollment.tsx`)
+- Update `onComplete` signature to receive `dob` string
+- Store `childDob` in state, pass to DB insert
+- Pass `medicalNotes` from enrollment form data to DB insert
+- Show DOB and calculated age on confirmation
 
 ### Files Modified
-- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — add Tabs, session cards view, session filter
+1. **Migration** — add `child_dob` and `medical_notes` columns
+2. `src/components/swim-enrollment/SwimAssessment.tsx` — DOB input instead of age
+3. `src/components/swim-enrollment/EnrollmentForm.tsx` — add medical/allergy question, remove age display
+4. `src/pages/SwimEnrollment.tsx` — wire DOB and medical notes through to DB
+5. `src/components/swim-enrollment/types.ts` — update interfaces if needed
 
