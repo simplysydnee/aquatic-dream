@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { z } from "zod";
 
@@ -13,6 +14,7 @@ const enrollmentSchema = z.object({
   parentPhone: z.string().trim().max(20).optional(),
   childName: z.string().trim().min(1, "Required").max(100),
   notes: z.string().trim().max(500).optional(),
+  isFirstTime: z.enum(["yes", "no"], { required_error: "Please select one" }),
 });
 
 export type EnrollmentFormData = z.infer<typeof enrollmentSchema>;
@@ -31,6 +33,7 @@ const EnrollmentForm = ({ childAge, onSubmit, onBack, submitting }: Props) => {
     parentPhone: "",
     childName: "",
     notes: "",
+    isFirstTime: "" as "" | "yes" | "no",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -118,6 +121,31 @@ const EnrollmentForm = ({ childAge, onSubmit, onBack, submitting }: Props) => {
               className="mt-1"
             />
           </div>
+        </div>
+
+        {/* First-time swimmer question */}
+        <div className="p-4 rounded-lg border border-border bg-muted/30">
+          <Label className="text-sm font-semibold">
+            Is this your child's first time swimming with Aquatic Dreams? *
+          </Label>
+          <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+            First-time swimmers receive a swim bag, cap & goggles with a one-time $45 registration fee.
+          </p>
+          <RadioGroup
+            value={form.isFirstTime}
+            onValueChange={(val) => update("isFirstTime", val)}
+            className="flex gap-6"
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="yes" id="firstTimeYes" />
+              <Label htmlFor="firstTimeYes" className="font-normal cursor-pointer">Yes, first time</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="no" id="firstTimeNo" />
+              <Label htmlFor="firstTimeNo" className="font-normal cursor-pointer">No, returning swimmer</Label>
+            </div>
+          </RadioGroup>
+          {errors.isFirstTime && <p className="text-xs text-destructive mt-1">{errors.isFirstTime}</p>}
         </div>
 
         <div>
