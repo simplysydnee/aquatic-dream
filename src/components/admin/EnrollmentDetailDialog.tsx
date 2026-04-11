@@ -207,7 +207,6 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                       </div>
                     )}
                   </div>
-                  </div>
                 </div>
 
                 <Separator />
