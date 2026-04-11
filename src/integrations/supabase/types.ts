@@ -548,11 +548,13 @@ export type Database = {
       swim_enrollments: {
         Row: {
           child_age: number
+          child_dob: string | null
           child_name: string
           created_at: string
           id: string
           is_first_time: boolean
           lesson_type: string
+          medical_notes: string | null
           notes: string | null
           parent_email: string
           parent_name: string
@@ -570,11 +572,13 @@ export type Database = {
         }
         Insert: {
           child_age: number
+          child_dob?: string | null
           child_name: string
           created_at?: string
           id?: string
           is_first_time?: boolean
           lesson_type?: string
+          medical_notes?: string | null
           notes?: string | null
           parent_email: string
           parent_name: string
@@ -592,11 +596,13 @@ export type Database = {
         }
         Update: {
           child_age?: number
+          child_dob?: string | null
           child_name?: string
           created_at?: string
           id?: string
           is_first_time?: boolean
           lesson_type?: string
+          medical_notes?: string | null
           notes?: string | null
           parent_email?: string
           parent_name?: string
