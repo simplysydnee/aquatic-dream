@@ -71,10 +71,7 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         return;
       }
 
-      const levelCompatible = (swimLevel: string) => {
-        if (ageGroup === "preschool-3-5") return true;
-        return swimLevel === level;
-      };
+      const levelCompatible = (swimLevel: string) => swimLevel === level;
 
       const slotGroups: Record<string, typeof allSessions> = {};
       for (const s of allSessions) {
@@ -106,8 +103,8 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
       });
 
       const result: SlotInfo[] = relevantSlots.map(([, group]) => {
-        const matchingSession = group.find(s => levelCompatible(s.swim_level)) || group[0];
-        const totalEnrolled = group.reduce((sum, s) => sum + (countMap[s.id] || 0), 0);
+        const matchingSession = group.find(s => s.swim_level === level) || group[0];
+        const totalEnrolled = countMap[matchingSession.id] || 0;
         const capacity = matchingSession.max_students;
 
         return {

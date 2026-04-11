@@ -49,9 +49,10 @@ const DECISION_STEPS: DecisionStep[] = [
   },
 ];
 
-function determineLevel(answers: Record<string, boolean>): SwimLevel {
-  if (!answers.canSubmerge) return "white";
-  if (!answers.canFloat) return "red";
+function determineLevel(answers: Record<string, boolean>, age: number): SwimLevel {
+  const isSchoolAge = age >= 6;
+  if (!answers.canSubmerge) return isSchoolAge ? "yellow" : "white";
+  if (!answers.canFloat) return isSchoolAge ? "yellow" : "red";
   if (!answers.canTreadWater) return "yellow";
   if (!answers.canSideRollSide) return "blue";
   return "green";
@@ -80,11 +81,11 @@ const SwimAssessment = ({ onComplete }: Props) => {
     setAnswers(newAnswers);
 
     if (!answer) {
-      const level = determineLevel(newAnswers);
+      const level = determineLevel(newAnswers, age!);
       setRecommendedLevel(level);
       setPhase("result");
     } else if (questionIndex >= maxQuestionIndex) {
-      const level = determineLevel(newAnswers);
+      const level = determineLevel(newAnswers, age!);
       setRecommendedLevel(level);
       setPhase("result");
     } else {
