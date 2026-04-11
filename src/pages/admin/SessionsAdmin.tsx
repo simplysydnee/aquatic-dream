@@ -13,7 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
-import { Plus, Pencil, Copy, Loader2, CalendarIcon, ToggleLeft, ToggleRight, Clock, Users, CalendarDays } from "lucide-react";
+import { Plus, Pencil, Copy, Loader2, CalendarIcon, ToggleLeft, ToggleRight, Clock, Users, CalendarDays, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ManageDatesModal from "@/components/admin/ManageDatesModal";
 
@@ -31,6 +31,15 @@ interface Session {
   is_active: boolean;
   instructor_id: string | null;
   registration_status: string;
+  session_period_id: string | null;
+}
+
+interface SessionPeriod {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
 }
 
 interface Instructor {
@@ -81,8 +90,15 @@ const LEVEL_BORDER: Record<string, string> = {
   green: "border-l-green-400",
 };
 
+const COMBINED_GROUPS: Record<string, string> = {
+  "Bubble Makers": "Bubble Makers / Reef Explorers",
+  "Reef Explorers": "Bubble Makers / Reef Explorers",
+};
+const getDisplayGroup = (name: string) => COMBINED_GROUPS[name] || name;
+
 const SessionsAdmin = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [periods, setPeriods] = useState<SessionPeriod[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -90,10 +106,15 @@ const SessionsAdmin = () => {
   const [filterAgeGroup, setFilterAgeGroup] = useState<string>("all");
   const [manageDatesOpen, setManageDatesOpen] = useState(false);
   const [manageDatesSlot, setManageDatesSlot] = useState<{ sessionIds: string[]; startDate: string; endDate: string; label: string } | null>(null);
+
+  // Period management
+  const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
+  const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null);
+  const [periodForm, setPeriodForm] = useState({ name: "", start_date: undefined as Date | undefined, end_date: undefined as Date | undefined });
+
   const [form, setForm] = useState({
     session_name: "",
-    session_start_date: undefined as Date | undefined,
-    session_end_date: undefined as Date | undefined,
+    session_period_id: "" as string,
     days: [] as string[],
     start_time: "",
     end_time: "",
@@ -105,12 +126,14 @@ const SessionsAdmin = () => {
   });
 
   const fetchData = async () => {
-    const [sessRes, instrRes] = await Promise.all([
-      supabase.from("swim_sessions").select("*").order("session_name").order("start_time"),
+    const [sessRes, instrRes, periodRes] = await Promise.all([
+      supabase.from("swim_sessions").select("*").order("start_time"),
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("session_periods").select("*").order("start_date"),
     ]);
-    if (sessRes.data) setSessions(sessRes.data);
+    if (sessRes.data) setSessions(sessRes.data as Session[]);
     if (instrRes.data) setInstructors(instrRes.data);
+    if (periodRes.data) setPeriods(periodRes.data);
     setLoading(false);
   };
 
@@ -118,7 +141,7 @@ const SessionsAdmin = () => {
 
   const resetForm = () => {
     setForm({
-      session_name: "", session_start_date: undefined, session_end_date: undefined,
+      session_name: "", session_period_id: "",
       days: [], start_time: "", end_time: "", swim_levels: ["white"],
       age_group: "preschool-3-5", max_students: "3", instructor_id: "", registration_status: "open",
     });
@@ -130,8 +153,7 @@ const SessionsAdmin = () => {
     setEditingId(s.id);
     setForm({
       session_name: s.session_name || "",
-      session_start_date: s.session_start_date ? new Date(s.session_start_date + "T00:00:00") : undefined,
-      session_end_date: s.session_end_date ? new Date(s.session_end_date + "T00:00:00") : undefined,
+      session_period_id: s.session_period_id || "",
       days: [s.day_of_week],
       start_time: s.start_time.slice(0, 5),
       end_time: s.end_time.slice(0, 5),
@@ -149,8 +171,7 @@ const SessionsAdmin = () => {
     setEditingId(null);
     setForm({
       session_name: s.session_name || "",
-      session_start_date: s.session_start_date ? new Date(s.session_start_date + "T00:00:00") : undefined,
-      session_end_date: s.session_end_date ? new Date(s.session_end_date + "T00:00:00") : undefined,
+      session_period_id: s.session_period_id || "",
       days: [s.day_of_week],
       start_time: s.start_time.slice(0, 5),
       end_time: s.end_time.slice(0, 5),
@@ -164,14 +185,16 @@ const SessionsAdmin = () => {
   };
 
   const handleSave = async () => {
-    if (!form.session_name || !form.start_time || !form.end_time || form.days.length === 0 || form.swim_levels.length === 0) {
-      toast({ title: "Missing required fields", description: "Name, days, times, and at least one level are required", variant: "destructive" });
+    if (!form.session_name || !form.start_time || !form.end_time || form.days.length === 0 || form.swim_levels.length === 0 || !form.session_period_id) {
+      toast({ title: "Missing required fields", description: "Name, period, days, times, and at least one level are required", variant: "destructive" });
       return;
     }
+    const period = periods.find(p => p.id === form.session_period_id);
     const basePayload = {
       session_name: form.session_name,
-      session_start_date: form.session_start_date ? format(form.session_start_date, "yyyy-MM-dd") : null,
-      session_end_date: form.session_end_date ? format(form.session_end_date, "yyyy-MM-dd") : null,
+      session_period_id: form.session_period_id,
+      session_start_date: period?.start_date || null,
+      session_end_date: period?.end_date || null,
       start_time: form.start_time,
       end_time: form.end_time,
       age_group: form.age_group,
@@ -192,13 +215,11 @@ const SessionsAdmin = () => {
       const { data: inserted, error } = await supabase.from("swim_sessions").insert(rows).select("id");
       if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
 
-      // Auto-generate Mon/Wed class dates for new sessions
-      if (inserted && form.session_start_date && form.session_end_date) {
-        const startStr = format(form.session_start_date, "yyyy-MM-dd");
-        const endStr = format(form.session_end_date, "yyyy-MM-dd");
+      // Auto-generate Mon/Wed class dates
+      if (inserted && period) {
         const monWedDates: string[] = [];
-        const cur = new Date(startStr + "T00:00:00");
-        const endD = new Date(endStr + "T00:00:00");
+        const cur = new Date(period.start_date + "T00:00:00");
+        const endD = new Date(period.end_date + "T00:00:00");
         while (cur <= endD) {
           const dow = cur.getDay();
           if (dow === 1 || dow === 3) monWedDates.push(cur.toISOString().slice(0, 10));
@@ -245,43 +266,72 @@ const SessionsAdmin = () => {
     setForm(f => ({ ...f, swim_levels: f.swim_levels.includes(lvl) ? f.swim_levels.filter(l => l !== lvl) : [...f.swim_levels, lvl] }));
   };
 
-  // Combine related session names for display
-  const COMBINED_GROUPS: Record<string, string> = {
-    "Bubble Makers": "Bubble Makers / Reef Explorers",
-    "Reef Explorers": "Bubble Makers / Reef Explorers",
+  // Period CRUD
+  const resetPeriodForm = () => {
+    setPeriodForm({ name: "", start_date: undefined, end_date: undefined });
+    setEditingPeriodId(null);
   };
-  const getDisplayGroup = (name: string) => COMBINED_GROUPS[name] || name;
+
+  const handleSavePeriod = async () => {
+    if (!periodForm.name || !periodForm.start_date || !periodForm.end_date) {
+      toast({ title: "Missing fields", description: "Name and dates are required", variant: "destructive" });
+      return;
+    }
+    const payload = {
+      name: periodForm.name,
+      start_date: format(periodForm.start_date, "yyyy-MM-dd"),
+      end_date: format(periodForm.end_date, "yyyy-MM-dd"),
+    };
+    if (editingPeriodId) {
+      const { error } = await supabase.from("session_periods").update(payload).eq("id", editingPeriodId);
+      if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+      toast({ title: "Period updated" });
+    } else {
+      const { error } = await supabase.from("session_periods").insert(payload);
+      if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+      toast({ title: "Period created" });
+    }
+    setPeriodDialogOpen(false);
+    resetPeriodForm();
+    fetchData();
+  };
+
+  const deletePeriod = async (id: string) => {
+    const linked = sessions.filter(s => s.session_period_id === id);
+    if (linked.length > 0) {
+      toast({ title: "Cannot delete", description: `${linked.length} sessions are linked to this period`, variant: "destructive" });
+      return;
+    }
+    const { error } = await supabase.from("session_periods").delete().eq("id", id);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Period deleted" });
+    fetchData();
+  };
 
   const activeSessions = sessions.filter(s => s.is_active);
   const filtered = filterAgeGroup === "all" ? activeSessions : activeSessions.filter(s => s.age_group === filterAgeGroup);
 
-  // Group by session period (date range) → display group → slots
-  interface SessionPeriod {
-    label: string;
-    startDate: string;
+  // Group by session_period_id → display group → slots
+  interface PeriodGroup {
+    period: SessionPeriod | null;
     subgroups: Record<string, { ageGroup: string; slots: SlotGroup[] }>;
   }
 
-  const periodMap: Record<string, SessionPeriod> = {};
-
-  // Determine session period key from dates — sessions with close start dates belong together
-  const getSessionPeriodKey = (s: Session) => `${s.session_start_date || "none"}`;
+  const periodGroupMap: Record<string, PeriodGroup> = {};
 
   for (const s of filtered) {
-    const periodKey = getSessionPeriodKey(s);
-    if (!periodMap[periodKey]) {
-      periodMap[periodKey] = {
-        label: formatDateRange(s.session_start_date, s.session_end_date),
-        startDate: s.session_start_date || "",
+    const pId = s.session_period_id || "unlinked";
+    if (!periodGroupMap[pId]) {
+      periodGroupMap[pId] = {
+        period: periods.find(p => p.id === pId) || null,
         subgroups: {},
       };
     }
     const displayName = getDisplayGroup(s.session_name || "Unnamed");
-    if (!periodMap[periodKey].subgroups[displayName]) {
-      periodMap[periodKey].subgroups[displayName] = { ageGroup: s.age_group || "unknown", slots: [] };
+    if (!periodGroupMap[pId].subgroups[displayName]) {
+      periodGroupMap[pId].subgroups[displayName] = { ageGroup: s.age_group || "unknown", slots: [] };
     }
-    const sub = periodMap[periodKey].subgroups[displayName];
-
+    const sub = periodGroupMap[pId].subgroups[displayName];
     const slotKey = `${s.start_time}|${s.day_of_week}`;
     let slot = sub.slots.find(sg => sg.key === slotKey);
     if (!slot) {
@@ -296,17 +346,11 @@ const SessionsAdmin = () => {
     }
   }
 
-  // Sort periods by start date
-  const sortedPeriods = Object.entries(periodMap).sort(([, a], [, b]) => a.startDate.localeCompare(b.startDate));
-
-  // Calculate total classes from date range
-  const getClassCount = (startDate: string | null, endDate: string | null) => {
-    if (!startDate || !endDate) return null;
-    const s = new Date(startDate + "T00:00:00");
-    const e = new Date(endDate + "T00:00:00");
-    const weeks = Math.round((e.getTime() - s.getTime()) / (7 * 24 * 60 * 60 * 1000));
-    return weeks * 2; // Mon & Wed = 2 per week
-  };
+  const sortedPeriods = Object.entries(periodGroupMap).sort(([, a], [, b]) => {
+    const aDate = a.period?.start_date || "9999";
+    const bDate = b.period?.start_date || "9999";
+    return aDate.localeCompare(bDate);
+  });
 
   const getInstructorName = (id: string | null) => {
     if (!id) return null;
@@ -353,35 +397,19 @@ const SessionsAdmin = () => {
                     <Input className="mt-1" placeholder="Custom session name" value="" onChange={e => setForm(f => ({ ...f, session_name: e.target.value }))} />
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Start Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.session_start_date && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.session_start_date ? format(form.session_start_date, "MMM d, yyyy") : "Pick date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={form.session_start_date} onSelect={d => setForm(f => ({ ...f, session_start_date: d }))} className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div>
-                    <Label>End Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !form.session_end_date && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.session_end_date ? format(form.session_end_date, "MMM d, yyyy") : "Pick date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={form.session_end_date} onSelect={d => setForm(f => ({ ...f, session_end_date: d }))} className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                <div>
+                  <Label>Session Period *</Label>
+                  <Select value={form.session_period_id || "none"} onValueChange={v => setForm(f => ({ ...f, session_period_id: v === "none" ? "" : v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select period" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select a period...</SelectItem>
+                      {periods.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} ({formatDateRange(p.start_date, p.end_date)})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label>Days of Week *</Label>
@@ -457,123 +485,201 @@ const SessionsAdmin = () => {
         </div>
       </div>
 
-      {/* Session periods */}
-      {sortedPeriods.map(([periodKey, period], idx) => {
-        const firstSubSlot = Object.values(period.subgroups)[0]?.slots[0]?.first;
-        
+      {/* Session Periods Management */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Session Periods</CardTitle>
+            <Dialog open={periodDialogOpen} onOpenChange={(open) => { setPeriodDialogOpen(open); if (!open) resetPeriodForm(); }}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline"><Plus className="w-3.5 h-3.5 mr-1" /> Add Period</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-sm">
+                <DialogHeader><DialogTitle>{editingPeriodId ? "Edit Period" : "New Period"}</DialogTitle></DialogHeader>
+                <div className="space-y-3">
+                  <div><Label>Name *</Label><Input value={periodForm.name} onChange={e => setPeriodForm(f => ({ ...f, name: e.target.value }))} placeholder="Session 3" /></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Start Date *</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !periodForm.start_date && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {periodForm.start_date ? format(periodForm.start_date, "MMM d, yyyy") : "Pick"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={periodForm.start_date} onSelect={d => setPeriodForm(f => ({ ...f, start_date: d }))} className="p-3 pointer-events-auto" />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div>
+                      <Label>End Date *</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !periodForm.end_date && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {periodForm.end_date ? format(periodForm.end_date, "MMM d, yyyy") : "Pick"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={periodForm.end_date} onSelect={d => setPeriodForm(f => ({ ...f, end_date: d }))} className="p-3 pointer-events-auto" />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                  <Button onClick={handleSavePeriod} className="w-full">{editingPeriodId ? "Update" : "Create"}</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {periods.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-3">No session periods yet. Create one to get started.</p>
+          ) : (
+            <div className="divide-y divide-border">
+              {periods.map(p => {
+                const linkedCount = sessions.filter(s => s.session_period_id === p.id).length;
+                return (
+                  <div key={p.id} className="flex items-center justify-between py-2">
+                    <div>
+                      <span className="font-medium text-sm">{p.name}</span>
+                      <span className="text-xs text-muted-foreground ml-2">{formatDateRange(p.start_date, p.end_date)}</span>
+                      <span className="text-xs text-muted-foreground ml-2">({linkedCount} classes)</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => {
+                        setEditingPeriodId(p.id);
+                        setPeriodForm({ name: p.name, start_date: new Date(p.start_date + "T00:00:00"), end_date: new Date(p.end_date + "T00:00:00") });
+                        setPeriodDialogOpen(true);
+                      }}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deletePeriod(p.id)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        return (
-          <div key={periodKey} className="space-y-4">
-            {/* Period header */}
-            <div className="flex items-center gap-3">
-              <h3 className="text-xl font-display font-bold text-foreground">Session {idx + 1}</h3>
+      {/* Session slots grouped by period */}
+      {sortedPeriods.map(([pId, group]) => (
+        <div key={pId} className="space-y-4">
+          <div className="flex items-center gap-3">
+            <h3 className="text-xl font-display font-bold text-foreground">
+              {group.period?.name || "Unlinked Sessions"}
+            </h3>
+            {group.period && (
               <span className="text-sm text-muted-foreground flex items-center gap-1">
                 <CalendarIcon className="w-3.5 h-3.5" />
-                {period.label}
+                {formatDateRange(group.period.start_date, group.period.end_date)}
               </span>
-
-
-            </div>
-
-            {/* Subgroups within this period */}
-            {Object.entries(period.subgroups).map(([groupName, sub]) => {
-              const ag = sub.ageGroup;
-              return (
-                <Card key={groupName} className="overflow-hidden">
-                  <CardHeader className="py-3 px-4 bg-muted/50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-base">{groupName}</CardTitle>
-                        <Badge variant="outline" className={`text-[10px] ${
-                          ag === "preschool-3-5" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-teal-50 text-teal-700 border-teal-200"
-                        }`}>
-                          {ag === "preschool-3-5" ? "Preschool 3–5" : "School-Age 6–12"}
-                        </Badge>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{sub.slots.length} time slots</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="divide-y divide-border">
-                      {sub.slots.map(slot => {
-                        const s = slot.first;
-                        const isOpen = s.registration_status === "open";
-                        const primaryLevel = slot.levels[0] || "white";
-                        const borderColor = LEVEL_BORDER[primaryLevel] || "border-l-gray-300";
-
-                        return (
-                          <div key={slot.key} className={`flex items-center gap-3 px-4 py-3 border-l-4 ${borderColor} hover:bg-muted/30 transition-colors`}>
-                            <div className="w-[140px] shrink-0">
-                              <span className="text-sm font-medium text-foreground">
-                                {formatTime(s.start_time)} – {formatTime(s.end_time)}
-                              </span>
-                            </div>
-                            <div className="flex gap-1 w-[160px] shrink-0 flex-wrap">
-                              {slot.levels.map(l => {
-                                const lc = LEVEL_BADGE_COLORS[l as SwimLevel];
-                                return lc ? (
-                                  <span key={l} className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${lc.bg} ${lc.text} ${lc.ring}`}>
-                                    {LEVEL_DISPLAY[l as SwimLevel]?.name}
-                                  </span>
-                                ) : null;
-                              })}
-                            </div>
-                            <div className="flex items-center gap-1 w-[50px] shrink-0 text-sm text-muted-foreground">
-                              <Users className="w-3.5 h-3.5" />
-                              {s.max_students}
-                            </div>
-                            <div className="w-[140px] shrink-0">
-                              <Select
-                                value={s.instructor_id || "unassigned"}
-                                onValueChange={v => assignInstructor(slot.sessions, v === "unassigned" ? "" : v)}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Assign" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                                  {instructors.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <Badge
-                              variant={isOpen ? "default" : "secondary"}
-                              className="text-xs capitalize cursor-pointer shrink-0"
-                              onClick={() => toggleStatus(slot.sessions)}
-                            >
-                              {isOpen ? <ToggleRight className="w-3 h-3 mr-1" /> : <ToggleLeft className="w-3 h-3 mr-1" />}
-                              {s.registration_status}
-                            </Badge>
-                            <div className="flex items-center gap-1 ml-auto shrink-0">
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => {
-                                setManageDatesSlot({
-                                  sessionIds: slot.sessions.map(ss => ss.id),
-                                  startDate: s.session_start_date || "",
-                                  endDate: s.session_end_date || "",
-                                  label: `${formatTime(s.start_time)} – ${formatTime(s.end_time)} · ${slot.levels.map(l => LEVEL_DISPLAY[l as SwimLevel]?.name).join("/")}`,
-                                });
-                                setManageDatesOpen(true);
-                              }} title="Manage Dates">
-                                <CalendarDays className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(s, slot.sessions)} title="Edit">
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => duplicateSession(s, slot.sessions)} title="Duplicate">
-                                <Copy className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            )}
           </div>
-        );
-      })}
+
+          {Object.entries(group.subgroups).map(([groupName, sub]) => {
+            const ag = sub.ageGroup;
+            return (
+              <Card key={groupName} className="overflow-hidden">
+                <CardHeader className="py-3 px-4 bg-muted/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-base">{groupName}</CardTitle>
+                      <Badge variant="outline" className={`text-[10px] ${
+                        ag === "preschool-3-5" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-teal-50 text-teal-700 border-teal-200"
+                      }`}>
+                        {ag === "preschool-3-5" ? "Preschool 3–5" : "School-Age 6–12"}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{sub.slots.length} time slots</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-border">
+                    {sub.slots.map(slot => {
+                      const s = slot.first;
+                      const isOpen = s.registration_status === "open";
+                      const primaryLevel = slot.levels[0] || "white";
+                      const borderColor = LEVEL_BORDER[primaryLevel] || "border-l-gray-300";
+
+                      return (
+                        <div key={slot.key} className={`flex items-center gap-3 px-4 py-3 border-l-4 ${borderColor} hover:bg-muted/30 transition-colors`}>
+                          <div className="w-[140px] shrink-0">
+                            <span className="text-sm font-medium text-foreground">
+                              {formatTime(s.start_time)} – {formatTime(s.end_time)}
+                            </span>
+                          </div>
+                          <div className="flex gap-1 w-[160px] shrink-0 flex-wrap">
+                            {slot.levels.map(l => {
+                              const lc = LEVEL_BADGE_COLORS[l as SwimLevel];
+                              return lc ? (
+                                <span key={l} className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${lc.bg} ${lc.text} ${lc.ring}`}>
+                                  {LEVEL_DISPLAY[l as SwimLevel]?.name}
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                          <div className="flex items-center gap-1 w-[50px] shrink-0 text-sm text-muted-foreground">
+                            <Users className="w-3.5 h-3.5" />
+                            {s.max_students}
+                          </div>
+                          <div className="w-[140px] shrink-0">
+                            <Select
+                              value={s.instructor_id || "unassigned"}
+                              onValueChange={v => assignInstructor(slot.sessions, v === "unassigned" ? "" : v)}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Assign" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned">Unassigned</SelectItem>
+                                {instructors.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Badge
+                            variant={isOpen ? "default" : "secondary"}
+                            className="text-xs capitalize cursor-pointer shrink-0"
+                            onClick={() => toggleStatus(slot.sessions)}
+                          >
+                            {isOpen ? <ToggleRight className="w-3 h-3 mr-1" /> : <ToggleLeft className="w-3 h-3 mr-1" />}
+                            {s.registration_status}
+                          </Badge>
+                          <div className="flex items-center gap-1 ml-auto shrink-0">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => {
+                              setManageDatesSlot({
+                                sessionIds: slot.sessions.map(ss => ss.id),
+                                startDate: s.session_start_date || "",
+                                endDate: s.session_end_date || "",
+                                label: `${formatTime(s.start_time)} – ${formatTime(s.end_time)} · ${slot.levels.map(l => LEVEL_DISPLAY[l as SwimLevel]?.name).join("/")}`,
+                              });
+                              setManageDatesOpen(true);
+                            }} title="Manage Dates">
+                              <CalendarDays className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(s, slot.sessions)} title="Edit">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => duplicateSession(s, slot.sessions)} title="Duplicate">
+                              <Copy className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ))}
 
       {manageDatesSlot && (
         <ManageDatesModal
@@ -596,4 +702,3 @@ const SessionsAdmin = () => {
 };
 
 export default SessionsAdmin;
-
