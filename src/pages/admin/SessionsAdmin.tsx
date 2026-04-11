@@ -221,7 +221,7 @@ const SessionsAdmin = () => {
     setForm(f => ({ ...f, swim_levels: f.swim_levels.includes(lvl) ? f.swim_levels.filter(l => l !== lvl) : [...f.swim_levels, lvl] }));
   };
 
-  // Combine related session names for display (e.g. Bubble Makers + Reef Explorers)
+  // Combine related session names for display
   const COMBINED_GROUPS: Record<string, string> = {
     "Bubble Makers": "Bubble Makers / Reef Explorers",
     "Reef Explorers": "Bubble Makers / Reef Explorers",
@@ -230,34 +230,57 @@ const SessionsAdmin = () => {
   };
   const getDisplayGroup = (name: string) => COMBINED_GROUPS[name] || name;
 
-  // Build structure: Display Group → Age Group → Slot[]
   const activeSessions = sessions.filter(s => s.is_active);
   const filtered = filterAgeGroup === "all" ? activeSessions : activeSessions.filter(s => s.age_group === filterAgeGroup);
 
-  const sessionNameGroups: Record<string, { dateRange: string; dayLabel: string; ageGroups: Record<string, SlotGroup[]> }> = {};
+  // Group by session period (date range) → display group → slots
+  interface SessionPeriod {
+    label: string;
+    startDate: string;
+    subgroups: Record<string, { ageGroup: string; slots: SlotGroup[] }>;
+  }
+
+  const periodMap: Record<string, SessionPeriod> = {};
+
+  // Determine session period key from dates — sessions with close start dates belong together
+  const getSessionPeriodKey = (s: Session) => `${s.session_start_date || "none"}`;
 
   for (const s of filtered) {
-    const displayName = getDisplayGroup(s.session_name || "Unnamed");
-    if (!sessionNameGroups[displayName]) {
-      sessionNameGroups[displayName] = {
-        dateRange: formatDateRange(s.session_start_date, s.session_end_date),
-        dayLabel: formatDayLabel(s.day_of_week),
-        ageGroups: {},
+    const periodKey = getSessionPeriodKey(s);
+    if (!periodMap[periodKey]) {
+      periodMap[periodKey] = {
+        label: formatDateRange(s.session_start_date, s.session_end_date),
+        startDate: s.session_start_date || "",
+        subgroups: {},
       };
     }
-    const ag = s.age_group || "unknown";
-    if (!sessionNameGroups[displayName].ageGroups[ag]) sessionNameGroups[displayName].ageGroups[ag] = [];
+    const displayName = getDisplayGroup(s.session_name || "Unnamed");
+    if (!periodMap[periodKey].subgroups[displayName]) {
+      periodMap[periodKey].subgroups[displayName] = { ageGroup: s.age_group || "unknown", slots: [] };
+    }
+    const sub = periodMap[periodKey].subgroups[displayName];
 
-    // Group by time slot — sessions at the same time merge (e.g. white+red at 2:45)
     const slotKey = `${s.start_time}|${s.day_of_week}`;
-    let slot = sessionNameGroups[displayName].ageGroups[ag].find(sg => sg.key === slotKey);
+    let slot = sub.slots.find(sg => sg.key === slotKey);
     if (!slot) {
       slot = { key: slotKey, sessions: [], levels: [], first: s };
-      sessionNameGroups[displayName].ageGroups[ag].push(slot);
+      sub.slots.push(slot);
     }
     slot.sessions.push(s);
     if (!slot.levels.includes(s.swim_level)) slot.levels.push(s.swim_level);
   }
+
+  // Sort periods by start date
+  const sortedPeriods = Object.entries(periodMap).sort(([, a], [, b]) => a.startDate.localeCompare(b.startDate));
+
+  // Calculate total lessons from date range
+  const getLessonCount = (startDate: string | null, endDate: string | null) => {
+    if (!startDate || !endDate) return null;
+    const s = new Date(startDate + "T00:00:00");
+    const e = new Date(endDate + "T00:00:00");
+    const weeks = Math.round((e.getTime() - s.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    return weeks * 2; // Mon & Wed = 2 per week
+  };
 
   const getInstructorName = (id: string | null) => {
     if (!id) return null;
@@ -408,115 +431,115 @@ const SessionsAdmin = () => {
         </div>
       </div>
 
-      {/* Session cards */}
-      {Object.entries(sessionNameGroups).map(([name, group]) => (
-        <Card key={name} className="overflow-hidden">
-          <CardHeader className="bg-muted/50 pb-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <CardTitle className="text-lg">{name}</CardTitle>
-                <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <CalendarIcon className="w-3.5 h-3.5" />
-                    {group.dateRange}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    {group.dayLabel}
-                  </span>
-                </div>
-              </div>
+      {/* Session periods */}
+      {sortedPeriods.map(([periodKey, period], idx) => {
+        const firstSubSlot = Object.values(period.subgroups)[0]?.slots[0]?.first;
+        const lessonCount = firstSubSlot ? getLessonCount(firstSubSlot.session_start_date, firstSubSlot.session_end_date) : null;
+
+        return (
+          <div key={periodKey} className="space-y-4">
+            {/* Period header */}
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-display font-bold text-foreground">Session {idx + 1}</h3>
+              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                <CalendarIcon className="w-3.5 h-3.5" />
+                {period.label}
+              </span>
+              {lessonCount && (
+                <span className="text-sm text-muted-foreground">· {lessonCount} lessons</span>
+              )}
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {Object.entries(group.ageGroups).map(([ag, slots]) => (
-              <div key={ag}>
-                <div className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider ${
-                  ag === "preschool-3-5" ? "bg-purple-50 text-purple-700" : "bg-teal-50 text-teal-700"
-                }`}>
-                  {ag === "preschool-3-5" ? "Preschool (Ages 3–5)" : "School-Age (Ages 6–12)"}
-                  <span className="ml-2 font-normal normal-case">· {slots.length} time slots</span>
-                </div>
-                <div className="divide-y divide-border">
-                  {slots.map(slot => {
-                    const s = slot.first;
-                    const isOpen = s.registration_status === "open";
-                    const primaryLevel = slot.levels[0] || "white";
-                    const borderColor = LEVEL_BORDER[primaryLevel] || "border-l-gray-300";
 
-                    return (
-                      <div key={slot.key} className={`flex items-center gap-3 px-4 py-3 border-l-4 ${borderColor} hover:bg-muted/30 transition-colors`}>
-                        {/* Time */}
-                        <div className="w-[140px] shrink-0">
-                          <span className="text-sm font-medium text-foreground">
-                            {formatTime(s.start_time)} – {formatTime(s.end_time)}
-                          </span>
-                        </div>
-
-                        {/* Levels */}
-                        <div className="flex gap-1 w-[120px] shrink-0">
-                          {slot.levels.map(l => {
-                            const lc = LEVEL_BADGE_COLORS[l as SwimLevel];
-                            return lc ? (
-                              <span key={l} className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${lc.bg} ${lc.text} ${lc.ring}`}>
-                                {LEVEL_DISPLAY[l as SwimLevel]?.name}
-                              </span>
-                            ) : null;
-                          })}
-                        </div>
-
-                        {/* Capacity */}
-                        <div className="flex items-center gap-1 w-[50px] shrink-0 text-sm text-muted-foreground">
-                          <Users className="w-3.5 h-3.5" />
-                          {s.max_students}
-                        </div>
-
-                        {/* Instructor dropdown */}
-                        <div className="w-[140px] shrink-0">
-                          <Select
-                            value={s.instructor_id || "unassigned"}
-                            onValueChange={v => assignInstructor(slot.sessions, v === "unassigned" ? "" : v)}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Assign" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="unassigned">Unassigned</SelectItem>
-                              {instructors.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Status */}
-                        <Badge
-                          variant={isOpen ? "default" : "secondary"}
-                          className="text-xs capitalize cursor-pointer shrink-0"
-                          onClick={() => toggleStatus(slot.sessions)}
-                        >
-                          {isOpen ? <ToggleRight className="w-3 h-3 mr-1" /> : <ToggleLeft className="w-3 h-3 mr-1" />}
-                          {s.registration_status}
+            {/* Subgroups within this period */}
+            {Object.entries(period.subgroups).map(([groupName, sub]) => {
+              const ag = sub.ageGroup;
+              return (
+                <Card key={groupName} className="overflow-hidden">
+                  <CardHeader className="py-3 px-4 bg-muted/50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-base">{groupName}</CardTitle>
+                        <Badge variant="outline" className={`text-[10px] ${
+                          ag === "preschool-3-5" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-teal-50 text-teal-700 border-teal-200"
+                        }`}>
+                          {ag === "preschool-3-5" ? "Preschool 3–5" : "School-Age 6–12"}
                         </Badge>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-1 ml-auto shrink-0">
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(s, slot.sessions)} title="Edit">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => duplicateSession(s, slot.sessions)} title="Duplicate">
-                            <Copy className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ))}
+                      <span className="text-xs text-muted-foreground">{sub.slots.length} time slots</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-border">
+                      {sub.slots.map(slot => {
+                        const s = slot.first;
+                        const isOpen = s.registration_status === "open";
+                        const primaryLevel = slot.levels[0] || "white";
+                        const borderColor = LEVEL_BORDER[primaryLevel] || "border-l-gray-300";
 
-      {Object.keys(sessionNameGroups).length === 0 && (
+                        return (
+                          <div key={slot.key} className={`flex items-center gap-3 px-4 py-3 border-l-4 ${borderColor} hover:bg-muted/30 transition-colors`}>
+                            <div className="w-[140px] shrink-0">
+                              <span className="text-sm font-medium text-foreground">
+                                {formatTime(s.start_time)} – {formatTime(s.end_time)}
+                              </span>
+                            </div>
+                            <div className="flex gap-1 w-[120px] shrink-0">
+                              {slot.levels.map(l => {
+                                const lc = LEVEL_BADGE_COLORS[l as SwimLevel];
+                                return lc ? (
+                                  <span key={l} className={`px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${lc.bg} ${lc.text} ${lc.ring}`}>
+                                    {LEVEL_DISPLAY[l as SwimLevel]?.name}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                            <div className="flex items-center gap-1 w-[50px] shrink-0 text-sm text-muted-foreground">
+                              <Users className="w-3.5 h-3.5" />
+                              {s.max_students}
+                            </div>
+                            <div className="w-[140px] shrink-0">
+                              <Select
+                                value={s.instructor_id || "unassigned"}
+                                onValueChange={v => assignInstructor(slot.sessions, v === "unassigned" ? "" : v)}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Assign" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                                  {instructors.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Badge
+                              variant={isOpen ? "default" : "secondary"}
+                              className="text-xs capitalize cursor-pointer shrink-0"
+                              onClick={() => toggleStatus(slot.sessions)}
+                            >
+                              {isOpen ? <ToggleRight className="w-3 h-3 mr-1" /> : <ToggleLeft className="w-3 h-3 mr-1" />}
+                              {s.registration_status}
+                            </Badge>
+                            <div className="flex items-center gap-1 ml-auto shrink-0">
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(s, slot.sessions)} title="Edit">
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => duplicateSession(s, slot.sessions)} title="Duplicate">
+                                <Copy className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        );
+      })}
+
+      {sortedPeriods.length === 0 && (
         <Card className="p-8 text-center">
           <p className="text-muted-foreground">No sessions match your filter.</p>
         </Card>
