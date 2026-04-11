@@ -73,24 +73,35 @@ const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, se
   }, [open, sessionIds.join(",")]);
 
   const handleGenerate = async () => {
-    if (!sessionStartDate || !sessionEndDate) return;
+    if (!sessionStartDate || !sessionEndDate) {
+      toast({ title: "Missing date range", description: "Session start/end dates are not set.", variant: "destructive" });
+      return;
+    }
     setGenerating(true);
     const monWed = generateMonWedDates(sessionStartDate, sessionEndDate);
     
-    // Insert for each session_id at this slot
-    const rows = sessionIds.flatMap(sid =>
-      monWed.map(d => ({ session_id: sid, lesson_date: d }))
-    );
-
-    const { error } = await supabase
-      .from("session_lesson_dates")
-      .upsert(rows, { onConflict: "session_id,lesson_date" });
-
-    if (error) {
-      toast({ title: "Error generating dates", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: `${monWed.length} class dates generated` });
+    if (monWed.length === 0) {
+      toast({ title: "No Mon/Wed dates found in range", variant: "destructive" });
+      setGenerating(false);
+      return;
     }
+
+    // Insert for each session_id at this slot
+    for (const sid of sessionIds) {
+      const rows = monWed.map(d => ({ session_id: sid, lesson_date: d }));
+      const { error } = await supabase
+        .from("session_lesson_dates")
+        .upsert(rows, { onConflict: "session_id,lesson_date" });
+
+      if (error) {
+        console.error("Upsert error for session", sid, error);
+        toast({ title: "Error generating dates", description: error.message, variant: "destructive" });
+        setGenerating(false);
+        return;
+      }
+    }
+
+    toast({ title: `${monWed.length} class dates generated` });
     setGenerating(false);
     fetchDates();
   };
