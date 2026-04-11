@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { format } from "date-fns";
 import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import type { CalendarSwimSession, CalendarEnrollment, CalendarPoolEvent, Attend
 import type { ICSSession } from "./CalendarDayView";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import { Checkbox } from "@/components/ui/checkbox";
+import AddSwimmerDialog from "./AddSwimmerDialog";
 
 interface SwimBlockInfo {
   kind: "swim";
@@ -33,6 +35,7 @@ interface Props {
   onClose: () => void;
   onEdit: () => void;
   onCheckIn?: (enrollmentId: string, sessionId: string, isCheckedIn: boolean) => void;
+  onRefetch?: () => void;
 }
 
 function getInitials(name: string) {
@@ -54,7 +57,8 @@ function fmtICSTime(iso: string) {
   });
 }
 
-const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
+const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: Props) => {
+  const [showAddSwimmer, setShowAddSwimmer] = useState(false);
   if (!block) return null;
 
   const isSwim = block.kind === "swim";
@@ -303,11 +307,23 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
                 <Pencil className="w-3.5 h-3.5" /> Edit
               </Button>
               {isSwim && (
-                <Button size="sm" variant="outline" className="flex-1 gap-1.5">
+                <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => setShowAddSwimmer(true)}>
                   <UserPlus className="w-3.5 h-3.5" /> Add Swimmer
                 </Button>
               )}
             </div>
+
+            {isSwim && (
+              <AddSwimmerDialog
+                open={showAddSwimmer}
+                onOpenChange={setShowAddSwimmer}
+                sessionId={block.session.id}
+                sessionName={block.session.session_name || block.session.swim_level}
+                swimLevel={block.session.swim_level}
+                dateStr={block.dateStr}
+                onSaved={onRefetch || (() => {})}
+              />
+            )}
           </>
         )}
       </div>
