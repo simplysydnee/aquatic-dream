@@ -91,10 +91,10 @@ export default function SessionEnrollmentCards({
       <div className="flex items-center gap-3">
         <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
           <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="All Periods" />
+            <SelectValue placeholder="All Sessions" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Periods</SelectItem>
+            <SelectItem value="all">All Sessions</SelectItem>
             {periodOrder.map((p) => (
               <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
             ))}
