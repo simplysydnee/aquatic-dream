@@ -1,8 +1,8 @@
 import { format } from "date-fns";
-import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock } from "lucide-react";
+import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { CalendarSwimSession, CalendarEnrollment, CalendarPoolEvent, AttendanceRecord } from "@/hooks/useCalendarData";
+import type { CalendarSwimSession, CalendarEnrollment, CalendarPoolEvent, AttendanceRecord, EnrollmentAgreement } from "@/hooks/useCalendarData";
 import type { ICSSession } from "./CalendarDayView";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,6 +12,7 @@ interface SwimBlockInfo {
   session: CalendarSwimSession;
   enrollments: CalendarEnrollment[];
   attendance: AttendanceRecord[];
+  agreements: EnrollmentAgreement[];
   dateStr: string;
 }
 
@@ -97,7 +98,6 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
         {/* ICS Detail (read-only) */}
         {isICS && (
           <div className="p-4 space-y-4">
-            {/* Time */}
             <div className="rounded-lg bg-muted/50 p-3">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                 <Clock className="w-3.5 h-3.5" /> Time
@@ -107,7 +107,6 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
               </p>
             </div>
 
-            {/* Instructor */}
             {block.session.instructor_name && (
               <div className="rounded-lg bg-muted/50 p-3">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
@@ -117,13 +116,11 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
               </div>
             )}
 
-            {/* Status */}
             <div className="rounded-lg bg-muted/50 p-3">
               <div className="text-xs text-muted-foreground mb-1">Status</div>
               <p className="text-sm font-medium capitalize">{block.session.status}</p>
             </div>
 
-            {/* Client / Contact Info */}
             <div className="border-t pt-4">
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 Contact Information
@@ -154,10 +151,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
               )}
 
               {block.session.parent_email && (
-                <a
-                  href={`mailto:${block.session.parent_email}`}
-                  className="flex items-center gap-3 mb-3 group"
-                >
+                <a href={`mailto:${block.session.parent_email}`} className="flex items-center gap-3 mb-3 group">
                   <div className="w-8 h-8 rounded-full bg-secondary/50 flex items-center justify-center shrink-0">
                     <Mail className="w-3.5 h-3.5 text-muted-foreground" />
                   </div>
@@ -166,10 +160,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
               )}
 
               {block.session.parent_phone && (
-                <a
-                  href={`tel:${block.session.parent_phone}`}
-                  className="flex items-center gap-3 mb-3 group"
-                >
+                <a href={`tel:${block.session.parent_phone}`} className="flex items-center gap-3 mb-3 group">
                   <div className="w-8 h-8 rounded-full bg-secondary/50 flex items-center justify-center shrink-0">
                     <Phone className="w-3.5 h-3.5 text-muted-foreground" />
                   </div>
@@ -211,7 +202,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
               </div>
             </div>
 
-            {/* Roster */}
+            {/* Roster with contact info */}
             {isSwim && (
               <div className="px-4 pb-4">
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -220,27 +211,76 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn }: Props) => {
                 {block.enrollments.length === 0 ? (
                   <p className="text-sm text-muted-foreground italic">No students enrolled</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {block.enrollments.map((enr) => {
                       const att = block.attendance.find(
                         (a) => a.enrollment_id === enr.id && a.lesson_date === block.dateStr
                       );
                       const isCheckedIn = !!att?.checked_in;
+                      const agreement = block.agreements.find((ag) => ag.enrollment_id === enr.id);
+
                       return (
-                        <div key={enr.id} className="flex items-center gap-3 py-1.5">
-                          <Checkbox
-                            checked={isCheckedIn}
-                            onCheckedChange={() => onCheckIn?.(enr.id, block.session.id, isCheckedIn)}
-                          />
-                          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
-                            {getInitials(enr.child_name)}
+                        <div key={enr.id} className="rounded-lg border bg-card p-3">
+                          {/* Row 1: Check-in + student name */}
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={isCheckedIn}
+                              onCheckedChange={() => onCheckIn?.(enr.id, block.session.id, isCheckedIn)}
+                            />
+                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+                              {getInitials(enr.child_name)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={cn("text-sm font-medium", isCheckedIn && "line-through text-muted-foreground")}>
+                                {enr.child_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">Age {enr.child_age}</p>
+                            </div>
+                            {isCheckedIn && (
+                              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                                ✓ In
+                              </span>
+                            )}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className={cn("text-sm font-medium", isCheckedIn && "line-through text-muted-foreground")}>
-                              {enr.child_name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">Age {enr.child_age}</p>
+
+                          {/* Row 2: Parent contact */}
+                          <div className="mt-2 pl-[52px] space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <User className="w-3 h-3 shrink-0" />
+                              <span className="font-medium">{enr.parent_name}</span>
+                            </div>
+                            {enr.parent_phone && (
+                              <a href={`tel:${enr.parent_phone}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+                                <Phone className="w-3 h-3 shrink-0" />
+                                {enr.parent_phone}
+                              </a>
+                            )}
+                            {(enr as any).parent_email && (
+                              <a href={`mailto:${(enr as any).parent_email}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+                                <Mail className="w-3 h-3 shrink-0" />
+                                {(enr as any).parent_email}
+                              </a>
+                            )}
                           </div>
+
+                          {/* Row 3: Emergency contact */}
+                          {agreement ? (
+                            <div className="mt-2 pl-[52px] pt-2 border-t border-dashed">
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                                <AlertTriangle className="w-3 h-3 shrink-0 text-amber-500" />
+                                <span className="font-semibold uppercase tracking-wide text-[10px]">Emergency Contact</span>
+                              </div>
+                              <p className="text-xs font-medium">{agreement.emergency_contact_name} ({agreement.emergency_contact_relationship})</p>
+                              <a href={`tel:${agreement.emergency_contact_phone}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-0.5">
+                                <Phone className="w-3 h-3 shrink-0" />
+                                {agreement.emergency_contact_phone}
+                              </a>
+                            </div>
+                          ) : (
+                            <div className="mt-2 pl-[52px] pt-2 border-t border-dashed">
+                              <p className="text-[10px] text-muted-foreground italic">No emergency contact on file</p>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
