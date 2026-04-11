@@ -60,6 +60,7 @@ export default function SessionEnrollmentCards({
   enrollments: Enrollment[];
   sessionPeriods: SessionPeriod[];
 }) {
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
   const enrollmentsBySession: Record<string, Enrollment[]> = {};
   enrollments.forEach((e) => {
     if (e.session_id && e.status !== "cancelled") {
