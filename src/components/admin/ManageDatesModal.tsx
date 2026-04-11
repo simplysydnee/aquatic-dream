@@ -93,10 +93,10 @@ const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, se
       return;
     }
     setGenerating(true);
-    const monWed = generateMonWedDates(sessionStartDate, sessionEndDate);
+    const lessonDates = generateLessonDates(sessionStartDate, sessionEndDate, daysOfWeek);
     
-    if (monWed.length === 0) {
-      toast({ title: "No Mon/Wed dates found in range", variant: "destructive" });
+    if (lessonDates.length === 0) {
+      toast({ title: "No class dates found in range", variant: "destructive" });
       setGenerating(false);
       return;
     }
