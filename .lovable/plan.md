@@ -1,53 +1,33 @@
 
 
-## Fix: Assessment Labels Mismatch for School-Age Levels
+## Fix: Last Class Dates Missing from Generated Lesson Dates
 
 ### The Problem
-When a school-age child (6-12) answers "No" to the first question, they get placed in Yellow level showing **"Sea Scouts — Yellow Level — Intermediate"**. But per the curriculum on the Swim Lessons page, Sea Scouts is **School Age 1 — Beginner**. The labels are wrong because `getDiveStatus()` doesn't account for age group when assigning school-age labels.
+The last lesson day for each session period is missing from the generated class dates. Session 1 should include July 2 (Wednesday) and Session 2 should include August 6 (Wednesday), but both are cut off because the `session_end_date` stored on swim_sessions records is wrong:
 
-The curriculum defines:
-- Sea Scouts = School Age 1 = **Beginner** (ages 6-12)
-- Deep Sea Divers = School Age 2 = **Intermediate** (ages 6-12)
-- Ocean Masters = School Age 3 = **Advanced** (ages 6-12)
+| Period | Period End Date | session_end_date (actual) | Missing Date |
+|--------|----------------|--------------------------|--------------|
+| Session 1 | July 2 | July 1 | July 2 (Wed) |
+| Session 2 | Aug 6 | Aug 2 | Aug 6 (Wed) |
 
-But `types.ts` currently returns: Yellow=Intermediate, Blue=Advanced, Green=Expert.
+The `generateLessonDates` function uses `while (cur <= e)` which is correct — the issue is the data, not the logic.
 
-### Changes
+### Root Cause
+When swim_sessions were bulk-created, they copied `period.end_date` at that time. Either the period end dates were updated afterward, or the data was set incorrectly during creation. The current period end dates (July 2, Aug 6) are correct, but the swim_sessions still have stale values.
 
-**1. `src/components/swim-enrollment/types.ts`** — Fix `getDiveStatus()`:
-```
-Yellow (school-age) → "Beginner"     (was "Intermediate")
-Blue   (school-age) → "Intermediate" (was "Advanced")
-Green  (school-age) → "Advanced"     (was "Expert")
-```
-No changes needed to `getGroupName()` — it already returns the correct group names.
+### Fix
 
-**2. `src/components/swim-enrollment/SwimAssessment.tsx`** — Update result card:
-- Replace `{levelInfo.name} Level` (e.g. "Yellow Level") with age-appropriate label: **"School Age 1"** / **"School Age 2"** / **"School Age 3"** for school-age, keep **"Preschool 1"** / **"Preschool 2"** for preschool
-- Add a small age range badge (e.g. "Ages 6-12") below the level name for clarity
-
-**3. `src/components/swim-enrollment/EnrollmentConfirmation.tsx`** — Same label update on the confirmation card so it says "School Age 1" instead of "Yellow Level"
-
-**4. Admin views** — `EnrollmentDetailDialog.tsx`, `SwimEnrollmentsAdmin.tsx`, `SessionEnrollmentCards.tsx` all use `getGroupName()` which is already correct. No changes needed there since they show group names (Sea Scouts, etc.) not the raw color level labels.
-
-### New helper function in `types.ts`
-Add a `getLevelLabel(level, ageGroup)` function:
-```typescript
-export function getLevelLabel(level: SwimLevel, ageGroup: AgeGroup): string {
-  if (ageGroup === "preschool-3-5") {
-    return level === "white" ? "Preschool 1" : "Preschool 2";
-  }
-  if (level === "yellow") return "School Age 1";
-  if (level === "blue") return "School Age 2";
-  return "School Age 3";
-}
+**1. Data fix** — Update all swim_sessions to sync their `session_end_date` with the correct period end dates:
+```sql
+UPDATE swim_sessions SET session_end_date = sp.end_date
+FROM session_periods sp WHERE swim_sessions.session_period_id = sp.id;
 ```
 
-### No database changes needed
-The database stores the color level (white/red/yellow/blue/green) which is correct. The fix is purely display-side.
+**2. Regenerate class dates** — After fixing the data, the admin will need to click "Regenerate" in the Manage Dates modal for affected classes, OR we can add code to auto-sync dates.
+
+**3. Code safeguard** — In the `ManageDatesModal`, when generating dates, use the period's end date as a fallback instead of relying solely on the session's potentially stale `session_end_date`. Update the component to fetch the period end date if the session has a `session_period_id`.
 
 ### Files Modified
-1. `src/components/swim-enrollment/types.ts` — fix `getDiveStatus()`, add `getLevelLabel()`
-2. `src/components/swim-enrollment/SwimAssessment.tsx` — use `getLevelLabel()` and show age range
-3. `src/components/swim-enrollment/EnrollmentConfirmation.tsx` — use `getLevelLabel()` for consistency
+1. **Data update** (via insert tool) — sync `session_end_date` on all swim_sessions
+2. `src/components/admin/ManageDatesModal.tsx` — use period end date as source of truth when generating dates
 
