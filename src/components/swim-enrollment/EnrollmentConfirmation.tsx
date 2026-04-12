@@ -63,7 +63,7 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionId, isFirst
           <p className="text-muted-foreground mb-2">
             <strong>{childName}</strong> has been enrolled in{" "}
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
-              {groupName}
+              {groupName} — {levelLabel}
             </span>
           </p>
 
