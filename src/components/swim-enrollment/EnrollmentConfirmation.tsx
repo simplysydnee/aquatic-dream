@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, ArrowRight, Calendar, Loader2, DollarSign } from "lucide-react";
 import { Link } from "react-router-dom";
-import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getAgeGroup } from "./types";
+import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getAgeGroup, getLevelLabel } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
@@ -25,6 +25,7 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionId, isFirst
   const levelInfo = LEVEL_DISPLAY[level];
   const badge = LEVEL_BADGE_COLORS[level];
   const ageGroup = getAgeGroup(childAge);
+  const levelLabel = getLevelLabel(level, ageGroup);
   const groupName = getGroupName(level, ageGroup);
   const [classDates, setClassDates] = useState<string[]>([]);
   const [loadingDates, setLoadingDates] = useState(false);
