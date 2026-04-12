@@ -93,7 +93,30 @@ const ManageDatesModal = ({ open, onOpenChange, sessionIds, sessionStartDate, se
       return;
     }
     setGenerating(true);
-    const lessonDates = generateLessonDates(sessionStartDate, sessionEndDate, daysOfWeek);
+
+    // Use period end date as source of truth to avoid stale session_end_date
+    let effectiveStart = sessionStartDate;
+    let effectiveEnd = sessionEndDate;
+    if (sessionIds.length > 0) {
+      const { data: sessionData } = await supabase
+        .from("swim_sessions")
+        .select("session_period_id")
+        .eq("id", sessionIds[0])
+        .single();
+      if (sessionData?.session_period_id) {
+        const { data: period } = await supabase
+          .from("session_periods")
+          .select("start_date, end_date")
+          .eq("id", sessionData.session_period_id)
+          .single();
+        if (period) {
+          effectiveStart = period.start_date;
+          effectiveEnd = period.end_date;
+        }
+      }
+    }
+
+    const lessonDates = generateLessonDates(effectiveStart, effectiveEnd, daysOfWeek);
     
     if (lessonDates.length === 0) {
       toast({ title: "No class dates found in range", variant: "destructive" });
