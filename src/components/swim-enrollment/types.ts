@@ -36,9 +36,19 @@ export function getDiveStatus(level: SwimLevel, ageGroup: AgeGroup): string {
     if (level === "white") return "Beginner";
     if (level === "red") return "Foundations";
   }
-  if (level === "yellow") return "Intermediate";
-  if (level === "blue") return "Advanced";
-  return "Expert";
+  if (level === "yellow") return "Beginner";
+  if (level === "blue") return "Intermediate";
+  return "Advanced";
+}
+
+/** Returns a user-friendly level label based on age group */
+export function getLevelLabel(level: SwimLevel, ageGroup: AgeGroup): string {
+  if (ageGroup === "preschool-3-5") {
+    return level === "white" ? "Preschool 1" : "Preschool 2";
+  }
+  if (level === "yellow") return "School Age 1";
+  if (level === "blue") return "School Age 2";
+  return "School Age 3";
 }
 
 export const LEVEL_BADGE_COLORS: Record<SwimLevel, { bg: string; ring: string; text: string }> = {

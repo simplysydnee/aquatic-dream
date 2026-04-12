@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
-import { SwimLevel, LEVEL_DISPLAY, LEVEL_BADGE_COLORS, getGroupName, getDiveStatus, getAgeGroup } from "./types";
+import { SwimLevel, LEVEL_DISPLAY, LEVEL_BADGE_COLORS, getGroupName, getDiveStatus, getAgeGroup, getLevelLabel, AGE_GROUP_LABELS } from "./types";
 
 interface Props {
   onComplete: (level: SwimLevel, age: number, dob: string) => void;
@@ -124,6 +124,8 @@ const SwimAssessment = ({ onComplete }: Props) => {
     const ageGroup = getAgeGroup(age!);
     const groupName = getGroupName(recommendedLevel, ageGroup);
     const diveStatus = getDiveStatus(recommendedLevel, ageGroup);
+    const levelLabel = getLevelLabel(recommendedLevel, ageGroup);
+    const ageRange = ageGroup === "preschool-3-5" ? "Ages 3–5" : "Ages 6–12";
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -146,9 +148,12 @@ const SwimAssessment = ({ onComplete }: Props) => {
             <h3 className="font-display text-3xl font-bold text-foreground mb-0.5">
               {groupName}
             </h3>
-            <p className="text-sm font-medium text-muted-foreground mb-1">
-              {levelInfo.name} Level
+             <p className="text-sm font-medium text-muted-foreground mb-1">
+              {levelLabel}
             </p>
+            <span className="inline-block text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5 mb-1">
+              {ageRange}
+            </span>
             <p className={`text-xs font-semibold uppercase tracking-wider ${badge.text} mb-3`}>
               🤿 {diveStatus}
             </p>
