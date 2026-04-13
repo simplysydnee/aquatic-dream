@@ -468,6 +468,9 @@ const SwimLessons = () => {
             <h2 className="font-display text-3xl font-bold text-foreground mb-3">Class Schedule</h2>
             <p className="text-muted-foreground">Monday & Wednesday · 30 minute lessons · Max 3 students per class</p>
             <p className="text-xs text-muted-foreground mt-1">Preschool and school-age times are staggered to ease parking</p>
+            <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base mt-6">
+              <Link to="/swim-enrollment">Enroll Now</Link>
+            </Button>
           </div>
 
           <ScheduleSection />
