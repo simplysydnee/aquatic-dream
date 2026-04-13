@@ -1,33 +1,37 @@
 
 
-## Fix: Last Class Dates Missing from Generated Lesson Dates
+## Fix Swim Lessons Page: Curriculum & Schedule
 
-### The Problem
-The last lesson day for each session period is missing from the generated class dates. Session 1 should include July 2 (Wednesday) and Session 2 should include August 6 (Wednesday), but both are cut off because the `session_end_date` stored on swim_sessions records is wrong:
+### Problems Found
 
-| Period | Period End Date | session_end_date (actual) | Missing Date |
-|--------|----------------|--------------------------|--------------|
-| Session 1 | July 2 | July 1 | July 2 (Wed) |
-| Session 2 | Aug 6 | Aug 2 | Aug 6 (Wed) |
+1. **Wrong color labels on curriculum cards**:
+   - Sea Scouts shows "White / Red" — should be "Yellow"
+   - Deep Sea Divers shows "Yellow" — should be "Blue"  
+   - Ocean Masters shows "Green / Blue" — should be "Green"
 
-The `generateLessonDates` function uses `while (cur <= e)` which is correct — the issue is the data, not the logic.
+2. **Curriculum not visually separated** by age group — all 5 cards shown in one flat grid. Should have clear "Preschool Program" and "School-Age Program" sections.
 
-### Root Cause
-When swim_sessions were bulk-created, they copied `period.end_date` at that time. Either the period end dates were updated afterward, or the data was set incorrectly during creation. The current period end dates (July 2, Aug 6) are correct, but the swim_sessions still have stale values.
+3. **Schedule section uses raw color names** ("Blue & Yellow") instead of group names (Sea Scouts, Deep Sea Divers). Confusing for parents.
 
-### Fix
+4. **Schedule is hardcoded and duplicated** — same time slots copy-pasted for both sessions. Should pull live data from the database to show actual availability and correct session dates.
 
-**1. Data fix** — Update all swim_sessions to sync their `session_end_date` with the correct period end dates:
-```sql
-UPDATE swim_sessions SET session_end_date = sp.end_date
-FROM session_periods sp WHERE swim_sessions.session_period_id = sp.id;
-```
+### Plan
 
-**2. Regenerate class dates** — After fixing the data, the admin will need to click "Regenerate" in the Manage Dates modal for affected classes, OR we can add code to auto-sync dates.
+**1. Fix curriculum data and separate into two sections** (`SwimLessons.tsx`)
 
-**3. Code safeguard** — In the `ManageDatesModal`, when generating dates, use the period's end date as a fallback instead of relying solely on the session's potentially stale `session_end_date`. Update the component to fetch the period end date if the session has a `session_period_id`.
+Split the curriculum array into `preschoolCurriculum` (Bubble Makers, Reef Explorers) and `schoolAgeCurriculum` (Sea Scouts, Deep Sea Divers, Ocean Masters). Fix the color labels:
+- Sea Scouts: color "Yellow", gradient yellow tones
+- Deep Sea Divers: color "Blue", gradient blue tones  
+- Ocean Masters: color "Green" (unchanged)
+
+Render two distinct sections with headers: "Preschool Program (Ages 3–5)" and "School-Age Program (Ages 6–12)".
+
+**2. Redesign the schedule section** (`SwimLessons.tsx`)
+
+Replace hardcoded time slots with a database-driven schedule. Fetch active `swim_sessions` joined with `session_periods` to show real data grouped by session period. Display using group names instead of color names, and show spots remaining for each time slot.
+
+Layout: Each session period gets a card. Within each card, times are grouped under "Preschool" and "School-Age" subheadings, showing the group name and time — e.g. "3:00 PM — Sea Scouts · 2 spots left".
 
 ### Files Modified
-1. **Data update** (via insert tool) — sync `session_end_date` on all swim_sessions
-2. `src/components/admin/ManageDatesModal.tsx` — use period end date as source of truth when generating dates
+1. `src/pages/SwimLessons.tsx` — fix curriculum data, split into two program sections, replace hardcoded schedule with database-driven display
 
