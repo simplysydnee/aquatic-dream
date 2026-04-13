@@ -7,20 +7,22 @@ import SessionPicker from "@/components/swim-enrollment/SessionPicker";
 import EnrollmentForm, { EnrollmentFormData } from "@/components/swim-enrollment/EnrollmentForm";
 import LegalAgreements, { LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import EnrollmentConfirmation from "@/components/swim-enrollment/EnrollmentConfirmation";
+import EnrollmentCheckout from "@/components/swim-enrollment/EnrollmentCheckout";
 import LessonRequestForm from "@/components/swim-enrollment/LessonRequestForm";
+import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { SwimLevel, PRICING } from "@/components/swim-enrollment/types";
 import { WAIVER_VERSION, TOS_VERSION, PRIVACY_POLICY_VERSION } from "@/components/swim-enrollment/legal-content";
 import { Button } from "@/components/ui/button";
 
-type Step = "assess" | "session" | "info" | "legal" | "done";
-
-const STEP_LABELS = ["Assessment", "Session", "Details", "Agreements", "Confirmed"];
+type Step = "assess" | "session" | "info" | "legal" | "payment" | "done";
 
 const SwimEnrollment = () => {
   const [searchParams] = useSearchParams();
   const isRequest = searchParams.get("type") === "request";
+  // If returning from Stripe checkout, go straight to done
+  const initialStep = searchParams.get("step") === "done" ? "done" : "assess";
 
-  const [step, setStep] = useState<Step>("assess");
+  const [step, setStep] = useState<Step>(initialStep as Step);
   const [level, setLevel] = useState<SwimLevel | null>(null);
   const [childAge, setChildAge] = useState(0);
   const [childDob, setChildDob] = useState("");
@@ -31,9 +33,19 @@ const SwimEnrollment = () => {
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [totalDue, setTotalDue] = useState(0);
+  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const stepIndex = ["assess", "session", "info", "legal", "done"].indexOf(step);
+  // Step labels change based on whether payment is needed (returning swimmers)
+  const allSteps = isFirstTime
+    ? ["Assessment", "Session", "Details", "Agreements", "Confirmed"]
+    : ["Assessment", "Session", "Details", "Agreements", "Payment", "Confirmed"];
+
+  const stepKeys = isFirstTime
+    ? ["assess", "session", "info", "legal", "done"]
+    : ["assess", "session", "info", "legal", "payment", "done"];
+
+  const stepIndex = stepKeys.indexOf(step);
 
   const handleAssessmentComplete = (recommendedLevel: SwimLevel, age: number, dob: string) => {
     setLevel(recommendedLevel);
@@ -54,7 +66,6 @@ const SwimEnrollment = () => {
     const firstTime = data.isFirstTime === "yes";
     setIsFirstTime(firstTime);
 
-    // Get session price
     if (sessionId) {
       const { data: session } = await supabase
         .from("swim_sessions")
@@ -126,6 +137,8 @@ const SwimEnrollment = () => {
       return;
     }
 
+    setEnrollmentId(enrollment.id);
+
     let signerIp: string | null = null;
     try {
       const ipRes = await fetch("https://api.ipify.org?format=json");
@@ -158,13 +171,28 @@ const SwimEnrollment = () => {
       toast({ title: "Something went wrong", description: "Please try again or contact us directly.", variant: "destructive" });
       return;
     }
-    setStep("done");
+
+    // Returning swimmers → go to payment step
+    // First-time swimmers → skip payment (due on first day of class)
+    if (!isFirstTime) {
+      setStep("payment");
+    } else {
+      setStep("done");
+    }
+  };
+
+  // Build price IDs for checkout based on enrollment type
+  const getCheckoutPriceIds = (): string[] => {
+    const ids = ["swim_session_fee"];
+    if (isFirstTime) ids.push("registration_fee");
+    return ids;
   };
 
   // Request mode — simple form
   if (mode === "request") {
     return (
       <main className="min-h-screen bg-background">
+        <PaymentTestModeBanner />
         <section className="bg-gradient-to-br from-primary/10 to-background py-12">
           <div className="container">
             <p className="text-primary font-medium tracking-wider uppercase text-sm mb-2">Lesson Request</p>
@@ -186,6 +214,7 @@ const SwimEnrollment = () => {
 
   return (
     <main className="min-h-screen bg-background">
+      <PaymentTestModeBanner />
       <section className="bg-gradient-to-br from-primary/10 to-background py-12">
         <div className="container">
           <p className="text-primary font-medium tracking-wider uppercase text-sm mb-2">Swim Enrollment</p>
@@ -200,7 +229,7 @@ const SwimEnrollment = () => {
         </div>
 
         <div className="flex items-center justify-center gap-2 max-w-xl mx-auto mb-8">
-          {STEP_LABELS.map((label, i) => (
+          {allSteps.map((label, i) => (
             <div key={label} className="flex items-center gap-2 flex-1">
               <div className="flex flex-col items-center flex-1">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${i <= stepIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
@@ -208,7 +237,7 @@ const SwimEnrollment = () => {
                 </div>
                 <span className="text-xs text-muted-foreground mt-1 hidden sm:block">{label}</span>
               </div>
-              {i < STEP_LABELS.length - 1 && (
+              {i < allSteps.length - 1 && (
                 <div className={`h-0.5 flex-1 -mt-4 sm:-mt-6 ${i < stepIndex ? "bg-primary" : "bg-muted"}`} />
               )}
             </div>
@@ -225,6 +254,14 @@ const SwimEnrollment = () => {
           )}
           {step === "legal" && enrollmentData && (
             <LegalAgreements parentName={enrollmentData.parentName} childName={enrollmentData.childName} onSubmit={handleLegalSubmit} onBack={() => setStep("info")} submitting={submitting} />
+          )}
+          {step === "payment" && enrollmentId && enrollmentData && (
+            <EnrollmentCheckout
+              priceIds={getCheckoutPriceIds()}
+              customerEmail={enrollmentData.parentEmail}
+              enrollmentId={enrollmentId}
+              onBack={() => setStep("legal")}
+            />
           )}
           {step === "done" && level && (
             <EnrollmentConfirmation
