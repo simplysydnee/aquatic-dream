@@ -1,16 +1,19 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, Star, ChevronRight, DollarSign, Calendar, Clock, ShoppingBag } from "lucide-react";
+import { Users, Star, ChevronRight, DollarSign, Calendar, Clock, ShoppingBag, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
-const curriculum = [
+/* ───────── curriculum data ───────── */
+
+const preschoolCurriculum = [
   {
     group: "Bubble Makers",
     level: "Preschool 1",
     color: "White",
     diveStatus: "Beginner",
-    ages: "Ages 3–5",
     gradient: "from-gray-50 to-gray-100/60",
     borderColor: "border-gray-300",
     accentColor: "text-gray-600",
@@ -29,7 +32,6 @@ const curriculum = [
     level: "Preschool 2",
     color: "Red",
     diveStatus: "Foundations",
-    ages: "Ages 3–5",
     gradient: "from-red-50 to-red-100/60",
     borderColor: "border-red-200",
     accentColor: "text-red-600",
@@ -43,17 +45,19 @@ const curriculum = [
       "Basic water safety skills",
     ],
   },
+];
+
+const schoolAgeCurriculum = [
   {
     group: "Sea Scouts",
     level: "School Age 1",
-    color: "White / Red",
+    color: "Yellow",
     diveStatus: "Beginner",
-    ages: "Ages 6–12",
-    gradient: "from-sky-50 to-sky-100/60",
-    borderColor: "border-sky-200",
-    accentColor: "text-sky-600",
-    badgeBg: "bg-sky-50",
-    badgeRing: "ring-sky-300",
+    gradient: "from-yellow-50 to-yellow-100/60",
+    borderColor: "border-yellow-200",
+    accentColor: "text-yellow-600",
+    badgeBg: "bg-yellow-50",
+    badgeRing: "ring-yellow-300",
     letter: "SS",
     skills: [
       "Beginner water comfort & submersion",
@@ -65,14 +69,13 @@ const curriculum = [
   {
     group: "Deep Sea Divers",
     level: "School Age 2",
-    color: "Yellow",
+    color: "Blue",
     diveStatus: "Intermediate",
-    ages: "Ages 6–12",
-    gradient: "from-yellow-50 to-yellow-100/60",
-    borderColor: "border-yellow-200",
-    accentColor: "text-yellow-600",
-    badgeBg: "bg-yellow-50",
-    badgeRing: "ring-yellow-300",
+    gradient: "from-sky-50 to-sky-100/60",
+    borderColor: "border-sky-200",
+    accentColor: "text-sky-600",
+    badgeBg: "bg-sky-50",
+    badgeRing: "ring-sky-300",
     letter: "DD",
     skills: [
       "Independent front & back float",
@@ -84,9 +87,8 @@ const curriculum = [
   {
     group: "Ocean Masters",
     level: "School Age 3",
-    color: "Green / Blue",
+    color: "Green",
     diveStatus: "Advanced",
-    ages: "Ages 6–12",
     gradient: "from-green-50 to-green-100/60",
     borderColor: "border-green-200",
     accentColor: "text-green-600",
@@ -102,27 +104,247 @@ const curriculum = [
   },
 ];
 
-const preschoolSlots = [
-  { time: "2:45 PM", groups: "Bubble Makers / Reef Explorers" },
-  { time: "3:15 PM", groups: "Bubble Makers / Reef Explorers" },
-  { time: "3:45 PM", groups: "Bubble Makers / Reef Explorers" },
-  { time: "4:15 PM", groups: "Bubble Makers / Reef Explorers" },
-  { time: "4:45 PM", groups: "Bubble Makers / Reef Explorers" },
-  { time: "5:30 PM", groups: "Bubble Makers / Reef Explorers" },
-  { time: "6:00 PM", groups: "Bubble Makers / Reef Explorers" },
-  { time: "6:30 PM", groups: "Bubble Makers / Reef Explorers" },
-];
+/* ───────── helpers ───────── */
 
-const schoolAgeSlots = [
-  { time: "3:00 PM", groups: "Blue & Yellow" },
-  { time: "3:30 PM", groups: "Blue & Yellow" },
-  { time: "4:00 PM", groups: "Blue & Yellow" },
-  { time: "4:30 PM", groups: "Blue & Yellow" },
-  { time: "5:00 PM", groups: "Blue & Yellow" },
-  { time: "5:45 PM", groups: "Blue & Yellow" },
-  { time: "6:15 PM", groups: "Yellow & Green" },
-  { time: "6:45 PM", groups: "Yellow & Green" },
-];
+interface SessionPeriod {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+}
+
+interface SwimSession {
+  id: string;
+  swim_level: string;
+  age_group: string | null;
+  start_time: string;
+  end_time: string;
+  max_students: number;
+  session_name: string | null;
+  session_period_id: string | null;
+  registration_status: string;
+}
+
+interface EnrollmentCount {
+  session_id: string;
+  count: number;
+}
+
+const levelOrder: Record<string, number> = { white: 0, red: 1, yellow: 2, blue: 3, green: 4 };
+
+function formatTime(t: string) {
+  const [h, m] = t.split(":");
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${h12}:${m} ${ampm}`;
+}
+
+function formatDate(d: string) {
+  const date = new Date(d + "T00:00:00");
+  return date.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+}
+
+const groupColors: Record<string, { bg: string; text: string; dot: string }> = {
+  white: { bg: "bg-gray-100", text: "text-gray-700", dot: "bg-gray-400" },
+  red: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-400" },
+  yellow: { bg: "bg-yellow-50", text: "text-yellow-700", dot: "bg-yellow-400" },
+  blue: { bg: "bg-sky-50", text: "text-sky-700", dot: "bg-sky-400" },
+  green: { bg: "bg-green-50", text: "text-green-700", dot: "bg-green-400" },
+};
+
+/* ───────── curriculum card ───────── */
+
+function CurriculumCard({ item, index }: { item: typeof preschoolCurriculum[0]; index: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay: index * 0.1 }}
+    >
+      <Card className={`h-full border ${item.borderColor} bg-gradient-to-br ${item.gradient} hover:shadow-xl transition-all duration-300 overflow-hidden`}>
+        <CardContent className="p-0">
+          <div className="flex flex-col items-center pt-8 pb-4 px-6">
+            <div className={`w-24 h-24 rounded-full ${item.badgeBg} ring-4 ${item.badgeRing} shadow-lg mb-4 flex items-center justify-center`}>
+              <span className={`font-display text-2xl font-bold ${item.accentColor}`}>{item.letter}</span>
+            </div>
+            <h3 className="font-display text-2xl font-bold text-foreground">{item.group}</h3>
+            <div className="flex items-center gap-2 mt-1 mb-0.5">
+              <span className={`text-sm font-semibold ${item.accentColor}`}>{item.level}</span>
+              <span className="text-muted-foreground/40">•</span>
+              <span className="text-xs text-muted-foreground font-medium">{item.color} Level</span>
+            </div>
+            <span className={`text-[11px] font-semibold uppercase tracking-wider ${item.accentColor}`}>
+              🤿 {item.diveStatus}
+            </span>
+          </div>
+          <div className="px-6 pb-6">
+            <div className="border-t border-foreground/10 pt-4">
+              <ul className="space-y-2.5">
+                {item.skills.map((skill) => (
+                  <li key={skill} className="flex items-start gap-2.5 text-sm text-foreground/80">
+                    <Star className={`w-4 h-4 mt-0.5 shrink-0 fill-current ${item.accentColor}`} />
+                    {skill}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+/* ───────── schedule section ───────── */
+
+function ScheduleSection() {
+  const [periods, setPeriods] = useState<SessionPeriod[]>([]);
+  const [sessions, setSessions] = useState<SwimSession[]>([]);
+  const [counts, setCounts] = useState<EnrollmentCount[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const [periodsRes, sessionsRes, countsRes] = await Promise.all([
+        supabase.from("session_periods").select("id, name, start_date, end_date").eq("is_active", true).order("start_date"),
+        supabase.from("swim_sessions").select("id, swim_level, age_group, start_time, end_time, max_students, session_name, session_period_id, registration_status").eq("is_active", true).order("start_time"),
+        supabase.from("swim_enrollments").select("session_id").in("status", ["pending", "confirmed", "enrolled"]),
+      ]);
+      if (periodsRes.data) setPeriods(periodsRes.data);
+      if (sessionsRes.data) setSessions(sessionsRes.data);
+      if (countsRes.data) {
+        const map = new Map<string, number>();
+        countsRes.data.forEach((e) => {
+          if (e.session_id) map.set(e.session_id, (map.get(e.session_id) || 0) + 1);
+        });
+        setCounts(Array.from(map, ([session_id, count]) => ({ session_id, count })));
+      }
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (periods.length === 0) {
+    return <p className="text-center text-muted-foreground">Schedule coming soon — check back later!</p>;
+  }
+
+  const getCount = (id: string) => counts.find((c) => c.session_id === id)?.count ?? 0;
+
+  // Group sessions by time slot within a period, then by age group
+  function renderPeriod(period: SessionPeriod) {
+    const periodSessions = sessions.filter((s) => s.session_period_id === period.id);
+    const preschool = periodSessions
+      .filter((s) => s.age_group === "preschool-3-5")
+      .sort((a, b) => a.start_time.localeCompare(b.start_time) || (levelOrder[a.swim_level] ?? 99) - (levelOrder[b.swim_level] ?? 99));
+    const schoolAge = periodSessions
+      .filter((s) => s.age_group === "school-age-6-12")
+      .sort((a, b) => a.start_time.localeCompare(b.start_time) || (levelOrder[a.swim_level] ?? 99) - (levelOrder[b.swim_level] ?? 99));
+
+    // Group by unique start_time
+    function groupByTime(list: SwimSession[]) {
+      const grouped = new Map<string, SwimSession[]>();
+      list.forEach((s) => {
+        const key = s.start_time;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)!.push(s);
+      });
+      return Array.from(grouped);
+    }
+
+    const preschoolTimes = groupByTime(preschool);
+    const schoolAgeTimes = groupByTime(schoolAge);
+
+    return (
+      <Card key={period.id} className="p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Calendar className="w-5 h-5 text-primary" />
+          <h3 className="font-display text-xl font-bold text-foreground">{period.name}</h3>
+        </div>
+        <p className="text-sm text-muted-foreground mb-5">
+          {formatDate(period.start_date)} – {formatDate(period.end_date)} · Mon & Wed · 30 min lessons
+        </p>
+
+        {preschoolTimes.length > 0 && (
+          <>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              🐠 Preschool (Ages 3–5)
+            </h4>
+            <div className="space-y-2 mb-5">
+              {preschoolTimes.map(([time, slots]) => (
+                <TimeSlotRow key={time} time={time} slots={slots} getCount={getCount} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {schoolAgeTimes.length > 0 && (
+          <>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              🏊 School-Age (Ages 6–12)
+            </h4>
+            <div className="space-y-2">
+              {schoolAgeTimes.map(([time, slots]) => (
+                <TimeSlotRow key={time} time={time} slots={slots} getCount={getCount} />
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid gap-8 md:grid-cols-2 max-w-5xl mx-auto">
+      {periods.map(renderPeriod)}
+    </div>
+  );
+}
+
+function TimeSlotRow({ time, slots, getCount }: { time: string; slots: SwimSession[]; getCount: (id: string) => number }) {
+  return (
+    <div className="flex items-start gap-3 py-2.5 px-3 rounded-lg bg-muted/50">
+      <div className="flex items-center gap-1.5 min-w-[80px] pt-0.5">
+        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="text-sm font-semibold text-foreground">{formatTime(time)}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {slots.map((s) => {
+          const enrolled = getCount(s.id);
+          const spotsLeft = s.max_students - enrolled;
+          const full = spotsLeft <= 0;
+          const colors = groupColors[s.swim_level] ?? groupColors.blue;
+          return (
+            <span
+              key={s.id}
+              className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
+                full ? "bg-muted text-muted-foreground line-through" : `${colors.bg} ${colors.text}`
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${full ? "bg-muted-foreground/40" : colors.dot}`} />
+              {s.session_name || s.swim_level}
+              {!full && (
+                <span className="text-[10px] opacity-70">· {spotsLeft} {spotsLeft === 1 ? "spot" : "spots"}</span>
+              )}
+              {full && <span className="text-[10px]">Full</span>}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ───────── main page ───────── */
 
 const SwimLessons = () => {
   return (
@@ -189,57 +411,37 @@ const SwimLessons = () => {
         </div>
       </section>
 
-      {/* Curriculum */}
+      {/* Preschool Curriculum */}
       <section className="py-20">
         <div className="container">
           <div className="text-center mb-14">
-            <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">Our Curriculum</h2>
+            <p className="text-sm font-semibold uppercase tracking-wider text-primary mb-2">Ages 3–5</p>
+            <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">Preschool Program</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              From Bubble Makers to Ocean Masters — each group builds on the last, following the Starfish Aquatics curriculum.
+              White & Red levels — building water comfort and safety foundations for our youngest swimmers.
             </p>
           </div>
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {curriculum.map((item, i) => (
-              <motion.div
-                key={item.group}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-              >
-                <Card className={`h-full border ${item.borderColor} bg-gradient-to-br ${item.gradient} hover:shadow-xl transition-all duration-300 overflow-hidden`}>
-                  <CardContent className="p-0">
-                    <div className="flex flex-col items-center pt-8 pb-4 px-6">
-                      <div className={`w-24 h-24 rounded-full ${item.badgeBg} ring-4 ${item.badgeRing} shadow-lg mb-4 flex items-center justify-center`}>
-                        <span className={`font-display text-2xl font-bold ${item.accentColor}`}>
-                          {item.letter}
-                        </span>
-                      </div>
-                      <h3 className="font-display text-2xl font-bold text-foreground">{item.group}</h3>
-                      <div className="flex items-center gap-2 mt-1 mb-0.5">
-                        <span className={`text-sm font-semibold ${item.accentColor}`}>{item.ages}</span>
-                        <span className="text-muted-foreground/40">•</span>
-                        <span className="text-xs text-muted-foreground font-medium">{item.color}</span>
-                      </div>
-                      <span className={`text-[11px] font-semibold uppercase tracking-wider ${item.accentColor}`}>
-                        🤿 {item.diveStatus}
-                      </span>
-                    </div>
-                    <div className="px-6 pb-6">
-                      <div className="border-t border-foreground/10 pt-4">
-                        <ul className="space-y-2.5">
-                          {item.skills.map((skill) => (
-                            <li key={skill} className="flex items-start gap-2.5 text-sm text-foreground/80">
-                              <Star className={`w-4 h-4 mt-0.5 shrink-0 fill-current ${item.accentColor}`} />
-                              {skill}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+          <div className="grid gap-8 md:grid-cols-2 max-w-3xl mx-auto">
+            {preschoolCurriculum.map((item, i) => (
+              <CurriculumCard key={item.group} item={item} index={i} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* School-Age Curriculum */}
+      <section className="py-20 bg-muted/30">
+        <div className="container">
+          <div className="text-center mb-14">
+            <p className="text-sm font-semibold uppercase tracking-wider text-primary mb-2">Ages 6–12</p>
+            <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">School-Age Program</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+              Yellow → Blue → Green levels — progressing from beginner fundamentals through intermediate skills to advanced swimming.
+            </p>
+          </div>
+          <div className="grid gap-8 md:grid-cols-3 max-w-5xl mx-auto">
+            {schoolAgeCurriculum.map((item, i) => (
+              <CurriculumCard key={item.group} item={item} index={i} />
             ))}
           </div>
         </div>
@@ -263,60 +465,12 @@ const SwimLessons = () => {
       <section className="py-20">
         <div className="container">
           <div className="text-center mb-12">
-            <h2 className="font-display text-3xl font-bold text-foreground mb-3">Summer Schedule</h2>
+            <h2 className="font-display text-3xl font-bold text-foreground mb-3">Class Schedule</h2>
             <p className="text-muted-foreground">Monday & Wednesday · 30 minute lessons · Max 3 students per class</p>
-            <p className="text-xs text-muted-foreground mt-1">Preschool and school-age times staggered to ease parking</p>
+            <p className="text-xs text-muted-foreground mt-1">Preschool and school-age times are staggered to ease parking</p>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
-            <Card className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Calendar className="w-5 h-5 text-primary" />
-                <h3 className="font-display text-xl font-bold text-foreground">Session 1</h3>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">June 6 – June 29 · 8 lessons</p>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Preschool (Ages 3–5)</h4>
-              {preschoolSlots.map((slot) => (
-                <div key={slot.time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50 mb-2">
-                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">{slot.time}</span>
-                  <span className="text-xs text-muted-foreground ml-auto">{slot.groups}</span>
-                </div>
-              ))}
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 mt-4">School-Age (Ages 6–12)</h4>
-              {schoolAgeSlots.map((slot) => (
-                <div key={slot.time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50 mb-2">
-                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">{slot.time}</span>
-                  <span className="text-xs text-muted-foreground ml-auto">{slot.groups}</span>
-                </div>
-              ))}
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Calendar className="w-5 h-5 text-primary" />
-                <h3 className="font-display text-xl font-bold text-foreground">Session 2</h3>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">July 13 – August 5 · 8 lessons</p>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Preschool (Ages 3–5)</h4>
-              {preschoolSlots.map((slot) => (
-                <div key={slot.time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50 mb-2">
-                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">{slot.time}</span>
-                  <span className="text-xs text-muted-foreground ml-auto">{slot.groups}</span>
-                </div>
-              ))}
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 mt-4">School-Age (Ages 6–12)</h4>
-              {schoolAgeSlots.map((slot) => (
-                <div key={slot.time} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/50 mb-2">
-                  <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">{slot.time}</span>
-                  <span className="text-xs text-muted-foreground ml-auto">{slot.groups}</span>
-                </div>
-              ))}
-            </Card>
-          </div>
+          <ScheduleSection />
 
           <div className="text-center mt-8">
             <p className="text-muted-foreground text-sm mb-2">
