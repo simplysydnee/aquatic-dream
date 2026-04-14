@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/popover";
 
 const ALL_FILTERS: ActivityType[] = [
-  "i-can-swim", "swim", "swim-lesson", "private-lesson", "semi-private-lesson", "dive-session", "pool-rental",
+  "i-can-swim", "swim", "private-lesson", "semi-private-lesson", "dive-session", "pool-rental",
 ];
 
 const CalendarAdmin = () => {
