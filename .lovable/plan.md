@@ -1,37 +1,27 @@
 
 
-## Fix Swim Lessons Page: Curriculum & Schedule
+## Rename "Bubble Makers" → "Little Fins"
 
-### Problems Found
+### Why
+The name "Bubble Makers" is trademarked by PADI and needs to be replaced with "Little Fins" for the white preschool level.
 
-1. **Wrong color labels on curriculum cards**:
-   - Sea Scouts shows "White / Red" — should be "Yellow"
-   - Deep Sea Divers shows "Yellow" — should be "Blue"  
-   - Ocean Masters shows "Green / Blue" — should be "Green"
+### Changes
 
-2. **Curriculum not visually separated** by age group — all 5 cards shown in one flat grid. Should have clear "Preschool Program" and "School-Age Program" sections.
+**3 code files** — replace all instances of "Bubble Makers" with "Little Fins":
 
-3. **Schedule section uses raw color names** ("Blue & Yellow") instead of group names (Sea Scouts, Deep Sea Divers). Confusing for parents.
+1. **`src/pages/SwimLessons.tsx`** (line 13) — curriculum card `group` value
+2. **`src/components/swim-enrollment/types.ts`** (lines 14, 24) — `LEVEL_DISPLAY` groupName and `getGroupName` return value
+3. **`src/pages/admin/SessionsAdmin.tsx`** (line 68) — `LEVEL_TO_GROUP` mapping
 
-4. **Schedule is hardcoded and duplicated** — same time slots copy-pasted for both sessions. Should pull live data from the database to show actual availability and correct session dates.
+**Database** — update 16 rows in `swim_sessions`:
+```sql
+UPDATE swim_sessions SET session_name = 'Little Fins'
+WHERE session_name = 'Bubble Makers';
+```
 
-### Plan
+Historical migration files will not be edited.
 
-**1. Fix curriculum data and separate into two sections** (`SwimLessons.tsx`)
-
-Split the curriculum array into `preschoolCurriculum` (Bubble Makers, Reef Explorers) and `schoolAgeCurriculum` (Sea Scouts, Deep Sea Divers, Ocean Masters). Fix the color labels:
-- Sea Scouts: color "Yellow", gradient yellow tones
-- Deep Sea Divers: color "Blue", gradient blue tones  
-- Ocean Masters: color "Green" (unchanged)
-
-Render two distinct sections with headers: "Preschool Program (Ages 3–5)" and "School-Age Program (Ages 6–12)".
-
-**2. Redesign the schedule section** (`SwimLessons.tsx`)
-
-Replace hardcoded time slots with a database-driven schedule. Fetch active `swim_sessions` joined with `session_periods` to show real data grouped by session period. Display using group names instead of color names, and show spots remaining for each time slot.
-
-Layout: Each session period gets a card. Within each card, times are grouped under "Preschool" and "School-Age" subheadings, showing the group name and time — e.g. "3:00 PM — Sea Scouts · 2 spots left".
-
-### Files Modified
-1. `src/pages/SwimLessons.tsx` — fix curriculum data, split into two program sections, replace hardcoded schedule with database-driven display
+### Steps
+1. Update all three code files
+2. Run the data update on `swim_sessions`
 
