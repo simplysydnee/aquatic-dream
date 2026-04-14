@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 export type ActivityType =
   | "i-can-swim"
   | "swim"
+  | "swim-lesson"
   | "private-lesson"
   | "semi-private-lesson"
   | "dive-session"
@@ -17,7 +18,8 @@ interface FilterChip {
 
 const FILTER_CHIPS: FilterChip[] = [
   { type: "i-can-swim", label: "I Can Swim 209", bg: "#d4f0f8", text: "#2a5e84" },
-  { type: "swim", label: "Swim Lesson", bg: "#d0ddf7", text: "#1a3a8a" },
+  { type: "swim", label: "Swim Session", bg: "#d0ddf7", text: "#1a3a8a" },
+  { type: "swim-lesson", label: "Swim Lesson", bg: "#e8f5e9", text: "#2e7d32" },
   { type: "private-lesson", label: "Private Lesson", bg: "#EEEDFE", text: "#26215C" },
   { type: "semi-private-lesson", label: "Semi-Private", bg: "#FBEAF0", text: "#4B1528" },
   { type: "dive-session", label: "Dive Session", bg: "#FAEEDA", text: "#633806" },

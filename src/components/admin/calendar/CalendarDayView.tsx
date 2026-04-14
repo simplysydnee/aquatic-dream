@@ -55,6 +55,7 @@ const BLOCK_COLORS: Record<string, { bg: string; border: string; text: string }>
   "i-can-swim":         { bg: "#d4f0f8", border: "#2a5e84", text: "#2a5e84" },
   "i-can-swim-closed":  { bg: "#2c2c2c", border: "#111",    text: "#e0e0e0" },
   "swim":               { bg: "#d0ddf7", border: "#1a3a8a", text: "#1a3a8a" },
+  "swim-lesson":        { bg: "#e8f5e9", border: "#2e7d32", text: "#2e7d32" },
   "private-lesson":     { bg: "#EEEDFE", border: "#26215C", text: "#26215C" },
   "semi-private-lesson":{ bg: "#FBEAF0", border: "#4B1528", text: "#4B1528" },
   "dive-session":       { bg: "#FAEEDA", border: "#633806", text: "#633806" },
@@ -199,15 +200,16 @@ const CalendarDayView = ({
   );
 
   const adEvents = todayEvents.filter(
-    (e) => !["dive-session", "pool-rental", "i-can-swim"].includes(e.event_type)
+    (e) => !["dive-session", "pool-rental", "i-can-swim", "maintenance", "swim-lesson"].includes(e.event_type)
   );
+  const swimLessonEvents = todayEvents.filter((e) => e.event_type === "swim-lesson");
   const diveRentalEvents = todayEvents.filter(
     (e) => ["dive-session", "pool-rental", "maintenance"].includes(e.event_type)
   );
 
   // ── Determine which groups are visible based on filters ──
   const showICS = activeFilters.has("i-can-swim");
-  const showAD = activeFilters.has("swim") || activeFilters.has("private-lesson") || activeFilters.has("semi-private-lesson");
+  const showAD = activeFilters.has("swim") || activeFilters.has("swim-lesson") || activeFilters.has("private-lesson") || activeFilters.has("semi-private-lesson");
   const showDive = activeFilters.has("dive-session") || activeFilters.has("pool-rental");
 
   // ── Build unique AD session-name columns from today's sessions ──
@@ -620,7 +622,40 @@ const CalendarDayView = ({
                 );
               })}
 
-            {/* ── Dive / Rental blocks ── */}
+            {/* ── Swim Lesson pool events — in first AD column ── */}
+            {col.group === "ad" && col.id === columns.find(c => c.group === "ad")?.id &&
+              swimLessonEvents.map((e) => {
+                const startMins = timeToMinutes(e.start_time);
+                const endMins = timeToMinutes(e.end_time);
+                const dimmed = !activeFilters.has("swim-lesson");
+
+                return renderBlock(
+                  e.id,
+                  startMins,
+                  endMins,
+                  "swim-lesson",
+                  e.title,
+                  e.instructor_name || e.notes || "",
+                  dimmed,
+                  () => setDetailBlock({ kind: "event", event: e }),
+                  false,
+                  <div className="flex shrink-0 gap-0.5">
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); onEditEvent?.(e); }}
+                      className="p-0.5 rounded hover:bg-white/50"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); setDeleteId(e.id); }}
+                      className="p-0.5 rounded hover:bg-white/50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+
             {col.group === "dive" &&
               diveRentalEvents.map((e) => {
                 const startMins = timeToMinutes(e.start_time);

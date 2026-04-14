@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/popover";
 
 const ALL_FILTERS: ActivityType[] = [
-  "i-can-swim", "swim", "private-lesson", "semi-private-lesson", "dive-session", "pool-rental",
+  "i-can-swim", "swim", "swim-lesson", "private-lesson", "semi-private-lesson", "dive-session", "pool-rental",
 ];
 
 const CalendarAdmin = () => {
@@ -104,7 +104,8 @@ const CalendarAdmin = () => {
       <div className="flex flex-wrap gap-3 text-xs">
         {[
           { label: "I Can Swim", border: "#2a5e84", bg: "#d4f0f8" },
-          { label: "Swim Lessons", border: "#1a3a8a", bg: "#d0ddf7" },
+          { label: "Swim Sessions", border: "#1a3a8a", bg: "#d0ddf7" },
+          { label: "Swim Lesson", border: "#2e7d32", bg: "#e8f5e9" },
           { label: "Private Lesson", border: "#26215C", bg: "#EEEDFE" },
           { label: "Semi-Private", border: "#4B1528", bg: "#FBEAF0" },
           { label: "Dive Session", border: "#633806", bg: "#FAEEDA" },
