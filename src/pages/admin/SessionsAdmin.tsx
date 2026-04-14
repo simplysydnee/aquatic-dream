@@ -65,7 +65,7 @@ const ALL_LEVELS: SwimLevel[] = ["white", "red", "yellow", "blue", "green"];
 
 // Auto-derive session_name from level
 const LEVEL_TO_GROUP: Record<string, string> = {
-  white: "Bubble Makers",
+  white: "Little Fins",
   red: "Reef Explorers",
   yellow: "Sea Scouts",
   blue: "Deep Sea Divers",

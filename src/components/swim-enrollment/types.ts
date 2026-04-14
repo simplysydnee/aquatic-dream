@@ -11,7 +11,7 @@ export interface LevelInfo {
 }
 
 export const LEVEL_DISPLAY: Record<SwimLevel, LevelInfo> = {
-  white: { name: "White", groupName: "Bubble Makers", diveStatus: "Beginner", description: "Water comfort & safety introduction", color: "bg-gray-100 text-gray-700 border-gray-300" },
+  white: { name: "White", groupName: "Little Fins", diveStatus: "Beginner", description: "Water comfort & safety introduction", color: "bg-gray-100 text-gray-700 border-gray-300" },
   red: { name: "Red", groupName: "Reef Explorers", diveStatus: "Foundations", description: "Submersion confidence, beginning floating", color: "bg-red-100 text-red-700 border-red-300" },
   yellow: { name: "Yellow", groupName: "Sea Scouts", diveStatus: "Intermediate", description: "Independent floating, intro to kicks", color: "bg-yellow-100 text-yellow-700 border-yellow-300" },
   blue: { name: "Blue", groupName: "Deep Sea Divers", diveStatus: "Advanced", description: "Treading water, developing strokes", color: "bg-blue-100 text-blue-700 border-blue-300" },
@@ -21,7 +21,7 @@ export const LEVEL_DISPLAY: Record<SwimLevel, LevelInfo> = {
 /** Maps level to its group display name based on age group */
 export function getGroupName(level: SwimLevel, ageGroup: AgeGroup): string {
   if (ageGroup === "preschool-3-5") {
-    if (level === "white") return "Bubble Makers";
+    if (level === "white") return "Little Fins";
     if (level === "red") return "Reef Explorers";
   }
   // School-age groupings

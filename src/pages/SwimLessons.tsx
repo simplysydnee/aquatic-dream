@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const preschoolCurriculum = [
   {
-    group: "Bubble Makers",
+    group: "Little Fins",
     level: "Preschool 1",
     color: "White",
     diveStatus: "Beginner",
