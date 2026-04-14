@@ -55,6 +55,7 @@ const BLOCK_COLORS: Record<string, { bg: string; border: string; text: string }>
   "i-can-swim":         { bg: "#d4f0f8", border: "#2a5e84", text: "#2a5e84" },
   "i-can-swim-closed":  { bg: "#2c2c2c", border: "#111",    text: "#e0e0e0" },
   "swim":               { bg: "#d0ddf7", border: "#1a3a8a", text: "#1a3a8a" },
+  "swim-lesson":        { bg: "#e8f5e9", border: "#2e7d32", text: "#2e7d32" },
   "private-lesson":     { bg: "#EEEDFE", border: "#26215C", text: "#26215C" },
   "semi-private-lesson":{ bg: "#FBEAF0", border: "#4B1528", text: "#4B1528" },
   "dive-session":       { bg: "#FAEEDA", border: "#633806", text: "#633806" },
@@ -199,8 +200,9 @@ const CalendarDayView = ({
   );
 
   const adEvents = todayEvents.filter(
-    (e) => !["dive-session", "pool-rental", "i-can-swim"].includes(e.event_type)
+    (e) => !["dive-session", "pool-rental", "i-can-swim", "maintenance", "swim-lesson"].includes(e.event_type)
   );
+  const swimLessonEvents = todayEvents.filter((e) => e.event_type === "swim-lesson");
   const diveRentalEvents = todayEvents.filter(
     (e) => ["dive-session", "pool-rental", "maintenance"].includes(e.event_type)
   );
