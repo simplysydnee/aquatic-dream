@@ -209,7 +209,7 @@ const CalendarDayView = ({
 
   // ── Determine which groups are visible based on filters ──
   const showICS = activeFilters.has("i-can-swim");
-  const showAD = activeFilters.has("swim") || activeFilters.has("private-lesson") || activeFilters.has("semi-private-lesson");
+  const showAD = activeFilters.has("swim") || activeFilters.has("swim-lesson") || activeFilters.has("private-lesson") || activeFilters.has("semi-private-lesson");
   const showDive = activeFilters.has("dive-session") || activeFilters.has("pool-rental");
 
   // ── Build unique AD session-name columns from today's sessions ──
