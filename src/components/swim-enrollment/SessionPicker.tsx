@@ -22,7 +22,7 @@ interface SlotInfo {
 interface Props {
   level: SwimLevel;
   childAge: number;
-  onSelect: (sessionId: string) => void;
+  onSelect: (sessionIds: string[]) => void;
   onBack: () => void;
 }
 
