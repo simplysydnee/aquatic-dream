@@ -108,19 +108,40 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
           </p>
 
           {/* Payment Summary */}
-          <div className="my-4 p-3 rounded-lg border border-green-300 bg-green-50 text-left">
-            <p className="text-sm font-semibold text-green-800 flex items-center gap-1.5 mb-1">
-              <CheckCircle className="w-4 h-4" />
-              Payment Complete
-            </p>
-            <div className="text-sm text-green-700 space-y-0.5">
-              {isFirstTime && (
-                <p>Registration fee: <strong>${PRICING.registrationFee}</strong> <span className="text-xs">(swim bag, cap & goggles)</span></p>
-              )}
-              <p>Session fee{ids.length > 1 ? `s (${ids.length} sessions)` : ""}: <strong>${totalDue - (isFirstTime ? PRICING.registrationFee : 0)}</strong></p>
-              <p className="font-semibold border-t border-green-200 pt-1 mt-1">Total paid: ${totalDue}</p>
+          {isFirstTime ? (
+            <>
+              <div className="my-4 p-3 rounded-lg border border-green-300 bg-green-50 text-left">
+                <p className="text-sm font-semibold text-green-800 flex items-center gap-1.5 mb-1">
+                  <CheckCircle className="w-4 h-4" />
+                  Registration Fee Paid
+                </p>
+                <div className="text-sm text-green-700 space-y-0.5">
+                  <p>Registration fee: <strong>${PRICING.registrationFee}</strong> <span className="text-xs">(swim bag, cap & goggles)</span></p>
+                </div>
+              </div>
+              <div className="my-4 p-3 rounded-lg border border-amber-300 bg-amber-50 text-left">
+                <p className="text-sm font-semibold text-amber-800 flex items-center gap-1.5 mb-1">
+                  <Calendar className="w-4 h-4" />
+                  Session Fees Due
+                </p>
+                <div className="text-sm text-amber-700 space-y-0.5">
+                  <p>Session fee{ids.length > 1 ? `s (${ids.length} sessions)` : ""}: <strong>${totalDue - PRICING.registrationFee}</strong></p>
+                  <p className="text-xs">Due on or before {firstClassDate}</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="my-4 p-3 rounded-lg border border-green-300 bg-green-50 text-left">
+              <p className="text-sm font-semibold text-green-800 flex items-center gap-1.5 mb-1">
+                <CheckCircle className="w-4 h-4" />
+                Payment Complete
+              </p>
+              <div className="text-sm text-green-700 space-y-0.5">
+                <p>Session fee{ids.length > 1 ? `s (${ids.length} sessions)` : ""}: <strong>${totalDue}</strong></p>
+                <p className="font-semibold border-t border-green-200 pt-1 mt-1">Total paid: ${totalDue}</p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Class dates */}
           {loadingDates && (
