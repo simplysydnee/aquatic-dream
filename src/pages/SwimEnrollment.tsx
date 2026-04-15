@@ -19,24 +19,22 @@ type Step = "assess" | "session" | "info" | "legal" | "payment" | "done";
 const SwimEnrollment = () => {
   const [searchParams] = useSearchParams();
   const isRequest = searchParams.get("type") === "request";
-  // If returning from Stripe checkout, go straight to done
   const initialStep = searchParams.get("step") === "done" ? "done" : "assess";
 
   const [step, setStep] = useState<Step>(initialStep as Step);
   const [level, setLevel] = useState<SwimLevel | null>(null);
   const [childAge, setChildAge] = useState(0);
   const [childDob, setChildDob] = useState("");
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionIds, setSessionIds] = useState<string[]>([]);
   const [childName, setChildName] = useState("");
   const [enrollmentData, setEnrollmentData] = useState<EnrollmentFormData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [totalDue, setTotalDue] = useState(0);
-  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+  const [enrollmentIds, setEnrollmentIds] = useState<string[]>([]);
   const { toast } = useToast();
 
-  // Step labels change based on whether payment is needed (returning swimmers)
   const allSteps = isFirstTime
     ? ["Assessment", "Session", "Details", "Agreements", "Confirmed"]
     : ["Assessment", "Session", "Details", "Agreements", "Payment", "Confirmed"];
@@ -54,8 +52,8 @@ const SwimEnrollment = () => {
     setStep("session");
   };
 
-  const handleSessionSelect = (id: string) => {
-    setSessionId(id);
+  const handleSessionSelect = (ids: string[]) => {
+    setSessionIds(ids);
     setStep("info");
   };
 
@@ -66,79 +64,94 @@ const SwimEnrollment = () => {
     const firstTime = data.isFirstTime === "yes";
     setIsFirstTime(firstTime);
 
-    if (sessionId) {
-      const { data: session } = await supabase
+    if (sessionIds.length > 0) {
+      const { data: sessions } = await supabase
         .from("swim_sessions")
-        .select("session_price")
-        .eq("id", sessionId)
-        .single();
-      const sessionFee = session?.session_price ?? 280;
+        .select("id, session_price")
+        .in("id", sessionIds);
+      const totalSessionFees = sessions?.reduce((sum, s) => sum + (s.session_price ?? 280), 0) ?? 280 * sessionIds.length;
       const regFee = firstTime ? PRICING.registrationFee : 0;
-      setTotalDue(sessionFee + regFee);
+      setTotalDue(totalSessionFees + regFee);
     }
 
     setStep("legal");
   };
 
   const handleLegalSubmit = async (legalData: LegalAgreementData) => {
-    if (!level || !sessionId || !enrollmentData) return;
+    if (!level || sessionIds.length === 0 || !enrollmentData) return;
     setSubmitting(true);
 
-    const { count } = await supabase
+    // Fetch all selected sessions
+    const { data: sessions } = await supabase
+      .from("swim_sessions")
+      .select("id, max_students, session_price, session_start_date")
+      .in("id", sessionIds);
+
+    if (!sessions || sessions.length === 0) {
+      toast({ title: "Something went wrong", description: "Could not find selected sessions.", variant: "destructive" });
+      setSubmitting(false);
+      return;
+    }
+
+    // Check capacity for all sessions
+    const { data: enrollments } = await supabase
       .from("swim_enrollments")
-      .select("*", { count: "exact", head: true })
-      .eq("session_id", sessionId)
+      .select("session_id")
+      .in("session_id", sessionIds)
       .in("status", ["enrolled"]);
 
-    const { data: session } = await supabase
-      .from("swim_sessions")
-      .select("max_students, session_price, session_start_date")
-      .eq("id", sessionId)
-      .single();
+    const countMap: Record<string, number> = {};
+    enrollments?.forEach(e => {
+      if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
+    });
 
-    if (session && count !== null && count >= session.max_students) {
-      toast({ title: "Session is full", description: "This session just filled up. Please go back and choose another.", variant: "destructive" });
+    const fullSessions = sessions.filter(s => (countMap[s.id] || 0) >= s.max_students);
+    if (fullSessions.length > 0) {
+      toast({ title: "Session full", description: `${fullSessions.length} session(s) just filled up. Please go back and choose again.`, variant: "destructive" });
       setSubmitting(false);
       setStep("session");
       return;
     }
 
-    const sessionFee = session?.session_price ?? 280;
+    // Registration fee only on the first enrollment
     const regFee = isFirstTime ? PRICING.registrationFee : 0;
-    const paymentDueDate = session?.session_start_date || null;
 
-    const { data: enrollment, error: enrollError } = await supabase
+    // Create enrollments for all selected sessions
+    const enrollmentRows = sessions.map((s, i) => ({
+      swim_level: level,
+      session_id: s.id,
+      parent_name: enrollmentData.parentName,
+      parent_email: enrollmentData.parentEmail,
+      parent_phone: enrollmentData.parentPhone || null,
+      child_name: enrollmentData.childName,
+      child_age: childAge,
+      child_dob: childDob || null,
+      medical_notes: enrollmentData.hasMedical === "yes" ? (enrollmentData.medicalNotes || null) : null,
+      notes: enrollmentData.notes || null,
+      lesson_type: "group" as const,
+      registration_fee: i === 0 ? regFee : 0, // reg fee only on first
+      status: "enrolled" as const,
+      payment_status: "unpaid" as const,
+      payment_amount: (s.session_price ?? 280) + (i === 0 ? regFee : 0),
+      is_first_time: isFirstTime,
+      payment_due_date: s.session_start_date || null,
+    }));
+
+    const { data: newEnrollments, error: enrollError } = await supabase
       .from("swim_enrollments")
-      .insert({
-        swim_level: level,
-        session_id: sessionId,
-        parent_name: enrollmentData.parentName,
-        parent_email: enrollmentData.parentEmail,
-        parent_phone: enrollmentData.parentPhone || null,
-        child_name: enrollmentData.childName,
-        child_age: childAge,
-        child_dob: childDob || null,
-        medical_notes: enrollmentData.hasMedical === "yes" ? (enrollmentData.medicalNotes || null) : null,
-        notes: enrollmentData.notes || null,
-        lesson_type: "group",
-        registration_fee: regFee,
-        status: "enrolled",
-        payment_status: "unpaid",
-        payment_amount: sessionFee + regFee,
-        is_first_time: isFirstTime,
-        payment_due_date: paymentDueDate,
-      })
-      .select("id")
-      .single();
+      .insert(enrollmentRows)
+      .select("id");
 
-    if (enrollError || !enrollment) {
+    if (enrollError || !newEnrollments || newEnrollments.length === 0) {
       toast({ title: "Something went wrong", description: "Please try again or contact us directly.", variant: "destructive" });
       setSubmitting(false);
       return;
     }
 
-    setEnrollmentId(enrollment.id);
+    const newIds = newEnrollments.map(e => e.id);
+    setEnrollmentIds(newIds);
 
+    // Create legal agreements for each enrollment
     let signerIp: string | null = null;
     try {
       const ipRes = await fetch("https://api.ipify.org?format=json");
@@ -146,25 +159,27 @@ const SwimEnrollment = () => {
       signerIp = ipData.ip;
     } catch { /* best-effort */ }
 
+    const agreementRows = newIds.map(enrollId => ({
+      enrollment_id: enrollId,
+      waiver_accepted: legalData.waiverAccepted,
+      photo_release_accepted: legalData.photoReleaseAccepted,
+      privacy_policy_accepted: legalData.privacyPolicyAccepted,
+      terms_accepted: legalData.termsAccepted,
+      signature_text: legalData.signatureText,
+      signer_name: enrollmentData.parentName,
+      signer_email: enrollmentData.parentEmail,
+      signer_ip: signerIp,
+      waiver_version: WAIVER_VERSION,
+      tos_version: TOS_VERSION,
+      privacy_policy_version: PRIVACY_POLICY_VERSION,
+      emergency_contact_name: legalData.emergencyContactName,
+      emergency_contact_phone: legalData.emergencyContactPhone,
+      emergency_contact_relationship: legalData.emergencyContactRelationship,
+    }));
+
     const { error: legalError } = await supabase
       .from("enrollment_agreements")
-      .insert({
-        enrollment_id: enrollment.id,
-        waiver_accepted: legalData.waiverAccepted,
-        photo_release_accepted: legalData.photoReleaseAccepted,
-        privacy_policy_accepted: legalData.privacyPolicyAccepted,
-        terms_accepted: legalData.termsAccepted,
-        signature_text: legalData.signatureText,
-        signer_name: enrollmentData.parentName,
-        signer_email: enrollmentData.parentEmail,
-        signer_ip: signerIp,
-        waiver_version: WAIVER_VERSION,
-        tos_version: TOS_VERSION,
-        privacy_policy_version: PRIVACY_POLICY_VERSION,
-        emergency_contact_name: legalData.emergencyContactName,
-        emergency_contact_phone: legalData.emergencyContactPhone,
-        emergency_contact_relationship: legalData.emergencyContactRelationship,
-      });
+      .insert(agreementRows);
 
     setSubmitting(false);
     if (legalError) {
@@ -172,8 +187,6 @@ const SwimEnrollment = () => {
       return;
     }
 
-    // Returning swimmers → go to payment step
-    // First-time swimmers → skip payment (due on first day of class)
     if (!isFirstTime) {
       setStep("payment");
     } else {
@@ -181,14 +194,15 @@ const SwimEnrollment = () => {
     }
   };
 
-  // Build price IDs for checkout based on enrollment type
   const getCheckoutPriceIds = (): string[] => {
-    const ids = ["swim_session_fee"];
+    const ids: string[] = [];
+    for (let i = 0; i < sessionIds.length; i++) {
+      ids.push("swim_session_fee");
+    }
     if (isFirstTime) ids.push("registration_fee");
     return ids;
   };
 
-  // Request mode — simple form
   if (mode === "request") {
     return (
       <main className="min-h-screen bg-background">
@@ -255,11 +269,11 @@ const SwimEnrollment = () => {
           {step === "legal" && enrollmentData && (
             <LegalAgreements parentName={enrollmentData.parentName} childName={enrollmentData.childName} onSubmit={handleLegalSubmit} onBack={() => setStep("info")} submitting={submitting} />
           )}
-          {step === "payment" && enrollmentId && enrollmentData && (
+          {step === "payment" && enrollmentIds.length > 0 && enrollmentData && (
             <EnrollmentCheckout
               priceIds={getCheckoutPriceIds()}
               customerEmail={enrollmentData.parentEmail}
-              enrollmentId={enrollmentId}
+              enrollmentId={enrollmentIds[0]}
               onBack={() => setStep("legal")}
             />
           )}
@@ -268,7 +282,7 @@ const SwimEnrollment = () => {
               level={level}
               childName={childName}
               childAge={childAge}
-              sessionId={sessionId}
+              sessionIds={sessionIds}
               isFirstTime={isFirstTime}
               totalDue={totalDue}
             />

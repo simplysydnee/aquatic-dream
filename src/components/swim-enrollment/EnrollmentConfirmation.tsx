@@ -11,6 +11,8 @@ interface Props {
   level: SwimLevel;
   childName: string;
   childAge: number;
+  sessionIds?: string[];
+  /** @deprecated use sessionIds instead */
   sessionId?: string | null;
   isFirstTime?: boolean;
   totalDue?: number;
@@ -21,32 +23,67 @@ function formatClassDate(d: string) {
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
-const EnrollmentConfirmation = ({ level, childName, childAge, sessionId, isFirstTime = true, totalDue = 0 }: Props) => {
+const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessionId, isFirstTime = true, totalDue = 0 }: Props) => {
   const levelInfo = LEVEL_DISPLAY[level];
   const badge = LEVEL_BADGE_COLORS[level];
   const ageGroup = getAgeGroup(childAge);
   const levelLabel = getLevelLabel(level, ageGroup);
   const groupName = getGroupName(level, ageGroup);
-  const [classDates, setClassDates] = useState<string[]>([]);
+  const [classDates, setClassDates] = useState<Record<string, string[]>>({});
+  const [sessionNames, setSessionNames] = useState<Record<string, string>>({});
   const [loadingDates, setLoadingDates] = useState(false);
 
+  // Normalize to array
+  const ids = sessionIds && sessionIds.length > 0 ? sessionIds : sessionId ? [sessionId] : [];
+
   useEffect(() => {
-    if (!sessionId) return;
+    if (ids.length === 0) return;
     async function fetchDates() {
       setLoadingDates(true);
-      const { data } = await supabase
-        .from("session_lesson_dates")
-        .select("lesson_date")
-        .eq("session_id", sessionId!)
-        .eq("is_cancelled", false)
-        .order("lesson_date");
-      setClassDates(data?.map(d => d.lesson_date) || []);
+      const [datesRes, sessionsRes] = await Promise.all([
+        supabase
+          .from("session_lesson_dates")
+          .select("session_id, lesson_date")
+          .in("session_id", ids)
+          .eq("is_cancelled", false)
+          .order("lesson_date"),
+        supabase
+          .from("swim_sessions")
+          .select("id, session_period_id")
+          .in("id", ids),
+      ]);
+
+      const grouped: Record<string, string[]> = {};
+      datesRes.data?.forEach(d => {
+        if (!grouped[d.session_id]) grouped[d.session_id] = [];
+        grouped[d.session_id].push(d.lesson_date);
+      });
+      setClassDates(grouped);
+
+      // Fetch period names
+      if (sessionsRes.data) {
+        const periodIds = sessionsRes.data.map(s => s.session_period_id).filter(Boolean) as string[];
+        if (periodIds.length > 0) {
+          const { data: periods } = await supabase
+            .from("session_periods")
+            .select("id, name")
+            .in("id", periodIds);
+          const periodMap = Object.fromEntries((periods || []).map(p => [p.id, p.name]));
+          const names: Record<string, string> = {};
+          sessionsRes.data.forEach(s => {
+            names[s.id] = s.session_period_id ? (periodMap[s.session_period_id] || "Session") : "Session";
+          });
+          setSessionNames(names);
+        }
+      }
+
       setLoadingDates(false);
     }
     fetchDates();
-  }, [sessionId]);
+  }, [ids.join(",")]);
 
-  const firstClassDate = classDates.length > 0 ? formatClassDate(classDates[0]) : "your first class";
+  const allDates = Object.values(classDates).flat().sort();
+  const firstClassDate = allDates.length > 0 ? formatClassDate(allDates[0]) : "your first class";
 
   return (
     <motion.div
@@ -65,6 +102,9 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionId, isFirst
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
               {groupName} — {levelLabel}
             </span>
+            {ids.length > 1 && (
+              <span className="text-sm text-muted-foreground"> for {ids.length} sessions</span>
+            )}
           </p>
 
           {/* Payment Due Info */}
@@ -77,7 +117,7 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionId, isFirst
               {isFirstTime && (
                 <p>Registration fee: <strong>${PRICING.registrationFee}</strong> <span className="text-xs">(swim bag, cap & goggles)</span></p>
               )}
-              <p>Session fee: <strong>${totalDue - (isFirstTime ? PRICING.registrationFee : 0)}</strong></p>
+              <p>Session fee{ids.length > 1 ? `s (${ids.length} sessions)` : ""}: <strong>${totalDue - (isFirstTime ? PRICING.registrationFee : 0)}</strong></p>
               <p className="font-semibold border-t border-yellow-200 pt-1 mt-1">Total: ${totalDue}</p>
             </div>
             {isFirstTime ? (
@@ -97,21 +137,26 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionId, isFirst
               <Loader2 className="w-4 h-4 animate-spin text-primary" />
             </div>
           )}
-          {classDates.length > 0 && (
-            <div className="my-4 p-3 rounded-lg border border-primary/20 bg-background/50 text-left">
-              <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-primary" />
-                Your Class Dates ({classDates.length} classes)
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {classDates.map(d => (
-                  <span key={d} className="text-xs bg-muted border border-border rounded px-1.5 py-0.5 text-muted-foreground">
-                    {formatClassDate(d)}
-                  </span>
-                ))}
+          {ids.map(id => {
+            const dates = classDates[id] || [];
+            if (dates.length === 0) return null;
+            return (
+              <div key={id} className="my-4 p-3 rounded-lg border border-primary/20 bg-background/50 text-left">
+                <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-primary" />
+                  {ids.length > 1 && sessionNames[id] ? `${sessionNames[id]} — ` : ""}
+                  {dates.length} classes
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {dates.map(d => (
+                    <span key={d} className="text-xs bg-muted border border-border rounded px-1.5 py-0.5 text-muted-foreground">
+                      {formatClassDate(d)}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })}
 
           <p className="text-muted-foreground mb-4 text-sm">
             We'll send a confirmation email with all the details.

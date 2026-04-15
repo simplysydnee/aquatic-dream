@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar, ShoppingBag } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar, ShoppingBag, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, PRICING } from "./types";
 
@@ -22,7 +22,7 @@ interface SlotInfo {
 interface Props {
   level: SwimLevel;
   childAge: number;
-  onSelect: (sessionId: string) => void;
+  onSelect: (sessionIds: string[]) => void;
   onBack: () => void;
 }
 
@@ -57,8 +57,8 @@ function formatDayOfWeek(dow: string) {
 const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [classDates, setClassDates] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [classDates, setClassDates] = useState<Record<string, string[]>>({});
   const [loadingDates, setLoadingDates] = useState(false);
 
   const ageGroup = getAgeGroup(childAge);
@@ -142,22 +142,28 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
     fetchSessions();
   }, [level, ageGroup]);
 
-  // Fetch class dates when a slot is selected
+  // Fetch class dates when selection changes
   useEffect(() => {
-    if (!selectedId) { setClassDates([]); return; }
+    if (selectedIds.size === 0) { setClassDates({}); return; }
     async function fetchDates() {
       setLoadingDates(true);
+      const ids = Array.from(selectedIds);
       const { data } = await supabase
         .from("session_lesson_dates")
-        .select("lesson_date, is_cancelled")
-        .eq("session_id", selectedId)
+        .select("session_id, lesson_date, is_cancelled")
+        .in("session_id", ids)
         .eq("is_cancelled", false)
         .order("lesson_date");
-      setClassDates(data?.map(d => d.lesson_date) || []);
+      const grouped: Record<string, string[]> = {};
+      data?.forEach(d => {
+        if (!grouped[d.session_id]) grouped[d.session_id] = [];
+        grouped[d.session_id].push(d.lesson_date);
+      });
+      setClassDates(grouped);
       setLoadingDates(false);
     }
     fetchDates();
-  }, [selectedId]);
+  }, [selectedIds.size]);
 
   // Group by period
   const grouped = slots.reduce<Record<string, SlotInfo[]>>((acc, s) => {
@@ -174,10 +180,10 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
       className="max-w-2xl mx-auto"
     >
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">
-        Pick a Session
+        Pick Your Sessions
       </h3>
       <p className="text-muted-foreground text-sm mb-2">
-        Choose a <strong>{getGroupName(level, ageGroup)}</strong> ({levelInfo.name}) class · {AGE_GROUP_LABELS[ageGroup]}
+        Choose one or more <strong>{getGroupName(level, ageGroup)}</strong> ({levelInfo.name}) sessions · {AGE_GROUP_LABELS[ageGroup]}
       </p>
       {slots.length > 0 && (
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
@@ -223,12 +229,22 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
                 <div className="grid gap-3 sm:grid-cols-2">
                   {groupSlots.map((slot) => {
                     const isFull = slot.spots_left <= 0;
-                    const isSelected = selectedId === slot.assignSessionId;
+                    const isSelected = selectedIds.has(slot.assignSessionId);
                     return (
                       <button
                         key={slot.assignSessionId}
                         disabled={isFull}
-                        onClick={() => setSelectedId(slot.assignSessionId)}
+                        onClick={() => {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev);
+                            if (next.has(slot.assignSessionId)) {
+                              next.delete(slot.assignSessionId);
+                            } else {
+                              next.add(slot.assignSessionId);
+                            }
+                            return next;
+                          });
+                        }}
                         className={`text-left p-4 rounded-xl border transition-all ${
                           isFull
                             ? "opacity-50 cursor-not-allowed border-border bg-muted"
@@ -237,19 +253,26 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
                             : "border-border hover:border-primary/40 bg-card"
                         }`}
                       >
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5" />
-                            {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5" />
-                            {isFull ? (
-                              <span className="text-destructive font-medium">Full</span>
-                            ) : (
-                              <span>{slot.spots_left} spot{slot.spots_left !== 1 ? "s" : ""} left</span>
-                            )}
-                          </span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" />
+                              {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5" />
+                              {isFull ? (
+                                <span className="text-destructive font-medium">Full</span>
+                              ) : (
+                                <span>{slot.spots_left} spot{slot.spots_left !== 1 ? "s" : ""} left</span>
+                              )}
+                            </span>
+                          </div>
+                          {isSelected && (
+                            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-primary-foreground" />
+                            </div>
+                          )}
                         </div>
                       </button>
                     );
@@ -261,25 +284,40 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         </div>
       )}
 
-      {selectedId && classDates.length > 0 && (
-        <div className="mt-4 p-4 rounded-xl border border-primary/20 bg-accent/30">
-          <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-primary" />
-            Class Dates ({classDates.length} classes)
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {classDates.map(d => (
-              <span key={d} className="text-xs bg-background border border-border rounded-md px-2 py-1 text-muted-foreground">
-                {formatClassDate(d)}
-              </span>
-            ))}
-          </div>
+      {selectedIds.size > 0 && Object.keys(classDates).length > 0 && (
+        <div className="mt-4 space-y-3">
+          {Array.from(selectedIds).map(id => {
+            const slot = slots.find(s => s.assignSessionId === id);
+            const dates = classDates[id] || [];
+            if (dates.length === 0) return null;
+            return (
+              <div key={id} className="p-4 rounded-xl border border-primary/20 bg-accent/30">
+                <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  {slot?.periodName} — {dates.length} classes
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {dates.map(d => (
+                    <span key={d} className="text-xs bg-background border border-border rounded-md px-2 py-1 text-muted-foreground">
+                      {formatClassDate(d)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
-      {selectedId && loadingDates && (
+      {selectedIds.size > 0 && loadingDates && (
         <div className="mt-4 flex justify-center">
           <Loader2 className="w-4 h-4 animate-spin text-primary" />
         </div>
+      )}
+
+      {selectedIds.size > 1 && (
+        <p className="mt-3 text-sm text-primary font-medium text-center">
+          ✓ {selectedIds.size} sessions selected
+        </p>
       )}
 
       <div className="flex justify-between mt-8">
@@ -287,8 +325,8 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
           <ChevronLeft className="mr-1 w-4 h-4" /> Back
         </Button>
         <Button
-          disabled={!selectedId}
-          onClick={() => selectedId && onSelect(selectedId)}
+          disabled={selectedIds.size === 0}
+          onClick={() => onSelect(Array.from(selectedIds))}
           className="bg-primary text-primary-foreground"
         >
           Continue <ChevronRight className="ml-1 w-4 h-4" />
