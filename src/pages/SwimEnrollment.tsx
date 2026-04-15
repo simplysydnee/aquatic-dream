@@ -98,7 +98,7 @@ const SwimEnrollment = () => {
       .from("swim_enrollments")
       .select("session_id")
       .in("session_id", sessionIds)
-      .in("status", ["enrolled"]);
+      .in("status", ["pending", "confirmed"]);
 
     const countMap: Record<string, number> = {};
     enrollments?.forEach(e => {
@@ -130,7 +130,7 @@ const SwimEnrollment = () => {
       notes: enrollmentData.notes || null,
       lesson_type: "group" as const,
       registration_fee: i === 0 ? regFee : 0, // reg fee only on first
-      status: "enrolled" as const,
+      status: "confirmed" as const,
       payment_status: "unpaid" as const,
       payment_amount: (s.session_price ?? 280) + (i === 0 ? regFee : 0),
       is_first_time: isFirstTime,
