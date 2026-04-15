@@ -124,9 +124,10 @@ const SwimEnrollment = () => {
       medical_notes: enrollmentData.hasMedical === "yes" ? (enrollmentData.medicalNotes || null) : null,
       notes: enrollmentData.notes || null,
       lesson_type: "group" as const,
-      registration_fee: i === 0 ? regFee : 0, // reg fee only on first
+      registration_fee: i === 0 ? regFee : 0,
       status: "confirmed" as const,
-      payment_status: "unpaid" as const,
+      // First-time: session fees are deferred (unpaid); returning: paid at checkout
+      payment_status: isFirstTime ? "unpaid" as const : "unpaid" as const,
       payment_amount: (s.session_price ?? 280) + (i === 0 ? regFee : 0),
       is_first_time: isFirstTime,
       payment_due_date: s.session_start_date || null,
@@ -186,12 +187,12 @@ const SwimEnrollment = () => {
   };
 
   const getCheckoutPriceIds = (): string[] => {
-    const ids: string[] = [];
-    for (let i = 0; i < sessionIds.length; i++) {
-      ids.push("swim_session_fee");
+    if (isFirstTime) {
+      // First-time: pay only registration fee now; session fees deferred
+      return ["registration_fee"];
     }
-    if (isFirstTime) ids.push("registration_fee");
-    return ids;
+    // Returning: pay session fees now, no registration fee
+    return sessionIds.map(() => "swim_session_fee");
   };
 
   if (mode === "request") {
