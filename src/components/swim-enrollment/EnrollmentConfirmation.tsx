@@ -107,28 +107,19 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
             )}
           </p>
 
-          {/* Payment Due Info */}
-          <div className="my-4 p-3 rounded-lg border border-yellow-300 bg-yellow-50 text-left">
-            <p className="text-sm font-semibold text-yellow-800 flex items-center gap-1.5 mb-1">
-              <DollarSign className="w-4 h-4" />
-              Payment Due {isFirstTime ? `on ${firstClassDate}` : "Now"}
+          {/* Payment Summary */}
+          <div className="my-4 p-3 rounded-lg border border-green-300 bg-green-50 text-left">
+            <p className="text-sm font-semibold text-green-800 flex items-center gap-1.5 mb-1">
+              <CheckCircle className="w-4 h-4" />
+              Payment Complete
             </p>
-            <div className="text-sm text-yellow-700 space-y-0.5">
+            <div className="text-sm text-green-700 space-y-0.5">
               {isFirstTime && (
                 <p>Registration fee: <strong>${PRICING.registrationFee}</strong> <span className="text-xs">(swim bag, cap & goggles)</span></p>
               )}
               <p>Session fee{ids.length > 1 ? `s (${ids.length} sessions)` : ""}: <strong>${totalDue - (isFirstTime ? PRICING.registrationFee : 0)}</strong></p>
-              <p className="font-semibold border-t border-yellow-200 pt-1 mt-1">Total: ${totalDue}</p>
+              <p className="font-semibold border-t border-green-200 pt-1 mt-1">Total paid: ${totalDue}</p>
             </div>
-            {isFirstTime ? (
-              <p className="text-xs text-yellow-600 mt-2">
-                You'll receive a payment link by email the day before your first class.
-              </p>
-            ) : (
-              <p className="text-xs text-yellow-600 mt-2">
-                A payment link will be sent to your email shortly.
-              </p>
-            )}
           </div>
 
           {/* Class dates */}

@@ -35,13 +35,8 @@ const SwimEnrollment = () => {
   const [enrollmentIds, setEnrollmentIds] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const allSteps = isFirstTime
-    ? ["Assessment", "Session", "Details", "Agreements", "Confirmed"]
-    : ["Assessment", "Session", "Details", "Agreements", "Payment", "Confirmed"];
-
-  const stepKeys = isFirstTime
-    ? ["assess", "session", "info", "legal", "done"]
-    : ["assess", "session", "info", "legal", "payment", "done"];
+  const allSteps = ["Assessment", "Session", "Details", "Agreements", "Payment", "Confirmed"];
+  const stepKeys = ["assess", "session", "info", "legal", "payment", "done"];
 
   const stepIndex = stepKeys.indexOf(step);
 
@@ -187,11 +182,7 @@ const SwimEnrollment = () => {
       return;
     }
 
-    if (!isFirstTime) {
-      setStep("payment");
-    } else {
-      setStep("done");
-    }
+    setStep("payment");
   };
 
   const getCheckoutPriceIds = (): string[] => {
