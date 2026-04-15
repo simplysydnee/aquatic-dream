@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle, ArrowRight, Calendar, Loader2, DollarSign } from "lucide-react";
+import { CheckCircle, ArrowRight, Calendar, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getAgeGroup, getLevelLabel } from "./types";
 import { supabase } from "@/integrations/supabase/client";
