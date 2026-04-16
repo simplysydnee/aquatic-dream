@@ -10,10 +10,13 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
+
+const LOGO_URL = 'https://jilrijklnehbfuulykty.supabase.co/storage/v1/object/public/email-assets/AQD_Favicon.png'
 
 interface InviteEmailProps {
   siteName: string
@@ -31,6 +34,7 @@ export const InviteEmail = ({
     <Preview>You've been invited to join {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
+        <Img src={LOGO_URL} width="80" height="80" alt="Aquatic Dreams" style={logo} />
         <Heading style={h1}>{siteName}</Heading>
         <Hr style={hr} />
         <Heading style={h2}>You've been invited</Heading>
@@ -58,6 +62,7 @@ export default InviteEmail
 
 const main = { backgroundColor: '#ffffff', fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }
 const container = { padding: '30px 25px', maxWidth: '560px', margin: '0 auto' }
+const logo = { margin: '0 0 10px' }
 const h1 = { fontSize: '24px', fontWeight: '700' as const, color: '#0f2343', margin: '0 0 10px', fontFamily: "'Playfair Display', Georgia, serif" }
 const h2 = { fontSize: '20px', fontWeight: '600' as const, color: '#0f2343', margin: '0 0 16px', fontFamily: "'Playfair Display', Georgia, serif" }
 const hr = { borderColor: '#5badcb', borderWidth: '2px', margin: '15px 0 25px' }
