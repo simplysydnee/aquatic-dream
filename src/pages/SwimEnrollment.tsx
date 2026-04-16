@@ -164,7 +164,7 @@ const SwimEnrollment = () => {
     const agreementRows = newIds.map(enrollId => ({
       enrollment_id: enrollId,
       waiver_accepted: legalData.waiverAccepted,
-      photo_release_accepted: legalData.photoReleaseAccepted,
+      photo_release_accepted: legalData.photoReleaseAccepted === "yes",
       privacy_policy_accepted: legalData.privacyPolicyAccepted,
       terms_accepted: legalData.termsAccepted,
       signature_text: legalData.signatureText,
