@@ -201,14 +201,14 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting }: Props) => {
           />
         </div>
 
-        <div className="flex justify-between pt-4">
-          <Button type="button" variant="ghost" onClick={onBack}>
+        <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 pt-4">
+          <Button type="button" variant="ghost" onClick={onBack} className="w-full sm:w-auto">
             <ChevronLeft className="mr-1 w-4 h-4" /> Back
           </Button>
           <Button
             type="submit"
             disabled={submitting}
-            className="bg-coral hover:bg-coral/90 text-coral-foreground"
+            className="w-full sm:w-auto bg-coral hover:bg-coral/90 text-coral-foreground"
           >
             {submitting ? "Enrolling..." : "Complete Enrollment"}{" "}
             <ChevronRight className="ml-1 w-4 h-4" />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,7 @@ import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { SwimLevel, PRICING } from "@/components/swim-enrollment/types";
 import { WAIVER_VERSION, TOS_VERSION, PRIVACY_POLICY_VERSION } from "@/components/swim-enrollment/legal-content";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 type Step = "assess" | "session" | "info" | "legal" | "payment" | "done";
 
@@ -39,6 +40,11 @@ const SwimEnrollment = () => {
   const stepKeys = ["assess", "session", "info", "legal", "payment", "done"];
 
   const stepIndex = stepKeys.indexOf(step);
+
+  // Scroll to top whenever step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step]);
 
   const handleAssessmentComplete = (recommendedLevel: SwimLevel, age: number, dob: string) => {
     setLevel(recommendedLevel);
@@ -234,17 +240,31 @@ const SwimEnrollment = () => {
           <Button variant="outline" size="sm" onClick={() => setMode("request")}>Private / Semi-Private</Button>
         </div>
 
-        <div className="flex items-center justify-center gap-2 max-w-xl mx-auto mb-8">
+        {/* Mobile: compact progress bar */}
+        <div className="sm:hidden mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold text-foreground">
+              Step {stepIndex + 1}: {allSteps[stepIndex]}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {stepIndex + 1} of {allSteps.length}
+            </span>
+          </div>
+          <Progress value={((stepIndex + 1) / allSteps.length) * 100} className="h-2" />
+        </div>
+
+        {/* Desktop: full step circles */}
+        <div className="hidden sm:flex items-center justify-center gap-2 max-w-xl mx-auto mb-8">
           {allSteps.map((label, i) => (
             <div key={label} className="flex items-center gap-2 flex-1">
               <div className="flex flex-col items-center flex-1">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${i <= stepIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                   {i + 1}
                 </div>
-                <span className="text-xs text-muted-foreground mt-1 hidden sm:block">{label}</span>
+                <span className="text-xs text-muted-foreground mt-1">{label}</span>
               </div>
               {i < allSteps.length - 1 && (
-                <div className={`h-0.5 flex-1 -mt-4 sm:-mt-6 ${i < stepIndex ? "bg-primary" : "bg-muted"}`} />
+                <div className={`h-0.5 flex-1 -mt-6 ${i < stepIndex ? "bg-primary" : "bg-muted"}`} />
               )}
             </div>
           ))}

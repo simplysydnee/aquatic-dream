@@ -253,8 +253,8 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
                             : "border-border hover:border-primary/40 bg-card"
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5" />
                               {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
@@ -269,7 +269,7 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
                             </span>
                           </div>
                           {isSelected && (
-                            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0">
                               <CheckCircle2 className="w-3.5 h-3.5 text-primary-foreground" />
                             </div>
                           )}
@@ -320,14 +320,14 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         </p>
       )}
 
-      <div className="flex justify-between mt-8">
-        <Button variant="ghost" onClick={onBack}>
+      <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 mt-8">
+        <Button variant="ghost" onClick={onBack} className="w-full sm:w-auto">
           <ChevronLeft className="mr-1 w-4 h-4" /> Back
         </Button>
         <Button
           disabled={selectedIds.size === 0}
           onClick={() => onSelect(Array.from(selectedIds))}
-          className="bg-primary text-primary-foreground"
+          className="w-full sm:w-auto bg-primary text-primary-foreground"
         >
           Continue <ChevronRight className="ml-1 w-4 h-4" />
         </Button>

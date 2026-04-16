@@ -161,9 +161,10 @@ const SwimAssessment = ({ onComplete }: Props) => {
             <p className="text-xs text-muted-foreground mb-6">
               This is a tentative placement — our instructors will confirm the best fit on day one.
             </p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button
                 variant="outline"
+                className="w-full sm:w-auto"
                 onClick={() => {
                   setPhase("age");
                   setDob("");
@@ -176,7 +177,7 @@ const SwimAssessment = ({ onComplete }: Props) => {
                 Retake Assessment
               </Button>
               <Button
-                className="bg-coral hover:bg-coral/90 text-coral-foreground"
+                className="w-full sm:w-auto bg-coral hover:bg-coral/90 text-coral-foreground"
                 onClick={() => onComplete(recommendedLevel, age!, dob)}
               >
                 Continue to Sessions <ChevronRight className="ml-1 w-4 h-4" />
