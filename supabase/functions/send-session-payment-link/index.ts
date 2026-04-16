@@ -1,0 +1,113 @@
+import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createStripeClient, type StripeEnv } from '../_shared/stripe.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+  try {
+    const { enrollmentId, environment, siteUrl } = await req.json()
+    if (!enrollmentId) {
+      return new Response(JSON.stringify({ error: 'enrollmentId is required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Fetch enrollment + session details
+    const { data: enrollment, error: enrollErr } = await supabase
+      .from('swim_enrollments')
+      .select('*, swim_sessions(session_name, day_of_week, start_time, swim_level, session_start_date, session_price)')
+      .eq('id', enrollmentId)
+      .maybeSingle()
+
+    if (enrollErr || !enrollment) {
+      return new Response(JSON.stringify({ error: 'Enrollment not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Calculate session fee (exclude registration fee)
+    const sessionPrice = enrollment.swim_sessions?.session_price ?? 280
+    const regFee = enrollment.registration_fee ?? 0
+    const sessionFee = (enrollment.payment_amount ?? sessionPrice) - regFee
+
+    if (sessionFee <= 0) {
+      return new Response(JSON.stringify({ error: 'No session fee due' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Create a hosted Stripe checkout session for the session fee
+    const env = (environment || 'sandbox') as StripeEnv
+    const stripe = createStripeClient(env)
+
+    const prices = await stripe.prices.list({ lookup_keys: ['swim_session_fee'] })
+    if (!prices.data.length) {
+      return new Response(JSON.stringify({ error: 'Session fee price not configured in Stripe' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const returnBase = siteUrl || 'https://aquatic-dream-quest.lovable.app'
+    const checkoutSession = await stripe.checkout.sessions.create({
+      line_items: [{ price: prices.data[0].id, quantity: 1 }],
+      mode: 'payment',
+      success_url: `${returnBase}/swim-enrollment?step=done`,
+      cancel_url: `${returnBase}/swim-enrollment`,
+      customer_email: enrollment.parent_email,
+      metadata: { enrollmentId, type: 'session_fee' },
+    })
+
+    const paymentLink = checkoutSession.url
+
+    // Send email via transactional email system
+    const session = enrollment.swim_sessions
+    const sessionInfo = session
+      ? `${session.session_name || session.swim_level} — ${session.day_of_week} ${session.start_time}`
+      : undefined
+    const dueDate = session?.session_start_date
+      ? new Date(session.session_start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      : undefined
+
+    await supabase.functions.invoke('send-transactional-email', {
+      body: {
+        templateName: 'session-payment-link',
+        recipientEmail: enrollment.parent_email,
+        idempotencyKey: `session-payment-${enrollmentId}-${Date.now()}`,
+        templateData: {
+          parentName: enrollment.parent_name,
+          childName: enrollment.child_name,
+          sessionInfo,
+          amountDue: `$${sessionFee}`,
+          paymentLink,
+          dueDate,
+        },
+      },
+    })
+
+    // Update reminder timestamp
+    await supabase
+      .from('swim_enrollments')
+      .update({ payment_reminder_sent_at: new Date().toISOString() })
+      .eq('id', enrollmentId)
+
+    return new Response(JSON.stringify({ success: true, paymentLink }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  } catch (error) {
+    console.error('Error sending payment link:', error)
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+})

@@ -24,6 +24,7 @@ import JobApplicationsAdmin from "./pages/admin/JobApplicationsAdmin";
 import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
 import KioskCheckIn from "./pages/KioskCheckIn";
+import Unsubscribe from "./pages/Unsubscribe";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
             {/* Admin routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/checkin" element={<KioskCheckIn />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route
               path="/admin"
               element={
