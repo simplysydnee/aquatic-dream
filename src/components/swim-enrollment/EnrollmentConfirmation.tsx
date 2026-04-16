@@ -36,6 +36,8 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
   // Normalize to array
   const ids = sessionIds && sessionIds.length > 0 ? sessionIds : sessionId ? [sessionId] : [];
 
+  const [confirmationSent, setConfirmationSent] = useState(false);
+
   useEffect(() => {
     if (ids.length === 0) return;
     async function fetchDates() {
@@ -49,7 +51,7 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
           .order("lesson_date"),
         supabase
           .from("swim_sessions")
-          .select("id, session_period_id")
+          .select("id, session_period_id, day_of_week, start_time")
           .in("id", ids),
       ]);
 
@@ -61,6 +63,7 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
       setClassDates(grouped);
 
       // Fetch period names
+      let periodNames: Record<string, string> = {};
       if (sessionsRes.data) {
         const periodIds = sessionsRes.data.map(s => s.session_period_id).filter(Boolean) as string[];
         if (periodIds.length > 0) {
@@ -74,10 +77,65 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
             names[s.id] = s.session_period_id ? (periodMap[s.session_period_id] || "Session") : "Session";
           });
           setSessionNames(names);
+          periodNames = names;
         }
       }
 
       setLoadingDates(false);
+
+      // Send confirmation email (once)
+      if (!confirmationSent && ids.length > 0) {
+        setConfirmationSent(true);
+
+        const allDatesFlat = Object.values(grouped).flat().sort();
+        const formattedDates = allDatesFlat.map(d => {
+          const date = new Date(d + "T00:00:00");
+          return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        });
+
+        const firstSession = sessionsRes.data?.[0];
+        const sessionInfoStr = firstSession
+          ? `${periodNames[firstSession.id] || "Session"} — ${firstSession.day_of_week} ${
+              firstSession.start_time
+                ? new Date(`2000-01-01T${firstSession.start_time}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+                : ""
+            }`
+          : undefined;
+
+        const firstClassDate = allDatesFlat.length > 0
+          ? new Date(allDatesFlat[0] + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+          : undefined;
+
+        // We need parent email - fetch from enrollment
+        const { data: enrollmentRow } = await supabase
+          .from("swim_enrollments")
+          .select("parent_email, parent_name")
+          .eq("id", ids[0])
+          .maybeSingle();
+
+        if (enrollmentRow?.parent_email) {
+          supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "enrollment-confirmation",
+              recipientEmail: enrollmentRow.parent_email,
+              idempotencyKey: `enrollment-confirm-${ids[0]}`,
+              templateData: {
+                parentName: enrollmentRow.parent_name,
+                childName,
+                levelLabel,
+                groupName,
+                sessionInfo: sessionInfoStr,
+                lessonDates: formattedDates,
+                isFirstTime,
+                registrationFeePaid: isFirstTime ? `$${PRICING.registrationFee}` : undefined,
+                sessionFeeDue: isFirstTime ? `$${totalDue - PRICING.registrationFee}` : undefined,
+                dueDate: firstClassDate,
+                totalPaid: !isFirstTime ? `$${totalDue}` : undefined,
+              },
+            },
+          }).catch(err => console.error("Failed to send confirmation email:", err));
+        }
+      }
     }
     fetchDates();
   }, [ids.join(",")]);
