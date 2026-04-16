@@ -8,6 +8,7 @@ import {
   Container,
   Head,
   Heading,
+  Hr,
   Html,
   Link,
   Preview,
@@ -32,9 +33,11 @@ export const EmailChangeEmail = ({
     <Preview>Confirm your email change for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Confirm your email change</Heading>
+        <Heading style={h1}>{siteName}</Heading>
+        <Hr style={hr} />
+        <Heading style={h2}>Confirm your email change</Heading>
         <Text style={text}>
-          You requested to change your email address for {siteName} from{' '}
+          You requested to change your email address from{' '}
           <Link href={`mailto:${email}`} style={link}>
             {email}
           </Link>{' '}
@@ -61,27 +64,21 @@ export const EmailChangeEmail = ({
 
 export default EmailChangeEmail
 
-const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }
-const container = { padding: '20px 25px' }
-const h1 = {
-  fontSize: '22px',
-  fontWeight: 'bold' as const,
-  color: '#000000',
-  margin: '0 0 20px',
-}
-const text = {
-  fontSize: '14px',
-  color: '#55575d',
-  lineHeight: '1.5',
-  margin: '0 0 25px',
-}
-const link = { color: 'inherit', textDecoration: 'underline' }
+const main = { backgroundColor: '#ffffff', fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }
+const container = { padding: '30px 25px', maxWidth: '560px', margin: '0 auto' }
+const h1 = { fontSize: '24px', fontWeight: '700' as const, color: '#0f2343', margin: '0 0 10px', fontFamily: "'Playfair Display', Georgia, serif" }
+const h2 = { fontSize: '20px', fontWeight: '600' as const, color: '#0f2343', margin: '0 0 16px', fontFamily: "'Playfair Display', Georgia, serif" }
+const hr = { borderColor: '#5badcb', borderWidth: '2px', margin: '15px 0 25px' }
+const text = { fontSize: '15px', color: '#333333', lineHeight: '1.6', margin: '0 0 16px' }
+const link = { color: '#5badcb', textDecoration: 'underline' }
 const button = {
-  backgroundColor: '#000000',
+  backgroundColor: '#5badcb',
   color: '#ffffff',
-  fontSize: '14px',
+  fontSize: '16px',
+  fontWeight: '600' as const,
   borderRadius: '8px',
-  padding: '12px 20px',
+  padding: '14px 28px',
   textDecoration: 'none',
+  display: 'inline-block' as const,
 }
-const footer = { fontSize: '12px', color: '#999999', margin: '30px 0 0' }
+const footer = { fontSize: '13px', color: '#888888', margin: '30px 0 0', lineHeight: '1.5' }
