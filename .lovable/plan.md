@@ -1,22 +1,25 @@
 
 
-## Fix: Enrollment Confirmation Email Not Sending
+## Send Test Early Access Invitation Email
 
-### Root Cause
+### What we're doing
+1. Create a branded HTML email template (`early-access-invite.tsx`) matching your existing Aquatic Dreams email style, with an "Enroll Now" button linking to the enrollment page
+2. Register it in the template registry
+3. Deploy the updated edge functions
+4. Send one test email to sydneesmerchant@gmail.com with `parentName: "Sydnee"`
 
-The `payments-webhook` edge function calls `send-transactional-email` after a successful Stripe payment. The call returned **401 Unauthorized** because `send-transactional-email` has `verify_jwt = true` in `config.toml`, and the server-to-server invocation from the webhook isn't passing the JWT in the format the gateway expects.
+### The email content
+- Personalized greeting ("Hi Sydnee,")
+- Your exact copy about early access enrollment being open
+- Prominent **Enroll Now** button → `https://aquatic-dream-quest.lovable.app/swim-enrollment`
+- Feedback request and Sutton Lucas sign-off
+- Aquatic Dreams branding (logo, maritime colors, same layout as your confirmation emails)
 
-The edge function logs confirm:
-- Webhook received and processed correctly (enrollment marked as paid ✅)
-- `send-transactional-email` was called but returned 401 ❌
-- Email was never enqueued, so no confirmation was sent
+### Files
+- **New**: `supabase/functions/_shared/transactional-email-templates/early-access-invite.tsx`
+- **Modified**: `supabase/functions/_shared/transactional-email-templates/registry.ts` (add new entry)
+- **Redeployed**: `send-transactional-email`
 
-### Fix
-
-**One change in `supabase/config.toml`**: Set `verify_jwt = false` for `send-transactional-email`. This is safe because the function is already protected — it requires a valid request body with a registered template name, and it uses the service role client internally. The JWT gate is redundant and blocks legitimate server-to-server calls.
-
-After updating config.toml, redeploy `send-transactional-email` so the new config takes effect.
-
-### Files Modified
-- `supabase/config.toml` — change `verify_jwt` from `true` to `false` for `send-transactional-email`
+### After approval
+Once you confirm the test email looks good, I'll send to the full list of 9 parents.
 
