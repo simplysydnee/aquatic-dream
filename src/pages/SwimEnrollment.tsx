@@ -99,7 +99,7 @@ const SwimEnrollment = () => {
       .from("swim_enrollments")
       .select("session_id")
       .in("session_id", sessionIds)
-      .in("status", ["pending", "confirmed"]);
+      .in("status", ["pending", "confirmed", "enrolled"]);
 
     const countMap: Record<string, number> = {};
     enrollments?.forEach(e => {
