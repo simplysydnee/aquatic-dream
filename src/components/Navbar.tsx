@@ -29,7 +29,7 @@ const Navbar = () => {
               <Phone className="w-3 h-3" /> (209) 577-3483
             </span>
             <span className="flex items-center gap-1.5">
-              <Mail className="w-3 h-3" /> generalmail@aquaticdreams.com
+              <Mail className="w-3 h-3" /> info@aquaticdreamsswim.com
             </span>
           </div>
           <span className="font-display italic text-primary-foreground/80">Swim. Dive. Dream.</span>

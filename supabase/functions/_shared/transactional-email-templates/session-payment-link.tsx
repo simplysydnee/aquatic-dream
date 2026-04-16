@@ -1,10 +1,11 @@
 import * as React from 'npm:react@18.3.1'
 import {
-  Body, Container, Head, Heading, Html, Preview, Text, Button, Hr, Section,
+  Body, Container, Head, Heading, Html, Img, Preview, Text, Button, Hr, Section,
 } from 'npm:@react-email/components@0.0.22'
 import type { TemplateEntry } from './registry.ts'
 
 const SITE_NAME = "Aquatic Dreams"
+const LOGO_URL = 'https://jilrijklnehbfuulykty.supabase.co/storage/v1/object/public/email-assets/AQD_Favicon.png'
 
 interface SessionPaymentLinkProps {
   parentName?: string
@@ -28,6 +29,7 @@ const SessionPaymentLinkEmail = ({
     <Preview>Session fee payment for {childName || 'your swimmer'} — {SITE_NAME}</Preview>
     <Body style={main}>
       <Container style={container}>
+        <Img src={LOGO_URL} width="80" height="80" alt="Aquatic Dreams" style={logo} />
         <Heading style={h1}>{SITE_NAME}</Heading>
         <Hr style={hr} />
         <Text style={text}>
@@ -52,7 +54,7 @@ const SessionPaymentLinkEmail = ({
         )}
         <Text style={text}>
           If you have any questions, feel free to contact us at{' '}
-          generalmail@aquaticdreams.com or call (209) 577-3483.
+          info@aquaticdreamsswim.com or call (209) 577-3483.
         </Text>
         <Text style={footer}>
           Best regards,<br />
@@ -80,6 +82,7 @@ export const template = {
 
 const main = { backgroundColor: '#ffffff', fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }
 const container = { padding: '30px 25px', maxWidth: '560px', margin: '0 auto' }
+const logo = { margin: '0 0 10px' }
 const h1 = { fontSize: '24px', fontWeight: '700' as const, color: '#0f2343', margin: '0 0 10px', fontFamily: "'Playfair Display', Georgia, serif" }
 const hr = { borderColor: '#5badcb', borderWidth: '2px', margin: '15px 0 25px' }
 const text = { fontSize: '15px', color: '#333', lineHeight: '1.6', margin: '0 0 16px' }
