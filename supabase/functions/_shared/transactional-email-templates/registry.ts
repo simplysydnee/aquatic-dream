@@ -12,9 +12,11 @@ export interface TemplateEntry {
 import { template as sessionPaymentLink } from './session-payment-link.tsx'
 import { template as enrollmentConfirmation } from './enrollment-confirmation.tsx'
 import { template as lessonReminder } from './lesson-reminder.tsx'
+import { template as earlyAccessInvite } from './early-access-invite.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'session-payment-link': sessionPaymentLink,
   'enrollment-confirmation': enrollmentConfirmation,
   'lesson-reminder': lessonReminder,
+  'early-access-invite': earlyAccessInvite,
 }
