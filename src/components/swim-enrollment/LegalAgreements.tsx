@@ -99,8 +99,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const validate = (): LegalAgreementData | null => {
     const result = legalSchema.safeParse(form);
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -108,10 +107,21 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         fieldErrors[issue.path[0] as string] = issue.message;
       });
       setErrors(fieldErrors);
-      return;
+      return null;
     }
     setErrors({});
-    onSubmit(result.data);
+    return result.data;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = validate();
+    if (data) onSubmit(data);
+  };
+
+  const handleAddAnother = () => {
+    const data = validate();
+    if (data && onAddAnother) onAddAnother(data);
   };
 
   const update = (key: string, value: string | boolean) => {
@@ -311,14 +321,27 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
           <Button type="button" variant="ghost" onClick={onBack} className="w-full sm:w-auto">
             <ChevronLeft className="mr-1 w-4 h-4" /> Back
           </Button>
-          <Button
-            type="submit"
-            disabled={submitting}
-            className="w-full sm:w-auto bg-coral hover:bg-coral/90 text-coral-foreground"
-          >
-            {submitting ? "Enrolling..." : "Complete Enrollment"}{" "}
-            <ChevronRight className="ml-1 w-4 h-4" />
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            {showAddAnother && onAddAnother && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={submitting}
+                onClick={handleAddAnother}
+                className="w-full sm:w-auto"
+              >
+                Add Another Swimmer
+              </Button>
+            )}
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="w-full sm:w-auto bg-coral hover:bg-coral/90 text-coral-foreground"
+            >
+              {submitting ? "Enrolling..." : "Complete Enrollment"}{" "}
+              <ChevronRight className="ml-1 w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </form>
     </motion.div>
