@@ -7,6 +7,19 @@ import { Link } from "react-router-dom";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getAgeGroup, getLevelLabel } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 
+function formatClassDate(d: string) {
+  const date = new Date(d + "T00:00:00");
+  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+interface ChildInfo {
+  level: SwimLevel;
+  childName: string;
+  childAge: number;
+  sessionIds: string[];
+  isFirstTime: boolean;
+}
+
 interface Props {
   level: SwimLevel;
   childName: string;
@@ -16,14 +29,13 @@ interface Props {
   sessionId?: string | null;
   isFirstTime?: boolean;
   totalDue?: number;
+  children?: ChildInfo[];
 }
 
-function formatClassDate(d: string) {
-  const date = new Date(d + "T00:00:00");
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-}
-
-const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessionId, isFirstTime = true, totalDue = 0 }: Props) => {
+const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessionId, isFirstTime = true, totalDue = 0, children: multiChildren }: Props) => {
+  const isMulti = multiChildren && multiChildren.length > 1;
+  const displayChildren = multiChildren && multiChildren.length > 0 ? multiChildren : [{ level, childName, childAge, sessionIds: sessionIds || (sessionId ? [sessionId] : []), isFirstTime: isFirstTime ?? true }];
+  const firstChild = displayChildren[0];
   const levelInfo = LEVEL_DISPLAY[level];
   const badge = LEVEL_BADGE_COLORS[level];
   const ageGroup = getAgeGroup(childAge);
@@ -33,8 +45,10 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
   const [sessionNames, setSessionNames] = useState<Record<string, string>>({});
   const [loadingDates, setLoadingDates] = useState(false);
 
-  // Normalize to array
-  const ids = sessionIds && sessionIds.length > 0 ? sessionIds : sessionId ? [sessionId] : [];
+  // Normalize to array — collect all session IDs across all children
+  const ids = isMulti
+    ? [...new Set(displayChildren.flatMap(c => c.sessionIds))]
+    : sessionIds && sessionIds.length > 0 ? sessionIds : sessionId ? [sessionId] : [];
 
   useEffect(() => {
     if (ids.length === 0) return;
@@ -97,15 +111,34 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
           <h3 className="font-display text-2xl font-bold text-foreground mb-2">
             You're All Set!
           </h3>
-          <p className="text-muted-foreground mb-2">
-            <strong>{childName}</strong> has been enrolled in{" "}
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
-              {groupName} — {levelLabel}
-            </span>
-            {ids.length > 1 && (
-              <span className="text-sm text-muted-foreground"> for {ids.length} sessions</span>
-            )}
-          </p>
+          {isMulti ? (
+            <div className="text-left space-y-2 mb-2">
+              {displayChildren.map((child, i) => {
+                const cAgeGroup = getAgeGroup(child.childAge);
+                const cLevelLabel = getLevelLabel(child.level, cAgeGroup);
+                const cGroupName = getGroupName(child.level, cAgeGroup);
+                const cBadge = LEVEL_BADGE_COLORS[child.level];
+                return (
+                  <p key={i} className="text-muted-foreground text-sm">
+                    <strong>{child.childName}</strong> →{" "}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cBadge.bg} ${cBadge.text}`}>
+                      {cGroupName} — {cLevelLabel}
+                    </span>
+                  </p>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-muted-foreground mb-2">
+              <strong>{firstChild.childName}</strong> has been enrolled in{" "}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
+                {groupName} — {levelLabel}
+              </span>
+              {ids.length > 1 && (
+                <span className="text-sm text-muted-foreground"> for {ids.length} sessions</span>
+              )}
+            </p>
+          )}
 
           {/* Payment Summary */}
           {isFirstTime ? (

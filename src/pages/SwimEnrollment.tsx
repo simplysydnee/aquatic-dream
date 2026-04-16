@@ -19,28 +19,46 @@ type Step = "assess" | "session" | "info" | "legal" | "payment" | "done";
 
 const ENROLLMENT_STORAGE_KEY = "swim_enrollment_state";
 
+interface ChildEnrollment {
+  level: SwimLevel;
+  childAge: number;
+  childDob: string;
+  childName: string;
+  sessionIds: string[];
+  enrollmentData: EnrollmentFormData;
+  legalData: LegalAgreementData;
+  isFirstTime: boolean;
+}
+
 const SwimEnrollment = () => {
   const [searchParams] = useSearchParams();
   const isRequest = searchParams.get("type") === "request";
   const isDone = searchParams.get("step") === "done";
 
   const [step, setStep] = useState<Step>(isDone ? "done" : "assess");
+  // Current child being enrolled (in-progress state)
   const [level, setLevel] = useState<SwimLevel | null>(null);
   const [childAge, setChildAge] = useState(0);
   const [childDob, setChildDob] = useState("");
   const [sessionIds, setSessionIds] = useState<string[]>([]);
-  const [childName, setChildName] = useState("");
   const [enrollmentData, setEnrollmentData] = useState<EnrollmentFormData | null>(null);
+
+  // Multi-child state
+  const [completedChildren, setCompletedChildren] = useState<ChildEnrollment[]>([]);
+  const [sharedParent, setSharedParent] = useState<{ name: string; email: string; phone: string } | null>(null);
+  const [sharedEmergency, setSharedEmergency] = useState<{ name: string; phone: string; relationship: string } | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [totalDue, setTotalDue] = useState(0);
   const [enrollmentIds, setEnrollmentIds] = useState<string[]>([]);
+  // For confirmation: all children info
+  const [confirmedChildren, setConfirmedChildren] = useState<ChildEnrollment[]>([]);
   const { toast } = useToast();
 
   const allSteps = ["Assessment", "Session", "Details", "Agreements", "Payment", "Confirmed"];
   const stepKeys = ["assess", "session", "info", "legal", "payment", "done"];
-
   const stepIndex = stepKeys.indexOf(step);
 
   // Restore state from localStorage when returning from Stripe
@@ -50,19 +68,15 @@ const SwimEnrollment = () => {
         const saved = localStorage.getItem(ENROLLMENT_STORAGE_KEY);
         if (saved) {
           const s = JSON.parse(saved);
-          if (s.level) setLevel(s.level);
-          if (s.childName) setChildName(s.childName);
-          if (s.childAge) setChildAge(s.childAge);
-          if (s.sessionIds) setSessionIds(s.sessionIds);
-          if (s.isFirstTime !== undefined) setIsFirstTime(s.isFirstTime);
+          if (s.confirmedChildren) setConfirmedChildren(s.confirmedChildren);
           if (s.totalDue) setTotalDue(s.totalDue);
+          if (s.enrollmentIds) setEnrollmentIds(s.enrollmentIds);
           localStorage.removeItem(ENROLLMENT_STORAGE_KEY);
         }
-      } catch { /* ignore parse errors */ }
+      } catch { /* ignore */ }
     }
   }, [isDone]);
 
-  // Scroll to top whenever step changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
@@ -81,33 +95,88 @@ const SwimEnrollment = () => {
 
   const handleInfoSubmit = async (data: EnrollmentFormData) => {
     setEnrollmentData(data);
-    setChildName(data.childName);
 
     const firstTime = data.isFirstTime === "yes";
     setIsFirstTime(firstTime);
 
-    if (sessionIds.length > 0) {
-      const { data: sessions } = await supabase
-        .from("swim_sessions")
-        .select("id, session_price")
-        .in("id", sessionIds);
-      const totalSessionFees = sessions?.reduce((sum, s) => sum + (s.session_price ?? 280), 0) ?? 280 * sessionIds.length;
-      const regFee = firstTime ? PRICING.registrationFee : 0;
-      setTotalDue(totalSessionFees + regFee);
+    // Save shared parent info for sibling pre-fill
+    if (!sharedParent) {
+      setSharedParent({ name: data.parentName, email: data.parentEmail, phone: data.parentPhone || "" });
     }
 
     setStep("legal");
+  };
+
+  const handleAddAnother = (legalData: LegalAgreementData) => {
+    if (!level || sessionIds.length === 0 || !enrollmentData) return;
+
+    // Save emergency contact for next sibling
+    if (!sharedEmergency) {
+      setSharedEmergency({
+        name: legalData.emergencyContactName,
+        phone: legalData.emergencyContactPhone,
+        relationship: legalData.emergencyContactRelationship,
+      });
+    }
+
+    const child: ChildEnrollment = {
+      level,
+      childAge,
+      childDob,
+      childName: enrollmentData.childName,
+      sessionIds,
+      enrollmentData,
+      legalData,
+      isFirstTime: enrollmentData.isFirstTime === "yes",
+    };
+    setCompletedChildren(prev => [...prev, child]);
+
+    // Reset per-child state and go back to assessment
+    setLevel(null);
+    setChildAge(0);
+    setChildDob("");
+    setSessionIds([]);
+    setEnrollmentData(null);
+    setStep("assess");
+
+    toast({ title: `${child.childName} added!`, description: "Now add the next swimmer." });
   };
 
   const handleLegalSubmit = async (legalData: LegalAgreementData) => {
     if (!level || sessionIds.length === 0 || !enrollmentData) return;
     setSubmitting(true);
 
-    // Fetch all selected sessions
+    // Save emergency contact
+    if (!sharedEmergency) {
+      setSharedEmergency({
+        name: legalData.emergencyContactName,
+        phone: legalData.emergencyContactPhone,
+        relationship: legalData.emergencyContactRelationship,
+      });
+    }
+
+    // Combine current child with all previously added children
+    const currentChild: ChildEnrollment = {
+      level,
+      childAge,
+      childDob,
+      childName: enrollmentData.childName,
+      sessionIds,
+      enrollmentData,
+      legalData,
+      isFirstTime: enrollmentData.isFirstTime === "yes",
+    };
+    const allChildren = [...completedChildren, currentChild];
+
+    // Gather all session IDs across all children
+    const allSessionIds = allChildren.flatMap(c => c.sessionIds);
+    const uniqueSessionIds = [...new Set(allSessionIds)];
+
+    // Fetch all sessions
     const { data: sessions } = await supabase
       .from("swim_sessions")
       .select("id, max_students, session_price, session_start_date")
-      .in("id", sessionIds);
+      .in("id", uniqueSessionIds);
 
     if (!sessions || sessions.length === 0) {
       toast({ title: "Something went wrong", description: "Could not find selected sessions.", variant: "destructive" });
@@ -115,15 +184,17 @@ const SwimEnrollment = () => {
       return;
     }
 
+    const sessionMap = Object.fromEntries(sessions.map(s => [s.id, s]));
+
     // Check capacity for all sessions
-    const { data: enrollments } = await supabase
+    const { data: existingEnrollments } = await supabase
       .from("swim_enrollments")
       .select("session_id")
-      .in("session_id", sessionIds)
+      .in("session_id", uniqueSessionIds)
       .in("status", ["pending", "confirmed", "enrolled"]);
 
     const countMap: Record<string, number> = {};
-    enrollments?.forEach(e => {
+    existingEnrollments?.forEach(e => {
       if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
     });
 
@@ -135,30 +206,38 @@ const SwimEnrollment = () => {
       return;
     }
 
-    // Registration fee only on the first enrollment
-    const regFee = isFirstTime ? PRICING.registrationFee : 0;
+    // Registration fee: only charge once for the entire family, on the first child who is first-time
+    const anyFirstTime = allChildren.some(c => c.isFirstTime);
+    let regFeeCharged = false;
 
-    // Create enrollments for all selected sessions
-    const enrollmentRows = sessions.map((s, i) => ({
-      swim_level: level,
-      session_id: s.id,
-      parent_name: enrollmentData.parentName,
-      parent_email: enrollmentData.parentEmail,
-      parent_phone: enrollmentData.parentPhone || null,
-      child_name: enrollmentData.childName,
-      child_age: childAge,
-      child_dob: childDob || null,
-      medical_notes: enrollmentData.hasMedical === "yes" ? (enrollmentData.medicalNotes || null) : null,
-      notes: enrollmentData.notes || null,
-      lesson_type: "group" as const,
-      registration_fee: i === 0 ? regFee : 0,
-      status: "confirmed" as const,
-      // First-time: session fees are deferred (unpaid); returning: paid at checkout
-      payment_status: isFirstTime ? "unpaid" as const : "unpaid" as const,
-      payment_amount: (s.session_price ?? 280) + (i === 0 ? regFee : 0),
-      is_first_time: isFirstTime,
-      payment_due_date: s.session_start_date || null,
-    }));
+    // Build enrollment rows for ALL children
+    const enrollmentRows = allChildren.flatMap(child => {
+      return child.sessionIds.map((sid, i) => {
+        const s = sessionMap[sid];
+        const chargeRegFee = child.isFirstTime && !regFeeCharged && i === 0;
+        if (chargeRegFee) regFeeCharged = true;
+        const regFee = chargeRegFee ? PRICING.registrationFee : 0;
+        return {
+          swim_level: child.level,
+          session_id: sid,
+          parent_name: child.enrollmentData.parentName,
+          parent_email: child.enrollmentData.parentEmail,
+          parent_phone: child.enrollmentData.parentPhone || null,
+          child_name: child.enrollmentData.childName,
+          child_age: child.childAge,
+          child_dob: child.childDob || null,
+          medical_notes: child.enrollmentData.hasMedical === "yes" ? (child.enrollmentData.medicalNotes || null) : null,
+          notes: child.enrollmentData.notes || null,
+          lesson_type: "group" as const,
+          registration_fee: regFee,
+          status: "confirmed" as const,
+          payment_status: "unpaid" as const,
+          payment_amount: (s?.session_price ?? 280) + regFee,
+          is_first_time: child.isFirstTime,
+          payment_due_date: s?.session_start_date || null,
+        };
+      });
+    });
 
     const { data: newEnrollments, error: enrollError } = await supabase
       .from("swim_enrollments")
@@ -182,23 +261,30 @@ const SwimEnrollment = () => {
       signerIp = ipData.ip;
     } catch { /* best-effort */ }
 
-    const agreementRows = newIds.map(enrollId => ({
-      enrollment_id: enrollId,
-      waiver_accepted: legalData.waiverAccepted,
-      photo_release_accepted: legalData.photoReleaseAccepted === "yes",
-      privacy_policy_accepted: legalData.privacyPolicyAccepted,
-      terms_accepted: legalData.termsAccepted,
-      signature_text: legalData.signatureText,
-      signer_name: enrollmentData.parentName,
-      signer_email: enrollmentData.parentEmail,
-      signer_ip: signerIp,
-      waiver_version: WAIVER_VERSION,
-      tos_version: TOS_VERSION,
-      privacy_policy_version: PRIVACY_POLICY_VERSION,
-      emergency_contact_name: legalData.emergencyContactName,
-      emergency_contact_phone: legalData.emergencyContactPhone,
-      emergency_contact_relationship: legalData.emergencyContactRelationship,
-    }));
+    // Map enrollment IDs back to children
+    let idx = 0;
+    const agreementRows = allChildren.flatMap(child => {
+      return child.sessionIds.map(() => {
+        const enrollId = newIds[idx++];
+        return {
+          enrollment_id: enrollId,
+          waiver_accepted: child.legalData.waiverAccepted,
+          photo_release_accepted: child.legalData.photoReleaseAccepted === "yes",
+          privacy_policy_accepted: child.legalData.privacyPolicyAccepted,
+          terms_accepted: child.legalData.termsAccepted,
+          signature_text: child.legalData.signatureText,
+          signer_name: child.enrollmentData.parentName,
+          signer_email: child.enrollmentData.parentEmail,
+          signer_ip: signerIp,
+          waiver_version: WAIVER_VERSION,
+          tos_version: TOS_VERSION,
+          privacy_policy_version: PRIVACY_POLICY_VERSION,
+          emergency_contact_name: child.legalData.emergencyContactName,
+          emergency_contact_phone: child.legalData.emergencyContactPhone,
+          emergency_contact_relationship: child.legalData.emergencyContactRelationship,
+        };
+      });
+    });
 
     const { error: legalError } = await supabase
       .from("enrollment_agreements")
@@ -210,15 +296,17 @@ const SwimEnrollment = () => {
       return;
     }
 
-    // Save state to localStorage so it survives Stripe redirect
+    // Calculate total due
+    const total = enrollmentRows.reduce((sum, r) => sum + r.payment_amount, 0);
+    setTotalDue(total);
+    setConfirmedChildren(allChildren);
+
+    // Save state for Stripe redirect
     try {
       localStorage.setItem(ENROLLMENT_STORAGE_KEY, JSON.stringify({
-        level,
-        childName: enrollmentData.childName,
-        childAge,
-        sessionIds,
-        isFirstTime,
-        totalDue,
+        confirmedChildren: allChildren,
+        totalDue: total,
+        enrollmentIds: newIds,
       }));
     } catch { /* ignore */ }
 
@@ -226,13 +314,20 @@ const SwimEnrollment = () => {
   };
 
   const getCheckoutPriceIds = (): string[] => {
-    if (isFirstTime) {
+    const allChildren = confirmedChildren.length > 0 ? confirmedChildren : [...completedChildren];
+    const anyFirstTime = allChildren.some(c => c.isFirstTime);
+    
+    if (anyFirstTime) {
       // First-time: pay only registration fee now; session fees deferred
       return ["registration_fee"];
     }
-    // Returning: pay session fees now, no registration fee
-    return sessionIds.map(() => "swim_session_fee");
+    // Returning: pay session fees for all children
+    const totalSessions = allChildren.reduce((sum, c) => sum + c.sessionIds.length, 0);
+    return Array(totalSessions).fill("swim_session_fee");
   };
+
+  // Count of swimmers added so far (for the progress indicator)
+  const swimmerCount = completedChildren.length + 1;
 
   if (mode === "request") {
     return (
@@ -263,7 +358,14 @@ const SwimEnrollment = () => {
       <section className="bg-gradient-to-br from-primary/10 to-background py-12">
         <div className="container">
           <p className="text-primary font-medium tracking-wider uppercase text-sm mb-2">Swim Enrollment</p>
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">Enroll Your Swimmer</h1>
+          <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+            Enroll Your Swimmer{completedChildren.length > 0 ? "s" : ""}
+          </h1>
+          {completedChildren.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {completedChildren.map(c => c.childName).join(", ")} added — now enrolling swimmer #{swimmerCount}
+            </p>
+          )}
         </div>
       </section>
 
@@ -273,7 +375,7 @@ const SwimEnrollment = () => {
           <Button variant="outline" size="sm" onClick={() => setMode("request")}>Private / Semi-Private</Button>
         </div>
 
-        {/* Mobile: compact progress bar */}
+        {/* Mobile progress */}
         <div className="sm:hidden mb-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-semibold text-foreground">
@@ -286,7 +388,7 @@ const SwimEnrollment = () => {
           <Progress value={((stepIndex + 1) / allSteps.length) * 100} className="h-2" />
         </div>
 
-        {/* Desktop: full step circles */}
+        {/* Desktop step circles */}
         <div className="hidden sm:flex items-center justify-center gap-2 max-w-xl mx-auto mb-8">
           {allSteps.map((label, i) => (
             <div key={label} className="flex items-center gap-2 flex-1">
@@ -309,26 +411,51 @@ const SwimEnrollment = () => {
             <SessionPicker level={level} childAge={childAge} onSelect={handleSessionSelect} onBack={() => setStep("assess")} />
           )}
           {step === "info" && (
-            <EnrollmentForm onSubmit={handleInfoSubmit} onBack={() => setStep("session")} submitting={false} />
+            <EnrollmentForm
+              onSubmit={handleInfoSubmit}
+              onBack={() => setStep("session")}
+              submitting={false}
+              defaultParentName={sharedParent?.name}
+              defaultParentEmail={sharedParent?.email}
+              defaultParentPhone={sharedParent?.phone}
+            />
           )}
           {step === "legal" && enrollmentData && (
-            <LegalAgreements parentName={enrollmentData.parentName} childName={enrollmentData.childName} onSubmit={handleLegalSubmit} onBack={() => setStep("info")} submitting={submitting} />
+            <LegalAgreements
+              parentName={enrollmentData.parentName}
+              childName={enrollmentData.childName}
+              onSubmit={handleLegalSubmit}
+              onBack={() => setStep("info")}
+              submitting={submitting}
+              defaultEmergencyContactName={sharedEmergency?.name}
+              defaultEmergencyContactPhone={sharedEmergency?.phone}
+              defaultEmergencyContactRelationship={sharedEmergency?.relationship}
+              showAddAnother={true}
+              onAddAnother={handleAddAnother}
+            />
           )}
-          {step === "payment" && enrollmentIds.length > 0 && enrollmentData && (
+          {step === "payment" && enrollmentIds.length > 0 && (
             <EnrollmentCheckout
               priceIds={getCheckoutPriceIds()}
-              customerEmail={enrollmentData.parentEmail}
+              customerEmail={confirmedChildren[0]?.enrollmentData?.parentEmail || enrollmentData?.parentEmail || ""}
               enrollmentId={enrollmentIds[0]}
               onBack={() => setStep("legal")}
             />
           )}
-          {step === "done" && level && (
+          {step === "done" && (
             <EnrollmentConfirmation
-              level={level}
-              childName={childName}
-              childAge={childAge}
-              sessionIds={sessionIds}
-              isFirstTime={isFirstTime}
+              children={confirmedChildren.length > 0 ? confirmedChildren.map(c => ({
+                level: c.level,
+                childName: c.childName,
+                childAge: c.childAge,
+                sessionIds: c.sessionIds,
+                isFirstTime: c.isFirstTime,
+              })) : undefined}
+              level={confirmedChildren[0]?.level || level || "white"}
+              childName={confirmedChildren[0]?.childName || ""}
+              childAge={confirmedChildren[0]?.childAge || 0}
+              sessionIds={confirmedChildren[0]?.sessionIds || []}
+              isFirstTime={confirmedChildren.some(c => c.isFirstTime)}
               totalDue={totalDue}
             />
           )}
