@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.handle-email-suppression]
 verify_jwt = false
+
+[functions.send-session-payment-link]
+verify_jwt = true
