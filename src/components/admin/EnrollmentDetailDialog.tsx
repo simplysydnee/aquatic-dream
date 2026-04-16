@@ -235,7 +235,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                         </Button>
                       </div>
                     )}
-                </div>
+                  </div>
 
                 <Separator />
 
