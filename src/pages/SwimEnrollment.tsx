@@ -99,7 +99,7 @@ const SwimEnrollment = () => {
       .from("swim_enrollments")
       .select("session_id")
       .in("session_id", sessionIds)
-      .in("status", ["pending", "confirmed"]);
+      .in("status", ["pending", "confirmed", "enrolled"]);
 
     const countMap: Record<string, number> = {};
     enrollments?.forEach(e => {
@@ -164,7 +164,7 @@ const SwimEnrollment = () => {
     const agreementRows = newIds.map(enrollId => ({
       enrollment_id: enrollId,
       waiver_accepted: legalData.waiverAccepted,
-      photo_release_accepted: legalData.photoReleaseAccepted,
+      photo_release_accepted: legalData.photoReleaseAccepted === "yes",
       privacy_policy_accepted: legalData.privacyPolicyAccepted,
       terms_accepted: legalData.termsAccepted,
       signature_text: legalData.signatureText,

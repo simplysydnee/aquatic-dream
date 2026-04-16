@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ChevronLeft, ChevronRight, ShieldCheck, FileText, Scale } from "lucide-react";
 import { z } from "zod";
 import {
@@ -18,7 +18,7 @@ const legalSchema = z.object({
   waiverAccepted: z.literal(true, { errorMap: () => ({ message: "You must accept the liability waiver" }) }),
   privacyPolicyAccepted: z.literal(true, { errorMap: () => ({ message: "You must accept the privacy policy" }) }),
   termsAccepted: z.literal(true, { errorMap: () => ({ message: "You must accept the terms of service" }) }),
-  photoReleaseAccepted: z.boolean(),
+  photoReleaseAccepted: z.enum(["yes", "no"], { errorMap: () => ({ message: "Please select Yes or No" }) }),
   signatureText: z.string().trim().min(2, "Please type your full legal name"),
   emergencyContactName: z.string().trim().min(1, "Required"),
   emergencyContactPhone: z.string().trim().min(7, "Valid phone number required"),
@@ -86,7 +86,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting }
     waiverAccepted: false,
     privacyPolicyAccepted: false,
     termsAccepted: false,
-    photoReleaseAccepted: false,
+    photoReleaseAccepted: "" as any,
     signatureText: parentName || "",
     emergencyContactName: "",
     emergencyContactPhone: "",
@@ -185,26 +185,32 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting }
 
         {/* Photo Release */}
         <div className="border border-border rounded-lg p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h4 className="text-sm font-semibold text-foreground mb-1">
-                Photo & Video Release (Optional)
-              </h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                I grant Aquatic Dreams Swim School permission to use photographs and/or
-                video of my child taken during swim lessons for promotional purposes,
-                including the website, social media, and printed materials. This consent
-                is optional and will not affect enrollment.
-              </p>
-            </div>
-            <Switch
-              checked={form.photoReleaseAccepted}
-              onCheckedChange={(v) => update("photoReleaseAccepted", v)}
-            />
-          </div>
-          <p className="text-xs mt-2 font-medium text-muted-foreground">
-            {form.photoReleaseAccepted ? "✓ Photo release granted" : "Photo release declined"}
+          <h4 className="text-sm font-semibold text-foreground mb-1">
+            Photo & Video Release *
+          </h4>
+          <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+            I grant Aquatic Dreams Swim School permission to use photographs and/or
+            video of my child taken during swim lessons for promotional purposes,
+            including the website, social media, and printed materials. This consent
+            is optional and will not affect enrollment.
           </p>
+          <RadioGroup
+            value={form.photoReleaseAccepted}
+            onValueChange={(v) => update("photoReleaseAccepted", v)}
+            className="flex gap-6"
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="yes" id="photo-yes" />
+              <Label htmlFor="photo-yes" className="text-sm cursor-pointer">Yes, I consent</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="no" id="photo-no" />
+              <Label htmlFor="photo-no" className="text-sm cursor-pointer">No, I decline</Label>
+            </div>
+          </RadioGroup>
+          {errors.photoReleaseAccepted && (
+            <p className="text-xs text-destructive mt-1">{errors.photoReleaseAccepted}</p>
+          )}
         </div>
 
         {/* Emergency Contact */}

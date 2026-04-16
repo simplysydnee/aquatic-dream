@@ -100,7 +100,7 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
           .from("swim_enrollments")
           .select("session_id")
           .in("session_id", allIds)
-          .in("status", ["pending", "confirmed"]);
+          .in("status", ["pending", "confirmed", "enrolled"]);
 
         const countMap: Record<string, number> = {};
         enrollments?.forEach(e => {
