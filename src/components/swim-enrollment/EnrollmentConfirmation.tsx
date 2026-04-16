@@ -109,15 +109,34 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
           <h3 className="font-display text-2xl font-bold text-foreground mb-2">
             You're All Set!
           </h3>
-          <p className="text-muted-foreground mb-2">
-            <strong>{childName}</strong> has been enrolled in{" "}
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
-              {groupName} — {levelLabel}
-            </span>
-            {ids.length > 1 && (
-              <span className="text-sm text-muted-foreground"> for {ids.length} sessions</span>
-            )}
-          </p>
+          {isMulti ? (
+            <div className="text-left space-y-2 mb-2">
+              {displayChildren.map((child, i) => {
+                const cAgeGroup = getAgeGroup(child.childAge);
+                const cLevelLabel = getLevelLabel(child.level, cAgeGroup);
+                const cGroupName = getGroupName(child.level, cAgeGroup);
+                const cBadge = LEVEL_BADGE_COLORS[child.level];
+                return (
+                  <p key={i} className="text-muted-foreground text-sm">
+                    <strong>{child.childName}</strong> →{" "}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cBadge.bg} ${cBadge.text}`}>
+                      {cGroupName} — {cLevelLabel}
+                    </span>
+                  </p>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-muted-foreground mb-2">
+              <strong>{firstChild.childName}</strong> has been enrolled in{" "}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
+                {groupName} — {levelLabel}
+              </span>
+              {ids.length > 1 && (
+                <span className="text-sm text-muted-foreground"> for {ids.length} sessions</span>
+              )}
+            </p>
+          )}
 
           {/* Payment Summary */}
           {isFirstTime ? (
