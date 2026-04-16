@@ -7,6 +7,11 @@ import { Link } from "react-router-dom";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getAgeGroup, getLevelLabel } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 
+function formatClassDate(d: string) {
+  const date = new Date(d + "T00:00:00");
+  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
 interface ChildInfo {
   level: SwimLevel;
   childName: string;
