@@ -1,30 +1,46 @@
 
 
-## Fix Payment Timing by Enrollment Type
+## Brand Auth Email Templates for Aquatic Dreams
 
-### Current behavior
-All swimmers (first-time and returning) go through Stripe checkout for the full amount (session fees + registration fee if applicable).
+The auth email templates have been scaffolded. Now I need to apply the Aquatic Dreams brand styling and deploy.
 
-### Correct behavior
-- **First-time swimmers**: Pay only the $45 registration fee at signup via Stripe. Session fees are due on or before the first day (deferred). Confirmation shows "Session fees due on [first class date]."
-- **Returning swimmers**: Pay session fees immediately via Stripe checkout. No registration fee.
+### Brand tokens to apply
+- **Primary (buttons)**: Teal `#5badcb`
+- **Heading color**: Navy `#0f2343`
+- **Body text**: `#333333`
+- **Muted/footer text**: `#888888`
+- **Border radius**: `8px`
+- **Heading font**: `'Playfair Display', Georgia, serif`
+- **Body font**: `'Plus Jakarta Sans', Arial, sans-serif`
+- **Accent line**: Teal `#5badcb` (matches existing transactional template)
+- **Background**: White `#ffffff`
 
-### Changes
+### Changes to all 6 templates
+Update style objects in each file under `supabase/functions/_shared/email-templates/`:
 
-**`src/pages/SwimEnrollment.tsx`**
-1. In `getCheckoutPriceIds()`: If first-time, return only `["registration_fee"]`. If returning, return `["swim_session_fee"]` × number of sessions (no registration fee).
-2. In `handleLegalSubmit()`: Update `payment_amount` on enrollment records to reflect what's actually being charged now vs deferred.
-3. For first-time enrollments, set `payment_status: "unpaid"` for session fees and mark enrollment records accordingly so the admin knows session fees are still owed.
+1. **signup.tsx** — Update colors, fonts, add `Hr` divider matching transactional style, change heading to "Aquatic Dreams", update copy tone
+2. **recovery.tsx** — Same brand styling, keep password reset copy
+3. **magic-link.tsx** — Same brand styling
+4. **invite.tsx** — Same brand styling
+5. **email-change.tsx** — Same brand styling
+6. **reauthentication.tsx** — Same brand styling, keep OTP code styling with navy
 
-**`src/components/swim-enrollment/EnrollmentConfirmation.tsx`**
-1. If first-time: show "Registration fee paid: $45" and "Session fees due on [first class date]: $X".
-2. If returning: show "Payment Complete" with session fee total.
+Each template gets:
+- Navy `#0f2343` headings in Playfair Display
+- Teal `#5badcb` buttons with white text
+- Teal `#5badcb` horizontal rule (2px, matching transactional template)
+- Body text in Plus Jakarta Sans
+- Container max-width 560px, matching transactional template layout
+- Consistent padding/spacing matching `session-payment-link.tsx`
 
-**`mem://features/payment-flow`** — Update to reflect correct logic.
+### Deployment
+Deploy `auth-email-hook` edge function after styling.
 
-### Technical details
-- First-time checkout creates a Stripe session with one line item: `registration_fee`
-- Returning checkout creates a Stripe session with N line items: `swim_session_fee` × session count
-- Enrollment records store `payment_amount` as the full eventual total, but `payment_status` distinguishes what's been paid
-- No database migration needed — just logic changes in two files
+### Files modified
+- `supabase/functions/_shared/email-templates/signup.tsx`
+- `supabase/functions/_shared/email-templates/recovery.tsx`
+- `supabase/functions/_shared/email-templates/magic-link.tsx`
+- `supabase/functions/_shared/email-templates/invite.tsx`
+- `supabase/functions/_shared/email-templates/email-change.tsx`
+- `supabase/functions/_shared/email-templates/reauthentication.tsx`
 
