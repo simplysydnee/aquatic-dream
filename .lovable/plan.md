@@ -1,40 +1,26 @@
 
 
-## Fix Email Branding: "Aquatic Dreams" Name + Logo
+## Add Payment Status & Send Payment Link to Calendar Block Detail
 
-### Problem
-- `SITE_NAME` in `auth-email-hook/index.ts` and `send-transactional-email/index.ts` is set to `"aquatic-dream-quest"` (the Lovable project slug) instead of `"Aquatic Dreams"`
-- No logo in any email templates
-- `session-payment-link.tsx` still references `generalmail@aquaticdreams.com` instead of `info@aquaticdreamsswim.com`
+### What changes
+The `CalendarBlockDetail.tsx` roster cards currently show check-in, parent contact, and emergency contact. We'll add:
 
-### Changes
+1. **Payment status badge** on each enrollment card (paid/unpaid) — green for paid, yellow for unpaid
+2. **"Send Payment Link" button** on unpaid enrollments — calls the existing `send-session-payment-link` edge function directly from the calendar panel
+3. **Medical notes indicator** — small icon if medical notes exist, visible on hover
 
-**1. Upload logo to storage**
-- Copy the uploaded `AQD_Favicon.png` to a storage bucket (`email-assets`) so it can be referenced via public URL in email templates
+### How it works
+- Each enrollment card in the roster section gets a payment status badge next to the child's name
+- For unpaid enrollments, a small "Send Link" button appears that invokes `send-session-payment-link` (same logic as `EnrollmentDetailDialog`)
+- Success/error feedback via toast notifications
 
-**2. Fix SITE_NAME in edge functions**
-- `supabase/functions/auth-email-hook/index.ts`: Change `SITE_NAME` from `"aquatic-dream-quest"` to `"Aquatic Dreams"`
-- `supabase/functions/send-transactional-email/index.ts`: Same change
-
-**3. Add logo + fix email to all 6 auth templates**
-Update each template in `supabase/functions/_shared/email-templates/` (signup, recovery, magic-link, invite, email-change, reauthentication):
-- Add an `Img` component at the top of the container showing the Aquatic Dreams logo (centered, ~80px width)
-- Import `Img` from `@react-email/components`
-
-**4. Add logo + fix email in transactional template**
-- `session-payment-link.tsx`: Add logo, change `generalmail@aquaticdreams.com` to `info@aquaticdreamsswim.com`
-
-**5. Deploy**
-- Deploy `auth-email-hook` and `send-transactional-email` edge functions
+### Technical details
+- `CalendarBlockDetail.tsx`: Import `supabase` client and `useToast`
+- Add `payment_status` rendering in the enrollment card (already available on `CalendarEnrollment` type)
+- Add async handler for sending payment link using `supabase.functions.invoke("send-session-payment-link", ...)`
+- Verify `CalendarEnrollment` type includes `payment_status` — if not, update `useCalendarData.ts` to fetch it
 
 ### Files modified
-- `supabase/functions/auth-email-hook/index.ts`
-- `supabase/functions/send-transactional-email/index.ts`
-- `supabase/functions/_shared/email-templates/signup.tsx`
-- `supabase/functions/_shared/email-templates/recovery.tsx`
-- `supabase/functions/_shared/email-templates/magic-link.tsx`
-- `supabase/functions/_shared/email-templates/invite.tsx`
-- `supabase/functions/_shared/email-templates/email-change.tsx`
-- `supabase/functions/_shared/email-templates/reauthentication.tsx`
-- `supabase/functions/_shared/transactional-email-templates/session-payment-link.tsx`
+- `src/components/admin/calendar/CalendarBlockDetail.tsx` — add payment badge + send link button
+- `src/hooks/useCalendarData.ts` — ensure `payment_status` and `is_first_time` are fetched with enrollments (if not already)
 
