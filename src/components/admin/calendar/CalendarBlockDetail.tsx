@@ -263,16 +263,33 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                               {getInitials(enr.child_name)}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className={cn("text-sm font-medium", isCheckedIn && "line-through text-muted-foreground")}>
-                                {enr.child_name}
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <p className={cn("text-sm font-medium", isCheckedIn && "line-through text-muted-foreground")}>
+                                  {enr.child_name}
+                                </p>
+                                {enr.medical_notes && (
+                                  <span title={enr.medical_notes}>
+                                    <Stethoscope className="w-3 h-3 text-amber-500" />
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">Age {enr.child_age}</p>
                             </div>
-                            {isCheckedIn && (
-                              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
-                                ✓ In
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1.5">
+                              <Badge className={cn(
+                                "text-[10px] px-1.5 py-0.5",
+                                enr.payment_status === "paid"
+                                  ? "bg-green-100 text-green-700 hover:bg-green-100"
+                                  : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
+                              )}>
+                                {enr.payment_status === "paid" ? "Paid" : "Unpaid"}
+                              </Badge>
+                              {isCheckedIn && (
+                                <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                                  ✓ In
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {/* Row 2: Parent contact */}
