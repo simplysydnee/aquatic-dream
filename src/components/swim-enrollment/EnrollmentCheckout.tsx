@@ -34,7 +34,7 @@ export default function EnrollmentCheckout({
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto px-0 sm:px-0">
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">
         Complete Payment
       </h3>
@@ -42,7 +42,7 @@ export default function EnrollmentCheckout({
         Please complete your payment to finalize enrollment.
       </p>
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-hidden min-w-0">
         <EmbeddedCheckoutProvider stripe={getStripe()} options={{ fetchClientSecret }}>
           <EmbeddedCheckout />
         </EmbeddedCheckoutProvider>

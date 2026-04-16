@@ -215,7 +215,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting }
           <p className="text-xs text-muted-foreground">
             Required per the liability waiver. This person will be contacted in case of emergency.
           </p>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
             <div>
               <Label htmlFor="emergencyContactName" className="text-xs">Name</Label>
               <Input
@@ -296,14 +296,14 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting }
         </div>
 
         {/* Actions */}
-        <div className="flex justify-between pt-4">
-          <Button type="button" variant="ghost" onClick={onBack}>
+        <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 pt-4">
+          <Button type="button" variant="ghost" onClick={onBack} className="w-full sm:w-auto">
             <ChevronLeft className="mr-1 w-4 h-4" /> Back
           </Button>
           <Button
             type="submit"
             disabled={submitting}
-            className="bg-coral hover:bg-coral/90 text-coral-foreground"
+            className="w-full sm:w-auto bg-coral hover:bg-coral/90 text-coral-foreground"
           >
             {submitting ? "Enrolling..." : "Complete Enrollment"}{" "}
             <ChevronRight className="ml-1 w-4 h-4" />
