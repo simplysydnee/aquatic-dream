@@ -62,7 +62,24 @@ function fmtICSTime(iso: string) {
 
 const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: Props) => {
   const [showAddSwimmer, setShowAddSwimmer] = useState(false);
+  const [sendingPaymentFor, setSendingPaymentFor] = useState<string | null>(null);
+
   if (!block) return null;
+
+  const handleSendPaymentLink = async (enrollmentId: string) => {
+    setSendingPaymentFor(enrollmentId);
+    try {
+      const { error } = await supabase.functions.invoke("send-session-payment-link", {
+        body: { enrollmentId, environment: "sandbox", siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast.success("Payment link sent!");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send payment link");
+    } finally {
+      setSendingPaymentFor(null);
+    }
+  };
 
   const isSwim = block.kind === "swim";
   const isICS = block.kind === "ics";
