@@ -25,6 +25,9 @@ export interface CalendarEnrollment {
   swim_level: string;
   session_id: string | null;
   status: string;
+  payment_status: string;
+  is_first_time: boolean;
+  medical_notes: string | null;
 }
 
 export interface CalendarPoolEvent {
@@ -102,7 +105,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .eq("is_active", true),
       supabase
         .from("swim_enrollments")
-        .select("id, child_name, child_age, parent_name, parent_phone, parent_email, swim_level, session_id, status")
+        .select("id, child_name, child_age, parent_name, parent_phone, parent_email, swim_level, session_id, status, payment_status, is_first_time, medical_notes")
         .in("status", ["pending", "confirmed"]),
       supabase
         .from("pool_events")
