@@ -17,12 +17,14 @@ import { Progress } from "@/components/ui/progress";
 
 type Step = "assess" | "session" | "info" | "legal" | "payment" | "done";
 
+const ENROLLMENT_STORAGE_KEY = "swim_enrollment_state";
+
 const SwimEnrollment = () => {
   const [searchParams] = useSearchParams();
   const isRequest = searchParams.get("type") === "request";
-  const initialStep = searchParams.get("step") === "done" ? "done" : "assess";
+  const isDone = searchParams.get("step") === "done";
 
-  const [step, setStep] = useState<Step>(initialStep as Step);
+  const [step, setStep] = useState<Step>(isDone ? "done" : "assess");
   const [level, setLevel] = useState<SwimLevel | null>(null);
   const [childAge, setChildAge] = useState(0);
   const [childDob, setChildDob] = useState("");
@@ -40,6 +42,25 @@ const SwimEnrollment = () => {
   const stepKeys = ["assess", "session", "info", "legal", "payment", "done"];
 
   const stepIndex = stepKeys.indexOf(step);
+
+  // Restore state from localStorage when returning from Stripe
+  useEffect(() => {
+    if (isDone) {
+      try {
+        const saved = localStorage.getItem(ENROLLMENT_STORAGE_KEY);
+        if (saved) {
+          const s = JSON.parse(saved);
+          if (s.level) setLevel(s.level);
+          if (s.childName) setChildName(s.childName);
+          if (s.childAge) setChildAge(s.childAge);
+          if (s.sessionIds) setSessionIds(s.sessionIds);
+          if (s.isFirstTime !== undefined) setIsFirstTime(s.isFirstTime);
+          if (s.totalDue) setTotalDue(s.totalDue);
+          localStorage.removeItem(ENROLLMENT_STORAGE_KEY);
+        }
+      } catch { /* ignore parse errors */ }
+    }
+  }, [isDone]);
 
   // Scroll to top whenever step changes
   useEffect(() => {
@@ -188,6 +209,18 @@ const SwimEnrollment = () => {
       toast({ title: "Something went wrong", description: "Please try again or contact us directly.", variant: "destructive" });
       return;
     }
+
+    // Save state to localStorage so it survives Stripe redirect
+    try {
+      localStorage.setItem(ENROLLMENT_STORAGE_KEY, JSON.stringify({
+        level,
+        childName: enrollmentData.childName,
+        childAge,
+        sessionIds,
+        isFirstTime,
+        totalDue,
+      }));
+    } catch { /* ignore */ }
 
     setStep("payment");
   };
