@@ -58,6 +58,13 @@ function formatDayOfWeek(dow: string) {
   return dow.toLowerCase().split("_").map(p => map[p] || p).join(" & ");
 }
 
+function formatTime12h(time: string) {
+  const [h, m] = time.split(":").map(Number);
+  const suffix = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${suffix}`;
+}
+
 const SwimEnrollmentsAdmin = () => {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [sessions, setSessions] = useState<Record<string, SessionInfo>>({});
@@ -151,7 +158,7 @@ const SwimEnrollmentsAdmin = () => {
   // Build session options for the filter dropdown
   const sessionOptions = Object.values(sessions).map((s) => ({
     id: s.id,
-    label: `${s.session_name || s.swim_level} – ${formatDayOfWeek(s.day_of_week)} ${s.start_time}`,
+    label: `${s.session_name || s.swim_level} – ${formatDayOfWeek(s.day_of_week)} ${formatTime12h(s.start_time)}`,
   }));
 
   return (
@@ -288,7 +295,7 @@ const SwimEnrollmentsAdmin = () => {
                           <div className="text-xs text-muted-foreground">{e.parent_email}</div>
                         </TableCell>
                         <TableCell className="text-sm">
-                          {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${session.start_time}` : "—"}
+                          {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
