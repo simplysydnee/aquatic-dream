@@ -41,6 +41,11 @@ const SwimEnrollment = () => {
 
   const stepIndex = stepKeys.indexOf(step);
 
+  // Scroll to top whenever step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step]);
+
   const handleAssessmentComplete = (recommendedLevel: SwimLevel, age: number, dob: string) => {
     setLevel(recommendedLevel);
     setChildAge(age);
