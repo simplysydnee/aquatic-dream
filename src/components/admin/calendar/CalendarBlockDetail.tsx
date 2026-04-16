@@ -330,6 +330,22 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                               <p className="text-[10px] text-muted-foreground italic">No emergency contact on file</p>
                             </div>
                           )}
+
+                          {/* Row 4: Send Payment Link for unpaid */}
+                          {enr.payment_status !== "paid" && (
+                            <div className="mt-2 pl-[52px] pt-2 border-t border-dashed">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1.5"
+                                disabled={sendingPaymentFor === enr.id}
+                                onClick={() => handleSendPaymentLink(enr.id)}
+                              >
+                                <Send className="w-3 h-3" />
+                                {sendingPaymentFor === enr.id ? "Sending…" : "Send Payment Link"}
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
