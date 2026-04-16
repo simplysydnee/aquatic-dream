@@ -45,8 +45,10 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
   const [sessionNames, setSessionNames] = useState<Record<string, string>>({});
   const [loadingDates, setLoadingDates] = useState(false);
 
-  // Normalize to array
-  const ids = sessionIds && sessionIds.length > 0 ? sessionIds : sessionId ? [sessionId] : [];
+  // Normalize to array — collect all session IDs across all children
+  const ids = isMulti
+    ? [...new Set(displayChildren.flatMap(c => c.sessionIds))]
+    : sessionIds && sessionIds.length > 0 ? sessionIds : sessionId ? [sessionId] : [];
 
   useEffect(() => {
     if (ids.length === 0) return;
