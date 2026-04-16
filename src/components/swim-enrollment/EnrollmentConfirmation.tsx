@@ -7,6 +7,14 @@ import { Link } from "react-router-dom";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getAgeGroup, getLevelLabel } from "./types";
 import { supabase } from "@/integrations/supabase/client";
 
+interface ChildInfo {
+  level: SwimLevel;
+  childName: string;
+  childAge: number;
+  sessionIds: string[];
+  isFirstTime: boolean;
+}
+
 interface Props {
   level: SwimLevel;
   childName: string;
@@ -16,14 +24,13 @@ interface Props {
   sessionId?: string | null;
   isFirstTime?: boolean;
   totalDue?: number;
+  children?: ChildInfo[];
 }
 
-function formatClassDate(d: string) {
-  const date = new Date(d + "T00:00:00");
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-}
-
-const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessionId, isFirstTime = true, totalDue = 0 }: Props) => {
+const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessionId, isFirstTime = true, totalDue = 0, children: multiChildren }: Props) => {
+  const isMulti = multiChildren && multiChildren.length > 1;
+  const displayChildren = multiChildren && multiChildren.length > 0 ? multiChildren : [{ level, childName, childAge, sessionIds: sessionIds || (sessionId ? [sessionId] : []), isFirstTime: isFirstTime ?? true }];
+  const firstChild = displayChildren[0];
   const levelInfo = LEVEL_DISPLAY[level];
   const badge = LEVEL_BADGE_COLORS[level];
   const ageGroup = getAgeGroup(childAge);
