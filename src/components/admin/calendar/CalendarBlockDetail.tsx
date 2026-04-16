@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle } from "lucide-react";
+import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import type { CalendarSwimSession, CalendarEnrollment, CalendarPoolEvent, AttendanceRecord, EnrollmentAgreement } from "@/hooks/useCalendarData";
 import type { ICSSession } from "./CalendarDayView";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
@@ -59,7 +62,24 @@ function fmtICSTime(iso: string) {
 
 const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: Props) => {
   const [showAddSwimmer, setShowAddSwimmer] = useState(false);
+  const [sendingPaymentFor, setSendingPaymentFor] = useState<string | null>(null);
+
   if (!block) return null;
+
+  const handleSendPaymentLink = async (enrollmentId: string) => {
+    setSendingPaymentFor(enrollmentId);
+    try {
+      const { error } = await supabase.functions.invoke("send-session-payment-link", {
+        body: { enrollmentId, environment: "sandbox", siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast.success("Payment link sent!");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send payment link");
+    } finally {
+      setSendingPaymentFor(null);
+    }
+  };
 
   const isSwim = block.kind === "swim";
   const isICS = block.kind === "ics";
@@ -243,16 +263,33 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                               {getInitials(enr.child_name)}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className={cn("text-sm font-medium", isCheckedIn && "line-through text-muted-foreground")}>
-                                {enr.child_name}
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <p className={cn("text-sm font-medium", isCheckedIn && "line-through text-muted-foreground")}>
+                                  {enr.child_name}
+                                </p>
+                                {enr.medical_notes && (
+                                  <span title={enr.medical_notes}>
+                                    <Stethoscope className="w-3 h-3 text-amber-500" />
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">Age {enr.child_age}</p>
                             </div>
-                            {isCheckedIn && (
-                              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
-                                ✓ In
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1.5">
+                              <Badge className={cn(
+                                "text-[10px] px-1.5 py-0.5",
+                                enr.payment_status === "paid"
+                                  ? "bg-green-100 text-green-700 hover:bg-green-100"
+                                  : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
+                              )}>
+                                {enr.payment_status === "paid" ? "Paid" : "Unpaid"}
+                              </Badge>
+                              {isCheckedIn && (
+                                <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                                  ✓ In
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {/* Row 2: Parent contact */}
@@ -291,6 +328,22 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                           ) : (
                             <div className="mt-2 pl-[52px] pt-2 border-t border-dashed">
                               <p className="text-[10px] text-muted-foreground italic">No emergency contact on file</p>
+                            </div>
+                          )}
+
+                          {/* Row 4: Send Payment Link for unpaid */}
+                          {enr.payment_status !== "paid" && (
+                            <div className="mt-2 pl-[52px] pt-2 border-t border-dashed">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1.5"
+                                disabled={sendingPaymentFor === enr.id}
+                                onClick={() => handleSendPaymentLink(enr.id)}
+                              >
+                                <Send className="w-3 h-3" />
+                                {sendingPaymentFor === enr.id ? "Sending…" : "Send Payment Link"}
+                              </Button>
                             </div>
                           )}
                         </div>
