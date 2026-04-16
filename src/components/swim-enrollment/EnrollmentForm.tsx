@@ -28,13 +28,16 @@ interface Props {
   onSubmit: (data: EnrollmentFormData) => void;
   onBack: () => void;
   submitting: boolean;
+  defaultParentName?: string;
+  defaultParentEmail?: string;
+  defaultParentPhone?: string;
 }
 
-const EnrollmentForm = ({ onSubmit, onBack, submitting }: Props) => {
+const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentName, defaultParentEmail, defaultParentPhone }: Props) => {
   const [form, setForm] = useState({
-    parentName: "",
-    parentEmail: "",
-    parentPhone: "",
+    parentName: defaultParentName || "",
+    parentEmail: defaultParentEmail || "",
+    parentPhone: defaultParentPhone || "",
     childName: "",
     notes: "",
     isFirstTime: "" as "" | "yes" | "no",
