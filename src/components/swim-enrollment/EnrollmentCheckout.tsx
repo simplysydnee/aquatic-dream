@@ -23,7 +23,7 @@ export default function EnrollmentCheckout({
         priceIds,
         customerEmail,
         enrollmentId,
-        returnUrl: `${window.location.origin}/enroll?step=done&session_id={CHECKOUT_SESSION_ID}`,
+        returnUrl: `${window.location.origin}/swim-enrollment?step=done&session_id={CHECKOUT_SESSION_ID}`,
         environment: getStripeEnvironment(),
       },
     });
