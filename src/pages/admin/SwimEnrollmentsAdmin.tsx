@@ -317,6 +317,16 @@ const SwimEnrollmentsAdmin = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
+                            {e.payment_status === "unpaid" && e.is_first_time && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                title="Send payment link email"
+                                onClick={() => sendPaymentLink(e)}
+                              >
+                                <Send className="w-4 h-4 text-primary" />
+                              </Button>
+                            )}
                             {e.payment_status === "unpaid" && (
                               <Button
                                 size="icon"
