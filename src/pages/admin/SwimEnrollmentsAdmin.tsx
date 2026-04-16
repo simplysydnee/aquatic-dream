@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
 import SessionEnrollmentCards from "@/components/admin/SessionEnrollmentCards";
-import { Eye, CheckCircle } from "lucide-react";
+import { Eye, CheckCircle, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Enrollment {
@@ -106,6 +106,19 @@ const SwimEnrollmentsAdmin = () => {
     } else {
       toast({ title: "Marked as paid", description: `${enrollment.child_name} marked as paid.` });
       setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, payment_status: "paid" } : e)));
+    }
+  };
+
+  const sendPaymentLink = async (enrollment: Enrollment) => {
+    toast({ title: "Sending payment link...", description: `Emailing ${enrollment.parent_email}` });
+    const { data, error } = await supabase.functions.invoke("send-session-payment-link", {
+      body: { enrollmentId: enrollment.id, environment: "live" },
+    });
+    if (error || !data?.success) {
+      toast({ title: "Failed to send", description: error?.message || data?.error || "Please try again.", variant: "destructive" });
+    } else {
+      toast({ title: "Payment link sent!", description: `Email sent to ${enrollment.parent_email}` });
+      setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, payment_reminder_sent_at: new Date().toISOString() } : e)));
     }
   };
 
