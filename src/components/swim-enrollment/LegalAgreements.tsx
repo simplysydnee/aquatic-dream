@@ -27,6 +27,52 @@ const legalSchema = z.object({
 
 export type LegalAgreementData = z.infer<typeof legalSchema>;
 
+const DocumentSection = ({
+  title,
+  icon: Icon,
+  text,
+  accepted,
+  onAcceptChange,
+  error,
+  checkboxLabel,
+}: {
+  title: string;
+  icon: React.ElementType;
+  text: string;
+  accepted: boolean;
+  onAcceptChange: (v: boolean) => void;
+  error?: string;
+  checkboxLabel: string;
+}) => (
+  <div className="border border-border rounded-lg overflow-hidden">
+    <div className="bg-muted/50 px-4 py-3 flex items-center gap-2 border-b border-border">
+      <Icon className="w-4 h-4 text-primary" />
+      <h4 className="font-semibold text-sm text-foreground">{title}</h4>
+    </div>
+    <ScrollArea className="h-48 p-4">
+      <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">
+        {text}
+      </pre>
+    </ScrollArea>
+    <div className="px-4 py-3 border-t border-border bg-muted/30">
+      <div className="flex items-start gap-2">
+        <Checkbox
+          id={`accept-${title}`}
+          checked={accepted}
+          onCheckedChange={(v) => onAcceptChange(v === true)}
+        />
+        <Label
+          htmlFor={`accept-${title}`}
+          className="text-sm cursor-pointer leading-snug"
+        >
+          {checkboxLabel}
+        </Label>
+      </div>
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </div>
+  </div>
+);
+
 interface Props {
   parentName: string;
   childName: string;
