@@ -1,51 +1,41 @@
 
 
-## Mobile-Friendly Enrollment Flow + Scroll-to-Top
+## Enrollment Flow Audit — Findings & Fixes
 
-### Problems identified
-1. **No scroll-to-top on step change** — after selecting a session/time, the page stays scrolled down and users can't see the next step's content
-2. **Step indicator overflows on mobile** — 6 steps with circles and labels crowd out on small screens
-3. **Button rows can overflow** — "Retake Assessment" + "Continue to Sessions" buttons on the result card, and nav buttons throughout, can run off-screen on narrow viewports
-4. **Session cards layout** — time/spots info crams horizontally on small screens
+### Issues Found
 
-### Changes
+**1. Double enrollment not prevented — status mismatch**
+The `swim_enrollments` table defaults `status` to `'enrolled'`, but both the SessionPicker capacity check (line 103) and the pre-insert capacity check (line 102 in SwimEnrollment.tsx) filter on `status IN ('pending', 'confirmed')`. The insert itself sets `status: "confirmed"`. So the capacity counting works for new enrollments, but any enrollment created with the default `'enrolled'` status would be invisible to capacity checks. This is inconsistent — the default should match what the code uses.
 
-**1. Add ScrollToTop component + scroll on step change (`SwimEnrollment.tsx`)**
-- Create `src/components/ScrollToTop.tsx` that scrolls to top on route change
-- Add it inside `BrowserRouter` in `App.tsx`
-- Additionally, add `window.scrollTo({ top: 0 })` inside `SwimEnrollment.tsx` whenever `step` changes (via a `useEffect` on `step`) — this handles in-page step transitions that don't change the route
+Additionally, there's **no unique constraint** preventing the same child from enrolling in the same session twice. A fast double-click or browser back could create duplicate rows.
 
-**2. Mobile-friendly step indicator (`SwimEnrollment.tsx`)**
-- On mobile (`sm:` breakpoint), show only the current step number/label and a compact progress bar instead of all 6 circles
-- Keep the full step circles on `sm:` and above
-- Use responsive classes: hide individual step labels on mobile (already partially done with `hidden sm:block`), but also shrink circle sizes and gap
+**2. Photo consent — Toggle vs Yes/No**
+Currently uses a `Switch` toggle (defaults to OFF). The user wants explicit "Yes" or "No" radio buttons instead of a toggle, making the choice more intentional and clear.
 
-**3. Fix button overflow in SwimAssessment result card**
-- Change `flex gap-3` to `flex flex-col sm:flex-row gap-3` so buttons stack vertically on mobile
-- Ensure buttons are `w-full sm:w-auto`
+**3. Payment is LIVE**
+All 4 go-live steps are completed. Live checkout is ready. The `.env.production` file should have a `pk_live_` token. No action needed here.
 
-**4. Fix SessionPicker mobile layout**
-- Session slot cards: stack time and spots vertically on very small screens using `flex-wrap`
-- "Back" / "Continue" buttons: ensure they don't overflow with `flex-wrap` and proper sizing
-- Registration fee banner: allow text to wrap properly
+### Plan
 
-**5. Fix EnrollmentForm button row**
-- "Complete Enrollment" button text can be long — ensure it wraps or shrinks on mobile
-- Add `flex-wrap` safety to the button container
+**A. Prevent double enrollment (2 changes)**
 
-**6. Fix LegalAgreements mobile**
-- Emergency contact fields grid: ensure `grid-cols-1` on mobile, `sm:grid-cols-2` on larger
+1. **Database migration**: Add a unique index on `(session_id, child_name, parent_email)` where `status IN ('confirmed', 'enrolled', 'pending')` to prevent duplicate enrollments at the DB level.
 
-**7. Fix EnrollmentCheckout mobile**
-- Ensure the Stripe embedded checkout container doesn't overflow on small screens
+2. **Client-side guard**: After the insert succeeds, disable the submit button and prevent re-submission. Already partially handled by `submitting` state, but add a check that `enrollmentIds` is empty before allowing submission.
+
+3. **Fix status default**: Update the DB default from `'enrolled'` to `'confirmed'` to match what the code inserts, OR update the capacity queries to also include `'enrolled'`. The simpler fix is updating the capacity queries to include all active statuses: `['pending', 'confirmed', 'enrolled']`.
+
+**B. Photo consent — Switch to Yes/No radio buttons**
+
+Replace the `Switch` component with a `RadioGroup` with explicit "Yes" and "No" options. Default to no selection (force an explicit choice). Add validation requiring a selection.
+
+**C. No payment changes needed**
+
+Stripe is fully live. No action required.
 
 ### Files modified
-- `src/components/ScrollToTop.tsx` (new)
-- `src/App.tsx` — add ScrollToTop
-- `src/pages/SwimEnrollment.tsx` — scroll-to-top on step change, responsive step indicator
-- `src/components/swim-enrollment/SwimAssessment.tsx` — stack result buttons on mobile
-- `src/components/swim-enrollment/SessionPicker.tsx` — responsive slot cards and buttons
-- `src/components/swim-enrollment/EnrollmentForm.tsx` — responsive button row
-- `src/components/swim-enrollment/LegalAgreements.tsx` — responsive grid
-- `src/components/swim-enrollment/EnrollmentCheckout.tsx` — responsive container
+- `src/components/swim-enrollment/LegalAgreements.tsx` — replace photo release Switch with RadioGroup
+- `src/pages/SwimEnrollment.tsx` — fix capacity query to include `'enrolled'` status, add double-submit guard
+- `src/components/swim-enrollment/SessionPicker.tsx` — fix capacity query to include `'enrolled'` status
+- Database migration — add partial unique index to prevent duplicate enrollments
 
