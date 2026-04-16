@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import { toast } from "@/hooks/use-toast";
-import { Save, FileCheck, ShieldCheck, Camera, AlertTriangle, User, Phone } from "lucide-react";
+import { Save, FileCheck, ShieldCheck, Camera, AlertTriangle, User, Phone, Send } from "lucide-react";
 
 interface Enrollment {
   id: string;
@@ -65,6 +65,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
   const [agreement, setAgreement] = useState<Agreement | null>(null);
   const [loadingAgreement, setLoadingAgreement] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sendingLink, setSendingLink] = useState(false);
 
   useEffect(() => {
     if (enrollment) {
@@ -112,6 +113,20 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
 
   const update = (key: keyof Enrollment, value: string | number | null) => {
     if (form) setForm({ ...form, [key]: value });
+  };
+
+  const handleSendPaymentLink = async () => {
+    if (!form) return;
+    setSendingLink(true);
+    const { data, error } = await supabase.functions.invoke("send-session-payment-link", {
+      body: { enrollmentId: form.id, environment: "live" },
+    });
+    setSendingLink(false);
+    if (error || !data?.success) {
+      toast({ title: "Failed to send", description: error?.message || data?.error || "Please try again.", variant: "destructive" });
+    } else {
+      toast({ title: "Payment link sent!", description: `Email sent to ${form.parent_email}` });
+    }
   };
 
   if (!form) return null;
@@ -206,7 +221,20 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                         <p className="text-sm font-mono">{form.stripe_payment_id}</p>
                       </div>
                     )}
-                  </div>
+                    {form.is_first_time && form.payment_status === "unpaid" && (
+                      <div className="col-span-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={handleSendPaymentLink}
+                          disabled={sendingLink}
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          {sendingLink ? "Sending..." : "Send Session Fee Payment Link"}
+                        </Button>
+                      </div>
+                    )}
                 </div>
 
                 <Separator />
