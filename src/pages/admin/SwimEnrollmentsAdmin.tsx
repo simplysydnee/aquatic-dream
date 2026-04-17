@@ -102,17 +102,17 @@ const SwimEnrollmentsAdmin = () => {
     setEnrollments((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
   };
 
-  const markAsPaid = async (enrollment: Enrollment) => {
+  const updatePaymentStatus = async (enrollment: Enrollment, payment_status: string) => {
     const { error } = await supabase
       .from("swim_enrollments")
-      .update({ payment_status: "paid" })
+      .update({ payment_status })
       .eq("id", enrollment.id);
 
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Marked as paid", description: `${enrollment.child_name} marked as paid.` });
-      setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, payment_status: "paid" } : e)));
+      toast({ title: "Payment updated", description: `${enrollment.child_name}: ${payment_status}` });
+      setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, payment_status } : e)));
     }
   };
 
@@ -298,9 +298,17 @@ const SwimEnrollmentsAdmin = () => {
                           {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
-                            {e.payment_status}
-                          </Badge>
+                          <Select value={e.payment_status} onValueChange={(v) => updatePaymentStatus(e, v)}>
+                            <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unpaid">Unpaid</SelectItem>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="refunded">Refunded</SelectItem>
+                              <SelectItem value="waived">Waived</SelectItem>
+                            </SelectContent>
+                          </Select>
                           {e.is_first_time && (
                             <span className="block text-[10px] text-muted-foreground mt-0.5">1st time</span>
                           )}
@@ -339,7 +347,7 @@ const SwimEnrollmentsAdmin = () => {
                                 size="icon"
                                 variant="ghost"
                                 title="Mark as paid (cash/check)"
-                                onClick={() => markAsPaid(e)}
+                                onClick={() => updatePaymentStatus(e, "paid")}
                               >
                                 <CheckCircle className="w-4 h-4 text-green-600" />
                               </Button>
