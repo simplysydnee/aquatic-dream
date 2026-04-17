@@ -347,7 +347,7 @@ const SwimEnrollmentsAdmin = () => {
                                 size="icon"
                                 variant="ghost"
                                 title="Mark as paid (cash/check)"
-                                onClick={() => markAsPaid(e)}
+                                onClick={() => updatePaymentStatus(e, "paid")}
                               >
                                 <CheckCircle className="w-4 h-4 text-green-600" />
                               </Button>
