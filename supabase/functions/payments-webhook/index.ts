@@ -38,13 +38,19 @@ serve(async (req) => {
 });
 
 async function handleCheckoutCompleted(session: any) {
-  const enrollmentId = session.metadata?.enrollmentId;
-  if (!enrollmentId) {
-    console.log("No enrollmentId in checkout metadata, skipping");
+  // Support both legacy single enrollmentId and new comma-separated enrollmentIds
+  const idsCsv: string | undefined = session.metadata?.enrollmentIds;
+  const singleId: string | undefined = session.metadata?.enrollmentId;
+  const enrollmentIds = idsCsv
+    ? idsCsv.split(",").map((s: string) => s.trim()).filter(Boolean)
+    : (singleId ? [singleId] : []);
+
+  if (enrollmentIds.length === 0) {
+    console.log("No enrollmentIds in checkout metadata, skipping");
     return;
   }
 
-  console.log("Updating enrollment payment status:", enrollmentId);
+  console.log("Updating enrollment payment status for:", enrollmentIds);
 
   const { error } = await supabase
     .from("swim_enrollments")
@@ -52,17 +58,19 @@ async function handleCheckoutCompleted(session: any) {
       payment_status: "paid",
       stripe_payment_id: session.payment_intent || session.id,
     })
-    .eq("id", enrollmentId);
+    .in("id", enrollmentIds);
 
   if (error) {
-    console.error("Failed to update enrollment:", error);
+    console.error("Failed to update enrollments:", error);
     return;
   }
 
-  console.log("Enrollment payment marked as paid:", enrollmentId);
+  console.log("Enrollments marked as paid:", enrollmentIds);
 
-  // Send enrollment confirmation email after successful payment
-  await sendEnrollmentConfirmation(enrollmentId);
+  // Send confirmation email per enrollment
+  for (const id of enrollmentIds) {
+    await sendEnrollmentConfirmation(id);
+  }
 }
 
 async function sendEnrollmentConfirmation(enrollmentId: string) {
