@@ -98,6 +98,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
         parent_phone: form.parent_phone,
         swim_level: form.swim_level,
         status: form.status,
+        payment_status: form.payment_status,
         notes: form.notes,
       })
       .eq("id", form.id);
