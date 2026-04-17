@@ -298,9 +298,17 @@ const SwimEnrollmentsAdmin = () => {
                           {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
-                            {e.payment_status}
-                          </Badge>
+                          <Select value={e.payment_status} onValueChange={(v) => updatePaymentStatus(e, v)}>
+                            <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unpaid">Unpaid</SelectItem>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="refunded">Refunded</SelectItem>
+                              <SelectItem value="waived">Waived</SelectItem>
+                            </SelectContent>
+                          </Select>
                           {e.is_first_time && (
                             <span className="block text-[10px] text-muted-foreground mt-0.5">1st time</span>
                           )}
