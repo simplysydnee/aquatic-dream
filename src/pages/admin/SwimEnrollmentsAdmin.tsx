@@ -102,17 +102,17 @@ const SwimEnrollmentsAdmin = () => {
     setEnrollments((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
   };
 
-  const markAsPaid = async (enrollment: Enrollment) => {
+  const updatePaymentStatus = async (enrollment: Enrollment, payment_status: string) => {
     const { error } = await supabase
       .from("swim_enrollments")
-      .update({ payment_status: "paid" })
+      .update({ payment_status })
       .eq("id", enrollment.id);
 
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Marked as paid", description: `${enrollment.child_name} marked as paid.` });
-      setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, payment_status: "paid" } : e)));
+      toast({ title: "Payment updated", description: `${enrollment.child_name}: ${payment_status}` });
+      setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, payment_status } : e)));
     }
   };
 
