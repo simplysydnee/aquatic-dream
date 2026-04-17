@@ -425,9 +425,8 @@ const SwimEnrollment = () => {
           )}
           {step === "payment" && enrollmentIds.length > 0 && (
             <EnrollmentCheckout
-              priceIds={getCheckoutPriceIds()}
+              enrollmentIds={enrollmentIds}
               customerEmail={confirmedChildren[0]?.enrollmentData?.parentEmail || enrollmentData?.parentEmail || ""}
-              enrollmentId={enrollmentIds[0]}
               onBack={() => setStep("legal")}
             />
           )}
