@@ -206,17 +206,18 @@ const SwimEnrollment = () => {
       return;
     }
 
-    // Registration fee: only charge once for the entire family, on the first child who is first-time
-    const anyFirstTime = allChildren.some(c => c.isFirstTime);
-    let regFeeCharged = false;
-
+    // Registration fee: each first-time child pays their own $45
     // Build enrollment rows for ALL children
     const enrollmentRows = allChildren.flatMap(child => {
       return child.sessionIds.map((sid, i) => {
         const s = sessionMap[sid];
-        const chargeRegFee = child.isFirstTime && !regFeeCharged && i === 0;
-        if (chargeRegFee) regFeeCharged = true;
+        // Charge reg fee once per first-time child (on their first session row)
+        const chargeRegFee = child.isFirstTime && i === 0;
         const regFee = chargeRegFee ? PRICING.registrationFee : 0;
+        // First-time: pay only reg fee now (session deferred to first lesson day)
+        // Returning: pay full session price upfront
+        const sessionPrice = s?.session_price ?? 280;
+        const paymentAmount = child.isFirstTime ? regFee : sessionPrice;
         return {
           swim_level: child.level,
           session_id: sid,
@@ -232,7 +233,7 @@ const SwimEnrollment = () => {
           registration_fee: regFee,
           status: "confirmed" as const,
           payment_status: "unpaid" as const,
-          payment_amount: (s?.session_price ?? 280) + regFee,
+          payment_amount: paymentAmount,
           is_first_time: child.isFirstTime,
           payment_due_date: s?.session_start_date || null,
         };
@@ -313,18 +314,6 @@ const SwimEnrollment = () => {
     setStep("payment");
   };
 
-  const getCheckoutPriceIds = (): string[] => {
-    const allChildren = confirmedChildren.length > 0 ? confirmedChildren : [...completedChildren];
-    const anyFirstTime = allChildren.some(c => c.isFirstTime);
-    
-    if (anyFirstTime) {
-      // First-time: pay only registration fee now; session fees deferred
-      return ["registration_fee"];
-    }
-    // Returning: pay session fees for all children
-    const totalSessions = allChildren.reduce((sum, c) => sum + c.sessionIds.length, 0);
-    return Array(totalSessions).fill("swim_session_fee");
-  };
 
   // Count of swimmers added so far (for the progress indicator)
   const swimmerCount = completedChildren.length + 1;
@@ -436,9 +425,8 @@ const SwimEnrollment = () => {
           )}
           {step === "payment" && enrollmentIds.length > 0 && (
             <EnrollmentCheckout
-              priceIds={getCheckoutPriceIds()}
+              enrollmentIds={enrollmentIds}
               customerEmail={confirmedChildren[0]?.enrollmentData?.parentEmail || enrollmentData?.parentEmail || ""}
-              enrollmentId={enrollmentIds[0]}
               onBack={() => setStep("legal")}
             />
           )}

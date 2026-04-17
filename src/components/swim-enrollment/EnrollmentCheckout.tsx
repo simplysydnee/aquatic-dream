@@ -5,24 +5,21 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 
 interface EnrollmentCheckoutProps {
-  priceIds: string[];
+  enrollmentIds: string[];
   customerEmail: string;
-  enrollmentId: string;
   onBack: () => void;
 }
 
 export default function EnrollmentCheckout({
-  priceIds,
+  enrollmentIds,
   customerEmail,
-  enrollmentId,
   onBack,
 }: EnrollmentCheckoutProps) {
   const fetchClientSecret = async (): Promise<string> => {
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: {
-        priceIds,
+        enrollmentIds,
         customerEmail,
-        enrollmentId,
         returnUrl: `${window.location.origin}/swim-enrollment?step=done&session_id={CHECKOUT_SESSION_ID}`,
         environment: getStripeEnvironment(),
       },
