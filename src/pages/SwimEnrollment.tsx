@@ -314,18 +314,6 @@ const SwimEnrollment = () => {
     setStep("payment");
   };
 
-  const getCheckoutPriceIds = (): string[] => {
-    const allChildren = confirmedChildren.length > 0 ? confirmedChildren : [...completedChildren];
-    const anyFirstTime = allChildren.some(c => c.isFirstTime);
-    
-    if (anyFirstTime) {
-      // First-time: pay only registration fee now; session fees deferred
-      return ["registration_fee"];
-    }
-    // Returning: pay session fees for all children
-    const totalSessions = allChildren.reduce((sum, c) => sum + c.sessionIds.length, 0);
-    return Array(totalSessions).fill("swim_session_fee");
-  };
 
   // Count of swimmers added so far (for the progress indicator)
   const swimmerCount = completedChildren.length + 1;
