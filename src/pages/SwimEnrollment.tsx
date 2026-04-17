@@ -206,17 +206,18 @@ const SwimEnrollment = () => {
       return;
     }
 
-    // Registration fee: only charge once for the entire family, on the first child who is first-time
-    const anyFirstTime = allChildren.some(c => c.isFirstTime);
-    let regFeeCharged = false;
-
+    // Registration fee: each first-time child pays their own $45
     // Build enrollment rows for ALL children
     const enrollmentRows = allChildren.flatMap(child => {
       return child.sessionIds.map((sid, i) => {
         const s = sessionMap[sid];
-        const chargeRegFee = child.isFirstTime && !regFeeCharged && i === 0;
-        if (chargeRegFee) regFeeCharged = true;
+        // Charge reg fee once per first-time child (on their first session row)
+        const chargeRegFee = child.isFirstTime && i === 0;
         const regFee = chargeRegFee ? PRICING.registrationFee : 0;
+        // First-time: pay only reg fee now (session deferred to first lesson day)
+        // Returning: pay full session price upfront
+        const sessionPrice = s?.session_price ?? 280;
+        const paymentAmount = child.isFirstTime ? regFee : sessionPrice;
         return {
           swim_level: child.level,
           session_id: sid,
@@ -232,7 +233,7 @@ const SwimEnrollment = () => {
           registration_fee: regFee,
           status: "confirmed" as const,
           payment_status: "unpaid" as const,
-          payment_amount: (s?.session_price ?? 280) + regFee,
+          payment_amount: paymentAmount,
           is_first_time: child.isFirstTime,
           payment_due_date: s?.session_start_date || null,
         };
