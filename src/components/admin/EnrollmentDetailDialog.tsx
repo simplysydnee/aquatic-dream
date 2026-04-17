@@ -98,6 +98,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
         parent_phone: form.parent_phone,
         swim_level: form.swim_level,
         status: form.status,
+        payment_status: form.payment_status,
         notes: form.notes,
       })
       .eq("id", form.id);
@@ -200,8 +201,16 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                   <h4 className="text-sm font-semibold text-muted-foreground mb-3">Payment</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 rounded-md border">
-                      <p className="text-[11px] text-muted-foreground">Status</p>
-                      <p className="text-sm font-medium capitalize">{form.payment_status}</p>
+                      <Label className="text-[11px] text-muted-foreground">Status</Label>
+                      <Select value={form.payment_status} onValueChange={(v) => update("payment_status", v)}>
+                        <SelectTrigger className="mt-1 h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unpaid">Unpaid</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="refunded">Refunded</SelectItem>
+                          <SelectItem value="waived">Waived</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="p-3 rounded-md border">
                       <p className="text-[11px] text-muted-foreground">Amount Due</p>
