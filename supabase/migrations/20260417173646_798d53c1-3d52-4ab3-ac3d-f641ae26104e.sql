@@ -1,0 +1,1 @@
+DELETE FROM swim_enrollments WHERE lower(parent_email) = 'trigger-test+brandnew@example.com';
