@@ -5,20 +5,20 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 
 interface EnrollmentCheckoutProps {
-  enrollmentIds: string[];
+  payload: unknown;
   customerEmail: string;
   onBack: () => void;
 }
 
 export default function EnrollmentCheckout({
-  enrollmentIds,
+  payload,
   customerEmail,
   onBack,
 }: EnrollmentCheckoutProps) {
   const fetchClientSecret = async (): Promise<string> => {
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: {
-        enrollmentIds,
+        payload,
         customerEmail,
         returnUrl: `${window.location.origin}/swim-enrollment?step=done&session_id={CHECKOUT_SESSION_ID}`,
         environment: getStripeEnvironment(),
@@ -36,7 +36,7 @@ export default function EnrollmentCheckout({
         Complete Payment
       </h3>
       <p className="text-muted-foreground text-sm mb-6">
-        Please complete your payment to finalize enrollment.
+        Please complete your payment to finalize enrollment. Your seat is reserved when payment succeeds.
       </p>
 
       <div className="rounded-lg border border-border overflow-hidden min-w-0">

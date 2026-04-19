@@ -8,61 +8,147 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+interface ChildPayload {
+  level: string;
+  childName: string;
+  childAge: number;
+  childDob: string | null;
+  sessionIds: string[];
+  isFirstTime: boolean;
+  parentName: string;
+  parentEmail: string;
+  parentPhone: string | null;
+  medicalNotes: string | null;
+  notes: string | null;
+  agreement: {
+    waiverAccepted: boolean;
+    photoReleaseAccepted: boolean;
+    privacyPolicyAccepted: boolean;
+    termsAccepted: boolean;
+    signatureText: string;
+    emergencyContactName: string;
+    emergencyContactPhone: string;
+    emergencyContactRelationship: string;
+  };
+}
+
+interface CheckoutPayload {
+  children: ChildPayload[];
+  signerIp: string | null;
+  versions: { waiver: string; tos: string; privacy: string };
+}
+
+const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { enrollmentIds, customerEmail, returnUrl, environment } = await req.json();
+    const { payload, customerEmail, returnUrl, environment } = await req.json();
 
-    if (!Array.isArray(enrollmentIds) || enrollmentIds.length === 0) {
-      return new Response(JSON.stringify({ error: "enrollmentIds must be a non-empty array" }), {
+    // Validate payload
+    if (!payload || typeof payload !== "object" || !Array.isArray(payload.children) || payload.children.length === 0) {
+      return new Response(JSON.stringify({ error: "Invalid payload: children required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Validate UUID format
-    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    for (const id of enrollmentIds) {
-      if (typeof id !== "string" || !uuidRe.test(id)) {
-        return new Response(JSON.stringify({ error: `Invalid enrollmentId: ${id}` }), {
+    const typedPayload = payload as CheckoutPayload;
+
+    // Collect & validate session IDs
+    const allSessionIds: string[] = [];
+    for (const child of typedPayload.children) {
+      if (!Array.isArray(child.sessionIds) || child.sessionIds.length === 0) {
+        return new Response(JSON.stringify({ error: "Each child must have at least one session" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      for (const sid of child.sessionIds) {
+        if (typeof sid !== "string" || !uuidRe.test(sid)) {
+          return new Response(JSON.stringify({ error: `Invalid session id: ${sid}` }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        allSessionIds.push(sid);
+      }
     }
+    const uniqueSessionIds = [...new Set(allSessionIds)];
 
-    // Server-authoritative pricing: query DB for each enrollment
-    const { data: enrollments, error: fetchErr } = await supabaseAdmin
-      .from("swim_enrollments")
-      .select("id, is_first_time")
-      .in("id", enrollmentIds);
+    // Fetch sessions
+    const { data: sessions, error: sessErr } = await supabaseAdmin
+      .from("swim_sessions")
+      .select("id, max_students, session_price, session_start_date")
+      .in("id", uniqueSessionIds);
 
-    if (fetchErr || !enrollments || enrollments.length === 0) {
-      return new Response(JSON.stringify({ error: "Enrollments not found" }), {
+    if (sessErr || !sessions || sessions.length !== uniqueSessionIds.length) {
+      return new Response(JSON.stringify({ error: "One or more sessions not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Build line items from DB truth
-    // - First-time child: 1× registration_fee (session deferred)
-    // - Returning child: 1× swim_session_fee per enrollment row
+    // Server-side capacity check — only confirmed rows count
+    const { data: existingEnrollments } = await supabaseAdmin
+      .from("swim_enrollments")
+      .select("session_id")
+      .in("session_id", uniqueSessionIds)
+      .eq("status", "confirmed");
+
+    const countMap: Record<string, number> = {};
+    existingEnrollments?.forEach((e) => {
+      if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
+    });
+
+    // Count how many seats this checkout would consume per session
+    const requestedMap: Record<string, number> = {};
+    for (const child of typedPayload.children) {
+      for (const sid of child.sessionIds) {
+        requestedMap[sid] = (requestedMap[sid] || 0) + 1;
+      }
+    }
+
+    const sessionMap = Object.fromEntries(sessions.map((s) => [s.id, s]));
+    for (const sid of uniqueSessionIds) {
+      const s = sessionMap[sid];
+      const used = countMap[sid] || 0;
+      const wanted = requestedMap[sid] || 0;
+      if (used + wanted > s.max_students) {
+        return new Response(JSON.stringify({ error: `Session ${sid} is full` }), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Build line items from payload truth
+    // First-time child: 1× registration_fee
+    // Returning child: 1× swim_session_fee per enrolled session row
     const lookupKeys: string[] = [];
-    for (const e of enrollments) {
-      if (e.is_first_time) {
+    for (const child of typedPayload.children) {
+      if (child.isFirstTime) {
         lookupKeys.push("registration_fee");
       } else {
-        lookupKeys.push("swim_session_fee");
+        for (const _ of child.sessionIds) {
+          lookupKeys.push("swim_session_fee");
+        }
       }
+    }
+
+    if (lookupKeys.length === 0) {
+      return new Response(JSON.stringify({ error: "No line items to charge" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const env = (environment || "sandbox") as StripeEnv;
     const stripe = createStripeClient(env);
 
-    // Resolve unique lookup keys
     const uniqueKeys = [...new Set(lookupKeys)];
     const prices = await stripe.prices.list({ lookup_keys: uniqueKeys });
     const priceMap: Record<string, string> = {};
@@ -83,20 +169,42 @@ serve(async (req) => {
       quantity: 1,
     }));
 
+    // Stage payload in pending_enrollments RIGHT BEFORE creating the Stripe session.
+    // This minimizes the window during which temporary data exists.
+    const { data: pending, error: pendingErr } = await supabaseAdmin
+      .from("pending_enrollments")
+      .insert({
+        payload: typedPayload as unknown as Record<string, unknown>,
+        customer_email: customerEmail || typedPayload.children[0].parentEmail,
+      })
+      .select("id")
+      .single();
+
+    if (pendingErr || !pending) {
+      console.error("Failed to stage pending enrollment:", pendingErr);
+      return new Response(JSON.stringify({ error: "Failed to start checkout" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const session = await stripe.checkout.sessions.create({
       line_items: lineItems,
       mode: "payment",
       ui_mode: "embedded",
-      return_url: returnUrl || `${req.headers.get("origin")}/swim-enrollment?step=done&session_id={CHECKOUT_SESSION_ID}`,
+      return_url:
+        returnUrl ||
+        `${req.headers.get("origin")}/swim-enrollment?step=done&session_id={CHECKOUT_SESSION_ID}`,
       ...(customerEmail && { customer_email: customerEmail }),
-      metadata: { enrollmentIds: enrollmentIds.join(",") },
+      metadata: { pendingEnrollmentId: pending.id },
     });
 
     return new Response(JSON.stringify({ clientSecret: session.client_secret }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("create-checkout error:", error);
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

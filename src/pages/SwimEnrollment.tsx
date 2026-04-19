@@ -52,7 +52,8 @@ const SwimEnrollment = () => {
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [totalDue, setTotalDue] = useState(0);
-  const [enrollmentIds, setEnrollmentIds] = useState<string[]>([]);
+  // Payload sent to create-checkout (no DB row exists yet)
+  const [checkoutPayload, setCheckoutPayload] = useState<unknown>(null);
   // For confirmation: all children info
   const [confirmedChildren, setConfirmedChildren] = useState<ChildEnrollment[]>([]);
   const { toast } = useToast();
@@ -70,7 +71,6 @@ const SwimEnrollment = () => {
           const s = JSON.parse(saved);
           if (s.confirmedChildren) setConfirmedChildren(s.confirmedChildren);
           if (s.totalDue) setTotalDue(s.totalDue);
-          if (s.enrollmentIds) setEnrollmentIds(s.enrollmentIds);
           localStorage.removeItem(ENROLLMENT_STORAGE_KEY);
         }
       } catch { /* ignore */ }
@@ -172,7 +172,7 @@ const SwimEnrollment = () => {
     const allSessionIds = allChildren.flatMap(c => c.sessionIds);
     const uniqueSessionIds = [...new Set(allSessionIds)];
 
-    // Fetch all sessions
+    // Fetch sessions for capacity check + price/total calculation
     const { data: sessions } = await supabase
       .from("swim_sessions")
       .select("id, max_students, session_price, session_start_date")
@@ -186,12 +186,12 @@ const SwimEnrollment = () => {
 
     const sessionMap = Object.fromEntries(sessions.map(s => [s.id, s]));
 
-    // Check capacity for all sessions
+    // Capacity check — only count CONFIRMED rows (paid). Pending checkouts don't hold seats.
     const { data: existingEnrollments } = await supabase
       .from("swim_enrollments")
       .select("session_id")
       .in("session_id", uniqueSessionIds)
-      .in("status", ["pending", "confirmed", "enrolled"]);
+      .eq("status", "confirmed");
 
     const countMap: Record<string, number> = {};
     existingEnrollments?.forEach(e => {
@@ -206,55 +206,7 @@ const SwimEnrollment = () => {
       return;
     }
 
-    // Registration fee: each first-time child pays their own $45
-    // Build enrollment rows for ALL children
-    const enrollmentRows = allChildren.flatMap(child => {
-      return child.sessionIds.map((sid, i) => {
-        const s = sessionMap[sid];
-        // Charge reg fee once per first-time child (on their first session row)
-        const chargeRegFee = child.isFirstTime && i === 0;
-        const regFee = chargeRegFee ? PRICING.registrationFee : 0;
-        // First-time: pay only reg fee now (session deferred to first lesson day)
-        // Returning: pay full session price upfront
-        const sessionPrice = s?.session_price ?? 280;
-        const paymentAmount = child.isFirstTime ? regFee : sessionPrice;
-        return {
-          swim_level: child.level,
-          session_id: sid,
-          parent_name: child.enrollmentData.parentName,
-          parent_email: child.enrollmentData.parentEmail,
-          parent_phone: child.enrollmentData.parentPhone || null,
-          child_name: child.enrollmentData.childName,
-          child_age: child.childAge,
-          child_dob: child.childDob || null,
-          medical_notes: child.enrollmentData.hasMedical === "yes" ? (child.enrollmentData.medicalNotes || null) : null,
-          notes: child.enrollmentData.notes || null,
-          lesson_type: "group" as const,
-          registration_fee: regFee,
-          status: "confirmed" as const,
-          payment_status: "unpaid" as const,
-          payment_amount: paymentAmount,
-          is_first_time: child.isFirstTime,
-          payment_due_date: s?.session_start_date || null,
-        };
-      });
-    });
-
-    const { data: newEnrollments, error: enrollError } = await supabase
-      .from("swim_enrollments")
-      .insert(enrollmentRows)
-      .select("id");
-
-    if (enrollError || !newEnrollments || newEnrollments.length === 0) {
-      toast({ title: "Something went wrong", description: "Please try again or contact us directly.", variant: "destructive" });
-      setSubmitting(false);
-      return;
-    }
-
-    const newIds = newEnrollments.map(e => e.id);
-    setEnrollmentIds(newIds);
-
-    // Create legal agreements for each enrollment
+    // Best-effort capture signer IP for the agreement record (created server-side after payment)
     let signerIp: string | null = null;
     try {
       const ipRes = await fetch("https://api.ipify.org?format=json");
@@ -262,55 +214,65 @@ const SwimEnrollment = () => {
       signerIp = ipData.ip;
     } catch { /* best-effort */ }
 
-    // Map enrollment IDs back to children
-    let idx = 0;
-    const agreementRows = allChildren.flatMap(child => {
-      return child.sessionIds.map(() => {
-        const enrollId = newIds[idx++];
-        return {
-          enrollment_id: enrollId,
-          waiver_accepted: child.legalData.waiverAccepted,
-          photo_release_accepted: child.legalData.photoReleaseAccepted === "yes",
-          privacy_policy_accepted: child.legalData.privacyPolicyAccepted,
-          terms_accepted: child.legalData.termsAccepted,
-          signature_text: child.legalData.signatureText,
-          signer_name: child.enrollmentData.parentName,
-          signer_email: child.enrollmentData.parentEmail,
-          signer_ip: signerIp,
-          waiver_version: WAIVER_VERSION,
-          tos_version: TOS_VERSION,
-          privacy_policy_version: PRIVACY_POLICY_VERSION,
-          emergency_contact_name: child.legalData.emergencyContactName,
-          emergency_contact_phone: child.legalData.emergencyContactPhone,
-          emergency_contact_relationship: child.legalData.emergencyContactRelationship,
-        };
-      });
-    });
+    // Calculate total for display purposes (server re-computes authoritatively)
+    const total = allChildren.reduce((sum, child) => {
+      return sum + child.sessionIds.reduce((cs, sid, i) => {
+        const s = sessionMap[sid];
+        const sessionPrice = s?.session_price ?? 280;
+        if (child.isFirstTime) {
+          // First-time: only reg fee due now (once per child, on first row)
+          return cs + (i === 0 ? PRICING.registrationFee : 0);
+        }
+        return cs + sessionPrice;
+      }, 0);
+    }, 0);
 
-    const { error: legalError } = await supabase
-      .from("enrollment_agreements")
-      .insert(agreementRows);
+    // Build the full payload — NO database writes until Stripe webhook fires.
+    const payload = {
+      children: allChildren.map(child => ({
+        level: child.level,
+        childName: child.enrollmentData.childName,
+        childAge: child.childAge,
+        childDob: child.childDob || null,
+        sessionIds: child.sessionIds,
+        isFirstTime: child.isFirstTime,
+        parentName: child.enrollmentData.parentName,
+        parentEmail: child.enrollmentData.parentEmail,
+        parentPhone: child.enrollmentData.parentPhone || null,
+        medicalNotes: child.enrollmentData.hasMedical === "yes" ? (child.enrollmentData.medicalNotes || null) : null,
+        notes: child.enrollmentData.notes || null,
+        agreement: {
+          waiverAccepted: child.legalData.waiverAccepted,
+          photoReleaseAccepted: child.legalData.photoReleaseAccepted === "yes",
+          privacyPolicyAccepted: child.legalData.privacyPolicyAccepted,
+          termsAccepted: child.legalData.termsAccepted,
+          signatureText: child.legalData.signatureText,
+          emergencyContactName: child.legalData.emergencyContactName,
+          emergencyContactPhone: child.legalData.emergencyContactPhone,
+          emergencyContactRelationship: child.legalData.emergencyContactRelationship,
+        },
+      })),
+      signerIp,
+      versions: {
+        waiver: WAIVER_VERSION,
+        tos: TOS_VERSION,
+        privacy: PRIVACY_POLICY_VERSION,
+      },
+    };
 
-    setSubmitting(false);
-    if (legalError) {
-      toast({ title: "Something went wrong", description: "Please try again or contact us directly.", variant: "destructive" });
-      return;
-    }
-
-    // Calculate total due
-    const total = enrollmentRows.reduce((sum, r) => sum + r.payment_amount, 0);
+    setCheckoutPayload(payload);
     setTotalDue(total);
     setConfirmedChildren(allChildren);
 
-    // Save state for Stripe redirect
+    // Save state for Stripe redirect (no enrollmentIds — they don't exist yet)
     try {
       localStorage.setItem(ENROLLMENT_STORAGE_KEY, JSON.stringify({
         confirmedChildren: allChildren,
         totalDue: total,
-        enrollmentIds: newIds,
       }));
     } catch { /* ignore */ }
 
+    setSubmitting(false);
     setStep("payment");
   };
 
@@ -423,9 +385,9 @@ const SwimEnrollment = () => {
               onAddAnother={handleAddAnother}
             />
           )}
-          {step === "payment" && enrollmentIds.length > 0 && (
+          {step === "payment" && checkoutPayload && (
             <EnrollmentCheckout
-              enrollmentIds={enrollmentIds}
+              payload={checkoutPayload}
               customerEmail={confirmedChildren[0]?.enrollmentData?.parentEmail || enrollmentData?.parentEmail || ""}
               onBack={() => setStep("legal")}
             />

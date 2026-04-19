@@ -133,7 +133,7 @@ These Terms of Service ("Terms") govern your access to and use of the Aquatic Dr
 To enroll a student or create a parent account, you must be at least 18 years of age and the parent or legal guardian of the student being enrolled. You are responsible for maintaining the confidentiality of your account login credentials and for all activity that occurs under your account.
 
 2. Enrollment, Tuition & Billing
-• A one-time, non-refundable $65 enrollment fee per swimmer is due at enrollment
+• A one-time, non-refundable $45 enrollment fee per swimmer is due at enrollment
 • Monthly tuition of $120 per swimmer is charged automatically on the 1st of each month via the card on file
 • First-month tuition is prorated based on the enrollment date
 • A 30-day written cancellation notice is required
