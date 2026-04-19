@@ -492,6 +492,27 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_enrollments: {
+        Row: {
+          created_at: string
+          customer_email: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          created_at?: string
+          customer_email: string
+          id?: string
+          payload: Json
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
       pool_events: {
         Row: {
           client_name: string | null
