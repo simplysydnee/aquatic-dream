@@ -7,13 +7,43 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
+interface ChildPayload {
+  level: string;
+  childName: string;
+  childAge: number;
+  childDob: string | null;
+  sessionIds: string[];
+  isFirstTime: boolean;
+  parentName: string;
+  parentEmail: string;
+  parentPhone: string | null;
+  medicalNotes: string | null;
+  notes: string | null;
+  agreement: {
+    waiverAccepted: boolean;
+    photoReleaseAccepted: boolean;
+    privacyPolicyAccepted: boolean;
+    termsAccepted: boolean;
+    signatureText: string;
+    emergencyContactName: string;
+    emergencyContactPhone: string;
+    emergencyContactRelationship: string;
+  };
+}
+
+interface CheckoutPayload {
+  children: ChildPayload[];
+  signerIp: string | null;
+  versions: { waiver: string; tos: string; privacy: string };
+}
+
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
 
   const url = new URL(req.url);
-  const env = (url.searchParams.get('env') || 'sandbox') as StripeEnv;
+  const env = (url.searchParams.get("env") || "sandbox") as StripeEnv;
 
   try {
     const event = await verifyWebhook(req, env);
@@ -38,44 +68,161 @@ serve(async (req) => {
 });
 
 async function handleCheckoutCompleted(session: any) {
-  // Support both legacy single enrollmentId and new comma-separated enrollmentIds
-  const idsCsv: string | undefined = session.metadata?.enrollmentIds;
-  const singleId: string | undefined = session.metadata?.enrollmentId;
-  const enrollmentIds = idsCsv
-    ? idsCsv.split(",").map((s: string) => s.trim()).filter(Boolean)
-    : (singleId ? [singleId] : []);
+  const sessionId: string = session.id;
 
-  if (enrollmentIds.length === 0) {
-    console.log("No enrollmentIds in checkout metadata, skipping");
-    return;
-  }
-
-  console.log("Updating enrollment payment status for:", enrollmentIds);
-
-  const { error } = await supabase
+  // 1. IDEMPOTENCY: if any enrollment already references this Stripe session, do nothing.
+  const { data: existing } = await supabase
     .from("swim_enrollments")
-    .update({
-      payment_status: "paid",
-      stripe_payment_id: session.payment_intent || session.id,
-    })
-    .in("id", enrollmentIds);
+    .select("id")
+    .eq("stripe_payment_id", sessionId)
+    .limit(1)
+    .maybeSingle();
 
-  if (error) {
-    console.error("Failed to update enrollments:", error);
+  if (existing) {
+    console.log("Webhook already processed for session:", sessionId);
     return;
   }
 
-  console.log("Enrollments marked as paid:", enrollmentIds);
+  const pendingId: string | undefined = session.metadata?.pendingEnrollmentId;
+  if (!pendingId) {
+    console.warn("No pendingEnrollmentId in metadata; skipping.");
+    return;
+  }
 
-  // Send confirmation email per enrollment
-  for (const id of enrollmentIds) {
-    await sendEnrollmentConfirmation(id);
+  // 2. Fetch staged payload
+  const { data: pending, error: pendingErr } = await supabase
+    .from("pending_enrollments")
+    .select("payload")
+    .eq("id", pendingId)
+    .maybeSingle();
+
+  if (pendingErr || !pending) {
+    console.error("Pending enrollment not found:", pendingId, pendingErr);
+    return;
+  }
+
+  const payload = pending.payload as CheckoutPayload;
+
+  // 3. Fetch session details for prices/dates
+  const allSessionIds = [...new Set(payload.children.flatMap((c) => c.sessionIds))];
+  const { data: sessions } = await supabase
+    .from("swim_sessions")
+    .select("id, session_price, session_start_date")
+    .in("id", allSessionIds);
+
+  const sessionMap = Object.fromEntries((sessions || []).map((s) => [s.id, s]));
+
+  // 4. Re-check capacity (best effort — never reject a paid customer; log warning if over)
+  const { data: existingEnrollments } = await supabase
+    .from("swim_enrollments")
+    .select("session_id")
+    .in("session_id", allSessionIds)
+    .eq("status", "confirmed");
+
+  const countMap: Record<string, number> = {};
+  existingEnrollments?.forEach((e) => {
+    if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
+  });
+  for (const sid of allSessionIds) {
+    const used = countMap[sid] || 0;
+    const wanted = payload.children.filter((c) => c.sessionIds.includes(sid)).length;
+    const s = sessionMap[sid];
+    if (s && used + wanted > 3) {
+      console.warn(`Capacity exceeded for session ${sid} after payment — admin review needed (used=${used}, wanted=${wanted})`);
+    }
+  }
+
+  // 5. Build atomic enrollment rows (all-or-nothing single insert)
+  const enrollmentRows = payload.children.flatMap((child) => {
+    return child.sessionIds.map((sid, i) => {
+      const s = sessionMap[sid];
+      const sessionPrice = s?.session_price ?? 280;
+      // First-time: reg fee on first row only ($45), session fee deferred
+      // Returning: full session fee, no reg fee
+      const chargeRegFee = child.isFirstTime && i === 0;
+      const regFee = chargeRegFee ? 45 : 0;
+      const paymentAmount = child.isFirstTime ? regFee : sessionPrice;
+
+      return {
+        swim_level: child.level,
+        session_id: sid,
+        parent_name: child.parentName,
+        parent_email: child.parentEmail,
+        parent_phone: child.parentPhone,
+        child_name: child.childName,
+        child_age: child.childAge,
+        child_dob: child.childDob,
+        medical_notes: child.medicalNotes,
+        notes: child.notes,
+        lesson_type: "group",
+        registration_fee: regFee,
+        status: "confirmed",
+        payment_status: "paid",
+        payment_amount: paymentAmount,
+        is_first_time: child.isFirstTime,
+        payment_due_date: s?.session_start_date || null,
+        stripe_payment_id: sessionId,
+      };
+    });
+  });
+
+  const { data: insertedEnrollments, error: enrollErr } = await supabase
+    .from("swim_enrollments")
+    .insert(enrollmentRows)
+    .select("id");
+
+  if (enrollErr || !insertedEnrollments) {
+    console.error("Atomic enrollment insert failed:", enrollErr);
+    throw new Error(`Enrollment insert failed: ${enrollErr?.message}`);
+  }
+
+  console.log(`Inserted ${insertedEnrollments.length} enrollments for session ${sessionId}`);
+
+  // 6. Build agreement rows mapped to enrollment IDs (one agreement per enrollment row)
+  let idx = 0;
+  const agreementRows = payload.children.flatMap((child) => {
+    return child.sessionIds.map(() => {
+      const enrollId = insertedEnrollments[idx++].id;
+      return {
+        enrollment_id: enrollId,
+        waiver_accepted: child.agreement.waiverAccepted,
+        photo_release_accepted: child.agreement.photoReleaseAccepted,
+        privacy_policy_accepted: child.agreement.privacyPolicyAccepted,
+        terms_accepted: child.agreement.termsAccepted,
+        signature_text: child.agreement.signatureText,
+        signer_name: child.parentName,
+        signer_email: child.parentEmail,
+        signer_ip: payload.signerIp,
+        waiver_version: payload.versions.waiver,
+        tos_version: payload.versions.tos,
+        privacy_policy_version: payload.versions.privacy,
+        emergency_contact_name: child.agreement.emergencyContactName,
+        emergency_contact_phone: child.agreement.emergencyContactPhone,
+        emergency_contact_relationship: child.agreement.emergencyContactRelationship,
+      };
+    });
+  });
+
+  const { error: agreementErr } = await supabase
+    .from("enrollment_agreements")
+    .insert(agreementRows);
+
+  if (agreementErr) {
+    console.error("Agreement insert failed (enrollments succeeded):", agreementErr);
+    // Do not throw — enrollments are recorded. Admin can backfill agreements if needed.
+  }
+
+  // 7. Cleanup staged payload
+  await supabase.from("pending_enrollments").delete().eq("id", pendingId);
+
+  // 8. Send confirmation emails (one per enrollment row)
+  for (const e of insertedEnrollments) {
+    await sendEnrollmentConfirmation(e.id);
   }
 }
 
 async function sendEnrollmentConfirmation(enrollmentId: string) {
   try {
-    // Fetch enrollment with session details
     const { data: enrollment, error: enrollErr } = await supabase
       .from("swim_enrollments")
       .select("*, swim_sessions(id, session_period_id, day_of_week, start_time, swim_level, session_price, session_start_date)")
@@ -90,7 +237,6 @@ async function sendEnrollmentConfirmation(enrollmentId: string) {
     const sessionId = enrollment.session_id;
     if (!sessionId) return;
 
-    // Fetch lesson dates
     const { data: lessonDates } = await supabase
       .from("session_lesson_dates")
       .select("lesson_date")
@@ -98,12 +244,11 @@ async function sendEnrollmentConfirmation(enrollmentId: string) {
       .eq("is_cancelled", false)
       .order("lesson_date");
 
-    const formattedDates = (lessonDates || []).map(d => {
+    const formattedDates = (lessonDates || []).map((d) => {
       const date = new Date(d.lesson_date + "T00:00:00");
       return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
     });
 
-    // Fetch period name
     let periodName = "Session";
     const session = enrollment.swim_sessions;
     if (session?.session_period_id) {
@@ -115,27 +260,33 @@ async function sendEnrollmentConfirmation(enrollmentId: string) {
       if (period) periodName = period.name;
     }
 
-    // Format session info
     const sessionInfo = session
       ? `${periodName} — ${session.day_of_week} ${
           session.start_time
-            ? new Date(`2000-01-01T${session.start_time}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+            ? new Date(`2000-01-01T${session.start_time}`).toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+              })
             : ""
         }`
       : undefined;
 
-    // Level label
     const levelLabel = getLevelLabel(enrollment.swim_level, enrollment.child_age);
     const groupName = getGroupName(enrollment.swim_level, enrollment.child_age);
 
-    // Payment details
     const regFee = enrollment.registration_fee ?? 0;
     const sessionPrice = session?.session_price ?? 280;
     const isFirstTime = enrollment.is_first_time;
 
-    const firstClassDate = lessonDates && lessonDates.length > 0
-      ? new Date(lessonDates[0].lesson_date + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-      : undefined;
+    const firstClassDate =
+      lessonDates && lessonDates.length > 0
+        ? new Date(lessonDates[0].lesson_date + "T00:00:00").toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })
+        : undefined;
 
     await supabase.functions.invoke("send-transactional-email", {
       body: {
