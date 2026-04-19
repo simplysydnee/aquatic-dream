@@ -12,7 +12,34 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import { toast } from "@/hooks/use-toast";
-import { Save, FileCheck, ShieldCheck, Camera, AlertTriangle, User, Phone, Send } from "lucide-react";
+import { Save, FileCheck, ShieldCheck, Camera, AlertTriangle, User, Phone, Send, ArrowRightLeft, CalendarClock } from "lucide-react";
+
+interface SessionOption {
+  id: string;
+  swim_level: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  max_students: number;
+  age_group: string | null;
+  session_period_id: string | null;
+  period_name: string | null;
+  enrolled_count: number;
+}
+
+const formatTime = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hr = h % 12 || 12;
+  return `${hr}:${m.toString().padStart(2, "0")} ${period}`;
+};
+
+const describeSession = (s: SessionOption) => {
+  const lvl = LEVEL_DISPLAY[s.swim_level as SwimLevel];
+  const ageLabel = s.age_group === "preschool-3-5" ? "Preschool" : s.age_group === "school-age-6-12" ? "School-Age" : "";
+  const period = s.period_name ? `${s.period_name} · ` : "";
+  return `${period}${s.day_of_week} · ${formatTime(s.start_time)} · ${lvl?.name || s.swim_level}${ageLabel ? ` (${ageLabel})` : ""}`;
+};
 
 interface Enrollment {
   id: string;
@@ -66,11 +93,15 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
   const [loadingAgreement, setLoadingAgreement] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
+  const [sessions, setSessions] = useState<SessionOption[]>([]);
+  const [originalSessionId, setOriginalSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (enrollment) {
       setForm({ ...enrollment });
+      setOriginalSessionId(enrollment.session_id);
       fetchAgreement(enrollment.id);
+      fetchSessions();
     }
   }, [enrollment]);
 
@@ -83,6 +114,30 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
       .maybeSingle();
     setAgreement(data as Agreement | null);
     setLoadingAgreement(false);
+  };
+
+  const fetchSessions = async () => {
+    const [sessionsRes, periodsRes, enrollRes] = await Promise.all([
+      supabase.from("swim_sessions").select("id, swim_level, day_of_week, start_time, end_time, max_students, age_group, session_period_id").eq("is_active", true),
+      supabase.from("session_periods").select("id, name").eq("is_active", true),
+      supabase.from("swim_enrollments").select("session_id").eq("status", "confirmed"),
+    ]);
+    const periodMap = new Map((periodsRes.data || []).map((p: any) => [p.id, p.name]));
+    const counts = new Map<string, number>();
+    (enrollRes.data || []).forEach((e: any) => {
+      if (e.session_id) counts.set(e.session_id, (counts.get(e.session_id) || 0) + 1);
+    });
+    const opts: SessionOption[] = (sessionsRes.data || []).map((s: any) => ({
+      ...s,
+      period_name: s.session_period_id ? periodMap.get(s.session_period_id) || null : null,
+      enrolled_count: counts.get(s.id) || 0,
+    }));
+    opts.sort((a, b) =>
+      (a.period_name || "").localeCompare(b.period_name || "") ||
+      a.day_of_week.localeCompare(b.day_of_week) ||
+      a.start_time.localeCompare(b.start_time)
+    );
+    setSessions(opts);
   };
 
   const handleSave = async () => {
@@ -100,6 +155,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
         status: form.status,
         payment_status: form.payment_status,
         notes: form.notes,
+        session_id: form.session_id,
       })
       .eq("id", form.id);
 
@@ -107,7 +163,14 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
     if (error) {
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Enrollment updated" });
+      const movedTo = form.session_id !== originalSessionId
+        ? sessions.find((s) => s.id === form.session_id)
+        : null;
+      toast({
+        title: movedTo ? `Moved ${form.child_name}` : "Enrollment updated",
+        description: movedTo ? describeSession(movedTo) : undefined,
+      });
+      setOriginalSessionId(form.session_id);
       onUpdated(form);
     }
   };
@@ -192,6 +255,59 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                       </Select>
                     </div>
                   </div>
+                </div>
+
+                <Separator />
+
+                {/* Class Assignment */}
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <CalendarClock className="w-4 h-4" />
+                    Class Assignment
+                  </h4>
+                  {(() => {
+                    const current = sessions.find((s) => s.id === form.session_id);
+                    const isMoved = form.session_id !== originalSessionId;
+                    return (
+                      <div className="space-y-3">
+                        <div className="p-3 rounded-md border bg-muted/40">
+                          <p className="text-[11px] text-muted-foreground">Currently in</p>
+                          <p className="text-sm font-medium">
+                            {current ? describeSession(current) : form.session_id ? "Loading…" : "Not assigned to a class"}
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs flex items-center gap-1.5">
+                            <ArrowRightLeft className="w-3 h-3" />
+                            Move to a different class
+                          </Label>
+                          <Select
+                            value={form.session_id || ""}
+                            onValueChange={(v) => update("session_id", v)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Select a class…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sessions.map((s) => {
+                                const full = s.enrolled_count >= s.max_students && s.id !== originalSessionId;
+                                return (
+                                  <SelectItem key={s.id} value={s.id} disabled={full}>
+                                    {describeSession(s)} — {full ? "FULL" : `${s.enrolled_count}/${s.max_students}`}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          {isMoved && (
+                            <p className="text-[11px] text-amber-600 mt-1.5">
+                              Pending: click "Save Changes" to confirm move.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <Separator />
