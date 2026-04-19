@@ -259,6 +259,59 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
 
                 <Separator />
 
+                {/* Class Assignment */}
+                <div>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <CalendarClock className="w-4 h-4" />
+                    Class Assignment
+                  </h4>
+                  {(() => {
+                    const current = sessions.find((s) => s.id === form.session_id);
+                    const isMoved = form.session_id !== originalSessionId;
+                    return (
+                      <div className="space-y-3">
+                        <div className="p-3 rounded-md border bg-muted/40">
+                          <p className="text-[11px] text-muted-foreground">Currently in</p>
+                          <p className="text-sm font-medium">
+                            {current ? describeSession(current) : form.session_id ? "Loading…" : "Not assigned to a class"}
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs flex items-center gap-1.5">
+                            <ArrowRightLeft className="w-3 h-3" />
+                            Move to a different class
+                          </Label>
+                          <Select
+                            value={form.session_id || ""}
+                            onValueChange={(v) => update("session_id", v)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Select a class…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sessions.map((s) => {
+                                const full = s.enrolled_count >= s.max_students && s.id !== originalSessionId;
+                                return (
+                                  <SelectItem key={s.id} value={s.id} disabled={full}>
+                                    {describeSession(s)} — {full ? "FULL" : `${s.enrolled_count}/${s.max_students}`}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          {isMoved && (
+                            <p className="text-[11px] text-amber-600 mt-1.5">
+                              Pending: click "Save Changes" to confirm move.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <Separator />
+
                 {/* Payment Info */}
                 <div>
                   <h4 className="text-sm font-semibold text-muted-foreground mb-3">Payment</h4>
