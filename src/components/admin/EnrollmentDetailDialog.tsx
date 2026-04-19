@@ -12,7 +12,34 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import { toast } from "@/hooks/use-toast";
-import { Save, FileCheck, ShieldCheck, Camera, AlertTriangle, User, Phone, Send } from "lucide-react";
+import { Save, FileCheck, ShieldCheck, Camera, AlertTriangle, User, Phone, Send, ArrowRightLeft, CalendarClock } from "lucide-react";
+
+interface SessionOption {
+  id: string;
+  swim_level: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  max_students: number;
+  age_group: string | null;
+  session_period_id: string | null;
+  period_name: string | null;
+  enrolled_count: number;
+}
+
+const formatTime = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hr = h % 12 || 12;
+  return `${hr}:${m.toString().padStart(2, "0")} ${period}`;
+};
+
+const describeSession = (s: SessionOption) => {
+  const lvl = LEVEL_DISPLAY[s.swim_level as SwimLevel];
+  const ageLabel = s.age_group === "preschool-3-5" ? "Preschool" : s.age_group === "school-age-6-12" ? "School-Age" : "";
+  const period = s.period_name ? `${s.period_name} · ` : "";
+  return `${period}${s.day_of_week} · ${formatTime(s.start_time)} · ${lvl?.name || s.swim_level}${ageLabel ? ` (${ageLabel})` : ""}`;
+};
 
 interface Enrollment {
   id: string;
