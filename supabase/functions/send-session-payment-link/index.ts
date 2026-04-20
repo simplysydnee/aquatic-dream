@@ -36,11 +36,19 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Calculate session fee (exclude registration fee)
-    const sessionPrice = enrollment.swim_sessions?.session_price ?? 280
-    const regFee = enrollment.registration_fee ?? 0
-    const sessionFee = (enrollment.payment_amount ?? sessionPrice) - regFee
-
+    // Session fee = swim_sessions.session_price (default $240).
+    // Only send if session_fee_status === 'due_day_1' (already paid or comp shouldn't re-charge).
+    if (enrollment.session_fee_status === 'paid') {
+      return new Response(JSON.stringify({ error: 'Session fee already paid' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (enrollment.session_fee_status === 'comp') {
+      return new Response(JSON.stringify({ error: 'Session fee is comped' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const sessionFee = Number(enrollment.swim_sessions?.session_price ?? 240)
     if (sessionFee <= 0) {
       return new Response(JSON.stringify({ error: 'No session fee due' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
