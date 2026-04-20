@@ -141,6 +141,7 @@ const CalendarDayView = ({
   attendance,
   agreements,
   icsSessions,
+  lessonDates,
   activeFilters,
   onAttendanceChange,
   onEditEvent,
