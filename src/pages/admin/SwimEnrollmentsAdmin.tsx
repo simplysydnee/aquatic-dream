@@ -393,8 +393,8 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Level</TableHead>
                     <TableHead>Parent</TableHead>
                     <TableHead>Session</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead>Amount</TableHead>
+                    <TableHead>Reg Fee</TableHead>
+                    <TableHead>Session Fee</TableHead>
                     <TableHead>Method / Ref</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
@@ -424,23 +424,33 @@ const SwimEnrollmentsAdmin = () => {
                           {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                         </TableCell>
                         <TableCell>
-                          <Select value={e.payment_status} onValueChange={(v) => updatePaymentStatus(e, v)}>
-                            <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
+                          {e.is_first_time ? (
+                            <Select value={e.payment_status} onValueChange={(v) => updatePaymentStatus(e, v)}>
+                              <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unpaid">Unpaid</SelectItem>
+                                <SelectItem value="paid">Paid ($45)</SelectItem>
+                                <SelectItem value="refunded">Refunded</SelectItem>
+                                <SelectItem value="waived">Waived</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">N/A (returning)</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Select value={e.session_fee_status} onValueChange={(v) => updateSessionFeeStatus(e, v)}>
+                            <SelectTrigger className={`w-[140px] h-8 ${sessionFeeColor(e.session_fee_status)}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="unpaid">Unpaid</SelectItem>
-                              <SelectItem value="paid">Paid</SelectItem>
-                              <SelectItem value="refunded">Refunded</SelectItem>
-                              <SelectItem value="waived">Waived</SelectItem>
+                              <SelectItem value="due_day_1">Due Day 1 ($240)</SelectItem>
+                              <SelectItem value="paid">Paid ($240)</SelectItem>
+                              <SelectItem value="comp">Comp</SelectItem>
                             </SelectContent>
                           </Select>
-                          {e.is_first_time && (
-                            <span className="block text-[10px] text-muted-foreground mt-0.5">1st time</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm font-medium">
-                          {e.payment_amount ? `$${e.payment_amount}` : "—"}
                         </TableCell>
                         <TableCell className="text-xs">
                           {e.payment_method ? (
@@ -472,24 +482,14 @@ const SwimEnrollmentsAdmin = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            {e.payment_status === "unpaid" && e.is_first_time && (
+                            {e.session_fee_status === "due_day_1" && (
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                title="Send payment link email"
+                                title="Send $240 session fee payment link"
                                 onClick={() => sendPaymentLink(e)}
                               >
                                 <Send className="w-4 h-4 text-primary" />
-                              </Button>
-                            )}
-                            {e.payment_status === "unpaid" && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                title="Mark as paid (cash/check)"
-                                onClick={() => updatePaymentStatus(e, "paid")}
-                              >
-                                <CheckCircle className="w-4 h-4 text-green-600" />
                               </Button>
                             )}
                             <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
