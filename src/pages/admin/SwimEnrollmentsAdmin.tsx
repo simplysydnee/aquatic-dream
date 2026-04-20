@@ -207,31 +207,58 @@ const SwimEnrollmentsAdmin = () => {
         <Badge variant="outline" className="text-sm">{enrollments.length} total</Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Enrolled (Unpaid)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Active Swimmers{anyFilterActive && <span className="text-[10px] ml-1">(filtered)</span>}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-yellow-600">{unpaidCount}</p>
+            <p className="text-3xl font-bold text-foreground">{activeCount}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Paid</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Revenue Collected</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-green-600">{paidCount}</p>
+            <p className="text-3xl font-bold text-green-600">{fmtMoney(revenueCollected)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Cancelled</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding Balance</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-red-600">{cancelledCount}</p>
+            <p className="text-3xl font-bold text-yellow-600">{fmtMoney(outstandingTotal)}</p>
+            <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
+              Returning (owe now): <span className="font-medium text-foreground">{fmtMoney(outstandingReturning)}</span><br />
+              First-time (pay day 1): <span className="font-medium text-foreground">{fmtMoney(outstandingFirstTime)}</span>
+            </p>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Capacity Used</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-foreground">
+              {activeCount}<span className="text-muted-foreground text-xl"> / {totalSeats}</span>
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">{capacityPct}% full</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground -mt-2">
+        <span>Cancelled: <span className="font-medium text-foreground">{cancelledCount}</span></span>
+        <span>·</span>
+        <span>Refunded: <span className="font-medium text-foreground">{refundedCount}</span></span>
+        <span>·</span>
+        <span>Waived: <span className="font-medium text-foreground">{waivedCount}</span></span>
+        <span>·</span>
+        <span>First-time on roster: <span className="font-medium text-foreground">{firstTimeOnRoster}</span></span>
       </div>
 
       <Tabs defaultValue="all">
