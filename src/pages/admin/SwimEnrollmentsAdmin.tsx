@@ -117,8 +117,25 @@ const SwimEnrollmentsAdmin = () => {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Payment updated", description: `${enrollment.child_name}: ${payment_status}` });
+      toast({ title: "Reg fee updated", description: `${enrollment.child_name}: ${payment_status}` });
       setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, payment_status } : e)));
+    }
+  };
+
+  const updateSessionFeeStatus = async (enrollment: Enrollment, session_fee_status: string) => {
+    const updates: Record<string, unknown> = { session_fee_status };
+    if (session_fee_status === "paid") {
+      updates.session_fee_paid_at = new Date().toISOString();
+    }
+    const { error } = await supabase
+      .from("swim_enrollments")
+      .update(updates)
+      .eq("id", enrollment.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Session fee updated", description: `${enrollment.child_name}: ${session_fee_status}` });
+      setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, ...updates } as Enrollment : e)));
     }
   };
 
@@ -169,28 +186,30 @@ const SwimEnrollmentsAdmin = () => {
 
   const activeCount = activeEnrollments.length;
   const revenueCollected = activeEnrollments
-    .filter((e) => e.payment_status === "paid")
-    .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
+    .filter((e) => e.payment_status === "paid" || e.session_fee_status === "paid")
+    .reduce((sum, e) => {
+      let amt = 0;
+      if (e.payment_status === "paid") amt += REG_FEE;
+      if (e.session_fee_status === "paid") amt += SESSION_FEE;
+      return sum + amt;
+    }, 0);
 
-  // Owed Now: overdue balances that should NEVER grow under the new rules.
-  // - Returning + unpaid → $240 (should have paid at checkout)
-  // - First-time + unpaid (reg fee NOT waived) → $45
-  const owedNowReturning = activeEnrollments
-    .filter((e) => !e.is_first_time && e.payment_status === "unpaid")
-    .reduce((sum) => sum + SESSION_FEE, 0);
+  // Owed Now: balances that should NEVER grow under the new rules.
+  // - First-time + reg fee unpaid (not waived) → $45
+  // - Returning + session_fee_status='due_day_1' → $240 (Mejia grace)
   const owedNowFirstTime = activeEnrollments
     .filter((e) => e.is_first_time && e.payment_status === "unpaid")
     .reduce((sum) => sum + REG_FEE, 0);
+  const owedNowReturning = activeEnrollments
+    .filter((e) => !e.is_first_time && e.session_fee_status === "due_day_1")
+    .reduce((sum) => sum + SESSION_FEE, 0);
   const owedNowTotal = owedNowReturning + owedNowFirstTime;
 
-  // Day-1 Collection: cash/check expected at first lesson.
-  // - Every active first-timer owes $240 day 1 (regardless of reg fee status)
-  // - Returning swimmers flagged as day-1 grace (payment_method = 'cash' AND unpaid)
-  const dayOneFirstTimers = activeEnrollments.filter((e) => e.is_first_time);
-  const dayOneReturningGrace = activeEnrollments.filter(
-    (e) => !e.is_first_time && e.payment_status === "unpaid" && e.payment_method === "cash",
-  );
-  const dayOneTotal = (dayOneFirstTimers.length + dayOneReturningGrace.length) * SESSION_FEE;
+  // Day-1 Collection: every active enrollment with session_fee_status='due_day_1' owes $240.
+  const dayOneRows = activeEnrollments.filter((e) => e.session_fee_status === "due_day_1");
+  const dayOneFirstTimers = dayOneRows.filter((e) => e.is_first_time);
+  const dayOneReturningGrace = dayOneRows.filter((e) => !e.is_first_time);
+  const dayOneTotal = dayOneRows.length * SESSION_FEE;
 
   // Capacity: classes (sessions) with ≥1 active enrollment vs. total available classes in scope.
   const allSessionIds = Object.values(sessions).map((s) => s.id);
