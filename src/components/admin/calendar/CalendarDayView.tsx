@@ -8,6 +8,7 @@ import type {
   CalendarPoolEvent,
   AttendanceRecord,
   EnrollmentAgreement,
+  LessonDate,
 } from "@/hooks/useCalendarData";
 import { Lock, Plus, Pencil, Trash2 } from "lucide-react";
 import {
@@ -115,6 +116,7 @@ interface Props {
   attendance: AttendanceRecord[];
   agreements: EnrollmentAgreement[];
   icsSessions: ICSSession[];
+  lessonDates: LessonDate[];
   activeFilters: Set<ActivityType>;
   onAttendanceChange: () => void;
   onEditEvent?: (event: CalendarPoolEvent) => void;
@@ -139,6 +141,7 @@ const CalendarDayView = ({
   attendance,
   agreements,
   icsSessions,
+  lessonDates,
   activeFilters,
   onAttendanceChange,
   onEditEvent,
@@ -187,11 +190,33 @@ const CalendarDayView = ({
     return names.length > 0 ? names.slice(0, 5) : ["Instructor"];
   }, [todayICS]);
 
-  // ── Aquatic Dreams sessions for today ──
+  // ── Aquatic Dreams sessions actually happening today ──
+  // A class "happens today" only if there's a non-cancelled session_lesson_dates row
+  // for the selected date. This filters out recurring templates outside their session period.
+  const activeSessionIdsToday = useMemo(() => {
+    return new Set(
+      lessonDates
+        .filter((ld) => ld.lesson_date === dateStr && !ld.is_cancelled)
+        .map((ld) => ld.session_id)
+    );
+  }, [lessonDates, dateStr]);
+
   const todaySessions = useMemo(
-    () => swimSessions.filter((s) => s.day_of_week.toLowerCase().includes(dayName.toLowerCase())),
-    [swimSessions, dayName]
+    () => swimSessions.filter(
+      (s) =>
+        s.day_of_week.toLowerCase().includes(dayName.toLowerCase()) &&
+        activeSessionIdsToday.has(s.id)
+    ),
+    [swimSessions, dayName, activeSessionIdsToday]
   );
+
+  // Count confirmed swimmers across today's classes
+  const todaySwimmerCount = useMemo(() => {
+    const ids = new Set(todaySessions.map((s) => s.id));
+    return enrollments.filter(
+      (e) => e.session_id && ids.has(e.session_id) && e.status === "confirmed"
+    ).length;
+  }, [enrollments, todaySessions]);
 
   // ── Pool events for today (non-ICS) ──
   const todayEvents = useMemo(
@@ -378,10 +403,27 @@ const CalendarDayView = ({
         {/* AD group */}
         {adCount > 0 && (
           <div
-            className="text-center text-xs font-semibold py-1.5 border-l"
+            className="flex items-center justify-center gap-2 text-xs font-semibold py-1.5 border-l px-2"
             style={{ backgroundColor: "#d0ddf7", color: "#1a3a8a", flex: adCount }}
           >
-            Aquatic Dreams — {todaySessions.length + adEvents.length} group{(todaySessions.length + adEvents.length) !== 1 ? "s" : ""}
+            <span>Aquatic Dreams</span>
+            {todaySessions.length === 0 && adEvents.length === 0 ? (
+              <span className="font-normal opacity-70">— No groups today</span>
+            ) : (
+              <span className="flex items-center gap-1.5 font-normal">
+                <span title="Classes scheduled today" className="px-1.5 py-0.5 rounded bg-white/60">
+                  {todaySessions.length} {todaySessions.length === 1 ? "class" : "classes"}
+                </span>
+                <span title="Confirmed enrollments across today's classes" className="px-1.5 py-0.5 rounded bg-white/60">
+                  {todaySwimmerCount} {todaySwimmerCount === 1 ? "swimmer" : "swimmers"}
+                </span>
+                {adEvents.length > 0 && (
+                  <span title="Walk-ins and private/semi-private events" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {adEvents.length} {adEvents.length === 1 ? "event" : "events"}
+                  </span>
+                )}
+              </span>
+            )}
           </div>
         )}
         {/* Dive group */}

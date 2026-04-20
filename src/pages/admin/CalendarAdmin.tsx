@@ -51,6 +51,7 @@ const CalendarAdmin = () => {
     attendance,
     agreements,
     icsSessions,
+    lessonDates,
     loading,
     refetch,
   } = useCalendarData(currentDate, view);
@@ -212,6 +213,7 @@ const CalendarAdmin = () => {
           attendance={attendance}
           agreements={agreements}
           icsSessions={icsSessions}
+          lessonDates={lessonDates}
           activeFilters={activeFilters}
           onAttendanceChange={refetch}
           onEditEvent={(event) => {
