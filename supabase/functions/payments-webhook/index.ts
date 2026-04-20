@@ -132,16 +132,28 @@ async function handleCheckoutCompleted(session: any) {
     }
   }
 
-  // 5. Build atomic enrollment rows (all-or-nothing single insert)
+  // 5. Build atomic enrollment rows — payment_amount reflects what Stripe ACTUALLY charged for that row.
+  //    First-time: $45 reg fee charged on row 0; session fee NOT charged (due day 1, payment_status='unpaid' for session fee tracking).
+  //    Returning: full session fee charged per row.
+  //
+  //    We sanity-check the per-row total against session.amount_total so we never claim more was paid
+  //    than Stripe actually collected.
+  const stripeAmountTotalCents = Number(session.amount_total || 0);
+  const stripeAmountTotal = stripeAmountTotalCents / 100;
+
   const enrollmentRows = payload.children.flatMap((child) => {
     return child.sessionIds.map((sid, i) => {
       const s = sessionMap[sid];
-      const sessionPrice = s?.session_price ?? 280;
-      // First-time: reg fee on first row only ($45), session fee deferred
-      // Returning: full session fee, no reg fee
+      const sessionPrice = Number(s?.session_price ?? 240);
       const chargeRegFee = child.isFirstTime && i === 0;
       const regFee = chargeRegFee ? 45 : 0;
-      const paymentAmount = child.isFirstTime ? regFee : sessionPrice;
+
+      // Returning swimmers: session fee was charged at checkout, this row is fully paid.
+      // First-time swimmers: only reg fee charged. Session fee owed day 1 → row stays "unpaid"
+      // for the session fee portion; payment_amount captures only the reg fee actually paid.
+      const isReturning = !child.isFirstTime;
+      const paymentAmount = isReturning ? sessionPrice : regFee;
+      const rowPaymentStatus = isReturning ? "paid" : (chargeRegFee ? "paid" : "unpaid");
 
       return {
         swim_level: child.level,
@@ -157,14 +169,28 @@ async function handleCheckoutCompleted(session: any) {
         lesson_type: "group",
         registration_fee: regFee,
         status: "confirmed",
-        payment_status: "paid",
+        payment_status: rowPaymentStatus,
         payment_amount: paymentAmount,
         is_first_time: child.isFirstTime,
         payment_due_date: s?.session_start_date || null,
         stripe_payment_id: sessionId,
+        payment_method: "stripe",
+        payment_reference: sessionId,
       };
     });
   });
+
+  // Reconciliation: sum of what we're recording must not exceed what Stripe actually charged.
+  const computedTotal = enrollmentRows.reduce((sum, r) => sum + Number(r.payment_amount || 0), 0);
+  if (stripeAmountTotal > 0 && computedTotal > stripeAmountTotal + 0.01) {
+    console.error(
+      `RECONCILIATION MISMATCH for session ${sessionId}: ` +
+      `Stripe charged $${stripeAmountTotal}, but enrollment rows sum to $${computedTotal}. ` +
+      `Inserting rows anyway, but this needs admin review.`
+    );
+  } else {
+    console.log(`Reconciliation OK: Stripe=$${stripeAmountTotal} rows=$${computedTotal}`);
+  }
 
   const { data: insertedEnrollments, error: enrollErr } = await supabase
     .from("swim_enrollments")

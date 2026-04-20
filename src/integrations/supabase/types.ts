@@ -693,6 +693,8 @@ export type Database = {
           parent_phone: string | null
           payment_amount: number | null
           payment_due_date: string | null
+          payment_method: string
+          payment_reference: string | null
           payment_reminder_sent_at: string | null
           payment_status: string
           registration_fee: number | null
@@ -717,6 +719,8 @@ export type Database = {
           parent_phone?: string | null
           payment_amount?: number | null
           payment_due_date?: string | null
+          payment_method?: string
+          payment_reference?: string | null
           payment_reminder_sent_at?: string | null
           payment_status?: string
           registration_fee?: number | null
@@ -741,6 +745,8 @@ export type Database = {
           parent_phone?: string | null
           payment_amount?: number | null
           payment_due_date?: string | null
+          payment_method?: string
+          payment_reference?: string | null
           payment_reminder_sent_at?: string | null
           payment_status?: string
           registration_fee?: number | null
