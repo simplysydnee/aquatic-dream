@@ -32,6 +32,10 @@ interface Enrollment {
   payment_due_date: string | null;
   payment_method?: string | null;
   payment_reference?: string | null;
+  payment_reminder_sent_at?: string | null;
+  session_fee_status: string;
+  session_fee_stripe_id?: string | null;
+  session_fee_paid_at?: string | null;
 }
 
 interface SessionInfo {
