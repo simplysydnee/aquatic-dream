@@ -58,6 +58,12 @@ interface Enrollment {
   stripe_payment_id: string | null;
   is_first_time: boolean;
   payment_due_date: string | null;
+  payment_method?: string | null;
+  payment_reference?: string | null;
+  payment_reminder_sent_at?: string | null;
+  session_fee_status: string;
+  session_fee_stripe_id?: string | null;
+  session_fee_paid_at?: string | null;
 }
 
 interface Agreement {
@@ -143,20 +149,26 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
   const handleSave = async () => {
     if (!form) return;
     setSaving(true);
+    const updates: Record<string, unknown> = {
+      child_name: form.child_name,
+      child_age: form.child_age,
+      parent_name: form.parent_name,
+      parent_email: form.parent_email,
+      parent_phone: form.parent_phone,
+      swim_level: form.swim_level,
+      status: form.status,
+      payment_status: form.payment_status,
+      session_fee_status: form.session_fee_status,
+      notes: form.notes,
+      session_id: form.session_id,
+    };
+    // If admin just flipped session fee to 'paid', stamp the timestamp
+    if (form.session_fee_status === "paid" && !form.session_fee_paid_at) {
+      updates.session_fee_paid_at = new Date().toISOString();
+    }
     const { error } = await supabase
       .from("swim_enrollments")
-      .update({
-        child_name: form.child_name,
-        child_age: form.child_age,
-        parent_name: form.parent_name,
-        parent_email: form.parent_email,
-        parent_phone: form.parent_phone,
-        swim_level: form.swim_level,
-        status: form.status,
-        payment_status: form.payment_status,
-        notes: form.notes,
-        session_id: form.session_id,
-      })
+      .update(updates)
       .eq("id", form.id);
 
     setSaving(false);
@@ -317,36 +329,55 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                   <h4 className="text-sm font-semibold text-muted-foreground mb-3">Payment</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 rounded-md border">
-                      <Label className="text-[11px] text-muted-foreground">Status</Label>
-                      <Select value={form.payment_status} onValueChange={(v) => update("payment_status", v)}>
-                        <SelectTrigger className="mt-1 h-8"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unpaid">Unpaid</SelectItem>
-                          <SelectItem value="paid">Paid</SelectItem>
-                          <SelectItem value="refunded">Refunded</SelectItem>
-                          <SelectItem value="waived">Waived</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-[11px] text-muted-foreground">
+                        Registration Fee {form.is_first_time ? "($45)" : "(N/A — returning)"}
+                      </Label>
+                      {form.is_first_time ? (
+                        <Select value={form.payment_status} onValueChange={(v) => update("payment_status", v)}>
+                          <SelectTrigger className="mt-1 h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unpaid">Unpaid</SelectItem>
+                            <SelectItem value="paid">Paid</SelectItem>
+                            <SelectItem value="refunded">Refunded</SelectItem>
+                            <SelectItem value="waived">Waived</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic mt-1">N/A</p>
+                      )}
                     </div>
                     <div className="p-3 rounded-md border">
-                      <p className="text-[11px] text-muted-foreground">Amount Due</p>
-                      <p className="text-sm font-medium">{form.payment_amount ? `$${form.payment_amount}` : "—"}</p>
+                      <Label className="text-[11px] text-muted-foreground">Session Fee ($240)</Label>
+                      <Select value={form.session_fee_status} onValueChange={(v) => update("session_fee_status", v)}>
+                        <SelectTrigger className="mt-1 h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="due_day_1">Due Day 1</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="comp">Comp</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="p-3 rounded-md border">
                       <p className="text-[11px] text-muted-foreground">First-Time Swimmer</p>
                       <p className="text-sm font-medium">{form.is_first_time ? "Yes" : "No (returning)"}</p>
                     </div>
                     <div className="p-3 rounded-md border">
-                      <p className="text-[11px] text-muted-foreground">Payment Due Date</p>
+                      <p className="text-[11px] text-muted-foreground">Session Start Date</p>
                       <p className="text-sm font-medium">{form.payment_due_date ? new Date(form.payment_due_date + "T00:00:00").toLocaleDateString() : "—"}</p>
                     </div>
                     {form.stripe_payment_id && (
                       <div className="col-span-2 p-3 rounded-md border">
-                        <p className="text-[11px] text-muted-foreground">Stripe Reference</p>
+                        <p className="text-[11px] text-muted-foreground">Stripe Reference (Reg Fee)</p>
                         <p className="text-sm font-mono">{form.stripe_payment_id}</p>
                       </div>
                     )}
-                    {form.is_first_time && form.payment_status === "unpaid" && (
+                    {form.session_fee_stripe_id && (
+                      <div className="col-span-2 p-3 rounded-md border">
+                        <p className="text-[11px] text-muted-foreground">Stripe Reference (Session Fee)</p>
+                        <p className="text-sm font-mono">{form.session_fee_stripe_id}</p>
+                      </div>
+                    )}
+                    {form.session_fee_status === "due_day_1" && (
                       <div className="col-span-2">
                         <Button
                           variant="outline"
@@ -356,7 +387,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                           disabled={sendingLink}
                         >
                           <Send className="w-4 h-4 mr-2" />
-                          {sendingLink ? "Sending..." : "Send Session Fee Payment Link"}
+                          {sendingLink ? "Sending..." : "Send $240 Session Fee Payment Link"}
                         </Button>
                       </div>
                     )}

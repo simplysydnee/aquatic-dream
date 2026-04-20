@@ -698,6 +698,9 @@ export type Database = {
           payment_reminder_sent_at: string | null
           payment_status: string
           registration_fee: number | null
+          session_fee_paid_at: string | null
+          session_fee_status: string
+          session_fee_stripe_id: string | null
           session_id: string | null
           status: string
           stripe_payment_id: string | null
@@ -724,6 +727,9 @@ export type Database = {
           payment_reminder_sent_at?: string | null
           payment_status?: string
           registration_fee?: number | null
+          session_fee_paid_at?: string | null
+          session_fee_status?: string
+          session_fee_stripe_id?: string | null
           session_id?: string | null
           status?: string
           stripe_payment_id?: string | null
@@ -750,6 +756,9 @@ export type Database = {
           payment_reminder_sent_at?: string | null
           payment_status?: string
           registration_fee?: number | null
+          session_fee_paid_at?: string | null
+          session_fee_status?: string
+          session_fee_stripe_id?: string | null
           session_id?: string | null
           status?: string
           stripe_payment_id?: string | null

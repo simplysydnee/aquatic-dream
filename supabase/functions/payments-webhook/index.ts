@@ -50,9 +50,16 @@ serve(async (req) => {
     console.log("Received event:", event.type, "env:", env);
 
     switch (event.type) {
-      case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object);
+      case "checkout.session.completed": {
+        const obj = event.data.object;
+        // Session-fee follow-up payment from send-session-payment-link
+        if (obj?.metadata?.type === "session_fee" && obj?.metadata?.enrollmentId) {
+          await handleSessionFeePaid(obj);
+        } else {
+          await handleCheckoutCompleted(obj);
+        }
         break;
+      }
       default:
         console.log("Unhandled event:", event.type);
     }
@@ -148,12 +155,14 @@ async function handleCheckoutCompleted(session: any) {
       const chargeRegFee = child.isFirstTime && i === 0;
       const regFee = chargeRegFee ? 45 : 0;
 
-      // Returning swimmers: session fee was charged at checkout, this row is fully paid.
-      // First-time swimmers: only reg fee charged. Session fee owed day 1 → row stays "unpaid"
-      // for the session fee portion; payment_amount captures only the reg fee actually paid.
+      // payment_status tracks the REGISTRATION FEE only.
+      // session_fee_status tracks the $240 session fee SEPARATELY.
+      //   - Returning: Stripe collected $240 at checkout → session_fee_status='paid'
+      //   - First-time: only $45 reg fee charged → session_fee_status='due_day_1' (collected day 1)
       const isReturning = !child.isFirstTime;
       const paymentAmount = isReturning ? sessionPrice : regFee;
-      const rowPaymentStatus = isReturning ? "paid" : (chargeRegFee ? "paid" : "unpaid");
+      const rowPaymentStatus = isReturning ? "not_required" : (chargeRegFee ? "paid" : "unpaid");
+      const sessionFeeStatus = isReturning ? "paid" : "due_day_1";
 
       return {
         swim_level: child.level,
@@ -176,6 +185,9 @@ async function handleCheckoutCompleted(session: any) {
         stripe_payment_id: sessionId,
         payment_method: "stripe",
         payment_reference: sessionId,
+        session_fee_status: sessionFeeStatus,
+        session_fee_stripe_id: isReturning ? sessionId : null,
+        session_fee_paid_at: isReturning ? new Date().toISOString() : null,
       };
     });
   });
@@ -244,6 +256,28 @@ async function handleCheckoutCompleted(session: any) {
   // 8. Send confirmation emails (one per enrollment row)
   for (const e of insertedEnrollments) {
     await sendEnrollmentConfirmation(e.id);
+  }
+}
+
+async function handleSessionFeePaid(checkoutSession: any) {
+  const enrollmentId = checkoutSession.metadata?.enrollmentId;
+  if (!enrollmentId) {
+    console.warn("Session fee callback missing enrollmentId");
+    return;
+  }
+  const stripeId = checkoutSession.payment_intent || checkoutSession.id;
+  const { error } = await supabase
+    .from("swim_enrollments")
+    .update({
+      session_fee_status: "paid",
+      session_fee_stripe_id: stripeId,
+      session_fee_paid_at: new Date().toISOString(),
+    })
+    .eq("id", enrollmentId);
+  if (error) {
+    console.error("Failed to mark session fee paid:", enrollmentId, error);
+  } else {
+    console.log("Session fee marked paid for enrollment:", enrollmentId);
   }
 }
 

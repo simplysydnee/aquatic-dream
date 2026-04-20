@@ -32,6 +32,10 @@ interface Enrollment {
   payment_due_date: string | null;
   payment_method?: string | null;
   payment_reference?: string | null;
+  payment_reminder_sent_at?: string | null;
+  session_fee_status: string;
+  session_fee_stripe_id?: string | null;
+  session_fee_paid_at?: string | null;
 }
 
 interface SessionInfo {
@@ -113,8 +117,25 @@ const SwimEnrollmentsAdmin = () => {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Payment updated", description: `${enrollment.child_name}: ${payment_status}` });
+      toast({ title: "Reg fee updated", description: `${enrollment.child_name}: ${payment_status}` });
       setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, payment_status } : e)));
+    }
+  };
+
+  const updateSessionFeeStatus = async (enrollment: Enrollment, session_fee_status: string) => {
+    const updates: Record<string, unknown> = { session_fee_status };
+    if (session_fee_status === "paid") {
+      updates.session_fee_paid_at = new Date().toISOString();
+    }
+    const { error } = await supabase
+      .from("swim_enrollments")
+      .update(updates)
+      .eq("id", enrollment.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Session fee updated", description: `${enrollment.child_name}: ${session_fee_status}` });
+      setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, ...updates } as Enrollment : e)));
     }
   };
 
@@ -135,7 +156,16 @@ const SwimEnrollmentsAdmin = () => {
     switch (status) {
       case "paid": return "bg-green-100 text-green-700 border-green-300";
       case "refunded": return "bg-purple-100 text-purple-700 border-purple-300";
+      case "waived": return "bg-slate-100 text-slate-700 border-slate-300";
       default: return "bg-yellow-100 text-yellow-700 border-yellow-300";
+    }
+  };
+
+  const sessionFeeColor = (status: string) => {
+    switch (status) {
+      case "paid": return "bg-green-100 text-green-700 border-green-300";
+      case "comp": return "bg-slate-100 text-slate-700 border-slate-300";
+      default: return "bg-blue-100 text-blue-700 border-blue-300";
     }
   };
 
@@ -165,28 +195,30 @@ const SwimEnrollmentsAdmin = () => {
 
   const activeCount = activeEnrollments.length;
   const revenueCollected = activeEnrollments
-    .filter((e) => e.payment_status === "paid")
-    .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
+    .filter((e) => e.payment_status === "paid" || e.session_fee_status === "paid")
+    .reduce((sum, e) => {
+      let amt = 0;
+      if (e.payment_status === "paid") amt += REG_FEE;
+      if (e.session_fee_status === "paid") amt += SESSION_FEE;
+      return sum + amt;
+    }, 0);
 
-  // Owed Now: overdue balances that should NEVER grow under the new rules.
-  // - Returning + unpaid → $240 (should have paid at checkout)
-  // - First-time + unpaid (reg fee NOT waived) → $45
-  const owedNowReturning = activeEnrollments
-    .filter((e) => !e.is_first_time && e.payment_status === "unpaid")
-    .reduce((sum) => sum + SESSION_FEE, 0);
+  // Owed Now: balances that should NEVER grow under the new rules.
+  // - First-time + reg fee unpaid (not waived) → $45
+  // - Returning + session_fee_status='due_day_1' → $240 (Mejia grace)
   const owedNowFirstTime = activeEnrollments
     .filter((e) => e.is_first_time && e.payment_status === "unpaid")
     .reduce((sum) => sum + REG_FEE, 0);
+  const owedNowReturning = activeEnrollments
+    .filter((e) => !e.is_first_time && e.session_fee_status === "due_day_1")
+    .reduce((sum) => sum + SESSION_FEE, 0);
   const owedNowTotal = owedNowReturning + owedNowFirstTime;
 
-  // Day-1 Collection: cash/check expected at first lesson.
-  // - Every active first-timer owes $240 day 1 (regardless of reg fee status)
-  // - Returning swimmers flagged as day-1 grace (payment_method = 'cash' AND unpaid)
-  const dayOneFirstTimers = activeEnrollments.filter((e) => e.is_first_time);
-  const dayOneReturningGrace = activeEnrollments.filter(
-    (e) => !e.is_first_time && e.payment_status === "unpaid" && e.payment_method === "cash",
-  );
-  const dayOneTotal = (dayOneFirstTimers.length + dayOneReturningGrace.length) * SESSION_FEE;
+  // Day-1 Collection: every active enrollment with session_fee_status='due_day_1' owes $240.
+  const dayOneRows = activeEnrollments.filter((e) => e.session_fee_status === "due_day_1");
+  const dayOneFirstTimers = dayOneRows.filter((e) => e.is_first_time);
+  const dayOneReturningGrace = dayOneRows.filter((e) => !e.is_first_time);
+  const dayOneTotal = dayOneRows.length * SESSION_FEE;
 
   // Capacity: classes (sessions) with ≥1 active enrollment vs. total available classes in scope.
   const allSessionIds = Object.values(sessions).map((s) => s.id);
@@ -370,8 +402,8 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Level</TableHead>
                     <TableHead>Parent</TableHead>
                     <TableHead>Session</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead>Amount</TableHead>
+                    <TableHead>Reg Fee</TableHead>
+                    <TableHead>Session Fee</TableHead>
                     <TableHead>Method / Ref</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
@@ -401,23 +433,33 @@ const SwimEnrollmentsAdmin = () => {
                           {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                         </TableCell>
                         <TableCell>
-                          <Select value={e.payment_status} onValueChange={(v) => updatePaymentStatus(e, v)}>
-                            <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
+                          {e.is_first_time ? (
+                            <Select value={e.payment_status} onValueChange={(v) => updatePaymentStatus(e, v)}>
+                              <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unpaid">Unpaid</SelectItem>
+                                <SelectItem value="paid">Paid ($45)</SelectItem>
+                                <SelectItem value="refunded">Refunded</SelectItem>
+                                <SelectItem value="waived">Waived</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">N/A (returning)</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Select value={e.session_fee_status} onValueChange={(v) => updateSessionFeeStatus(e, v)}>
+                            <SelectTrigger className={`w-[140px] h-8 ${sessionFeeColor(e.session_fee_status)}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="unpaid">Unpaid</SelectItem>
-                              <SelectItem value="paid">Paid</SelectItem>
-                              <SelectItem value="refunded">Refunded</SelectItem>
-                              <SelectItem value="waived">Waived</SelectItem>
+                              <SelectItem value="due_day_1">Due Day 1 ($240)</SelectItem>
+                              <SelectItem value="paid">Paid ($240)</SelectItem>
+                              <SelectItem value="comp">Comp</SelectItem>
                             </SelectContent>
                           </Select>
-                          {e.is_first_time && (
-                            <span className="block text-[10px] text-muted-foreground mt-0.5">1st time</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm font-medium">
-                          {e.payment_amount ? `$${e.payment_amount}` : "—"}
                         </TableCell>
                         <TableCell className="text-xs">
                           {e.payment_method ? (
@@ -449,24 +491,14 @@ const SwimEnrollmentsAdmin = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            {e.payment_status === "unpaid" && e.is_first_time && (
+                            {e.session_fee_status === "due_day_1" && (
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                title="Send payment link email"
+                                title="Send $240 session fee payment link"
                                 onClick={() => sendPaymentLink(e)}
                               >
                                 <Send className="w-4 h-4 text-primary" />
-                              </Button>
-                            )}
-                            {e.payment_status === "unpaid" && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                title="Mark as paid (cash/check)"
-                                onClick={() => updatePaymentStatus(e, "paid")}
-                              >
-                                <CheckCircle className="w-4 h-4 text-green-600" />
                               </Button>
                             )}
                             <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
