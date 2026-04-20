@@ -1,75 +1,72 @@
 
+You're right — I drifted. Reverting to the **original, correct rule** that's already documented in memory:
 
-User's rule: **No Stripe = no enrollment row.** Period.
-- First-time: must pay $45 reg fee at checkout. Session fee due day 1 (tracked, not charged at checkout).
-- Returning: must pay full session fee at checkout.
-- If Stripe doesn't confirm, no row gets created. Admin dashboard = source of truth, always matches Stripe.
+## The rule (unchanged, restated)
 
-## Root cause of the current mess
+- **First-time:** $45 reg fee at Stripe checkout. $240 session fee due day 1 (cash/check at door).
+- **Returning:** $240 full session fee at Stripe checkout. Nothing owed day 1.
+- **No Stripe = no enrollment row.** (Already enforced at DB level last round.)
 
-1. **Public RLS allows anyone to INSERT into `swim_enrollments` directly** — bypassing Stripe entirely. The enrollment form, walk-in dialog, and any client code can create rows with arbitrary `payment_status`. This is how the false "paid" rows got there.
-2. **Webhook stores expected amount, not actual amount** — `payment_amount = registration_fee + session_price` instead of `session.amount_total`. That's why DeLeon shows $285 paid when Stripe only got $45.
-3. **No DB constraint** ties an enrollment to a real Stripe payment.
+Current `create-checkout` already does this correctly. **No backend changes needed.**
 
-## Fix — lock it down at the database level
+## The 5 grace rows (one-time cleanup)
 
-### 1. Revoke public INSERT on `swim_enrollments`
-- Drop policy `Anyone can submit swim enrollment`.
-- Only the **service role** (used by `payments-webhook` after Stripe confirms) can insert enrollment rows.
-- Keep public SELECT for capacity counts (anonymized).
+These were created before the lockdown and never paid through Stripe properly:
 
-### 2. Refactor enrollment flow to "Stripe-first"
-- Public form collects data → posts to `create-checkout` → row goes into `pending_enrollments` only.
-- No `swim_enrollments` row exists until `payments-webhook` receives `checkout.session.completed` from Stripe.
-- If user abandons checkout: pending row expires (cleanup job, 24h), nothing in enrollments, seat freed.
+- **Kade Erwin, Fallon Erwin, Destiny Godinez (unpaid row)** — first-timers, never paid the $45 reg fee. Waive the reg fee (one-time grace), still owe **$240 day 1** per the standard rule.
+- **Madeline Mejia (×2)** — returning swimmer (prior to current ownership). Per rule, she should have paid $240 at checkout but didn't. One-time grace: collect **$240 day 1**.
 
-### 3. Walk-in / admin manual enrollment path (separate, explicit)
-- Admin-only edge function `admin-create-enrollment` (requires authenticated admin role) for legitimate offline cases (cash, walk-ins, comps).
-- Required fields: `payment_method` ∈ `{stripe, cash, check, comp, walk_in}` and `payment_reference` (Stripe charge ID OR free-text note like "cash 4/20 receipt #123").
-- Stored on the row so every "paid" enrollment is traceable.
-- Update `AddSwimmerDialog.tsx` to call this function instead of inserting directly.
+```sql
+-- 3 first-timers: waive reg fee, $240 still due day 1 (standard first-time rule)
+UPDATE swim_enrollments SET
+  payment_status = 'waived',
+  payment_method = 'comp',
+  payment_reference = 'Reg fee waived 2026-04-20 — rollout grace',
+  registration_fee = 0,
+  notes = COALESCE(notes || E'\n', '') || 'Reg fee waived 2026-04-20. $240 due day 1 per standard first-time rule.'
+WHERE id IN (<Kade>, <Fallon>, <Destiny-unpaid>);
 
-### 4. Webhook fixes (`supabase/functions/payments-webhook/index.ts`)
-- Use `session.amount_total / 100` for the actual `payment_amount`, split per-row by what was billed.
-- For first-time swimmers: insert row with `payment_status='paid'` (reg fee paid), `payment_amount=45`, plus a flag indicating the session fee is still due day 1.
-- Add a derived field shown in admin: **Day-1 amount due**.
+-- Mejia ×2: returning, $240 due day 1 (one-time grace; normally would pay at checkout)
+UPDATE swim_enrollments SET
+  is_first_time = false,
+  registration_fee = 0,
+  payment_method = 'cash',
+  payment_reference = 'Pending — day 1 collection (rollout grace)',
+  notes = COALESCE(notes || E'\n', '') || 'Returning (prior ownership). $240 due day 1, 2026-04-20 — one-time grace; future returning swimmers must pay at checkout.'
+WHERE id IN (<Mejia-1>, <Mejia-2>);
+```
 
-### 5. New schema additions (migration)
-On `swim_enrollments`:
-- `payment_method text` (default `'stripe'`)
-- `payment_reference text` (Stripe charge ID or manual note — required, not null going forward)
-- Drop the public INSERT policy. Add service-role INSERT policy.
+## Dashboard math fix (`SwimEnrollmentsAdmin.tsx`)
 
-### 6. Clean up the 3 known bad rows
-Run targeted UPDATEs you approve first:
-- Lizz Mejia (×2): `payment_status='unpaid'`, `payment_amount=NULL` — never paid in Stripe
-- Yvonne DeLeon: `payment_amount=45` — only reg fee was actually paid; session fee due day 1
-- Sarah Danhoff: no change
+Replace the broken Outstanding/Capacity cards. **No backend changes.**
 
-### 7. Admin dashboard truth-telling (`SwimEnrollmentsAdmin.tsx`)
-- Balance math: `expected = (is_first_time ? 0 : session_price) + (is_first_time ? 0 : 0); day1_due = is_first_time ? session_price : 0`
-- Per-row badges: `Owes $X` (returning unpaid — should never happen now, flag in red), `Day-1: $240` (first-time)
-- "Paid" cards reflect only what Stripe (or explicit manual entry) confirms.
-- Show `payment_method` + `payment_reference` columns so you can audit any row in 1 second.
+**Owed Now** (overdue, should never grow going forward):
+- Returning + unpaid → `+ $240`
+- First-time + reg fee unpaid (not waived) → `+ $45`
+- After cleanup: **$0**
 
-### 8. Update pricing (carry-over)
-Migration to set `swim_sessions`: `session_price=240`, `price_per_lesson=30`, `total_lessons=8`. Update memory.
+**Day-1 Collection** (cash/check at first lesson — normal for first-timers):
+- Every active first-timer → `+ $240` (whether reg paid, unpaid, or waived)
+- Plus the 2 Mejia grace rows
+- After cleanup: **$1,200** (5 swimmers × $240)
+- Subtitle: "3 first-timers (standard) + 2 returning (one-time grace)"
+
+**Capacity Used** — replace 7/192 nonsense:
+- "**7 / 64 classes started**" (classes with ≥1 enrollment)
+- Subtitle: "11% of classes started · avg 1.0 of 3 seats per filled class"
+- Respects period/age filters
+
+Add `'waived'` option to the per-row payment status dropdown.
 
 ## Files touched
 
-- New migration: schema changes + RLS lockdown + pricing update
-- 3 targeted UPDATEs (data cleanup, you approve SQL first)
-- `supabase/functions/payments-webhook/index.ts` — actual amount, per-row split
-- `supabase/functions/create-checkout/index.ts` — first-time gets reg fee only line item; session fee tracked but not charged
-- New: `supabase/functions/admin-create-enrollment/index.ts` — gated to admin role
-- `src/components/admin/calendar/AddSwimmerDialog.tsx` — call admin function instead of direct insert
-- `src/components/swim-enrollment/EnrollmentForm.tsx` — no DB writes, only checkout
-- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — accurate cards + payment_method column
-- Memory: pricing update, payment-flow rule
+- New migration: 5-row UPDATE only
+- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — fix Outstanding + Capacity cards, add Day-1 Collection card, expose `'waived'` in dropdown
+- `mem://features/payment-flow` — add note: "2026-04-20 grace rows are one-time exception. Going forward: first-time = $45 at checkout + $240 day 1; returning = $240 at checkout, $0 day 1."
 
 ## Not doing
 
-- ❌ No auto-refunds (you handle in Stripe)
-- ❌ No charging session fee at checkout for first-timers (your rule: due day 1)
-- ❌ No silent data fixes — every UPDATE shown to you first
-
+- ❌ No changes to `create-checkout` (already correct)
+- ❌ No changes to `payments-webhook` (already correct)
+- ❌ No refunds
+- ❌ No changes to Aniya (fully paid) or paid Destiny reg row
