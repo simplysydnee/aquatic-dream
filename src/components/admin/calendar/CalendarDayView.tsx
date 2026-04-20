@@ -190,11 +190,33 @@ const CalendarDayView = ({
     return names.length > 0 ? names.slice(0, 5) : ["Instructor"];
   }, [todayICS]);
 
-  // ── Aquatic Dreams sessions for today ──
+  // ── Aquatic Dreams sessions actually happening today ──
+  // A class "happens today" only if there's a non-cancelled session_lesson_dates row
+  // for the selected date. This filters out recurring templates outside their session period.
+  const activeSessionIdsToday = useMemo(() => {
+    return new Set(
+      lessonDates
+        .filter((ld) => ld.lesson_date === dateStr && !ld.is_cancelled)
+        .map((ld) => ld.session_id)
+    );
+  }, [lessonDates, dateStr]);
+
   const todaySessions = useMemo(
-    () => swimSessions.filter((s) => s.day_of_week.toLowerCase().includes(dayName.toLowerCase())),
-    [swimSessions, dayName]
+    () => swimSessions.filter(
+      (s) =>
+        s.day_of_week.toLowerCase().includes(dayName.toLowerCase()) &&
+        activeSessionIdsToday.has(s.id)
+    ),
+    [swimSessions, dayName, activeSessionIdsToday]
   );
+
+  // Count confirmed swimmers across today's classes
+  const todaySwimmerCount = useMemo(() => {
+    const ids = new Set(todaySessions.map((s) => s.id));
+    return enrollments.filter(
+      (e) => e.session_id && ids.has(e.session_id) && e.status === "confirmed"
+    ).length;
+  }, [enrollments, todaySessions]);
 
   // ── Pool events for today (non-ICS) ──
   const todayEvents = useMemo(
