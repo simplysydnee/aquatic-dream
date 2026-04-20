@@ -125,12 +125,15 @@ serve(async (req) => {
       }
     }
 
-    // Build line items from payload truth
-    // First-time child: 1× registration_fee
-    // Returning child: 1× swim_session_fee per enrolled session row
+    // Build line items from payload truth.
+    // RULE (per business owner): No Stripe = no enrollment row.
+    //   - First-time child: charge ONLY the $45 registration fee at checkout.
+    //                       Session fee is collected in person on day 1 of class.
+    //   - Returning child:  charge the full session fee per enrolled session row.
     const lookupKeys: string[] = [];
     for (const child of typedPayload.children) {
       if (child.isFirstTime) {
+        // Reg fee only — once per first-time child, regardless of how many sessions.
         lookupKeys.push("registration_fee");
       } else {
         for (const _ of child.sessionIds) {

@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, CalendarCheck } from "lucide-react";
@@ -23,6 +24,8 @@ interface Props {
   dateStr: string;
   onSaved: () => void;
 }
+
+type PaymentMethod = "cash" | "check" | "comp" | "stripe";
 
 const AddSwimmerDialog = ({
   open,
@@ -43,6 +46,13 @@ const AddSwimmerDialog = ({
   const [parentName, setParentName] = useState("");
   const [parentPhone, setParentPhone] = useState("");
   const [parentEmail, setParentEmail] = useState("");
+  const [isFirstTime, setIsFirstTime] = useState(false);
+
+  // Payment audit fields (REQUIRED — no row gets created without them)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<"paid" | "unpaid">("paid");
 
   const reset = () => {
     setChildName("");
@@ -50,7 +60,37 @@ const AddSwimmerDialog = ({
     setParentName("");
     setParentPhone("");
     setParentEmail("");
+    setIsFirstTime(false);
+    setPaymentMethod("cash");
+    setPaymentReference("");
+    setPaymentAmount("");
+    setPaymentStatus("paid");
     setTab("enroll");
+  };
+
+  const callAdminCreate = async (isWalkIn: boolean) => {
+    const { data, error } = await supabase.functions.invoke("admin-create-enrollment", {
+      body: {
+        childName,
+        childAge: parseInt(childAge),
+        swimLevel,
+        sessionId,
+        parentName: parentName || (isWalkIn ? "Walk-in" : ""),
+        parentEmail: parentEmail || (isWalkIn ? "walkin@temp.local" : ""),
+        parentPhone: parentPhone || null,
+        isFirstTime,
+        paymentMethod,
+        paymentReference: paymentReference.trim() || `${paymentMethod} ${dateStr}`,
+        paymentStatus,
+        paymentAmount: paymentAmount ? parseFloat(paymentAmount) : null,
+        notes: isWalkIn ? `Walk-in on ${dateStr}` : null,
+        isWalkIn,
+        walkInDate: isWalkIn ? dateStr : undefined,
+      },
+    });
+    if (error || !data?.success) {
+      throw new Error(error?.message || data?.error || "Failed to create enrollment");
+    }
   };
 
   const handleEnroll = async () => {
@@ -58,26 +98,21 @@ const AddSwimmerDialog = ({
       toast({ title: "Missing fields", description: "Fill in child name, age, parent name, and email.", variant: "destructive" });
       return;
     }
+    if (paymentStatus === "paid" && !paymentReference.trim() && paymentMethod !== "comp") {
+      toast({ title: "Payment reference required", description: "Enter a receipt #, check #, or note for the audit log.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
-    const { error } = await supabase.from("swim_enrollments").insert({
-      child_name: childName.trim(),
-      child_age: parseInt(childAge),
-      parent_name: parentName.trim(),
-      parent_phone: parentPhone.trim() || null,
-      parent_email: parentEmail.trim(),
-      swim_level: swimLevel,
-      session_id: sessionId,
-      status: "confirmed",
-    });
-    setSaving(false);
-
-    if (error) {
-      toast({ title: "Failed to enroll", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await callAdminCreate(false);
       toast({ title: "Swimmer enrolled", description: `${childName} added to ${sessionName}` });
       reset();
       onOpenChange(false);
       onSaved();
+    } catch (e) {
+      toast({ title: "Failed to enroll", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -87,50 +122,22 @@ const AddSwimmerDialog = ({
       return;
     }
     setSaving(true);
-
-    // Create a temporary enrollment for walk-in tracking
-    const { data: enrollment, error: enrollError } = await supabase
-      .from("swim_enrollments")
-      .insert({
-        child_name: childName.trim(),
-        child_age: parseInt(childAge),
-        parent_name: parentName.trim() || "Walk-in",
-        parent_email: parentEmail.trim() || "walkin@temp.local",
-        parent_phone: parentPhone.trim() || null,
-        swim_level: swimLevel,
-        session_id: sessionId,
-        status: "confirmed",
-        notes: `Walk-in on ${dateStr}`,
-      })
-      .select("id")
-      .single();
-
-    if (enrollError || !enrollment) {
+    try {
+      await callAdminCreate(true);
+      toast({ title: "Walk-in added", description: `${childName} checked in for today` });
+      reset();
+      onOpenChange(false);
+      onSaved();
+    } catch (e) {
+      toast({ title: "Failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
       setSaving(false);
-      toast({ title: "Failed", description: enrollError?.message || "Could not create walk-in record", variant: "destructive" });
-      return;
     }
-
-    // Also mark attendance for today
-    await supabase.from("attendance").insert({
-      enrollment_id: enrollment.id,
-      session_id: sessionId,
-      lesson_date: dateStr,
-      checked_in: true,
-      checked_in_at: new Date().toISOString(),
-      checked_in_by: "admin",
-    });
-
-    setSaving(false);
-    toast({ title: "Walk-in added", description: `${childName} checked in for today` });
-    reset();
-    onOpenChange(false);
-    onSaved();
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
-      <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle>Add Swimmer</DialogTitle>
           <DialogDescription>{sessionName} — {swimLevel}</DialogDescription>
@@ -171,8 +178,80 @@ const AddSwimmerDialog = ({
                 <Label htmlFor="parent-phone">Phone</Label>
                 <Input id="parent-phone" type="tel" value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} placeholder="(555) 123-4567" />
               </div>
+
+              <div className="flex items-center gap-2 p-2 rounded border border-border bg-muted/30">
+                <input
+                  id="first-time"
+                  type="checkbox"
+                  checked={isFirstTime}
+                  onChange={(e) => setIsFirstTime(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="first-time" className="text-sm font-normal cursor-pointer">
+                  First-time swimmer (adds $45 reg fee)
+                </Label>
+              </div>
+
+              {/* Payment audit block — required for traceability */}
+              <div className="space-y-3 p-3 rounded border border-border bg-muted/20">
+                <p className="text-xs font-semibold text-foreground">Payment Record (required)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="pay-method" className="text-xs">Method *</Label>
+                    <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
+                      <SelectTrigger id="pay-method"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="check">Check</SelectItem>
+                        <SelectItem value="stripe">Stripe (manual)</SelectItem>
+                        <SelectItem value="comp">Comp / Free</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="pay-status" className="text-xs">Status *</Label>
+                    <Select value={paymentStatus} onValueChange={(v) => setPaymentStatus(v as "paid" | "unpaid")}>
+                      <SelectTrigger id="pay-status"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="unpaid">Unpaid (due day 1)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="pay-amount" className="text-xs">Amount ($)</Label>
+                    <Input
+                      id="pay-amount"
+                      type="number"
+                      step="0.01"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder="240"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="pay-ref" className="text-xs">
+                      Reference {paymentStatus === "paid" && paymentMethod !== "comp" ? "*" : ""}
+                    </Label>
+                    <Input
+                      id="pay-ref"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      placeholder={
+                        paymentMethod === "stripe" ? "ch_xxx" :
+                        paymentMethod === "check" ? "Check #1234" :
+                        paymentMethod === "comp" ? "Reason" :
+                        "Receipt #"
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
               <Button onClick={handleEnroll} disabled={saving} className="w-full">
-                {saving ? "Enrolling..." : "Enroll in Full Session"}
+                {saving ? "Enrolling..." : "Enroll Swimmer"}
               </Button>
             </TabsContent>
 
@@ -185,6 +264,42 @@ const AddSwimmerDialog = ({
                 <Label htmlFor="walkin-phone">Phone</Label>
                 <Input id="walkin-phone" type="tel" value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} placeholder="Optional" />
               </div>
+
+              <div className="space-y-3 p-3 rounded border border-border bg-muted/20">
+                <p className="text-xs font-semibold text-foreground">Payment Record (required)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Method *</Label>
+                    <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="check">Check</SelectItem>
+                        <SelectItem value="comp">Comp / Free</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Amount ($)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder="30"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs">Reference / Receipt #</Label>
+                  <Input
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    placeholder={`Walk-in ${dateStr}`}
+                  />
+                </div>
+              </div>
+
               <p className="text-xs text-muted-foreground">
                 Walk-in swimmers are checked in for today only. They will appear on the roster for this date.
               </p>

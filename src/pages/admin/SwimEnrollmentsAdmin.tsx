@@ -30,6 +30,8 @@ interface Enrollment {
   stripe_payment_id: string | null;
   is_first_time: boolean;
   payment_due_date: string | null;
+  payment_method?: string | null;
+  payment_reference?: string | null;
 }
 
 interface SessionInfo {
@@ -336,6 +338,7 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Session</TableHead>
                     <TableHead>Payment</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>Method / Ref</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="w-[100px]"></TableHead>
@@ -381,6 +384,20 @@ const SwimEnrollmentsAdmin = () => {
                         </TableCell>
                         <TableCell className="text-sm font-medium">
                           {e.payment_amount ? `$${e.payment_amount}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {e.payment_method ? (
+                            <div>
+                              <span className="font-medium capitalize">{e.payment_method}</span>
+                              {e.payment_reference && (
+                                <div className="text-muted-foreground truncate max-w-[140px]" title={e.payment_reference}>
+                                  {e.payment_reference}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground italic">none</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
@@ -428,7 +445,7 @@ const SwimEnrollmentsAdmin = () => {
                   })}
                   {filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                         No enrollments found
                       </TableCell>
                     </TableRow>
