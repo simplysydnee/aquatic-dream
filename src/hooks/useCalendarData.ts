@@ -91,6 +91,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [agreements, setAgreements] = useState<EnrollmentAgreement[]>([]);
   const [icsSessions, setIcsSessions] = useState<ICSSession[]>([]);
+  const [lessonDates, setLessonDates] = useState<LessonDate[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -99,13 +100,15 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     const dateStr = format(currentDate, "yyyy-MM-dd");
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+    const rangeStart = view === "week" ? format(weekStart, "yyyy-MM-dd") : dateStr;
+    const rangeEnd = view === "week" ? format(weekEnd, "yyyy-MM-dd") : dateStr;
 
     const dayName = format(currentDate, "EEEE");
     const daysNeeded = view === "week"
       ? ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
       : [dayName];
 
-    const [sessionsRes, enrollmentsRes, eventsRes, attendanceRes, agreementsRes] = await Promise.all([
+    const [sessionsRes, enrollmentsRes, eventsRes, attendanceRes, agreementsRes, lessonDatesRes] = await Promise.all([
       supabase
         .from("swim_sessions")
         .select("id, swim_level, age_group, start_time, end_time, max_students, session_name, day_of_week, instructor_id, instructors(name)")
@@ -117,16 +120,21 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
       supabase
         .from("pool_events")
         .select("*")
-        .gte("event_date", view === "week" ? format(weekStart, "yyyy-MM-dd") : dateStr)
-        .lte("event_date", view === "week" ? format(weekEnd, "yyyy-MM-dd") : dateStr),
+        .gte("event_date", rangeStart)
+        .lte("event_date", rangeEnd),
       supabase
         .from("attendance")
         .select("*")
-        .gte("lesson_date", view === "week" ? format(weekStart, "yyyy-MM-dd") : dateStr)
-        .lte("lesson_date", view === "week" ? format(weekEnd, "yyyy-MM-dd") : dateStr),
+        .gte("lesson_date", rangeStart)
+        .lte("lesson_date", rangeEnd),
       supabase
         .from("enrollment_agreements")
         .select("id, enrollment_id, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship"),
+      supabase
+        .from("session_lesson_dates")
+        .select("id, session_id, lesson_date, is_cancelled")
+        .gte("lesson_date", rangeStart)
+        .lte("lesson_date", rangeEnd),
     ]);
 
     if (sessionsRes.data) setSwimSessions(sessionsRes.data);
@@ -134,16 +142,15 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     if (eventsRes.data) setPoolEvents(eventsRes.data);
     if (attendanceRes.data) setAttendance(attendanceRes.data);
     if (agreementsRes.data) setAgreements(agreementsRes.data);
+    if (lessonDatesRes.data) setLessonDates(lessonDatesRes.data);
 
     // Show the calendar immediately — ICS data loads in the background
     setLoading(false);
 
     // Fetch I Can Swim sessions from edge function (non-blocking)
-    const icsStartDate = view === "week" ? format(weekStart, "yyyy-MM-dd") : dateStr;
-    const icsEndDate = view === "week" ? format(weekEnd, "yyyy-MM-dd") : dateStr;
     try {
       const { data } = await supabase.functions.invoke("i-can-swim-schedule", {
-        body: { startDate: icsStartDate, endDate: icsEndDate },
+        body: { startDate: rangeStart, endDate: rangeEnd },
       });
       if (data?.sessions) {
         setIcsSessions(data.sessions);
@@ -155,5 +162,5 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  return { swimSessions, enrollments, poolEvents, attendance, agreements, icsSessions, loading, refetch: fetchData };
+  return { swimSessions, enrollments, poolEvents, attendance, agreements, icsSessions, lessonDates, loading, refetch: fetchData };
 }
