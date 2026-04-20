@@ -1,60 +1,63 @@
 
+The "Aquatic Dreams — 64 groups" header is misleading: it counts every recurring class **template** that matches today's day-of-week, even if zero lessons are actually happening, no instructors are assigned, and no swimmers are enrolled. Compare to the ICS header which correctly shows "0 instructors today" when empty.
 
-Yes — `send-session-payment-link` already exists. Looking at it: it creates a Stripe checkout for `swim_session_fee` and emails the parent. So "pay the $240 via Stripe day 1" is already wired — we just need to surface it in the UI and make the data model reflect that the session fee is its own thing.
+## Root cause
 
-## The model (final)
+In `CalendarDayView.tsx` line 384, the count is `todaySessions.length + adEvents.length` where `todaySessions` is filtered only by `day_of_week`. It doesn't check:
+- Whether the session period is active on this date
+- Whether there's an actual lesson date scheduled (`session_lesson_dates`)
+- Whether anyone is enrolled
+- Whether any pool events exist
 
-Add **`session_fee_status`** to `swim_enrollments`:
-- Values: `'paid'` | `'due_day_1'` | `'comp'`
-- Default: `'due_day_1'` (rule: first-timers always owe $240 day 1)
-- Returning swimmers get `'paid'` set by the webhook at checkout
+So an empty Monday in April still shows "64 groups" because 64 weekly templates *exist* for Mondays.
 
-`payment_status` continues to mean **registration fee** (paid / unpaid / waived / not_required).
+## Fix — make the header reflect reality
 
-## Webhook updates (`payments-webhook/index.ts`)
+Replace the single misleading number with **state-aware** content for the AD header. Three states:
 
-Already writes the row on `checkout.session.completed`. Extend it to:
-- **Returning row** → `session_fee_status = 'paid'` (Stripe collected $240), `stripe_payment_id` recorded (already does this)
-- **First-time row** → `session_fee_status = 'due_day_1'`, reg fee `payment_status = 'paid'` with `stripe_payment_id`
-- **Session-fee follow-up payment** (metadata `type: 'session_fee'` from `send-session-payment-link`) → flip `session_fee_status = 'paid'`, store `session_fee_stripe_id` + `session_fee_paid_at`
+**State 1 — Truly empty day** (no active sessions, no events, no enrollments)
+> Aquatic Dreams — No groups today
+> *(muted text, no column grid rendered for AD — just a "Add a class or event" CTA button)*
 
-This keeps the hard rule: **only the webhook writes paid statuses for Stripe-flow rows.** No bypass.
+**State 2 — Classes scheduled but no enrollments yet**
+> Aquatic Dreams — 5 classes scheduled · 0 swimmers
+> *(shows the empty grid so admin can still add walk-ins / events)*
 
-## Admin UI (`SwimEnrollmentsAdmin.tsx` + `EnrollmentDetailDialog.tsx`)
+**State 3 — Active day**
+> Aquatic Dreams — 5 classes · 12 swimmers · 2 events
+> *(today's reality: classes with at least one enrollment + walk-ins + private/semi-private events)*
 
-**Per-row badges** (replaces single confusing status):
-- Reg Fee: Paid / Waived / N/A
-- Session Fee: Paid / Due Day 1 / Comp
+## How "today's classes" gets calculated correctly
 
-**Per-row action button** "Send $240 Payment Link" — visible when `session_fee_status = 'due_day_1'`. Calls existing `send-session-payment-link` edge function. Disabled for 24h after last send (uses existing `payment_reminder_sent_at`).
+Filter `todaySessions` further before counting:
+1. Cross-reference `session_lesson_dates` for the selected date — only include classes that have a lesson scheduled today and aren't `is_cancelled`
+2. Exclude classes whose `session_period` ends before / starts after today
+3. Count enrolled swimmers from `swim_enrollments` where `session_id IN (today's class ids)` and `status='confirmed'`
+4. `adEvents.length` stays as-is (those are already date-specific)
 
-**Manual mark-paid** (cash/check at door): admin dropdown changes session_fee_status → `paid`, requires `payment_method` + `payment_reference`. Recorded in audit notes.
+`useCalendarData` already loads `swim_sessions` and `pool_events`; add a fetch for `session_lesson_dates` for the visible date range and a count query for enrollments per session_id.
 
-## Dashboard cards
+## UI/UX improvements bundled
 
-- **Owed Now** = unpaid reg fees (×$45) + returning rows stuck in `due_day_1` (Mejia grace ×$240). Shrinks to $0 as Mejia pays.
-- **Day-1 Collection** = COUNT(`session_fee_status = 'due_day_1'`) × $240. Today: $1,200 (5 rows). Drops as each $240 comes in (Stripe link OR cash).
-- **Capacity** = classes with ≥1 enrollment / total classes (already fixed).
+1. **Three-line header pill** instead of one cramped line:
+   - Line 1: "Aquatic Dreams" (bolder)
+   - Line 2: counts as chips — `5 classes` · `12 swimmers` · `2 events`
+   - Empty state: muted "No groups today" + small "+ Add" button inline
 
-## Backfill (8 rows)
+2. **Hide empty AD column entirely** when state 1 (no classes, no events). Today the grid still shows 5 colored level columns even when nothing's happening — that's visual noise. If state 1, collapse AD section so ICS or Dive can take the full width.
 
-| Row | session_fee_status |
-|---|---|
-| Aniya (returning, paid in full) | `paid` |
-| Destiny (paid reg) + Kade + Fallon + Destiny-unpaid (first-timers) | `due_day_1` |
-| Mejia ×2 (returning grace) | `due_day_1` |
+3. **Tooltip on the count chips** explaining what they mean (e.g., hover "12 swimmers" → "Confirmed enrollments across today's classes").
+
+4. **Match ICS pattern**: ICS already shows "0 instructors today" gracefully. Apply the same "show 0 / show empty state" pattern to AD.
 
 ## Files touched
 
-- New migration: add `session_fee_status` + `session_fee_stripe_id` + `session_fee_paid_at` columns; backfill 8 rows
-- `supabase/functions/payments-webhook/index.ts` — set session_fee_status per flow type; handle `metadata.type === 'session_fee'` callback
-- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — split badges, dual dropdowns, "Send Payment Link" row action, fixed cards
-- `src/components/admin/EnrollmentDetailDialog.tsx` — show/edit both fields, payment-link button, audit log entries
-- `mem://features/payment-flow` — document: first-time session fee is ALWAYS `due_day_1`; collected via Stripe link OR cash; webhook is the only writer for `paid`
+- `src/components/admin/calendar/CalendarDayView.tsx` — replace header count logic, add state-aware rendering, conditionally collapse empty AD column group
+- `src/hooks/useCalendarData.ts` — add fetch for `session_lesson_dates` for the visible week + enrollment counts per session_id
+- (No DB migration. No backend changes.)
 
 ## Not doing
 
-- ❌ No new edge function (`send-session-payment-link` already exists)
-- ❌ No changes to `create-checkout` (charging logic correct)
-- ❌ No way to set `session_fee_status='paid'` without either a Stripe webhook event OR an admin-recorded payment_reference (cash receipt)
-
+- ❌ No changes to the underlying class/session schema
+- ❌ No changes to ICS or Dive header logic (already correct)
+- ❌ No changes to the calendar week view (separate component, separate decision)
