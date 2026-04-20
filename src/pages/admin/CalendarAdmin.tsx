@@ -51,6 +51,7 @@ const CalendarAdmin = () => {
     attendance,
     agreements,
     icsSessions,
+    lessonDates,
     loading,
     refetch,
   } = useCalendarData(currentDate, view);
