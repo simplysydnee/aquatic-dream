@@ -149,9 +149,48 @@ const SwimEnrollmentsAdmin = () => {
     return matchSearch && matchPayment && matchSession && matchPeriod && matchAge;
   });
 
-  const unpaidCount = enrollments.filter((e) => e.payment_status === "unpaid" && e.status === "enrolled").length;
-  const paidCount = enrollments.filter((e) => e.payment_status === "paid").length;
-  const cancelledCount = enrollments.filter((e) => e.status === "cancelled").length;
+  // Filter-aware metrics: when any filter is active, scope to filtered; else use full set.
+  const anyFilterActive =
+    search !== "" || paymentFilter !== "all" || sessionFilter !== "all" ||
+    periodFilter !== "all" || ageFilter !== "all";
+  const scope = anyFilterActive ? filtered : enrollments;
+
+  const isActive = (e: Enrollment) => e.status === "confirmed" || e.status === "enrolled";
+  const activeEnrollments = scope.filter(isActive);
+
+  const activeCount = activeEnrollments.length;
+  const revenueCollected = activeEnrollments
+    .filter((e) => e.payment_status === "paid" || e.payment_status === "waived")
+    .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
+
+  const unpaidActive = activeEnrollments.filter((e) => e.payment_status === "unpaid");
+  const outstandingReturning = unpaidActive
+    .filter((e) => !e.is_first_time)
+    .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
+  const outstandingFirstTime = unpaidActive
+    .filter((e) => e.is_first_time)
+    .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
+  const outstandingTotal = outstandingReturning + outstandingFirstTime;
+
+  // Capacity: total seats across sessions present in the current scope.
+  const sessionIdsInScope = new Set(
+    (anyFilterActive ? filtered : Object.values(sessions).map((s) => ({ session_id: s.id })))
+      .map((e: any) => e.session_id)
+      .filter(Boolean) as string[]
+  );
+  const totalSeats = Array.from(sessionIdsInScope).reduce(
+    (sum, sid) => sum + (sessions[sid]?.max_students || 0),
+    0,
+  );
+  const capacityPct = totalSeats > 0 ? Math.round((activeCount / totalSeats) * 100) : 0;
+
+  const cancelledCount = scope.filter((e) => e.status === "cancelled").length;
+  const refundedCount = scope.filter((e) => e.payment_status === "refunded").length;
+  const waivedCount = scope.filter((e) => e.payment_status === "waived").length;
+  const firstTimeOnRoster = activeEnrollments.filter((e) => e.is_first_time).length;
+
+  const fmtMoney = (n: number) =>
+    n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
 
@@ -168,31 +207,58 @@ const SwimEnrollmentsAdmin = () => {
         <Badge variant="outline" className="text-sm">{enrollments.length} total</Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Enrolled (Unpaid)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Active Swimmers{anyFilterActive && <span className="text-[10px] ml-1">(filtered)</span>}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-yellow-600">{unpaidCount}</p>
+            <p className="text-3xl font-bold text-foreground">{activeCount}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Paid</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Revenue Collected</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-green-600">{paidCount}</p>
+            <p className="text-3xl font-bold text-green-600">{fmtMoney(revenueCollected)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Cancelled</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding Balance</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-red-600">{cancelledCount}</p>
+            <p className="text-3xl font-bold text-yellow-600">{fmtMoney(outstandingTotal)}</p>
+            <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
+              Returning (owe now): <span className="font-medium text-foreground">{fmtMoney(outstandingReturning)}</span><br />
+              First-time (pay day 1): <span className="font-medium text-foreground">{fmtMoney(outstandingFirstTime)}</span>
+            </p>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Capacity Used</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-foreground">
+              {activeCount}<span className="text-muted-foreground text-xl"> / {totalSeats}</span>
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">{capacityPct}% full</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground -mt-2">
+        <span>Cancelled: <span className="font-medium text-foreground">{cancelledCount}</span></span>
+        <span>·</span>
+        <span>Refunded: <span className="font-medium text-foreground">{refundedCount}</span></span>
+        <span>·</span>
+        <span>Waived: <span className="font-medium text-foreground">{waivedCount}</span></span>
+        <span>·</span>
+        <span>First-time on roster: <span className="font-medium text-foreground">{firstTimeOnRoster}</span></span>
       </div>
 
       <Tabs defaultValue="all">
