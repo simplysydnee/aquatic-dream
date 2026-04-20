@@ -8,6 +8,7 @@ import type {
   CalendarPoolEvent,
   AttendanceRecord,
   EnrollmentAgreement,
+  LessonDate,
 } from "@/hooks/useCalendarData";
 import { Lock, Plus, Pencil, Trash2 } from "lucide-react";
 import {
