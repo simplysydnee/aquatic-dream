@@ -1,72 +1,60 @@
 
-You're right — I drifted. Reverting to the **original, correct rule** that's already documented in memory:
 
-## The rule (unchanged, restated)
+Yes — `send-session-payment-link` already exists. Looking at it: it creates a Stripe checkout for `swim_session_fee` and emails the parent. So "pay the $240 via Stripe day 1" is already wired — we just need to surface it in the UI and make the data model reflect that the session fee is its own thing.
 
-- **First-time:** $45 reg fee at Stripe checkout. $240 session fee due day 1 (cash/check at door).
-- **Returning:** $240 full session fee at Stripe checkout. Nothing owed day 1.
-- **No Stripe = no enrollment row.** (Already enforced at DB level last round.)
+## The model (final)
 
-Current `create-checkout` already does this correctly. **No backend changes needed.**
+Add **`session_fee_status`** to `swim_enrollments`:
+- Values: `'paid'` | `'due_day_1'` | `'comp'`
+- Default: `'due_day_1'` (rule: first-timers always owe $240 day 1)
+- Returning swimmers get `'paid'` set by the webhook at checkout
 
-## The 5 grace rows (one-time cleanup)
+`payment_status` continues to mean **registration fee** (paid / unpaid / waived / not_required).
 
-These were created before the lockdown and never paid through Stripe properly:
+## Webhook updates (`payments-webhook/index.ts`)
 
-- **Kade Erwin, Fallon Erwin, Destiny Godinez (unpaid row)** — first-timers, never paid the $45 reg fee. Waive the reg fee (one-time grace), still owe **$240 day 1** per the standard rule.
-- **Madeline Mejia (×2)** — returning swimmer (prior to current ownership). Per rule, she should have paid $240 at checkout but didn't. One-time grace: collect **$240 day 1**.
+Already writes the row on `checkout.session.completed`. Extend it to:
+- **Returning row** → `session_fee_status = 'paid'` (Stripe collected $240), `stripe_payment_id` recorded (already does this)
+- **First-time row** → `session_fee_status = 'due_day_1'`, reg fee `payment_status = 'paid'` with `stripe_payment_id`
+- **Session-fee follow-up payment** (metadata `type: 'session_fee'` from `send-session-payment-link`) → flip `session_fee_status = 'paid'`, store `session_fee_stripe_id` + `session_fee_paid_at`
 
-```sql
--- 3 first-timers: waive reg fee, $240 still due day 1 (standard first-time rule)
-UPDATE swim_enrollments SET
-  payment_status = 'waived',
-  payment_method = 'comp',
-  payment_reference = 'Reg fee waived 2026-04-20 — rollout grace',
-  registration_fee = 0,
-  notes = COALESCE(notes || E'\n', '') || 'Reg fee waived 2026-04-20. $240 due day 1 per standard first-time rule.'
-WHERE id IN (<Kade>, <Fallon>, <Destiny-unpaid>);
+This keeps the hard rule: **only the webhook writes paid statuses for Stripe-flow rows.** No bypass.
 
--- Mejia ×2: returning, $240 due day 1 (one-time grace; normally would pay at checkout)
-UPDATE swim_enrollments SET
-  is_first_time = false,
-  registration_fee = 0,
-  payment_method = 'cash',
-  payment_reference = 'Pending — day 1 collection (rollout grace)',
-  notes = COALESCE(notes || E'\n', '') || 'Returning (prior ownership). $240 due day 1, 2026-04-20 — one-time grace; future returning swimmers must pay at checkout.'
-WHERE id IN (<Mejia-1>, <Mejia-2>);
-```
+## Admin UI (`SwimEnrollmentsAdmin.tsx` + `EnrollmentDetailDialog.tsx`)
 
-## Dashboard math fix (`SwimEnrollmentsAdmin.tsx`)
+**Per-row badges** (replaces single confusing status):
+- Reg Fee: Paid / Waived / N/A
+- Session Fee: Paid / Due Day 1 / Comp
 
-Replace the broken Outstanding/Capacity cards. **No backend changes.**
+**Per-row action button** "Send $240 Payment Link" — visible when `session_fee_status = 'due_day_1'`. Calls existing `send-session-payment-link` edge function. Disabled for 24h after last send (uses existing `payment_reminder_sent_at`).
 
-**Owed Now** (overdue, should never grow going forward):
-- Returning + unpaid → `+ $240`
-- First-time + reg fee unpaid (not waived) → `+ $45`
-- After cleanup: **$0**
+**Manual mark-paid** (cash/check at door): admin dropdown changes session_fee_status → `paid`, requires `payment_method` + `payment_reference`. Recorded in audit notes.
 
-**Day-1 Collection** (cash/check at first lesson — normal for first-timers):
-- Every active first-timer → `+ $240` (whether reg paid, unpaid, or waived)
-- Plus the 2 Mejia grace rows
-- After cleanup: **$1,200** (5 swimmers × $240)
-- Subtitle: "3 first-timers (standard) + 2 returning (one-time grace)"
+## Dashboard cards
 
-**Capacity Used** — replace 7/192 nonsense:
-- "**7 / 64 classes started**" (classes with ≥1 enrollment)
-- Subtitle: "11% of classes started · avg 1.0 of 3 seats per filled class"
-- Respects period/age filters
+- **Owed Now** = unpaid reg fees (×$45) + returning rows stuck in `due_day_1` (Mejia grace ×$240). Shrinks to $0 as Mejia pays.
+- **Day-1 Collection** = COUNT(`session_fee_status = 'due_day_1'`) × $240. Today: $1,200 (5 rows). Drops as each $240 comes in (Stripe link OR cash).
+- **Capacity** = classes with ≥1 enrollment / total classes (already fixed).
 
-Add `'waived'` option to the per-row payment status dropdown.
+## Backfill (8 rows)
+
+| Row | session_fee_status |
+|---|---|
+| Aniya (returning, paid in full) | `paid` |
+| Destiny (paid reg) + Kade + Fallon + Destiny-unpaid (first-timers) | `due_day_1` |
+| Mejia ×2 (returning grace) | `due_day_1` |
 
 ## Files touched
 
-- New migration: 5-row UPDATE only
-- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — fix Outstanding + Capacity cards, add Day-1 Collection card, expose `'waived'` in dropdown
-- `mem://features/payment-flow` — add note: "2026-04-20 grace rows are one-time exception. Going forward: first-time = $45 at checkout + $240 day 1; returning = $240 at checkout, $0 day 1."
+- New migration: add `session_fee_status` + `session_fee_stripe_id` + `session_fee_paid_at` columns; backfill 8 rows
+- `supabase/functions/payments-webhook/index.ts` — set session_fee_status per flow type; handle `metadata.type === 'session_fee'` callback
+- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — split badges, dual dropdowns, "Send Payment Link" row action, fixed cards
+- `src/components/admin/EnrollmentDetailDialog.tsx` — show/edit both fields, payment-link button, audit log entries
+- `mem://features/payment-flow` — document: first-time session fee is ALWAYS `due_day_1`; collected via Stripe link OR cash; webhook is the only writer for `paid`
 
 ## Not doing
 
-- ❌ No changes to `create-checkout` (already correct)
-- ❌ No changes to `payments-webhook` (already correct)
-- ❌ No refunds
-- ❌ No changes to Aniya (fully paid) or paid Destiny reg row
+- ❌ No new edge function (`send-session-payment-link` already exists)
+- ❌ No changes to `create-checkout` (charging logic correct)
+- ❌ No way to set `session_fee_status='paid'` without either a Stripe webhook event OR an admin-recorded payment_reference (cash receipt)
+
