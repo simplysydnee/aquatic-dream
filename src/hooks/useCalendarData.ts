@@ -61,6 +61,13 @@ export interface EnrollmentAgreement {
   emergency_contact_relationship: string;
 }
 
+export interface LessonDate {
+  id: string;
+  session_id: string;
+  lesson_date: string;
+  is_cancelled: boolean;
+}
+
 export interface ICSSession {
   id: string;
   start_time: string;
