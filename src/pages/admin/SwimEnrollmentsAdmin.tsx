@@ -156,7 +156,16 @@ const SwimEnrollmentsAdmin = () => {
     switch (status) {
       case "paid": return "bg-green-100 text-green-700 border-green-300";
       case "refunded": return "bg-purple-100 text-purple-700 border-purple-300";
+      case "waived": return "bg-slate-100 text-slate-700 border-slate-300";
       default: return "bg-yellow-100 text-yellow-700 border-yellow-300";
+    }
+  };
+
+  const sessionFeeColor = (status: string) => {
+    switch (status) {
+      case "paid": return "bg-green-100 text-green-700 border-green-300";
+      case "comp": return "bg-slate-100 text-slate-700 border-slate-300";
+      default: return "bg-blue-100 text-blue-700 border-blue-300";
     }
   };
 
