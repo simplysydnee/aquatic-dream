@@ -149,9 +149,48 @@ const SwimEnrollmentsAdmin = () => {
     return matchSearch && matchPayment && matchSession && matchPeriod && matchAge;
   });
 
-  const unpaidCount = enrollments.filter((e) => e.payment_status === "unpaid" && e.status === "enrolled").length;
-  const paidCount = enrollments.filter((e) => e.payment_status === "paid").length;
-  const cancelledCount = enrollments.filter((e) => e.status === "cancelled").length;
+  // Filter-aware metrics: when any filter is active, scope to filtered; else use full set.
+  const anyFilterActive =
+    search !== "" || paymentFilter !== "all" || sessionFilter !== "all" ||
+    periodFilter !== "all" || ageFilter !== "all";
+  const scope = anyFilterActive ? filtered : enrollments;
+
+  const isActive = (e: Enrollment) => e.status === "confirmed" || e.status === "enrolled";
+  const activeEnrollments = scope.filter(isActive);
+
+  const activeCount = activeEnrollments.length;
+  const revenueCollected = activeEnrollments
+    .filter((e) => e.payment_status === "paid" || e.payment_status === "waived")
+    .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
+
+  const unpaidActive = activeEnrollments.filter((e) => e.payment_status === "unpaid");
+  const outstandingReturning = unpaidActive
+    .filter((e) => !e.is_first_time)
+    .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
+  const outstandingFirstTime = unpaidActive
+    .filter((e) => e.is_first_time)
+    .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
+  const outstandingTotal = outstandingReturning + outstandingFirstTime;
+
+  // Capacity: total seats across sessions present in the current scope.
+  const sessionIdsInScope = new Set(
+    (anyFilterActive ? filtered : Object.values(sessions).map((s) => ({ session_id: s.id })))
+      .map((e: any) => e.session_id)
+      .filter(Boolean) as string[]
+  );
+  const totalSeats = Array.from(sessionIdsInScope).reduce(
+    (sum, sid) => sum + (sessions[sid]?.max_students || 0),
+    0,
+  );
+  const capacityPct = totalSeats > 0 ? Math.round((activeCount / totalSeats) * 100) : 0;
+
+  const cancelledCount = scope.filter((e) => e.status === "cancelled").length;
+  const refundedCount = scope.filter((e) => e.payment_status === "refunded").length;
+  const waivedCount = scope.filter((e) => e.payment_status === "waived").length;
+  const firstTimeOnRoster = activeEnrollments.filter((e) => e.is_first_time).length;
+
+  const fmtMoney = (n: number) =>
+    n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
 
