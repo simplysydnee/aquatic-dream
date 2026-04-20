@@ -213,6 +213,7 @@ const CalendarAdmin = () => {
           attendance={attendance}
           agreements={agreements}
           icsSessions={icsSessions}
+          lessonDates={lessonDates}
           activeFilters={activeFilters}
           onAttendanceChange={refetch}
           onEditEvent={(event) => {
