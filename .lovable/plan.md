@@ -1,53 +1,75 @@
 
-You're right — I conflated two things. Let me reset.
 
-## What you're actually saying
+User's rule: **No Stripe = no enrollment row.** Period.
+- First-time: must pay $45 reg fee at checkout. Session fee due day 1 (tracked, not charged at checkout).
+- Returning: must pay full session fee at checkout.
+- If Stripe doesn't confirm, no row gets created. Admin dashboard = source of truth, always matches Stripe.
 
-- Stripe shows you only ever received **one** real payment: $280 + $45 from one parent.
-- The admin UI is showing many enrollments as "paid" that were never paid in Stripe.
-- That's not a duplicate-charge problem. That's a **data integrity bug**: rows are landing in `swim_enrollments` with `payment_status='paid'` without a corresponding Stripe charge.
-- You don't want auto-refunds. You want the dashboard to tell the truth, and you want to know **how** these false-positive "paid" rows got created.
+## Root cause of the current mess
 
-## Investigation plan (read-only first, no DB writes, no code changes)
+1. **Public RLS allows anyone to INSERT into `swim_enrollments` directly** — bypassing Stripe entirely. The enrollment form, walk-in dialog, and any client code can create rows with arbitrary `payment_status`. This is how the false "paid" rows got there.
+2. **Webhook stores expected amount, not actual amount** — `payment_amount = registration_fee + session_price` instead of `session.amount_total`. That's why DeLeon shows $285 paid when Stripe only got $45.
+3. **No DB constraint** ties an enrollment to a real Stripe payment.
 
-I need to figure out where the bad "paid" rows came from before proposing any fix. Three possible sources:
+## Fix — lock it down at the database level
 
-1. **Admin manual edits** — someone toggled status to "paid" in the admin UI without a Stripe charge. The UPDATE policy on `swim_enrollments` allows any authenticated user to change anything.
-2. **Old test/seed data** — rows inserted during development with `payment_status='paid'` hardcoded.
-3. **Webhook firing on sandbox/test payments** — the webhook handler doesn't filter by env, so a sandbox `checkout.session.completed` event could insert "paid" rows tied to fake Stripe sessions.
-4. **Direct INSERT via the public RLS policy** — `Anyone can submit swim enrollment` allows the public form to insert any value, including `payment_status='paid'`. The form likely doesn't set this, but worth confirming.
+### 1. Revoke public INSERT on `swim_enrollments`
+- Drop policy `Anyone can submit swim enrollment`.
+- Only the **service role** (used by `payments-webhook` after Stripe confirms) can insert enrollment rows.
+- Keep public SELECT for capacity counts (anonymized).
 
-### Step 1 — Reconcile DB vs Stripe (no changes)
-Query every `swim_enrollments` row, group by `payment_status` and `stripe_payment_id`. Cross-reference each non-null `stripe_payment_id` against the Stripe CSV you uploaded. Output a table:
+### 2. Refactor enrollment flow to "Stripe-first"
+- Public form collects data → posts to `create-checkout` → row goes into `pending_enrollments` only.
+- No `swim_enrollments` row exists until `payments-webhook` receives `checkout.session.completed` from Stripe.
+- If user abandons checkout: pending row expires (cleanup job, 24h), nothing in enrollments, seat freed.
 
-```text
-| Parent | Child | Session | DB status | DB amount | Stripe charge? | Stripe amount |
-|--------|-------|---------|-----------|-----------|----------------|---------------|
-| ...    | ...   | ...     | paid      | $280      | NO             | —             |
-| ...    | ...   | ...     | paid      | $45       | YES            | $45           |
-```
+### 3. Walk-in / admin manual enrollment path (separate, explicit)
+- Admin-only edge function `admin-create-enrollment` (requires authenticated admin role) for legitimate offline cases (cash, walk-ins, comps).
+- Required fields: `payment_method` ∈ `{stripe, cash, check, comp, walk_in}` and `payment_reference` (Stripe charge ID OR free-text note like "cash 4/20 receipt #123").
+- Stored on the row so every "paid" enrollment is traceable.
+- Update `AddSwimmerDialog.tsx` to call this function instead of inserting directly.
 
-This gives you the exact list of rows where the DB lies.
+### 4. Webhook fixes (`supabase/functions/payments-webhook/index.ts`)
+- Use `session.amount_total / 100` for the actual `payment_amount`, split per-row by what was billed.
+- For first-time swimmers: insert row with `payment_status='paid'` (reg fee paid), `payment_amount=45`, plus a flag indicating the session fee is still due day 1.
+- Add a derived field shown in admin: **Day-1 amount due**.
 
-### Step 2 — Trace each false "paid" row's origin
-For each lying row, check `created_at` and look for matching `pending_enrollments` history, edge-function logs around that timestamp, and whether it has a `stripe_payment_id` at all (rows with `payment_status='paid'` AND `stripe_payment_id IS NULL` cannot have come from the webhook — they were either manually flipped or hardcoded).
+### 5. New schema additions (migration)
+On `swim_enrollments`:
+- `payment_method text` (default `'stripe'`)
+- `payment_reference text` (Stripe charge ID or manual note — required, not null going forward)
+- Drop the public INSERT policy. Add service-role INSERT policy.
 
-### Step 3 — Identify the bug
-Based on what step 2 shows, the fix is one of:
-- Tighten the swim_enrollments RLS so the public form can only insert `payment_status='unpaid'`.
-- Tighten the webhook so it requires a real Stripe charge object before marking paid.
-- Lock down the admin "mark as paid" action behind a confirmation (and log who did it).
+### 6. Clean up the 3 known bad rows
+Run targeted UPDATEs you approve first:
+- Lizz Mejia (×2): `payment_status='unpaid'`, `payment_amount=NULL` — never paid in Stripe
+- Yvonne DeLeon: `payment_amount=45` — only reg fee was actually paid; session fee due day 1
+- Sarah Danhoff: no change
 
-### Step 4 — Reconciliation report (one-time cleanup)
-Produce a CSV of every false-paid row for your review. **You** decide row-by-row whether to revert it to `unpaid`, leave it, or delete. Nothing gets auto-changed.
+### 7. Admin dashboard truth-telling (`SwimEnrollmentsAdmin.tsx`)
+- Balance math: `expected = (is_first_time ? 0 : session_price) + (is_first_time ? 0 : 0); day1_due = is_first_time ? session_price : 0`
+- Per-row badges: `Owes $X` (returning unpaid — should never happen now, flag in red), `Day-1: $240` (first-time)
+- "Paid" cards reflect only what Stripe (or explicit manual entry) confirms.
+- Show `payment_method` + `payment_reference` columns so you can audit any row in 1 second.
 
-## What I am NOT doing
-- ❌ Auto-issuing refunds (never)
-- ❌ Auto-waiving fees
-- ❌ Auto-flipping any payment status
-- ❌ Touching the `pending_enrollments` table
-- ❌ Changing the $280 → $240 pricing yet (separate decision, was already in the queue)
+### 8. Update pricing (carry-over)
+Migration to set `swim_sessions`: `session_price=240`, `price_per_lesson=30`, `total_lessons=8`. Update memory.
 
-## What I need from you to proceed
+## Files touched
 
-Once you approve, I'll switch out of plan mode and run the read-only DB queries + Stripe CSV cross-reference, then come back with the reconciliation report and the actual root cause. After you see the report we'll decide what to fix in code and what to clean up in the data.
+- New migration: schema changes + RLS lockdown + pricing update
+- 3 targeted UPDATEs (data cleanup, you approve SQL first)
+- `supabase/functions/payments-webhook/index.ts` — actual amount, per-row split
+- `supabase/functions/create-checkout/index.ts` — first-time gets reg fee only line item; session fee tracked but not charged
+- New: `supabase/functions/admin-create-enrollment/index.ts` — gated to admin role
+- `src/components/admin/calendar/AddSwimmerDialog.tsx` — call admin function instead of direct insert
+- `src/components/swim-enrollment/EnrollmentForm.tsx` — no DB writes, only checkout
+- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — accurate cards + payment_method column
+- Memory: pricing update, payment-flow rule
+
+## Not doing
+
+- ❌ No auto-refunds (you handle in Stripe)
+- ❌ No charging session fee at checkout for first-timers (your rule: due day 1)
+- ❌ No silent data fixes — every UPDATE shown to you first
+
