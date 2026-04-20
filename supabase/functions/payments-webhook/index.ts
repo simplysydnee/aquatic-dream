@@ -259,6 +259,28 @@ async function handleCheckoutCompleted(session: any) {
   }
 }
 
+async function handleSessionFeePaid(checkoutSession: any) {
+  const enrollmentId = checkoutSession.metadata?.enrollmentId;
+  if (!enrollmentId) {
+    console.warn("Session fee callback missing enrollmentId");
+    return;
+  }
+  const stripeId = checkoutSession.payment_intent || checkoutSession.id;
+  const { error } = await supabase
+    .from("swim_enrollments")
+    .update({
+      session_fee_status: "paid",
+      session_fee_stripe_id: stripeId,
+      session_fee_paid_at: new Date().toISOString(),
+    })
+    .eq("id", enrollmentId);
+  if (error) {
+    console.error("Failed to mark session fee paid:", enrollmentId, error);
+  } else {
+    console.log("Session fee marked paid for enrollment:", enrollmentId);
+  }
+}
+
 async function sendEnrollmentConfirmation(enrollmentId: string) {
   try {
     const { data: enrollment, error: enrollErr } = await supabase
