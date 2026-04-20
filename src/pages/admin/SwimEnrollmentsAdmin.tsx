@@ -225,7 +225,7 @@ const SwimEnrollmentsAdmin = () => {
         <Badge variant="outline" className="text-sm">{enrollments.length} total</Badge>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -242,17 +242,32 @@ const SwimEnrollmentsAdmin = () => {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-green-600">{fmtMoney(revenueCollected)}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Stripe payments to date</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding Balance</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Owed Now</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-yellow-600">{fmtMoney(outstandingTotal)}</p>
+            <p className="text-3xl font-bold text-yellow-600">{fmtMoney(owedNowTotal)}</p>
             <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
-              Returning (owe now): <span className="font-medium text-foreground">{fmtMoney(outstandingReturning)}</span><br />
-              First-time (pay day 1): <span className="font-medium text-foreground">{fmtMoney(outstandingFirstTime)}</span>
+              Returning unpaid: <span className="font-medium text-foreground">{fmtMoney(owedNowReturning)}</span><br />
+              Reg fees unpaid: <span className="font-medium text-foreground">{fmtMoney(owedNowFirstTime)}</span>
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Day-1 Collection</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-blue-600">{fmtMoney(dayOneTotal)}</p>
+            <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
+              {dayOneFirstTimers.length} first-timer{dayOneFirstTimers.length === 1 ? "" : "s"} (standard)
+              {dayOneReturningGrace.length > 0 && (
+                <> + {dayOneReturningGrace.length} returning (grace)</>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -262,9 +277,12 @@ const SwimEnrollmentsAdmin = () => {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-foreground">
-              {activeCount}<span className="text-muted-foreground text-xl"> / {totalSeats}</span>
+              {classesStarted}<span className="text-muted-foreground text-xl"> / {totalClasses}</span>
             </p>
-            <p className="text-[11px] text-muted-foreground mt-1">{capacityPct}% full</p>
+            <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
+              {classesPct}% of classes started<br />
+              avg {avgPerStartedClass} of 3 seats per filled class
+            </p>
           </CardContent>
         </Card>
       </div>
