@@ -160,31 +160,47 @@ const SwimEnrollmentsAdmin = () => {
   const isActive = (e: Enrollment) => e.status === "confirmed" || e.status === "enrolled";
   const activeEnrollments = scope.filter(isActive);
 
+  const SESSION_FEE = 240;
+  const REG_FEE = 45;
+
   const activeCount = activeEnrollments.length;
   const revenueCollected = activeEnrollments
-    .filter((e) => e.payment_status === "paid" || e.payment_status === "waived")
+    .filter((e) => e.payment_status === "paid")
     .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
 
-  const unpaidActive = activeEnrollments.filter((e) => e.payment_status === "unpaid");
-  const outstandingReturning = unpaidActive
-    .filter((e) => !e.is_first_time)
-    .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
-  const outstandingFirstTime = unpaidActive
-    .filter((e) => e.is_first_time)
-    .reduce((sum, e) => sum + (Number(e.payment_amount) || 0), 0);
-  const outstandingTotal = outstandingReturning + outstandingFirstTime;
+  // Owed Now: overdue balances that should NEVER grow under the new rules.
+  // - Returning + unpaid → $240 (should have paid at checkout)
+  // - First-time + unpaid (reg fee NOT waived) → $45
+  const owedNowReturning = activeEnrollments
+    .filter((e) => !e.is_first_time && e.payment_status === "unpaid")
+    .reduce((sum) => sum + SESSION_FEE, 0);
+  const owedNowFirstTime = activeEnrollments
+    .filter((e) => e.is_first_time && e.payment_status === "unpaid")
+    .reduce((sum) => sum + REG_FEE, 0);
+  const owedNowTotal = owedNowReturning + owedNowFirstTime;
 
-  // Capacity: total seats across sessions present in the current scope.
-  const sessionIdsInScope = new Set(
-    (anyFilterActive ? filtered : Object.values(sessions).map((s) => ({ session_id: s.id })))
-      .map((e: any) => e.session_id)
-      .filter(Boolean) as string[]
+  // Day-1 Collection: cash/check expected at first lesson.
+  // - Every active first-timer owes $240 day 1 (regardless of reg fee status)
+  // - Returning swimmers flagged as day-1 grace (payment_method = 'cash' AND unpaid)
+  const dayOneFirstTimers = activeEnrollments.filter((e) => e.is_first_time);
+  const dayOneReturningGrace = activeEnrollments.filter(
+    (e) => !e.is_first_time && e.payment_status === "unpaid" && e.payment_method === "cash",
   );
-  const totalSeats = Array.from(sessionIdsInScope).reduce(
-    (sum, sid) => sum + (sessions[sid]?.max_students || 0),
-    0,
+  const dayOneTotal = (dayOneFirstTimers.length + dayOneReturningGrace.length) * SESSION_FEE;
+
+  // Capacity: classes (sessions) with ≥1 active enrollment vs. total available classes in scope.
+  const allSessionIds = Object.values(sessions).map((s) => s.id);
+  const filteredSessionIds = anyFilterActive
+    ? new Set(filtered.map((e) => e.session_id).filter(Boolean) as string[])
+    : new Set(allSessionIds);
+  const totalClasses = filteredSessionIds.size;
+
+  const classesWithEnrollments = new Set(
+    activeEnrollments.map((e) => e.session_id).filter(Boolean) as string[],
   );
-  const capacityPct = totalSeats > 0 ? Math.round((activeCount / totalSeats) * 100) : 0;
+  const classesStarted = classesWithEnrollments.size;
+  const classesPct = totalClasses > 0 ? Math.round((classesStarted / totalClasses) * 100) : 0;
+  const avgPerStartedClass = classesStarted > 0 ? (activeCount / classesStarted).toFixed(1) : "0.0";
 
   const cancelledCount = scope.filter((e) => e.status === "cancelled").length;
   const refundedCount = scope.filter((e) => e.payment_status === "refunded").length;
@@ -209,7 +225,7 @@ const SwimEnrollmentsAdmin = () => {
         <Badge variant="outline" className="text-sm">{enrollments.length} total</Badge>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -226,17 +242,32 @@ const SwimEnrollmentsAdmin = () => {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-green-600">{fmtMoney(revenueCollected)}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Stripe payments to date</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding Balance</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Owed Now</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-yellow-600">{fmtMoney(outstandingTotal)}</p>
+            <p className="text-3xl font-bold text-yellow-600">{fmtMoney(owedNowTotal)}</p>
             <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
-              Returning (owe now): <span className="font-medium text-foreground">{fmtMoney(outstandingReturning)}</span><br />
-              First-time (pay day 1): <span className="font-medium text-foreground">{fmtMoney(outstandingFirstTime)}</span>
+              Returning unpaid: <span className="font-medium text-foreground">{fmtMoney(owedNowReturning)}</span><br />
+              Reg fees unpaid: <span className="font-medium text-foreground">{fmtMoney(owedNowFirstTime)}</span>
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Day-1 Collection</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-blue-600">{fmtMoney(dayOneTotal)}</p>
+            <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
+              {dayOneFirstTimers.length} first-timer{dayOneFirstTimers.length === 1 ? "" : "s"} (standard)
+              {dayOneReturningGrace.length > 0 && (
+                <> + {dayOneReturningGrace.length} returning (grace)</>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -246,9 +277,12 @@ const SwimEnrollmentsAdmin = () => {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-foreground">
-              {activeCount}<span className="text-muted-foreground text-xl"> / {totalSeats}</span>
+              {classesStarted}<span className="text-muted-foreground text-xl"> / {totalClasses}</span>
             </p>
-            <p className="text-[11px] text-muted-foreground mt-1">{capacityPct}% full</p>
+            <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
+              {classesPct}% of classes started<br />
+              avg {avgPerStartedClass} of 3 seats per filled class
+            </p>
           </CardContent>
         </Card>
       </div>
