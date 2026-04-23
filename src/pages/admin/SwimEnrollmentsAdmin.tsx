@@ -161,6 +161,16 @@ const SwimEnrollmentsAdmin = () => {
     }
   };
 
+  const enrollmentStateColor = (status: string) => {
+    switch (status) {
+      case "confirmed": return "bg-green-100 text-green-700 border-green-300";
+      case "waitlist": return "bg-amber-100 text-amber-700 border-amber-300";
+      case "no_show": return "bg-slate-100 text-slate-700 border-slate-300";
+      case "cancelled": return "bg-red-100 text-red-700 border-red-300";
+      default: return "";
+    }
+  };
+
   const sessionFeeColor = (status: string) => {
     switch (status) {
       case "paid": return "bg-green-100 text-green-700 border-green-300";
@@ -187,7 +197,7 @@ const SwimEnrollmentsAdmin = () => {
     periodFilter !== "all" || ageFilter !== "all";
   const scope = anyFilterActive ? filtered : enrollments;
 
-  const isActive = (e: Enrollment) => e.status === "confirmed" || e.status === "enrolled";
+  const isActive = (e: Enrollment) => e.status === "confirmed";
   const activeEnrollments = scope.filter(isActive);
 
   const SESSION_FEE = 240;
@@ -405,7 +415,7 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Reg Fee</TableHead>
                     <TableHead>Session Fee</TableHead>
                     <TableHead>Method / Ref</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Enrollment State</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="w-[100px]"></TableHead>
                   </TableRow>
@@ -477,11 +487,13 @@ const SwimEnrollmentsAdmin = () => {
                         </TableCell>
                         <TableCell>
                           <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
-                            <SelectTrigger className="w-[110px] h-8">
+                            <SelectTrigger className={`w-[130px] h-8 ${enrollmentStateColor(e.status)}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="enrolled">Enrolled</SelectItem>
+                              <SelectItem value="confirmed">Confirmed</SelectItem>
+                              <SelectItem value="waitlist">Waitlist</SelectItem>
+                              <SelectItem value="no_show">No-show</SelectItem>
                               <SelectItem value="cancelled">Cancelled</SelectItem>
                             </SelectContent>
                           </Select>
