@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
 import SessionEnrollmentCards from "@/components/admin/SessionEnrollmentCards";
+import { Progress } from "@/components/ui/progress";
 import { Eye, CheckCircle, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -83,6 +84,7 @@ const SwimEnrollmentsAdmin = () => {
   const [sessionFilter, setSessionFilter] = useState<string>("all");
   const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [ageFilter, setAgeFilter] = useState<string>("all");
+  const [seatsPeriodFilter, setSeatsPeriodFilter] = useState<string>("upcoming");
 
   const fetchData = async () => {
     const [enrollRes, sessionRes, periodRes] = await Promise.all([
@@ -244,6 +246,32 @@ const SwimEnrollmentsAdmin = () => {
   const classesPct = totalClasses > 0 ? Math.round((classesStarted / totalClasses) * 100) : 0;
   const avgPerStartedClass = classesStarted > 0 ? (activeCount / classesStarted).toFixed(1) : "0.0";
 
+  // Seat utilization (independent of table filters) — scoped by seatsPeriodFilter
+  const today = new Date().toISOString().split("T")[0];
+  const upcomingPeriod = sessionPeriods.find((p) => p.start_date >= today) || sessionPeriods[0];
+  const resolvedSeatsPeriodId =
+    seatsPeriodFilter === "upcoming" ? upcomingPeriod?.id :
+    seatsPeriodFilter === "all" ? null :
+    seatsPeriodFilter;
+  const seatScopeSessions = Object.values(sessions).filter((s) =>
+    resolvedSeatsPeriodId === null ? true : s.session_period_id === resolvedSeatsPeriodId
+  );
+  const seatScopeSessionIds = new Set(seatScopeSessions.map((s) => s.id));
+  const totalSeats = seatScopeSessions.reduce((sum, s) => sum + (s.max_students || 0), 0);
+  const seatsBooked = enrollments.filter(
+    (e) => e.status === "confirmed" && e.session_id && seatScopeSessionIds.has(e.session_id)
+  ).length;
+  const seatsOpen = Math.max(totalSeats - seatsBooked, 0);
+  const seatsPct = totalSeats > 0 ? Math.round((seatsBooked / totalSeats) * 100) : 0;
+  const seatsBarColor =
+    seatsPct >= 85 ? "[&>div]:bg-[hsl(var(--coral))]" :
+    seatsPct >= 50 ? "[&>div]:bg-[hsl(var(--teal))]" :
+    "[&>div]:bg-muted-foreground/40";
+  const seatsPeriodLabel =
+    seatsPeriodFilter === "upcoming" ? (upcomingPeriod?.name || "Upcoming") :
+    seatsPeriodFilter === "all" ? "All Sessions" :
+    sessionPeriods.find((p) => p.id === seatsPeriodFilter)?.name || "";
+
   const cancelledCount = scope.filter((e) => e.status === "cancelled").length;
   const refundedCount = scope.filter((e) => e.payment_status === "refunded").length;
   const waivedCount = scope.filter((e) => e.payment_status === "waived").length;
@@ -313,23 +341,41 @@ const SwimEnrollmentsAdmin = () => {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="col-span-2 lg:col-span-1">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Capacity Used</CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Seats Booked</CardTitle>
+              <Select value={seatsPeriodFilter} onValueChange={setSeatsPeriodFilter}>
+                <SelectTrigger className="h-7 text-xs w-[120px] px-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="upcoming">Upcoming</SelectItem>
+                  <SelectItem value="all">All Sessions</SelectItem>
+                  {sessionPeriods.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-foreground">
-              {classesStarted}<span className="text-muted-foreground text-xl"> / {totalClasses}</span>
+              {seatsBooked}<span className="text-muted-foreground text-xl"> / {totalSeats}</span>
             </p>
-            <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
-              {classesPct}% of classes started<br />
-              avg {avgPerStartedClass} of 3 seats per filled class
+            <Progress value={seatsPct} className={`h-1.5 mt-2 ${seatsBarColor}`} />
+            <p className="text-[11px] text-muted-foreground mt-1.5 leading-tight">
+              {seatsOpen} open · {seatsPct}% full
+              <br />
+              <span className="opacity-70">{seatsPeriodLabel}</span>
             </p>
           </CardContent>
         </Card>
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground -mt-2">
+        <span>Classes active: <span className="font-medium text-foreground">{classesStarted}/{totalClasses}</span></span>
+        <span>·</span>
         <span>Cancelled: <span className="font-medium text-foreground">{cancelledCount}</span></span>
         <span>·</span>
         <span>Refunded: <span className="font-medium text-foreground">{refundedCount}</span></span>
