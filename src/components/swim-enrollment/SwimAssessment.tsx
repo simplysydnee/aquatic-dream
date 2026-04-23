@@ -2,7 +2,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
 import { SwimLevel, LEVEL_DISPLAY, LEVEL_BADGE_COLORS, getGroupName, getDiveStatus, getAgeGroup, getLevelLabel, AGE_GROUP_LABELS } from "./types";
 
