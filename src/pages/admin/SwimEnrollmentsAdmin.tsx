@@ -84,6 +84,7 @@ const SwimEnrollmentsAdmin = () => {
   const [sessionFilter, setSessionFilter] = useState<string>("all");
   const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [ageFilter, setAgeFilter] = useState<string>("all");
+  const [seatsPeriodFilter, setSeatsPeriodFilter] = useState<string>("upcoming");
 
   const fetchData = async () => {
     const [enrollRes, sessionRes, periodRes] = await Promise.all([
