@@ -263,10 +263,10 @@ const SwimEnrollmentsAdmin = () => {
   ).length;
   const seatsOpen = Math.max(totalSeats - seatsBooked, 0);
   const seatsPct = totalSeats > 0 ? Math.round((seatsBooked / totalSeats) * 100) : 0;
-  const seatsBarColor =
-    seatsPct >= 85 ? "[&>div]:bg-[hsl(var(--coral))]" :
-    seatsPct >= 50 ? "[&>div]:bg-[hsl(var(--teal))]" :
-    "[&>div]:bg-muted-foreground/40";
+  const seatsFillColor =
+    seatsPct >= 85 ? "bg-[hsl(var(--coral))]" :
+    seatsPct >= 50 ? "bg-[hsl(var(--teal))]" :
+    "bg-slate-400";
   const seatsPeriodLabel =
     seatsPeriodFilter === "upcoming" ? (upcomingPeriod?.name || "Upcoming") :
     seatsPeriodFilter === "all" ? "All Sessions" :
