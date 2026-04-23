@@ -341,23 +341,41 @@ const SwimEnrollmentsAdmin = () => {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="col-span-2 lg:col-span-1">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Capacity Used</CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Seats Booked</CardTitle>
+              <Select value={seatsPeriodFilter} onValueChange={setSeatsPeriodFilter}>
+                <SelectTrigger className="h-7 text-xs w-[120px] px-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="upcoming">Upcoming</SelectItem>
+                  <SelectItem value="all">All Sessions</SelectItem>
+                  {sessionPeriods.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-foreground">
-              {classesStarted}<span className="text-muted-foreground text-xl"> / {totalClasses}</span>
+              {seatsBooked}<span className="text-muted-foreground text-xl"> / {totalSeats}</span>
             </p>
-            <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
-              {classesPct}% of classes started<br />
-              avg {avgPerStartedClass} of 3 seats per filled class
+            <Progress value={seatsPct} className={`h-1.5 mt-2 ${seatsBarColor}`} />
+            <p className="text-[11px] text-muted-foreground mt-1.5 leading-tight">
+              {seatsOpen} open · {seatsPct}% full
+              <br />
+              <span className="opacity-70">{seatsPeriodLabel}</span>
             </p>
           </CardContent>
         </Card>
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground -mt-2">
+        <span>Classes active: <span className="font-medium text-foreground">{classesStarted}/{totalClasses}</span></span>
+        <span>·</span>
         <span>Cancelled: <span className="font-medium text-foreground">{cancelledCount}</span></span>
         <span>·</span>
         <span>Refunded: <span className="font-medium text-foreground">{refundedCount}</span></span>
