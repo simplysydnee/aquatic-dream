@@ -246,6 +246,32 @@ const SwimEnrollmentsAdmin = () => {
   const classesPct = totalClasses > 0 ? Math.round((classesStarted / totalClasses) * 100) : 0;
   const avgPerStartedClass = classesStarted > 0 ? (activeCount / classesStarted).toFixed(1) : "0.0";
 
+  // Seat utilization (independent of table filters) — scoped by seatsPeriodFilter
+  const today = new Date().toISOString().split("T")[0];
+  const upcomingPeriod = sessionPeriods.find((p) => p.start_date >= today) || sessionPeriods[0];
+  const resolvedSeatsPeriodId =
+    seatsPeriodFilter === "upcoming" ? upcomingPeriod?.id :
+    seatsPeriodFilter === "all" ? null :
+    seatsPeriodFilter;
+  const seatScopeSessions = Object.values(sessions).filter((s) =>
+    resolvedSeatsPeriodId === null ? true : s.session_period_id === resolvedSeatsPeriodId
+  );
+  const seatScopeSessionIds = new Set(seatScopeSessions.map((s) => s.id));
+  const totalSeats = seatScopeSessions.reduce((sum, s) => sum + (s.max_students || 0), 0);
+  const seatsBooked = enrollments.filter(
+    (e) => e.status === "confirmed" && e.session_id && seatScopeSessionIds.has(e.session_id)
+  ).length;
+  const seatsOpen = Math.max(totalSeats - seatsBooked, 0);
+  const seatsPct = totalSeats > 0 ? Math.round((seatsBooked / totalSeats) * 100) : 0;
+  const seatsBarColor =
+    seatsPct >= 85 ? "[&>div]:bg-[hsl(var(--coral))]" :
+    seatsPct >= 50 ? "[&>div]:bg-[hsl(var(--teal))]" :
+    "[&>div]:bg-muted-foreground/40";
+  const seatsPeriodLabel =
+    seatsPeriodFilter === "upcoming" ? (upcomingPeriod?.name || "Upcoming") :
+    seatsPeriodFilter === "all" ? "All Sessions" :
+    sessionPeriods.find((p) => p.id === seatsPeriodFilter)?.name || "";
+
   const cancelledCount = scope.filter((e) => e.status === "cancelled").length;
   const refundedCount = scope.filter((e) => e.payment_status === "refunded").length;
   const waivedCount = scope.filter((e) => e.payment_status === "waived").length;
