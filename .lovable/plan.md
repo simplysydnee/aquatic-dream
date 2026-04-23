@@ -1,47 +1,60 @@
 
 
-## Fix the Status dropdown on Enrollments admin
+## Reframe Enrollment dashboard to seat utilization
 
-The Status column shows blank/odd values because the dropdown only offers `enrolled` + `cancelled`, but every row in the DB is stored as `confirmed`. Fix dropdown options, normalize data, and clarify the column.
+Replace the misleading "7 / 64" headline (active classes / total classes) with a real **seats booked vs seats open** metric, scoped to the session period the admin is looking at.
 
-### 1. Normalize Status dropdown options
+### What changes on the card
 
-In `src/pages/admin/SwimEnrollmentsAdmin.tsx` (line ~479), replace the dropdown options with the canonical set:
+Headline becomes:
 
-- **Confirmed** (`confirmed`) — default for paid/active enrollments
-- **Waitlist** (`waitlist`) — full class, awaiting spot
-- **No-show** (`no_show`) — registered but didn't attend
-- **Cancelled** (`cancelled`) — withdrawn / refunded
+```
+24 / 192 seats booked
+168 spots open  ·  13% full
+```
 
-Each option gets a colored badge (green / amber / gray / red) so the state is obvious at a glance instead of plain text in a select.
+- **Booked** = count of `swim_enrollments` with `status = 'confirmed'` whose `session_id` falls in the selected period
+- **Total seats** = sum of `max_students` across all `swim_sessions` in the selected period (each class is 3 max)
+- **Open** = total − booked
+- **% full** = booked ÷ total
 
-### 2. Rename column header
+A thin progress bar underneath visualizes fill rate. Color shifts: gray <50%, teal 50–85%, coral >85%.
 
-Change `Status` → **`Enrollment State`** so it's visually distinct from the adjacent `Payment` column. Update the matching tab/filter labels for consistency.
+### Scope selector
 
-### 3. Update `isActive` logic
+Add a small period picker on the card (defaults to the **next upcoming session period**, matching the logic already in `SessionEnrollmentCards.tsx`):
 
-Line 190 currently treats both `confirmed` and `enrolled` as active. After the backfill, simplify to just `confirmed` (drops the legacy alias). `waitlist` and `no_show` are NOT counted as active for capacity / revenue math.
+- Next upcoming session (default)
+- Specific session period (Session 1, Session 2, …)
+- All sessions combined
 
-### 4. Backfill data
+Selection only affects this card — the table below keeps its own filters.
 
-One-time data update via the insert tool:
-- `UPDATE swim_enrollments SET status='confirmed' WHERE status='enrolled'`
-- Verify no other stray values exist; if found, map them or leave with a console warning
+### Demote the old stat
 
-### 5. Memory
+"Classes started: 7 / 64" moves into the small footer line next to *Cancelled / Refunded / Waived* as a secondary diagnostic, since "how many classes have at least one swimmer" is still useful but isn't the headline.
 
-Add to `mem://features/admin-enrollments`: canonical status values are `confirmed | waitlist | no_show | cancelled`. Never use `enrolled` (legacy alias).
+### Layout
+
+```text
+┌─────────────────────────────────────────────┐
+│ Seats Booked          [Session 2 ▼]         │
+│                                             │
+│   24 / 192          168 open · 13% full     │
+│   ▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░            │
+│                                             │
+│ Classes active 7/64 · Cancelled 1 · …       │
+└─────────────────────────────────────────────┘
+```
 
 ### Files touched
 
-- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — dropdown options, header rename, `isActive` simplification, badge styling
-- DB: one `UPDATE` to normalize legacy `enrolled` rows
-- `mem://features/admin-enrollments` — record canonical status set
+- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — replace headline math, add period selector state, add progress bar + color thresholds, demote classes-started to footer
+- No DB migration, no edge function changes
 
 ### Not doing
 
-- ❌ No schema migration (status is free-text, no enum to alter)
-- ❌ No changes to payment status logic (separate concern, already correct)
-- ❌ No changes to enrollment creation paths (they already write `confirmed`)
+- ❌ No change to the "By Session" tab below (already shows per-class fill correctly)
+- ❌ No change to payment / revenue stats
+- ❌ No new tables or columns — all data already in `swim_sessions.max_students` + `swim_enrollments.status`
 
