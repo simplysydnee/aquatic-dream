@@ -360,15 +360,34 @@ const SwimEnrollmentsAdmin = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-foreground">
-              {seatsBooked}<span className="text-muted-foreground text-xl"> / {totalSeats}</span>
-            </p>
-            <Progress value={seatsPct} className={`h-1.5 mt-2 ${seatsBarColor}`} />
-            <p className="text-[11px] text-muted-foreground mt-1.5 leading-tight">
-              {seatsOpen} open · {seatsPct}% full
-              <br />
-              <span className="opacity-70">{seatsPeriodLabel}</span>
-            </p>
+            {totalSeats === 0 ? (
+              <>
+                <p className="text-3xl font-bold text-muted-foreground">—</p>
+                <p className="text-[11px] text-muted-foreground mt-2 leading-tight">
+                  No sessions in this period
+                  <br />
+                  <span className="opacity-70">{seatsPeriodLabel}</span>
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-3xl font-bold text-foreground leading-none">
+                  {seatsBooked}<span className="text-muted-foreground text-xl font-semibold"> / {totalSeats}</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  {seatsOpen} open · {seatsPct}% full
+                </p>
+                <div className="mt-2 h-1.5 w-full rounded-full bg-slate-200/60 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${seatsFillColor}`}
+                    style={{ width: seatsPct > 0 ? `max(4px, ${seatsPct}%)` : "0%" }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5 opacity-70">
+                  {seatsPeriodLabel}
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
