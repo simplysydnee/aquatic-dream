@@ -218,30 +218,41 @@ const SwimAssessment = ({ onComplete }: Props) => {
             <p className="text-muted-foreground text-sm mb-6">
               This helps us find the right group (ages 3–12)
             </p>
-            <div className="max-w-[240px]">
-              <Input
-                type="date"
-                value={dob}
-                onChange={(e) => handleDobChange(e.target.value)}
-                className="text-lg h-12"
-              />
-              {dob && age !== undefined && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  Age: <strong>{age}</strong> years old
-                  {(age < 3 || age > 12) && (
-                    <span className="text-destructive ml-1">(must be 3–12)</span>
-                  )}
-                </p>
-              )}
-            </div>
+            <DobPicker dob={dob} onChange={handleDobChange} />
+            {dob && age !== undefined && (
+              <p className="text-sm text-muted-foreground mt-3">
+                Age: <strong className="text-foreground">{age}</strong> years old
+                {age >= 3 && age <= 12 ? (
+                  <span className="text-primary ml-1">✓</span>
+                ) : (
+                  <span className="text-destructive ml-1">(must be 3–12)</span>
+                )}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Pick month, day, and year — your child's age will appear above.
+            </p>
             <div className="flex justify-end mt-8">
-              <Button
-                disabled={!age || age < 3 || age > 12 || !dob}
-                onClick={handleAgeNext}
-                className="bg-primary text-primary-foreground"
-              >
-                Next <ChevronRight className="ml-1 w-4 h-4" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button
+                        disabled={!age || age < 3 || age > 12 || !dob}
+                        onClick={handleAgeNext}
+                        className="bg-primary text-primary-foreground"
+                      >
+                        Next <ChevronRight className="ml-1 w-4 h-4" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {(!age || age < 3 || age > 12 || !dob) && (
+                    <TooltipContent>
+                      Please select a complete date of birth (ages 3–12)
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </motion.div>
         )}
