@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
   // Fetch session details
   const { data: sessions } = await supabase
     .from('swim_sessions')
-    .select('id, day_of_week, start_time, end_time, swim_level, session_period_id, age_group')
+    .select('id, day_of_week, start_time, end_time, swim_level, session_period_id, age_group, session_start_date, session_end_date')
     .in('id', sessionIds)
 
   const sessionMap = new Map(sessions?.map(s => [s.id, s]) || [])
@@ -136,6 +136,17 @@ Deno.serve(async (req) => {
 
     const periodName = session.session_period_id ? periodMap.get(session.session_period_id) : undefined
 
+    const formatLongDate = (d: string | null | undefined) =>
+      d
+        ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+          })
+        : undefined
+    const sessionStartDate = formatLongDate(session.session_start_date)
+    const sessionEndDate = formatLongDate(session.session_end_date)
+
     const templateData = {
       parentName: enrollment.parent_name,
       childName: enrollment.child_name,
@@ -143,6 +154,8 @@ Deno.serve(async (req) => {
       lessonTime: formattedTime,
       sessionInfo: periodName || undefined,
       levelLabel: getLevelLabel(enrollment.swim_level, enrollment.child_age),
+      sessionStartDate,
+      sessionEndDate,
     }
 
     try {
