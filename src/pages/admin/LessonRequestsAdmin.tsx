@@ -3,25 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-interface LessonRequest {
-  id: string;
-  parent_name: string;
-  parent_email: string;
-  parent_phone: string | null;
-  child_name: string;
-  child_age: number;
-  lesson_type: string;
-  preferred_times: string | null;
-  notes: string | null;
-  status: string;
-  created_at: string;
-}
+import LessonRequestDetailDialog, { LessonRequest } from "@/components/admin/LessonRequestDetailDialog";
+import { CheckCircle2 } from "lucide-react";
 
 const LessonRequestsAdmin = () => {
   const [requests, setRequests] = useState<LessonRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<LessonRequest | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     supabase
@@ -34,9 +23,14 @@ const LessonRequestsAdmin = () => {
       });
   }, []);
 
-  const updateStatus = async (id: string, status: string) => {
-    await supabase.from("lesson_requests").update({ status }).eq("id", id);
-    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+  const handleUpdated = (updated: LessonRequest) => {
+    setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+    setSelected(updated);
+  };
+
+  const openRequest = (r: LessonRequest) => {
+    setSelected(r);
+    setDialogOpen(true);
   };
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
@@ -75,12 +69,17 @@ const LessonRequestsAdmin = () => {
                 <TableHead>Parent</TableHead>
                 <TableHead>Preferred Times</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Replied</TableHead>
                 <TableHead>Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {requests.map((r) => (
-                <TableRow key={r.id}>
+                <TableRow
+                  key={r.id}
+                  className="cursor-pointer hover:bg-muted/40"
+                  onClick={() => openRequest(r)}
+                >
                   <TableCell className="font-medium">{r.child_name}</TableCell>
                   <TableCell>{r.child_age}</TableCell>
                   <TableCell>
@@ -95,17 +94,19 @@ const LessonRequestsAdmin = () => {
                   </TableCell>
                   <TableCell className="text-sm max-w-[200px] truncate">{r.preferred_times || "—"}</TableCell>
                   <TableCell>
-                    <Select value={r.status} onValueChange={(v) => updateStatus(r.id, v)}>
-                      <SelectTrigger className="w-[120px] h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="new">New</SelectItem>
-                        <SelectItem value="contacted">Contacted</SelectItem>
-                        <SelectItem value="scheduled">Scheduled</SelectItem>
-                        <SelectItem value="declined">Declined</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Badge variant={r.status === "new" ? "destructive" : "secondary"} className="capitalize">
+                      {r.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {r.last_replied_at ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {new Date(r.last_replied_at).toLocaleDateString()}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(r.created_at).toLocaleDateString()}
@@ -114,7 +115,7 @@ const LessonRequestsAdmin = () => {
               ))}
               {requests.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No lesson requests yet
                   </TableCell>
                 </TableRow>
@@ -123,6 +124,13 @@ const LessonRequestsAdmin = () => {
           </Table>
         </CardContent>
       </Card>
+
+      <LessonRequestDetailDialog
+        request={selected}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onUpdated={handleUpdated}
+      />
     </div>
   );
 };
