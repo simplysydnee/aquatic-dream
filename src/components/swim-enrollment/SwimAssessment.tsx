@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { format, parse } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ChevronRight, ChevronLeft, Sparkles, CalendarIcon } from "lucide-react";
 import { SwimLevel, LEVEL_DISPLAY, LEVEL_BADGE_COLORS, getGroupName, getDiveStatus, getAgeGroup, getLevelLabel, AGE_GROUP_LABELS } from "./types";
 
 interface Props {
