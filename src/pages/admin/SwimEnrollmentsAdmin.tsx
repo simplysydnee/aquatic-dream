@@ -206,14 +206,18 @@ const SwimEnrollmentsAdmin = () => {
   const REG_FEE = 45;
 
   const activeCount = activeEnrollments.length;
-  const revenueCollected = activeEnrollments
-    .filter((e) => e.payment_status === "paid" || e.session_fee_status === "paid")
-    .reduce((sum, e) => {
-      let amt = 0;
-      if (e.payment_status === "paid") amt += REG_FEE;
-      if (e.session_fee_status === "paid") amt += SESSION_FEE;
-      return sum + amt;
-    }, 0);
+  // Sums actual payment_amount when present (matches Stripe), excludes refunded rows.
+  const revenueCollected = activeEnrollments.reduce((sum, e) => {
+    if (e.payment_status === "refunded" || e.session_fee_status === "refunded") return sum;
+    let amt = 0;
+    if (e.payment_status === "paid") {
+      amt += Number(e.payment_amount ?? (e.is_first_time ? REG_FEE : SESSION_FEE));
+    }
+    if (e.session_fee_status === "paid" && e.payment_status !== "paid") {
+      amt += SESSION_FEE;
+    }
+    return sum + amt;
+  }, 0);
 
   // Owed Now: balances that should NEVER grow under the new rules.
   // - First-time + reg fee unpaid (not waived) → $45
@@ -312,7 +316,7 @@ const SwimEnrollmentsAdmin = () => {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-green-600">{fmtMoney(revenueCollected)}</p>
-            <p className="text-[11px] text-muted-foreground mt-1">Stripe payments to date</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Matches Stripe net (excludes refunds)</p>
           </CardContent>
         </Card>
         <Card>
