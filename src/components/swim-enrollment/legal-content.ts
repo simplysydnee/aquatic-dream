@@ -1,6 +1,6 @@
 // Document versions — update these when documents change
 export const WAIVER_VERSION = "2025-05-01";
-export const TOS_VERSION = "2025-05-01";
+export const TOS_VERSION = "2026-04-24";
 export const PRIVACY_POLICY_VERSION = "2025-05-01";
 
 export const LIABILITY_WAIVER_TEXT = `AQUATIC DREAMS SWIM SCHOOL
