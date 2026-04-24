@@ -122,3 +122,5 @@ const button = {
   display: 'inline-block' as const,
 }
 const footer = { fontSize: '13px', color: '#888', margin: '30px 0 0', lineHeight: '1.5' }
+const policyBox = { backgroundColor: '#fafafa', border: '1px solid #e5e7eb', padding: '12px 16px', borderRadius: '4px', margin: '16px 0 0' }
+const policyText = { fontSize: '12px', color: '#64748b', lineHeight: '1.5', margin: '0' }
