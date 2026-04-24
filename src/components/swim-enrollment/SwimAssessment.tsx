@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { format, parse } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ChevronRight, ChevronLeft, Sparkles, CalendarIcon } from "lucide-react";
 import { SwimLevel, LEVEL_DISPLAY, LEVEL_BADGE_COLORS, getGroupName, getDiveStatus, getAgeGroup, getLevelLabel, AGE_GROUP_LABELS } from "./types";
 
 interface Props {
@@ -70,75 +73,54 @@ const calculateAge = (dob: string): number => {
   return age;
 };
 
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-const daysInMonth = (month: number, year: number): number => {
-  if (!month || !year) return 31;
-  return new Date(year, month, 0).getDate();
-};
-
 interface DobPickerProps {
   dob: string;
   onChange: (dob: string) => void;
 }
 
 const DobPicker = ({ dob, onChange }: DobPickerProps) => {
-  const [year, month, day] = dob ? dob.split("-") : ["", "", ""];
-  const currentYear = new Date().getFullYear();
-  const minYear = currentYear - 12;
-  const maxYear = currentYear - 3;
-  const years: number[] = [];
-  for (let y = maxYear; y >= minYear; y--) years.push(y);
-
-  const update = (next: { y?: string; m?: string; d?: string }) => {
-    const yy = next.y ?? year;
-    const mm = next.m ?? month;
-    let dd = next.d ?? day;
-    if (yy && mm && dd) {
-      const max = daysInMonth(parseInt(mm), parseInt(yy));
-      if (parseInt(dd) > max) dd = String(max).padStart(2, "0");
-    }
-    if (yy && mm && dd) {
-      onChange(`${yy}-${mm}-${dd}`);
-    } else {
-      onChange("");
-    }
-  };
-
-  const maxDay = daysInMonth(parseInt(month) || 0, parseInt(year) || 0);
-  const days: number[] = [];
-  for (let d = 1; d <= maxDay; d++) days.push(d);
+  const [open, setOpen] = useState(false);
+  const today = new Date();
+  const selected = dob ? parse(dob, "yyyy-MM-dd", new Date()) : undefined;
+  const defaultMonth = selected ?? new Date(today.getFullYear() - 7, today.getMonth(), 1);
+  const fromYear = today.getFullYear() - 15;
+  const toYear = today.getFullYear();
 
   return (
-    <div className="grid grid-cols-3 gap-2 max-w-md">
-      <Select value={month} onValueChange={(v) => update({ m: v })}>
-        <SelectTrigger className="h-12"><SelectValue placeholder="Month" /></SelectTrigger>
-        <SelectContent className="max-h-72">
-          {MONTHS.map((name, i) => (
-            <SelectItem key={i} value={String(i + 1).padStart(2, "0")}>{name}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={day} onValueChange={(v) => update({ d: v })}>
-        <SelectTrigger className="h-12"><SelectValue placeholder="Day" /></SelectTrigger>
-        <SelectContent className="max-h-72">
-          {days.map((d) => (
-            <SelectItem key={d} value={String(d).padStart(2, "0")}>{d}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={year} onValueChange={(v) => update({ y: v })}>
-        <SelectTrigger className="h-12"><SelectValue placeholder="Year" /></SelectTrigger>
-        <SelectContent className="max-h-72">
-          {years.map((y) => (
-            <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "w-full sm:w-[280px] h-12 justify-start text-left font-normal",
+            !selected && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {selected ? format(selected, "MMMM d, yyyy") : <span>Pick a date</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
+        <Calendar
+          mode="single"
+          selected={selected}
+          defaultMonth={defaultMonth}
+          captionLayout="dropdown-buttons"
+          fromYear={fromYear}
+          toYear={toYear}
+          disabled={(date) => date > today || date < new Date(fromYear, 0, 1)}
+          onSelect={(date) => {
+            if (date) {
+              onChange(format(date, "yyyy-MM-dd"));
+              setOpen(false);
+            } else {
+              onChange("");
+            }
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
   );
 };
 
@@ -302,7 +284,7 @@ const SwimAssessment = ({ onComplete }: Props) => {
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              Pick month, day, and year — your child's age will appear above.
+              Tap to open the calendar, then jump to your child's birth month and year.
             </p>
             <div className="flex justify-end mt-8">
               <TooltipProvider>
