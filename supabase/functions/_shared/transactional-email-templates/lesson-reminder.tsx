@@ -27,7 +27,10 @@ const LessonReminderEmail = ({
 }: LessonReminderProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Lesson tomorrow for {childName || 'your swimmer'} — {SITE_NAME}</Preview>
+    <Preview>
+      Reminder: {childName || 'your swimmer'}'s lesson on {lessonDate || 'tomorrow'}
+      {lessonTime ? ` at ${lessonTime}` : ''} — {SITE_NAME}
+    </Preview>
     <Body style={main}>
       <Container style={container}>
         <Img src={LOGO_URL} width="80" height="80" alt="Aquatic Dreams" style={logo} />
@@ -40,12 +43,16 @@ const LessonReminderEmail = ({
 
         <Text style={text}>
           This is a friendly reminder that <strong>{childName || 'your swimmer'}</strong> has
-          a swim lesson <strong>tomorrow</strong>!
+          a swim lesson on{' '}
+          <strong>
+            {lessonDate || 'the scheduled date'}
+            {lessonTime ? ` at ${lessonTime}` : ''}
+          </strong>.
         </Text>
 
         <Section style={infoBox}>
           <Text style={infoText}>
-            📅 <strong>{lessonDate || 'Tomorrow'}</strong>
+            📅 <strong>{lessonDate || 'Scheduled date'}</strong>
             {lessonTime ? ` at ${lessonTime}` : ''}
           </Text>
           {levelLabel && (
@@ -84,8 +91,13 @@ const LessonReminderEmail = ({
 
 export const template = {
   component: LessonReminderEmail,
-  subject: (data: Record<string, any>) =>
-    `Lesson Tomorrow${data.childName ? ` for ${data.childName}` : ''} — ${SITE_NAME}`,
+  subject: (data: Record<string, any>) => {
+    const who = data.childName ? ` for ${data.childName}` : ''
+    const when = data.lessonDate
+      ? ` — ${data.lessonDate}${data.lessonTime ? ` at ${data.lessonTime}` : ''}`
+      : ''
+    return `Lesson Reminder${who}${when} — ${SITE_NAME}`
+  },
   displayName: 'Lesson reminder',
   previewData: {
     parentName: 'Jane',

@@ -1,56 +1,71 @@
+## Overhaul transactional emails: accurate amounts, full session details, real dates, and a working pay button
 
+The three transactional emails (enrollment confirmation, lesson reminder, session payment link) all have fixable problems. Here's what I'll change.
 
-## Fix the DOB picker — replace 3-dropdown with a real calendar
+---
 
-The 3-dropdown picker is broken in two ways and is the wrong tool for this job:
+### 1. Enrollment confirmation — show the exact Stripe-paid amount + full session details
 
-### What's wrong
+**Current problems**
+- For first-time families, the email shows a hardcoded `$45` registration fee instead of what Stripe actually charged on that row.
+- The session block ("📋 Session 1 — Mon 3:00 PM") is short and doesn't include start/end dates, end time, or swimmer name in a clear summary.
+- Swimmer name appears in body text but no consolidated "Enrollment summary" block.
 
-1. **Dob string is built in the wrong order.** Line 89 destructures as `[year, month, day] = dob.split("-")` but `dob` is stored as `yyyy-mm-dd` — that part is correct. **However**, the bigger trap: when the user picks Month first (the most natural first action), `year` and `day` are still empty, so `update()` calls `onChange("")` and the dropdown's controlled `value={month}` resets to empty on the next render. The Month selection visually disappears the moment they make it. Same for Day. **Nothing sticks until all three are picked in the right order** — and even then it's fragile.
-2. **Year list is too narrow.** Only ages 3–12 are offered (10 years). Parents of a child who *just* turned 3 last week or who is 12¾ literally cannot select their kid's birth year. They see no option and assume the form is broken.
-3. **It's a bad UX pattern in 2026.** Three coupled dropdowns for a date is clunky on mobile and desktop. Apple/Google/everyone use a calendar popover.
+**Fix**
+- In `payments-webhook/index.ts → sendEnrollmentConfirmation`, source the registration-fee amount from `enrollment.payment_amount` (what Stripe actually charged on that row, already validated against `session.amount_total` in step 5 of the webhook) instead of `enrollment.registration_fee`. For returning families, keep using `payment_amount` as `totalPaid`. Also pass `paymentReference` = `enrollment.stripe_payment_id` (the Stripe Checkout Session ID — that's the verified Stripe receipt identifier).
+- Fetch `session.session_start_date`, `session.session_end_date`, `session.end_time` from `swim_sessions` and pass a structured `enrollmentSummary` to the template:
+  - Swimmer name
+  - Level label
+  - Day of week + start time–end time
+  - Session start date → end date
+- Update `enrollment-confirmation.tsx` to render a clean **Enrollment Summary** info-box at the top with all of the above, and show the Stripe Session ID as a small "Payment confirmation: `cs_xxx…`" line under the amount-paid block.
 
-### The fix — switch to shadcn Calendar in a Popover
+---
 
-Replace the entire `DobPicker` component with a single button that opens a real calendar popover (the existing `src/components/ui/calendar.tsx` is already in the project). Two-month view, year/month dropdowns built in, defaults to a sensible date (7 years ago), disables future dates and dates older than 15 years.
+### 2. Lesson reminder — use the actual date and time, not "tomorrow"
 
-**UX:**
+**Current problems**
+- Subject is `"Lesson Tomorrow for {childName}"` — keep "tomorrow" as friendly framing in the subject is fine, BUT the body opens with "has a swim lesson **tomorrow**!" with no date/time on the same line, then shows date/time in a separate box.
 
-```text
-What is your child's date of birth?
+**Fix**
+- In `lesson-reminder.tsx`, change the lead sentence to:
+  > "{childName} has a swim lesson on **{lessonDate} at {lessonTime}**."
+- Drop the standalone "tomorrow" word from the body (keep it only in the subject for urgency).
+- Keep the info box (date, time, level, location) for at-a-glance scanning.
+- `send-lesson-reminders/index.ts` already passes `lessonDate` (e.g. "Monday, June 9") and `lessonTime` (e.g. "3:00 PM") — no edge-function change needed.
 
-[ 📅  Pick a date                    ▼ ]   ← button, full width on mobile
+---
 
-(after pick)
-[ 📅  June 15, 2018                  ▼ ]
-Age: 7 years old ✓
+### 3. Session payment link — fix the copy and make the button work
 
-                                  [ Next → ]
-```
+**Current problems**
+- Subject says "Session Fee Payment Due" with no due-date context.
+- Body says "starting on {dueDate}" which is vague; user wants explicit "**payment due on the first day of lessons, {date}**".
+- The button label is fine, but the surrounding copy doesn't say "Click here to complete payment."
+- The `paymentLink` is built using Stripe's redirect-mode `success_url` / `cancel_url` — this works (it returns a hosted Stripe checkout URL), so the button DOES function. I'll verify by sending a test and clicking it. (Note: the rest of the app uses embedded checkout per project knowledge, but for an email-link flow a hosted Stripe page is the correct pattern.)
 
-**Behavior:**
-- Click button → calendar popover opens
-- Calendar shows month + year dropdowns at top so parents can jump straight to e.g. "June 2018" without clicking back arrow 84 times
-- Disables: any date in the future, any date more than 15 years ago
-- On select: popover closes, button shows formatted date ("June 15, 2018"), age appears below with the existing ✓ / "must be 3–12" hint
-- Internal state stays as `yyyy-mm-dd` string so `calculateAge`, `handleAgeNext`, and the parent `onComplete(level, age, dob)` contract are unchanged
-- Calendar uses `pointer-events-auto` per shadcn guidance so it stays clickable
+**Fix**
+- Update `session-payment-link.tsx` body copy to:
+  > "{childName}'s session fee of **{amountDue}** is due on the **first day of lessons — {dueDate}**."
+  > "Click the button below to complete your payment securely:"
+  > **[ Pay Session Fee — $240 ]**
+- Add a fallback plain-text link under the button ("Or copy this link: {paymentLink}") in case the button doesn't render in some clients.
+- Subject becomes: `"Session Fee Due {dueDate} for {childName} — Aquatic Dreams"`.
+- No edge-function change needed — `send-session-payment-link/index.ts` already passes `dueDate`, `amountDue`, and `paymentLink`.
 
-**Validation messaging (keeps existing):**
-- If picked age < 3 or > 12: show the existing inline "(must be 3–12)" red text and keep Next disabled
-- Tooltip on disabled Next button stays as-is
+---
 
-### Files touched
+### Verification plan
 
-- `src/components/swim-enrollment/SwimAssessment.tsx` — delete `DobPicker`, `MONTHS`, `daysInMonth`, and the Select imports for the picker; add Popover + Calendar + a small format helper. ~50 lines net deletion.
+After the edits, I'll send fresh test emails to **sydnee@icanswim209.com** for all three templates using realistic data (real enrollment ID for the payment-link test so the Stripe link is clickable). I'll also generate a hosted-checkout link via `send-session-payment-link` against a real recent enrollment row so you can click through and confirm Stripe accepts it.
+
+### Files to change
+- `supabase/functions/payments-webhook/index.ts` — fetch end_date/end_time, pass real `payment_amount` + Stripe session ID, build structured summary
+- `supabase/functions/_shared/transactional-email-templates/enrollment-confirmation.tsx` — render summary block + Stripe receipt ID
+- `supabase/functions/_shared/transactional-email-templates/lesson-reminder.tsx` — date/time in lead sentence, drop standalone "tomorrow"
+- `supabase/functions/_shared/transactional-email-templates/session-payment-link.tsx` — clearer due-date copy, "click here" framing, fallback link
 
 ### Not doing
-
-- ❌ No DB or edge function changes
-- ❌ No change to assessment questions, session step, or downstream flow
-- ❌ No new dependencies — `react-day-picker`, `date-fns`, Popover, and Calendar are all already in the project
-
-### After this lands
-
-You'll need to click **Publish → Update** to push to the live domain so your customer can retry.
-
+- ❌ No DB schema changes
+- ❌ No change to the public enrollment flow / DOB picker / Stripe checkout creation
+- ❌ Not switching session-payment-link to embedded checkout — hosted Stripe checkout from an email link is the right UX
