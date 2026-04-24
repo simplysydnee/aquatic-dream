@@ -15,6 +15,8 @@ interface LessonReminderProps {
   lessonTime?: string
   sessionInfo?: string
   levelLabel?: string
+  sessionStartDate?: string
+  sessionEndDate?: string
 }
 
 const LessonReminderEmail = ({
@@ -24,6 +26,8 @@ const LessonReminderEmail = ({
   lessonTime,
   sessionInfo,
   levelLabel,
+  sessionStartDate,
+  sessionEndDate,
 }: LessonReminderProps) => (
   <Html lang="en" dir="ltr">
     <Head />
@@ -63,6 +67,12 @@ const LessonReminderEmail = ({
           {sessionInfo && (
             <Text style={{ ...infoText, marginTop: '4px' }}>
               📋 {sessionInfo}
+            </Text>
+          )}
+          {(sessionStartDate || sessionEndDate) && (
+            <Text style={{ ...infoText, marginTop: '4px' }}>
+              📆 Session dates: {sessionStartDate}
+              {sessionEndDate ? ` – ${sessionEndDate}` : ''}
             </Text>
           )}
           <Text style={{ ...infoText, marginTop: '8px' }}>
@@ -106,6 +116,8 @@ export const template = {
     lessonTime: '3:00 PM',
     sessionInfo: 'Session 1',
     levelLabel: 'Little Fins — Preschool 1 (White)',
+    sessionStartDate: 'June 8, 2025',
+    sessionEndDate: 'July 2, 2025',
   },
 } satisfies TemplateEntry
 
