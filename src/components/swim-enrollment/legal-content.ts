@@ -1,6 +1,6 @@
 // Document versions — update these when documents change
 export const WAIVER_VERSION = "2025-05-01";
-export const TOS_VERSION = "2025-05-01";
+export const TOS_VERSION = "2026-04-24";
 export const PRIVACY_POLICY_VERSION = "2025-05-01";
 
 export const LIABILITY_WAIVER_TEXT = `AQUATIC DREAMS SWIM SCHOOL
@@ -133,53 +133,61 @@ These Terms of Service ("Terms") govern your access to and use of the Aquatic Dr
 To enroll a student or create a parent account, you must be at least 18 years of age and the parent or legal guardian of the student being enrolled. You are responsible for maintaining the confidentiality of your account login credentials and for all activity that occurs under your account.
 
 2. Enrollment, Tuition & Billing
-• A one-time, non-refundable $45 enrollment fee per swimmer is due at enrollment
-• Monthly tuition of $120 per swimmer is charged automatically on the 1st of each month via the card on file
-• First-month tuition is prorated based on the enrollment date
-• A 30-day written cancellation notice is required
-• Enrollment may be suspended after a 7-day grace period following a failed payment
+• A one-time $45 registration fee per new swimmer is due at enrollment and is non-refundable. The registration fee includes a swim bag, swim cap, and goggles.
+• Session fee is $240 per swimmer for an 8-lesson session.
+• New swimmers: the $240 session fee is due on the FIRST DAY OF LESSONS (cash, check, or via the secure payment link emailed to you).
+• Returning swimmers: the $240 session fee is paid at the time of enrollment via Stripe.
+• Enrollment is not confirmed until payment is received.
+• Per-lesson pricing (when offered): $30 group, $45 semi-private, $65 private.
 
-3. Program Policies
+3. Refund Policy
+• REGISTRATION FEE ($45): One-time and NON-REFUNDABLE under any circumstances.
+• SESSION FEES ($240): Non-refundable once paid, except in documented circumstances (illness with doctor's note, injury, family relocation). Refund requests must be submitted in writing to info@aquaticdreamsswim.com BEFORE the second lesson of the session. Approved refunds are reviewed case-by-case and prorated for lessons not yet taken.
+• MISSED LESSONS / NO-SHOWS: A missed lesson, late arrival, or no-show does NOT result in a refund, credit, or makeup lesson. Please plan to attend every scheduled lesson.
+• CANCELLATIONS BY AQUATIC DREAMS: If we cancel a lesson (weather, facility issue, instructor unavailability), we will reschedule the lesson or issue a credit toward a future session. We do not issue cash refunds when a lesson can be rescheduled.
+• LEVEL CHANGES: If our instructors determine your swimmer needs a different level after the first lesson, we will move them to the appropriate class at no extra charge — this is not grounds for a refund.
+
+4. Program Policies
 • Students must be at least 3 years old to enroll
 • Students must be toilet-trained or wear appropriate swim diapers
 • Students must be in good health to participate
 • Aquatic Dreams reserves the right to remove a student from a class or program if their participation poses a safety risk
 
-4. Assumption of Risk & Safety
+5. Assumption of Risk & Safety
 Swimming and aquatic activities carry inherent risks, including the risk of drowning, injury, and illness. By enrolling a student, you acknowledge these risks and agree to the terms of our separate Waiver and Release of Liability.
 
-5. Acceptable Use of the Website
+6. Acceptable Use of the Website
 You agree to use our Site only for lawful purposes and not to:
 • Attempt to gain unauthorized access to any part of our Site
 • Use automated tools, bots, or scrapers
 • Upload malicious code or harmful content
 • Impersonate another person or entity
 
-6. Intellectual Property
+7. Intellectual Property
 All content on the Aquatic Dreams website is the property of Aquatic Dreams Modesto, LLC and is protected by copyright and trademark law.
 
-7. Third-Party Services & Links
+8. Third-Party Services & Links
 Our Site integrates with Stripe (payments), Supabase (data), Resend (email), and TextMagic (SMS). Your use of these services is subject to their respective terms.
 
-8. Disclaimers
+9. Disclaimers
 Our Services are provided "as is" and "as available" without warranties of any kind.
 
-9. Limitation of Liability
+10. Limitation of Liability
 Our total liability shall not exceed the total amount you paid to Aquatic Dreams in the three (3) months preceding the claim.
 
-10. Governing Law & Dispute Resolution
+11. Governing Law & Dispute Resolution
 These Terms are governed by California law. Any dispute shall be subject to the exclusive jurisdiction of courts in Stanislaus County, California.
 
-11. Communications Consent
+12. Communications Consent
 By providing your email address and phone number during enrollment, you consent to receive transactional communications from Aquatic Dreams.
 
-12. Modifications to Terms
+13. Modifications to Terms
 We reserve the right to update these Terms at any time. For material changes, we will notify enrolled families by email at least 14 days before the changes take effect.
 
-13. Termination
+14. Termination
 Aquatic Dreams reserves the right to suspend or terminate your account at any time for violation of these Terms.
 
-14. Contact Us
+15. Contact Us
 Aquatic Dreams Modesto, LLC
 1212 Kansas Ave, Modesto, CA 95351
 (209) 577-3483

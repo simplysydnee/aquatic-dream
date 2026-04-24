@@ -61,6 +61,14 @@ const SessionPaymentLinkEmail = ({
             </Text>
           </>
         )}
+        <Section style={policyBox}>
+          <Text style={policyText}>
+            <strong>Refund Policy:</strong> Session fees are non-refundable once paid, except in
+            documented circumstances (illness, injury, relocation) — written request to
+            info@aquaticdreamsswim.com required before the second lesson. Missed lessons and
+            no-shows are not refunded.
+          </Text>
+        </Section>
         <Hr style={hr} />
         <Text style={text}>
           If you have any questions, feel free to contact us at{' '}
@@ -114,3 +122,5 @@ const button = {
   display: 'inline-block' as const,
 }
 const footer = { fontSize: '13px', color: '#888', margin: '30px 0 0', lineHeight: '1.5' }
+const policyBox = { backgroundColor: '#fafafa', border: '1px solid #e5e7eb', padding: '12px 16px', borderRadius: '4px', margin: '16px 0 0' }
+const policyText = { fontSize: '12px', color: '#64748b', lineHeight: '1.5', margin: '0' }

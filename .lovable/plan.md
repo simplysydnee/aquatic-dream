@@ -1,36 +1,52 @@
-## Two issues, two fixes
+## Add Refund Policy
 
-### 1. Lesson reminder is missing session start/end dates
+### 1. Update Terms of Service (`src/components/swim-enrollment/legal-content.ts`)
 
-In the screenshot, the reminder shows the lesson date, time, level, session, and address — but no session period date range (e.g. "Session 1: June 8 – July 2"). The data exists in `swim_sessions.session_start_date` / `session_end_date` and the dispatcher just isn't pulling it through.
+Replace the outdated Section 2 (which references monthly $120 tuition that no longer exists) with up-to-date Tuition + Refund language matching the actual $45 reg + $240 session model. Bump `TOS_VERSION` to `"2026-04-24"` so any existing acceptances re-prompt.
 
-**Fix:**
-- `supabase/functions/send-lesson-reminders/index.ts` — extend the `swim_sessions` select to include `session_start_date, session_end_date`, format them, and pass `sessionStartDate` + `sessionEndDate` into `templateData`.
-- `supabase/functions/_shared/transactional-email-templates/lesson-reminder.tsx` — add two optional props and render a "📆 Session dates: June 8 – July 2, 2025" line inside the existing info box. Update `previewData` to include sample dates.
-- Redeploy `send-lesson-reminders` and `send-transactional-email`.
-- Send a fresh test reminder to **sydnee@icanswim209.com** so you can verify the new line appears.
+New Section 2 + new Section 3:
 
-The enrollment-confirmation email already has the date range wired correctly (`sessionStartDate` / `sessionEndDate` are passed by `payments-webhook` and rendered in the template) — no change needed there.
+```
+2. Enrollment, Tuition & Billing
+• One-time $45 registration fee per new swimmer, due at enrollment, non-refundable. Includes swim bag, cap, and goggles.
+• Session fee $240 per swimmer for an 8-lesson session.
+• New swimmers: $240 session fee due on the first day of lessons (cash, check, or secure payment link).
+• Returning swimmers: $240 session fee paid at time of enrollment via Stripe.
+• Enrollment is not confirmed until payment is received.
 
-### 2. The "click here to pay" button — confirm it generates a real Stripe Checkout URL
+3. Refund Policy
+• Registration fee ($45): one-time and NON-REFUNDABLE.
+• Session fees ($240): non-refundable once paid, except in documented circumstances (illness with doctor's note, injury, relocation). Written request to info@aquaticdreamsswim.com BEFORE the second lesson; reviewed case-by-case; prorated when approved.
+• Missed lessons / no-shows: NO refund, credit, or makeup.
+• Cancellations by Aquatic Dreams (weather, facility, instructor): we reschedule or issue a credit; no cash refunds when reschedulable.
+• Level changes after first lesson: we move the swimmer at no extra charge — not grounds for a refund.
+```
 
-Good news: the `send-session-payment-link` edge function **already** creates a real Stripe checkout session via `stripe.checkout.sessions.create({...})` with `lookup_keys: ['swim_session_fee']` and uses the returned `checkoutSession.url` as `paymentLink`. So in production it will be a real `https://checkout.stripe.com/c/pay/cs_test_...` (or `cs_live_...`) URL — not a placeholder.
+Existing sections 3-14 renumber to 4-15.
 
-The earlier `cs_test_demo123` URL you saw came from the manual curl test I sent with sample data — not from this function. To confirm the live wiring works:
+### 2. Enrollment confirmation email (`enrollment-confirmation.tsx`)
 
-**Verification:**
-- Pick a real enrollment with `session_fee_status != 'paid'` (Sydnee's test enrollment).
-- Invoke `send-session-payment-link` with `{ enrollmentId, environment: 'sandbox' }` — this will hit Stripe, generate a real sandbox checkout URL, and email it to the parent on file.
-- Confirm the email arrives with a working "Pay Session Fee — $240" button that opens a live Stripe checkout page.
+Add a small "Refund Policy" muted-text block above the contact line:
 
-Two small hardening tweaks while we're in there:
-- Switch the checkout from legacy `success_url`/`cancel_url` to embedded-mode-compatible `return_url` (or keep hosted but point success/cancel to a real return page like `/swim-enrollment/payment-complete`).
-- Pass the real site origin (`https://aquaticdreamsswim.com`) instead of the hardcoded `aquatic-dream-quest.lovable.app` fallback when invoked from cron/admin.
+> **Refund Policy:** Registration fee is non-refundable. Session fees are non-refundable once paid, except in documented circumstances. Missed lessons and no-shows are not refunded. Full policy at aquaticdreamsswim.com/swim-enrollment.
+
+### 3. Session payment link email (`session-payment-link.tsx`)
+
+Add one muted line below the payment button:
+
+> Session fees are non-refundable once paid. No-shows and missed lessons are not refunded.
+
+### 4. Public swim lessons page (`src/pages/SwimLessons.tsx`)
+
+Add a "Pricing & Refund Policy" card near the existing pricing/CTA section so families see the policy *before* they enroll. Mirrors the TOS Section 3 wording in scannable bullet form.
+
+### Deploy & verify
+- Redeploy `send-transactional-email` so the updated email templates are live.
+- Send a fresh test confirmation + payment-link email to **sydnee@icanswim209.com** so you can see the new copy.
 
 ### Not doing
 - ❌ No DB migrations
-- ❌ No change to enrollment-confirmation email (already correct)
-- ❌ No change to the Stripe price / product setup
+- ❌ No Stripe refund automation — refunds remain manual via Stripe dashboard
+- ❌ No new route — refund policy lives inside TOS + on the lessons page
 
-### After this lands
-You'll need to click **Publish → Update** to push the updated edge functions live. Then I'll trigger one real `send-session-payment-link` call against your test enrollment so you can click through a real Stripe checkout.
+**Approve to implement.**

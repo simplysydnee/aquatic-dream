@@ -411,6 +411,43 @@ const SwimLessons = () => {
         </div>
       </section>
 
+      {/* Refund Policy */}
+      <section className="py-12 bg-background">
+        <div className="container max-w-4xl">
+          <div className="rounded-xl border border-border bg-card p-6 md:p-8">
+            <h3 className="font-display text-2xl font-bold text-foreground mb-4">
+              Pricing & Refund Policy
+            </h3>
+            <ul className="space-y-3 text-sm md:text-base text-muted-foreground leading-relaxed">
+              <li>
+                <strong className="text-foreground">Registration fee ($45):</strong> One-time and{" "}
+                <strong>non-refundable</strong>. Includes swim bag, cap, and goggles.
+              </li>
+              <li>
+                <strong className="text-foreground">New swimmers:</strong> $240 session fee is due on the{" "}
+                <strong>first day of lessons</strong> (cash, check, or secure payment link).
+              </li>
+              <li>
+                <strong className="text-foreground">Returning swimmers:</strong> $240 session fee is paid at the time of enrollment.
+              </li>
+              <li>
+                <strong className="text-foreground">Session fee refunds:</strong> Non-refundable once paid, except in documented circumstances (illness with doctor's note, injury, relocation). Email{" "}
+                <a href="mailto:info@aquaticdreamsswim.com" className="text-primary underline">
+                  info@aquaticdreamsswim.com
+                </a>{" "}
+                <strong>before the second lesson</strong>; reviewed case-by-case and prorated when approved.
+              </li>
+              <li>
+                <strong className="text-foreground">Missed lessons / no-shows:</strong> Not refunded, credited, or rescheduled as makeups.
+              </li>
+              <li>
+                <strong className="text-foreground">Cancellations by Aquatic Dreams</strong> (weather, facility, instructor): We reschedule the lesson or issue a session credit.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       {/* Preschool Curriculum */}
       <section className="py-20">
         <div className="container">
