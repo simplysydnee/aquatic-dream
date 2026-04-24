@@ -243,3 +243,6 @@ const successText = { fontSize: '14px', color: '#166534', margin: '0' }
 const warningBox = { backgroundColor: '#fffbeb', borderLeft: '4px solid #f59e0b', padding: '12px 16px', borderRadius: '4px', margin: '0 0 16px' }
 const warningText = { fontSize: '14px', color: '#92400e', margin: '0' }
 const footer = { fontSize: '13px', color: '#888', margin: '30px 0 0', lineHeight: '1.5' }
+const policyBox = { backgroundColor: '#fafafa', border: '1px solid #e5e7eb', padding: '12px 16px', borderRadius: '4px', margin: '0 0 16px' }
+const policyHeading = { fontSize: '12px', fontWeight: '700' as const, color: '#475569', textTransform: 'uppercase' as const, letterSpacing: '0.05em', margin: '0 0 6px' }
+const policyText = { fontSize: '12px', color: '#64748b', lineHeight: '1.5', margin: '0' }
