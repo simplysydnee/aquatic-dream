@@ -284,7 +284,7 @@ const SwimAssessment = ({ onComplete }: Props) => {
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              Pick month, day, and year — your child's age will appear above.
+              Tap to open the calendar, then jump to your child's birth month and year.
             </p>
             <div className="flex justify-end mt-8">
               <TooltipProvider>
