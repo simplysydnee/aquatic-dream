@@ -61,6 +61,14 @@ const SessionPaymentLinkEmail = ({
             </Text>
           </>
         )}
+        <Section style={policyBox}>
+          <Text style={policyText}>
+            <strong>Refund Policy:</strong> Session fees are non-refundable once paid, except in
+            documented circumstances (illness, injury, relocation) — written request to
+            info@aquaticdreamsswim.com required before the second lesson. Missed lessons and
+            no-shows are not refunded.
+          </Text>
+        </Section>
         <Hr style={hr} />
         <Text style={text}>
           If you have any questions, feel free to contact us at{' '}
