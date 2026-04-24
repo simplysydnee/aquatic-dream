@@ -175,6 +175,17 @@ const EnrollmentConfirmationEmail = ({
 
           <Hr style={hr} />
 
+          <Section style={policyBox}>
+            <Text style={policyHeading}>Refund Policy</Text>
+            <Text style={policyText}>
+              The $45 registration fee is one-time and non-refundable. Session fees are non-refundable
+              once paid, except in documented circumstances (illness, injury, relocation) — written
+              request to info@aquaticdreamsswim.com required before the second lesson. Missed lessons
+              and no-shows are not refunded. Full policy available during enrollment and at
+              aquaticdreamsswim.com/swim-enrollment.
+            </Text>
+          </Section>
+
           <Text style={text}>
             Questions? Contact us at info@aquaticdreamsswim.com or call (209) 577-3483.
           </Text>
