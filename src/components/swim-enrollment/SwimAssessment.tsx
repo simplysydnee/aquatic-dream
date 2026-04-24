@@ -118,6 +118,17 @@ const DobPicker = ({ dob, onChange }: DobPickerProps) => {
             }
           }}
           initialFocus
+          classNames={{
+            caption: "flex justify-center pt-1 relative items-center gap-2",
+            caption_label: "hidden",
+            caption_dropdowns: "flex gap-2",
+            dropdown: "bg-background border border-input rounded-md px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer",
+            dropdown_month: "relative",
+            dropdown_year: "relative",
+            vhidden: "hidden",
+            nav_button_previous: "absolute left-1 opacity-50 hover:opacity-100",
+            nav_button_next: "absolute right-1 opacity-50 hover:opacity-100",
+          }}
         />
       </PopoverContent>
     </Popover>
