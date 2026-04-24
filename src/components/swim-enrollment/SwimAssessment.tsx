@@ -73,16 +73,6 @@ const calculateAge = (dob: string): number => {
   return age;
 };
 
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-const daysInMonth = (month: number, year: number): number => {
-  if (!month || !year) return 31;
-  return new Date(year, month, 0).getDate();
-};
-
 interface DobPickerProps {
   dob: string;
   onChange: (dob: string) => void;
