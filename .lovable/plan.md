@@ -1,56 +1,56 @@
 
 
-## Fix the DOB step blocking new enrollments
+## Fix the DOB picker — replace 3-dropdown with a real calendar
 
-I tested the published site (`aquaticdreamsswim.com/swim-enrollment`) end-to-end. **The site IS deployed and working** — homepage, navigation, and Supabase data all loaded. But step 1 has a real bug that almost certainly explains your customer's complaint.
+The 3-dropdown picker is broken in two ways and is the wrong tool for this job:
 
-### The bug
+### What's wrong
 
-Step 1 asks for the child's date of birth using a **native HTML `<input type="date">`** (SwimAssessment.tsx line 222). Two things go wrong for real users:
+1. **Dob string is built in the wrong order.** Line 89 destructures as `[year, month, day] = dob.split("-")` but `dob` is stored as `yyyy-mm-dd` — that part is correct. **However**, the bigger trap: when the user picks Month first (the most natural first action), `year` and `day` are still empty, so `update()` calls `onChange("")` and the dropdown's controlled `value={month}` resets to empty on the next render. The Month selection visually disappears the moment they make it. Same for Day. **Nothing sticks until all three are picked in the right order** — and even then it's fragile.
+2. **Year list is too narrow.** Only ages 3–12 are offered (10 years). Parents of a child who *just* turned 3 last week or who is 12¾ literally cannot select their kid's birth year. They see no option and assume the form is broken.
+3. **It's a bad UX pattern in 2026.** Three coupled dropdowns for a date is clunky on mobile and desktop. Apple/Google/everyone use a calendar popover.
 
-1. **Date format mismatch**: native date inputs require `yyyy-mm-dd` internally, but the placeholder shows `mm/dd/yyyy`. On many mobile browsers (especially iOS Safari and older Android), if the user types digits instead of using the spinner/picker, the value is rejected silently. The field stays empty, age never calculates, and the **Next button stays grayed out forever**. I reproduced this exact behavior in my test — typed `06/15/2018`, field stayed blank, Next stayed disabled. No error message appears.
-2. **No fallback / no error text**: there's no "please pick a date" hint, no manual month/day/year selectors, and no indication of why Next is disabled. A frustrated customer just sees a dead button and bounces.
+### The fix — switch to shadcn Calendar in a Popover
 
-This is almost certainly what your customer hit — especially if she was on mobile.
+Replace the entire `DobPicker` component with a single button that opens a real calendar popover (the existing `src/components/ui/calendar.tsx` is already in the project). Two-month view, year/month dropdowns built in, defaults to a sensible date (7 years ago), disables future dates and dates older than 15 years.
 
-### Fix
-
-Replace the single native date input with a friendlier 3-dropdown picker (Month / Day / Year) that:
-
-- Works identically on every browser and device — no native picker quirks
-- Shows the calculated age live ("Age: 7 years old") as soon as all three are picked
-- Restricts Year dropdown to 2013–2023 (the valid age 3–12 range), so the user literally can't pick something invalid
-- Keeps the existing `dob` string + age calculation downstream — the rest of the flow is untouched
-- Adds a small inline hint under the dropdowns: *"Pick month, day, and year — your child's age will appear below."*
+**UX:**
 
 ```text
 What is your child's date of birth?
-This helps us find the right group (ages 3–12)
 
-[ Month ▼ ]  [ Day ▼ ]  [ Year ▼ ]
+[ 📅  Pick a date                    ▼ ]   ← button, full width on mobile
 
+(after pick)
+[ 📅  June 15, 2018                  ▼ ]
 Age: 7 years old ✓
 
-                                       [ Next → ]
+                                  [ Next → ]
 ```
 
-The Next button enables the moment all three are picked and age lands in 3–12.
+**Behavior:**
+- Click button → calendar popover opens
+- Calendar shows month + year dropdowns at top so parents can jump straight to e.g. "June 2018" without clicking back arrow 84 times
+- Disables: any date in the future, any date more than 15 years ago
+- On select: popover closes, button shows formatted date ("June 15, 2018"), age appears below with the existing ✓ / "must be 3–12" hint
+- Internal state stays as `yyyy-mm-dd` string so `calculateAge`, `handleAgeNext`, and the parent `onComplete(level, age, dob)` contract are unchanged
+- Calendar uses `pointer-events-auto` per shadcn guidance so it stays clickable
 
-### Bonus fix while in this file
-
-Add a tiny "Why is Next disabled?" tooltip on the disabled button that reads *"Please select a complete date of birth"* — so even if the dropdown approach somehow trips someone up, they get a clear reason instead of a dead button.
+**Validation messaging (keeps existing):**
+- If picked age < 3 or > 12: show the existing inline "(must be 3–12)" red text and keep Next disabled
+- Tooltip on disabled Next button stays as-is
 
 ### Files touched
 
-- `src/components/swim-enrollment/SwimAssessment.tsx` — replace the `<Input type="date">` block (lines ~220–235) with a 3-Select component using the existing shadcn `Select`. Keep `dob` state as a `yyyy-mm-dd` string so `calculateAge`, `handleAgeNext`, and the parent `onComplete(level, age, dob)` contract all work unchanged.
+- `src/components/swim-enrollment/SwimAssessment.tsx` — delete `DobPicker`, `MONTHS`, `daysInMonth`, and the Select imports for the picker; add Popover + Calendar + a small format helper. ~50 lines net deletion.
 
 ### Not doing
 
-- ❌ No DB or edge function changes — this is purely a client-side input fix
-- ❌ No change to the rest of the enrollment flow (Session, Details, Agreements, Payment all working — verified in network logs)
-- ❌ No publishing — you'll still need to click **Publish → Update** after this fix to push it live
+- ❌ No DB or edge function changes
+- ❌ No change to assessment questions, session step, or downstream flow
+- ❌ No new dependencies — `react-day-picker`, `date-fns`, Popover, and Calendar are all already in the project
 
-### After the fix
+### After this lands
 
-Once approved and published, the email reply you already drafted ("try again, give us feedback") will land much better — the issue she actually hit will be gone.
+You'll need to click **Publish → Update** to push to the live domain so your customer can retry.
 
