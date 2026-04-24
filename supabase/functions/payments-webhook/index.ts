@@ -285,7 +285,7 @@ async function sendEnrollmentConfirmation(enrollmentId: string) {
   try {
     const { data: enrollment, error: enrollErr } = await supabase
       .from("swim_enrollments")
-      .select("*, swim_sessions(id, session_period_id, day_of_week, start_time, swim_level, session_price, session_start_date)")
+      .select("*, swim_sessions(id, session_period_id, day_of_week, start_time, end_time, swim_level, session_price, session_start_date, session_end_date)")
       .eq("id", enrollmentId)
       .maybeSingle();
 
@@ -320,33 +320,46 @@ async function sendEnrollmentConfirmation(enrollmentId: string) {
       if (period) periodName = period.name;
     }
 
-    const sessionInfo = session
-      ? `${periodName} — ${session.day_of_week} ${
-          session.start_time
-            ? new Date(`2000-01-01T${session.start_time}`).toLocaleTimeString("en-US", {
-                hour: "numeric",
-                minute: "2-digit",
-                hour12: true,
-              })
-            : ""
-        }`
-      : undefined;
+    const formatTime = (t: string | null | undefined) =>
+      t
+        ? new Date(`2000-01-01T${t}`).toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          })
+        : undefined;
 
-    const levelLabel = getLevelLabel(enrollment.swim_level, enrollment.child_age);
-    const groupName = getGroupName(enrollment.swim_level, enrollment.child_age);
-
-    const regFee = enrollment.registration_fee ?? 0;
-    const sessionPrice = session?.session_price ?? 280;
-    const isFirstTime = enrollment.is_first_time;
-
-    const firstClassDate =
-      lessonDates && lessonDates.length > 0
-        ? new Date(lessonDates[0].lesson_date + "T00:00:00").toLocaleDateString("en-US", {
+    const formatLongDate = (d: string | null | undefined) =>
+      d
+        ? new Date(d + "T00:00:00").toLocaleDateString("en-US", {
             month: "long",
             day: "numeric",
             year: "numeric",
           })
         : undefined;
+
+    const startTime = formatTime(session?.start_time);
+    const endTime = formatTime(session?.end_time);
+    const sessionStartDate = formatLongDate(session?.session_start_date);
+    const sessionEndDate = formatLongDate(session?.session_end_date);
+
+    const sessionInfo = session
+      ? `${periodName} — ${session.day_of_week}${startTime ? ` ${startTime}` : ""}`
+      : undefined;
+
+    const levelLabel = getLevelLabel(enrollment.swim_level, enrollment.child_age);
+    const groupName = getGroupName(enrollment.swim_level, enrollment.child_age);
+
+    const sessionPrice = session?.session_price ?? 240;
+    const isFirstTime = enrollment.is_first_time;
+    // Use the EXACT amount Stripe charged on this enrollment row (validated
+    // against session.amount_total in handleCheckoutCompleted).
+    const paidOnThisRow = Number(enrollment.payment_amount ?? 0);
+
+    const firstClassDate =
+      lessonDates && lessonDates.length > 0
+        ? formatLongDate(lessonDates[0].lesson_date)
+        : sessionStartDate;
 
     await supabase.functions.invoke("send-transactional-email", {
       body: {
@@ -358,13 +371,20 @@ async function sendEnrollmentConfirmation(enrollmentId: string) {
           childName: enrollment.child_name,
           levelLabel,
           groupName,
+          dayOfWeek: session?.day_of_week,
+          startTime,
+          endTime,
+          sessionStartDate,
+          sessionEndDate,
+          sessionPeriodName: periodName,
           sessionInfo,
           lessonDates: formattedDates,
           isFirstTime,
-          registrationFeePaid: isFirstTime ? `$${regFee}` : undefined,
+          registrationFeePaid: isFirstTime ? `$${paidOnThisRow || 45}` : undefined,
           sessionFeeDue: isFirstTime ? `$${sessionPrice}` : undefined,
           dueDate: firstClassDate,
-          totalPaid: !isFirstTime ? `$${enrollment.payment_amount || sessionPrice}` : undefined,
+          totalPaid: !isFirstTime ? `$${paidOnThisRow || sessionPrice}` : undefined,
+          paymentReference: enrollment.stripe_payment_id || undefined,
         },
       },
     });
