@@ -453,6 +453,8 @@ export type Database = {
           child_name: string
           created_at: string
           id: string
+          last_replied_at: string | null
+          last_reply_message: string | null
           lesson_type: string
           notes: string | null
           parent_email: string
@@ -467,6 +469,8 @@ export type Database = {
           child_name: string
           created_at?: string
           id?: string
+          last_replied_at?: string | null
+          last_reply_message?: string | null
           lesson_type?: string
           notes?: string | null
           parent_email: string
@@ -481,6 +485,8 @@ export type Database = {
           child_name?: string
           created_at?: string
           id?: string
+          last_replied_at?: string | null
+          last_reply_message?: string | null
           lesson_type?: string
           notes?: string | null
           parent_email?: string
