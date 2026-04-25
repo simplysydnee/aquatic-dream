@@ -41,6 +41,13 @@ interface ClassShift {
   end_time: string;
   title: string;
 }
+interface TimeOff {
+  id: string;
+  instructor_id: string;
+  start_date: string;
+  end_date: string;
+  reason: string | null;
+}
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -50,6 +57,7 @@ const ScheduleAdmin = () => {
   const [positions, setPositions] = useState<Position[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [classShifts, setClassShifts] = useState<ClassShift[]>([]);
+  const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
   const [publication, setPublication] = useState<Publication | null>(null);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
@@ -70,7 +78,7 @@ const ScheduleAdmin = () => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [instRes, posRes, shiftRes, pubRes, sessRes, ldRes] = await Promise.all([
+    const [instRes, posRes, shiftRes, pubRes, sessRes, ldRes, ptoRes] = await Promise.all([
       supabase.from("instructors").select("id, name, is_active, email").eq("is_active", true).order("name"),
       supabase.from("shift_positions").select("*").eq("is_active", true).order("name"),
       supabase.from("shifts").select("*").gte("shift_date", weekStartStr).lte("shift_date", weekEndStr),
@@ -81,11 +89,16 @@ const ScheduleAdmin = () => {
       supabase.from("session_lesson_dates")
         .select("session_id, lesson_date, is_cancelled")
         .gte("lesson_date", weekStartStr).lte("lesson_date", weekEndStr),
+      supabase.from("time_off_requests")
+        .select("id, instructor_id, start_date, end_date, reason")
+        .eq("status", "approved")
+        .lte("start_date", weekEndStr).gte("end_date", weekStartStr),
     ]);
     if (instRes.data) setInstructors(instRes.data);
     if (posRes.data) setPositions(posRes.data);
     if (shiftRes.data) setShifts(shiftRes.data);
     setPublication(pubRes.data ?? null);
+    setTimeOff((ptoRes.data ?? []) as TimeOff[]);
 
     // Build read-only "class" shifts from swim sessions + lesson dates
     const sessions = sessRes.data ?? [];
