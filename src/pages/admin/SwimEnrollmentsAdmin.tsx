@@ -512,7 +512,7 @@ const SwimEnrollmentsAdmin = () => {
                           {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                         </TableCell>
                         <TableCell>
-                          {e.is_first_time ? (
+                          {e.is_first_time && e.payment_status !== "not_required" ? (
                             <Select value={e.payment_status} onValueChange={(v) => updatePaymentStatus(e, v)}>
                               <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
                                 <SelectValue />
@@ -524,6 +524,8 @@ const SwimEnrollmentsAdmin = () => {
                                 <SelectItem value="waived">Waived</SelectItem>
                               </SelectContent>
                             </Select>
+                          ) : e.is_first_time && e.payment_status === "not_required" ? (
+                            <span className="text-xs text-muted-foreground italic">Paid w/ other session</span>
                           ) : (
                             <span className="text-xs text-muted-foreground italic">N/A (returning)</span>
                           )}

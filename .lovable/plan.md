@@ -1,35 +1,49 @@
-## Auto-acknowledgment for lesson requests
+## Problem
 
-Send an automatic confirmation email the moment someone submits the private/semi-private lesson request form, so they immediately know we received it and someone will follow up.
+When a first-time client signs up for **two sessions in one checkout** (e.g. Giana Bansal today), the webhook creates two enrollment rows and charges the $45 registration fee correctly only once. But the second row is mislabeled:
 
-### What the email says
+| Row | registration_fee | payment_status | session_fee_status |
+|-----|------------------|----------------|--------------------|
+| Session 1 | $45 | `paid` ✓ | `due_day_1` ✓ |
+| Session 2 | $0 | `unpaid` ✗ | `due_day_1` ✓ |
 
-Branded email matching the existing `lesson-request-reply.tsx` styling:
-- Subject: "We got your lesson request — Aquatic Dreams"
-- Greets the parent by first name
-- Confirms we received the request for `{childName}` (`{lessonType}` lesson)
-- Sets expectation: "Someone from our team will reach out within 1–2 business days to schedule"
-- Includes contact info (phone + email) in case they need to reach us sooner
-- Standard footer
+`payment_status: 'unpaid'` on row 2 makes it look like a $0 reg fee is owed. It should be `not_required` (the same status returning swimmers get, since the reg fee is a one-time charge already collected on row 1).
 
-### Changes
+Session fees on both rows correctly stay as `due_day_1` — collected on day 1 of each session, exactly as you described.
 
-**1. New template** — `supabase/functions/_shared/transactional-email-templates/lesson-request-acknowledgment.tsx`
-- React Email component, same visual style as `lesson-request-reply.tsx`
-- Props: `parentName`, `childName`, `lessonType`
-- Exports `template` with `previewData` for the dashboard preview
+## Fix
 
-**2. Register it** — add the import + entry to `supabase/functions/_shared/transactional-email-templates/registry.ts` under key `lesson-request-acknowledgment`.
+### 1. Webhook: stop labeling row 2+ as "unpaid"
 
-**3. Trigger it** — in `src/components/swim-enrollment/LessonRequestForm.tsx`, after the successful `lesson_requests` insert:
-- Capture an `id` (use `crypto.randomUUID()` and pass it in the insert) so we have an idempotency key
-- Call `supabase.functions.invoke('send-transactional-email', { body: { templateName: 'lesson-request-acknowledgment', recipientEmail: parsed.data.parentEmail, idempotencyKey: \`lesson-req-ack-${id}\`, templateData: { parentName, childName, lessonType } } })`
-- Fire-and-forget (don't block the success state on it; log errors to console only)
+In `supabase/functions/payments-webhook/index.ts` (line 164), change:
 
-**4. Deploy** — redeploy `send-transactional-email` so the new template is picked up by the running function.
+```ts
+// before
+const rowPaymentStatus = isReturning ? "not_required" : (chargeRegFee ? "paid" : "unpaid");
 
-### Safety
+// after
+const rowPaymentStatus = isReturning ? "not_required" : (chargeRegFee ? "paid" : "not_required");
+```
 
-- Does NOT touch the admin reply flow, the existing `lesson-request-reply` template, or any checkout/payment code
-- Email goes through the existing queued infrastructure (retry-safe, suppression-aware)
-- If the email send fails, the form still succeeds — user still sees the confirmation screen
+Resulting reg-fee statuses:
+- First-timer, session 1 → `paid` ($45 charged)
+- First-timer, session 2+ → `not_required` (already collected on row 1)
+- Returning swimmer, any session → `not_required` (waived for returners)
+
+Session fee tracking (`session_fee_status`) is not touched — still `due_day_1` for first-timers, collected on day 1 of each individual session.
+
+### 2. Backfill Giana Bansal's row
+
+Update the existing second-session row (id `eec4bf57-e625-438c-90bb-e2642abe7418`) from `payment_status: 'unpaid'` → `'not_required'`.
+
+### 3. Verify dashboard treats `not_required` correctly
+
+Quick check of `SwimEnrollmentsAdmin.tsx` to confirm `'not_required'` is grouped with paid/waived/comp (no outstanding-balance flag, not counted as revenue). If not, add it.
+
+## What is NOT changing
+
+- Checkout flow, Stripe charges, prices — untouched
+- Single-session enrollments — identical behavior
+- Returning swimmers — identical behavior
+- Session fee day-1 collection logic — untouched
+- Webhook reconciliation — untouched
