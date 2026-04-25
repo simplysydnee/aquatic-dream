@@ -304,6 +304,42 @@ export type Database = {
           },
         ]
       }
+      instructor_availability: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          instructor_id: string
+          notes: string | null
+          preference: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          instructor_id: string
+          notes?: string | null
+          preference?: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          instructor_id?: string
+          notes?: string | null
+          preference?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       instructors: {
         Row: {
           created_at: string
@@ -710,6 +746,51 @@ export type Database = {
         }
         Relationships: []
       }
+      shift_trade_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          from_instructor_id: string
+          id: string
+          message: string | null
+          responded_at: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shift_id: string
+          status: string
+          to_instructor_id: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          from_instructor_id: string
+          id?: string
+          message?: string | null
+          responded_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shift_id: string
+          status?: string
+          to_instructor_id: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          from_instructor_id?: string
+          id?: string
+          message?: string | null
+          responded_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shift_id?: string
+          status?: string
+          to_instructor_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shifts: {
         Row: {
           color: string | null
@@ -983,6 +1064,57 @@ export type Database = {
           },
         ]
       }
+      time_off_requests: {
+        Row: {
+          admin_notes: string | null
+          all_day: boolean
+          created_at: string
+          end_date: string
+          end_time: string | null
+          id: string
+          instructor_id: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          start_date: string
+          start_time: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          all_day?: boolean
+          created_at?: string
+          end_date: string
+          end_time?: string | null
+          id?: string
+          instructor_id: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date: string
+          start_time?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          all_day?: boolean
+          created_at?: string
+          end_date?: string
+          end_time?: string | null
+          id?: string
+          instructor_id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date?: string
+          start_time?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       trip_reservations: {
         Row: {
           certification_level: string | null
@@ -1051,6 +1183,53 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_shift_trade: {
+        Args: { _trade_id: string }
+        Returns: {
+          admin_notes: string | null
+          created_at: string
+          from_instructor_id: string
+          id: string
+          message: string | null
+          responded_at: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shift_id: string
+          status: string
+          to_instructor_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shift_trade_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      claim_open_shift: {
+        Args: { _shift_id: string }
+        Returns: {
+          color: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          instructor_id: string | null
+          notes: string | null
+          position_id: string | null
+          shift_date: string
+          start_time: string
+          status: string
+          swim_session_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shifts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       current_user_instructor_id: { Args: never; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
