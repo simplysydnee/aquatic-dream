@@ -161,7 +161,9 @@ async function handleCheckoutCompleted(session: any) {
       //   - First-time: only $45 reg fee charged → session_fee_status='due_day_1' (collected day 1)
       const isReturning = !child.isFirstTime;
       const paymentAmount = isReturning ? sessionPrice : regFee;
-      const rowPaymentStatus = isReturning ? "not_required" : (chargeRegFee ? "paid" : "unpaid");
+      // Reg fee is one-time per family. First-timer's first row pays it; additional
+      // rows (same checkout, same family) get 'not_required' — same as returning swimmers.
+      const rowPaymentStatus = isReturning ? "not_required" : (chargeRegFee ? "paid" : "not_required");
       const sessionFeeStatus = isReturning ? "paid" : "due_day_1";
 
       return {
