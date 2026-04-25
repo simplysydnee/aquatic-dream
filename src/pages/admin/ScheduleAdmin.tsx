@@ -247,6 +247,13 @@ const ScheduleAdmin = () => {
 
   const positionById = (id: string | null) => positions.find((p) => p.id === id);
 
+  const ptoFor = (instructorId: string | null, dateStr: string) => {
+    if (!instructorId) return null;
+    return timeOff.find(
+      (p) => p.instructor_id === instructorId && p.start_date <= dateStr && p.end_date >= dateStr,
+    ) ?? null;
+  };
+
   const renderCell = (instructorId: string | null, date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     const key = `${instructorId ?? "open"}|${dateStr}`;
@@ -255,15 +262,25 @@ const ScheduleAdmin = () => {
       ? classShifts.filter((c) => c.instructor_id === instructorId && c.shift_date === dateStr)
       : [];
     const isEmpty = cellShifts.length === 0 && cellClasses.length === 0;
+    const pto = ptoFor(instructorId, dateStr);
     return (
       <div
-        className="min-h-[80px] border-l p-1 space-y-1 hover:bg-muted/30 transition-colors"
+        className={`relative min-h-[80px] border-l p-1 space-y-1 hover:bg-muted/30 transition-colors ${pto ? "bg-rose-50/40" : ""}`}
         onDragOver={handleDragOver}
         onDrop={(e) => handleDrop(e, instructorId, date)}
         onClick={(e) => {
           if (e.target === e.currentTarget) openAdd(instructorId, date);
         }}
+        title={pto ? `Approved time off${pto.reason ? `: ${pto.reason}` : ""}` : undefined}
       >
+        {pto && (
+          <>
+            <div className="absolute inset-y-0 left-0 w-1 bg-rose-500 pointer-events-none" />
+            <div className="absolute top-1 right-1 text-[9px] font-semibold text-rose-700 bg-rose-100 px-1 rounded pointer-events-none uppercase tracking-wide">
+              PTO
+            </div>
+          </>
+        )}
         {cellClasses.map((c) => (
           <div
             key={c.key}
@@ -295,7 +312,7 @@ const ScheduleAdmin = () => {
             </div>
           );
         })}
-        {isEmpty && (
+        {isEmpty && !pto && (
           <button
             className="text-xs text-muted-foreground/60 hover:text-foreground w-full h-full text-left"
             onClick={() => openAdd(instructorId, date)}
