@@ -344,6 +344,7 @@ export type Database = {
         Row: {
           created_at: string
           email: string | null
+          hourly_wage: number | null
           id: string
           is_active: boolean
           name: string
@@ -354,6 +355,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email?: string | null
+          hourly_wage?: number | null
           id?: string
           is_active?: boolean
           name: string
@@ -364,6 +366,7 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string | null
+          hourly_wage?: number | null
           id?: string
           is_active?: boolean
           name?: string
@@ -1064,6 +1067,54 @@ export type Database = {
           },
         ]
       }
+      time_clock_entries: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          break_minutes: number
+          clock_in_at: string
+          clock_out_at: string | null
+          created_at: string
+          edited_by: string | null
+          id: string
+          instructor_id: string
+          notes: string | null
+          shift_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          break_minutes?: number
+          clock_in_at?: string
+          clock_out_at?: string | null
+          created_at?: string
+          edited_by?: string | null
+          id?: string
+          instructor_id: string
+          notes?: string | null
+          shift_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          break_minutes?: number
+          clock_in_at?: string
+          clock_out_at?: string | null
+          created_at?: string
+          edited_by?: string | null
+          id?: string
+          instructor_id?: string
+          notes?: string | null
+          shift_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       time_off_requests: {
         Row: {
           admin_notes: string | null
@@ -1226,6 +1277,54 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "shifts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      clock_in: {
+        Args: { _notes?: string; _shift_id?: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          break_minutes: number
+          clock_in_at: string
+          clock_out_at: string | null
+          created_at: string
+          edited_by: string | null
+          id: string
+          instructor_id: string
+          notes: string | null
+          shift_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "time_clock_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      clock_out: {
+        Args: { _break_minutes?: number; _notes?: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          break_minutes: number
+          clock_in_at: string
+          clock_out_at: string | null
+          created_at: string
+          edited_by: string | null
+          id: string
+          instructor_id: string
+          notes: string | null
+          shift_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "time_clock_entries"
           isOneToOne: true
           isSetofReturn: false
         }
