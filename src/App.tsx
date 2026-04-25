@@ -68,6 +68,7 @@ const App = () => (
               <Route path="instructors" element={<InstructorsAdmin />} />
               <Route path="schedule" element={<ScheduleAdmin />} />
               <Route path="time-off" element={<TimeOffAdmin />} />
+              <Route path="timesheets" element={<TimesheetsAdmin />} />
               <Route path="sessions" element={<SessionsAdmin />} />
               <Route path="careers" element={<JobPostingsAdmin />} />
               <Route path="applications" element={<JobApplicationsAdmin />} />
@@ -81,6 +82,7 @@ const App = () => (
               <Route path="availability" element={<InstructorAvailability />} />
               <Route path="time-off" element={<InstructorTimeOff />} />
               <Route path="open-shifts" element={<InstructorOpenShifts />} />
+              <Route path="time-clock" element={<InstructorTimeClock />} />
             </Route>
 
             {/* Public routes */}

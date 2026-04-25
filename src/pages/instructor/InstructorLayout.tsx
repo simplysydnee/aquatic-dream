@@ -1,7 +1,7 @@
 import { Navigate, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { CalendarClock, ClipboardList, LogOut, Loader2, CalendarCheck, CalendarOff, Hand } from "lucide-react";
+import { CalendarClock, ClipboardList, LogOut, Loader2, CalendarCheck, CalendarOff, Hand, Clock } from "lucide-react";
 
 export default function InstructorLayout() {
   const { user, isInstructor, isAdmin, loading, signOut } = useAuth();
