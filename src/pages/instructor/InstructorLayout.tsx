@@ -1,7 +1,7 @@
 import { Navigate, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { CalendarClock, ClipboardList, LogOut, Loader2 } from "lucide-react";
+import { CalendarClock, ClipboardList, LogOut, Loader2, CalendarCheck, CalendarOff, Hand } from "lucide-react";
 
 export default function InstructorLayout() {
   const { user, isInstructor, isAdmin, loading, signOut } = useAuth();
@@ -42,6 +42,15 @@ export default function InstructorLayout() {
           </NavLink>
           <NavLink to="/instructor/roster" className={({ isActive }) => `${linkBase} ${isActive ? active : ""}`}>
             <ClipboardList className="w-4 h-4" /> My Rosters
+          </NavLink>
+          <NavLink to="/instructor/availability" className={({ isActive }) => `${linkBase} ${isActive ? active : ""}`}>
+            <CalendarCheck className="w-4 h-4" /> Availability
+          </NavLink>
+          <NavLink to="/instructor/time-off" className={({ isActive }) => `${linkBase} ${isActive ? active : ""}`}>
+            <CalendarOff className="w-4 h-4" /> Time Off
+          </NavLink>
+          <NavLink to="/instructor/open-shifts" className={({ isActive }) => `${linkBase} ${isActive ? active : ""}`}>
+            <Hand className="w-4 h-4" /> Open Shifts
           </NavLink>
         </nav>
       </header>

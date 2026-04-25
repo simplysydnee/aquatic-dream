@@ -22,9 +22,13 @@ import ClassRosterAdmin from "./pages/admin/ClassRosterAdmin";
 import JobPostingsAdmin from "./pages/admin/JobPostingsAdmin";
 import JobApplicationsAdmin from "./pages/admin/JobApplicationsAdmin";
 import ScheduleAdmin from "./pages/admin/ScheduleAdmin";
+import TimeOffAdmin from "./pages/admin/TimeOffAdmin";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
 import InstructorMySchedule from "./pages/instructor/InstructorMySchedule";
 import InstructorMyRoster from "./pages/instructor/InstructorMyRoster";
+import InstructorAvailability from "./pages/instructor/InstructorAvailability";
+import InstructorTimeOff from "./pages/instructor/InstructorTimeOff";
+import InstructorOpenShifts from "./pages/instructor/InstructorOpenShifts";
 import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
 import KioskCheckIn from "./pages/KioskCheckIn";
@@ -61,6 +65,7 @@ const App = () => (
               <Route path="contacts" element={<ContactsAdmin />} />
               <Route path="instructors" element={<InstructorsAdmin />} />
               <Route path="schedule" element={<ScheduleAdmin />} />
+              <Route path="time-off" element={<TimeOffAdmin />} />
               <Route path="sessions" element={<SessionsAdmin />} />
               <Route path="careers" element={<JobPostingsAdmin />} />
               <Route path="applications" element={<JobApplicationsAdmin />} />
@@ -71,6 +76,9 @@ const App = () => (
             <Route path="/instructor" element={<InstructorLayout />}>
               <Route index element={<InstructorMySchedule />} />
               <Route path="roster" element={<InstructorMyRoster />} />
+              <Route path="availability" element={<InstructorAvailability />} />
+              <Route path="time-off" element={<InstructorTimeOff />} />
+              <Route path="open-shifts" element={<InstructorOpenShifts />} />
             </Route>
 
             {/* Public routes */}
