@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Loader2, UserCheck, UserX } from "lucide-react";
+import { Plus, Pencil, Loader2, UserCheck, UserX, KeyRound } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Instructor {
@@ -16,6 +16,7 @@ interface Instructor {
   email: string | null;
   phone: string | null;
   is_active: boolean;
+  user_id: string | null;
   created_at: string;
 }
 
@@ -25,13 +26,11 @@ const InstructorsAdmin = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [inviting, setInviting] = useState<string | null>(null);
 
   const fetchInstructors = async () => {
-    const { data } = await supabase
-      .from("instructors")
-      .select("*")
-      .order("name");
-    if (data) setInstructors(data);
+    const { data } = await supabase.from("instructors").select("*").order("name");
+    if (data) setInstructors(data as Instructor[]);
     setLoading(false);
   };
 
@@ -86,6 +85,33 @@ const InstructorsAdmin = () => {
     }
   };
 
+  const inviteLogin = async (inst: Instructor) => {
+    if (!inst.email) {
+      toast({ title: "Add an email first", variant: "destructive" });
+      return;
+    }
+    setInviting(inst.id);
+    const { data, error } = await supabase.functions.invoke("invite-instructor", {
+      body: { instructor_id: inst.id, email: inst.email },
+    });
+    setInviting(null);
+    if (error || (data && (data as any).error)) {
+      toast({
+        title: "Invite failed",
+        description: error?.message || (data as any)?.error,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({
+      title: (data as any).invited ? "Invitation sent" : "Account linked",
+      description: (data as any).invited
+        ? `${inst.email} will receive an email to set their password.`
+        : `Existing account at ${inst.email} is now linked.`,
+    });
+    fetchInstructors();
+  };
+
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
@@ -121,7 +147,8 @@ const InstructorsAdmin = () => {
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
+                  <TableHead>Login</TableHead>
+                  <TableHead className="w-[140px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -136,6 +163,13 @@ const InstructorsAdmin = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>
+                      {inst.user_id ? (
+                        <Badge variant="outline" className="text-xs">Linked</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No login</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-1">
                         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(inst)}>
                           <Pencil className="w-3.5 h-3.5" />
@@ -143,6 +177,20 @@ const InstructorsAdmin = () => {
                         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => toggleActive(inst)}>
                           {inst.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
                         </Button>
+                        {!inst.user_id && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title="Invite / link login"
+                            disabled={inviting === inst.id || !inst.email}
+                            onClick={() => inviteLogin(inst)}
+                          >
+                            {inviting === inst.id
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <KeyRound className="w-3.5 h-3.5" />}
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

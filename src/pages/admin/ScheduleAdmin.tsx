@@ -33,6 +33,14 @@ interface Shift {
   status: string;
 }
 interface Publication { week_start: string; published_at: string; }
+interface ClassShift {
+  key: string;
+  instructor_id: string;
+  shift_date: string;
+  start_time: string;
+  end_time: string;
+  title: string;
+}
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -41,6 +49,7 @@ const ScheduleAdmin = () => {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [classShifts, setClassShifts] = useState<ClassShift[]>([]);
   const [publication, setPublication] = useState<Publication | null>(null);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
@@ -61,16 +70,41 @@ const ScheduleAdmin = () => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [instRes, posRes, shiftRes, pubRes] = await Promise.all([
+    const [instRes, posRes, shiftRes, pubRes, sessRes, ldRes] = await Promise.all([
       supabase.from("instructors").select("id, name, is_active, email").eq("is_active", true).order("name"),
       supabase.from("shift_positions").select("*").eq("is_active", true).order("name"),
       supabase.from("shifts").select("*").gte("shift_date", weekStartStr).lte("shift_date", weekEndStr),
       supabase.from("schedule_publications").select("week_start, published_at").eq("week_start", weekStartStr).maybeSingle(),
+      supabase.from("swim_sessions")
+        .select("id, swim_level, age_group, start_time, end_time, session_name, instructor_id")
+        .eq("is_active", true).not("instructor_id", "is", null),
+      supabase.from("session_lesson_dates")
+        .select("session_id, lesson_date, is_cancelled")
+        .gte("lesson_date", weekStartStr).lte("lesson_date", weekEndStr),
     ]);
     if (instRes.data) setInstructors(instRes.data);
     if (posRes.data) setPositions(posRes.data);
     if (shiftRes.data) setShifts(shiftRes.data);
     setPublication(pubRes.data ?? null);
+
+    // Build read-only "class" shifts from swim sessions + lesson dates
+    const sessions = sessRes.data ?? [];
+    const dates = (ldRes.data ?? []).filter((d) => !d.is_cancelled);
+    const sessById = new Map(sessions.map((s) => [s.id, s]));
+    const cs: ClassShift[] = [];
+    for (const d of dates) {
+      const s = sessById.get(d.session_id);
+      if (!s || !s.instructor_id) continue;
+      cs.push({
+        key: `${s.id}-${d.lesson_date}`,
+        instructor_id: s.instructor_id,
+        shift_date: d.lesson_date,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        title: s.session_name || `${s.swim_level}${s.age_group ? " · " + s.age_group : ""}`,
+      });
+    }
+    setClassShifts(cs);
     setLoading(false);
   }, [weekStartStr, weekEndStr]);
 
@@ -201,8 +235,13 @@ const ScheduleAdmin = () => {
   const positionById = (id: string | null) => positions.find((p) => p.id === id);
 
   const renderCell = (instructorId: string | null, date: Date) => {
-    const key = `${instructorId ?? "open"}|${format(date, "yyyy-MM-dd")}`;
+    const dateStr = format(date, "yyyy-MM-dd");
+    const key = `${instructorId ?? "open"}|${dateStr}`;
     const cellShifts = shiftsBy.get(key) ?? [];
+    const cellClasses = instructorId
+      ? classShifts.filter((c) => c.instructor_id === instructorId && c.shift_date === dateStr)
+      : [];
+    const isEmpty = cellShifts.length === 0 && cellClasses.length === 0;
     return (
       <div
         className="min-h-[80px] border-l p-1 space-y-1 hover:bg-muted/30 transition-colors"
@@ -212,6 +251,17 @@ const ScheduleAdmin = () => {
           if (e.target === e.currentTarget) openAdd(instructorId, date);
         }}
       >
+        {cellClasses.map((c) => (
+          <div
+            key={c.key}
+            className="rounded px-2 py-1 text-xs text-white shadow-sm border border-white/30 opacity-90"
+            style={{ backgroundColor: "#0ea5e9" }}
+            title="Auto-pulled from swim sessions (read-only)"
+          >
+            <div className="font-semibold">{c.start_time.slice(0, 5)}–{c.end_time.slice(0, 5)}</div>
+            <div className="opacity-90 truncate">📚 {c.title}</div>
+          </div>
+        ))}
         {cellShifts.map((s) => {
           const pos = positionById(s.position_id);
           const color = s.color || pos?.color || "#2a5e84";
@@ -232,7 +282,7 @@ const ScheduleAdmin = () => {
             </div>
           );
         })}
-        {cellShifts.length === 0 && (
+        {isEmpty && (
           <button
             className="text-xs text-muted-foreground/60 hover:text-foreground w-full h-full text-left"
             onClick={() => openAdd(instructorId, date)}

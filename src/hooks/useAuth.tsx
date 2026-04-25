@@ -6,6 +6,7 @@ interface AuthContext {
   user: User | null;
   session: Session | null;
   isAdmin: boolean;
+  isInstructor: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -17,21 +18,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isInstructor, setIsInstructor] = useState(false);
   const [loading, setLoading] = useState(true);
   const requestIdRef = useRef(0);
 
-  const checkAdmin = async (userId: string) => {
-    const { data, error } = await supabase.rpc("has_role", {
-      _user_id: userId,
-      _role: "admin",
-    } as any);
-
-    if (error) {
-      console.error("Failed to check admin role", error);
-      return false;
-    }
-
-    return !!data;
+  const checkRoles = async (userId: string) => {
+    const [adminRes, instRes] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" } as any),
+      supabase.rpc("has_role", { _user_id: userId, _role: "instructor" } as any),
+    ]);
+    return {
+      admin: !adminRes.error && !!adminRes.data,
+      instructor: !instRes.error && !!instRes.data,
+    };
   };
 
   useEffect(() => {
@@ -47,16 +46,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!nextSession?.user) {
         setIsAdmin(false);
+        setIsInstructor(false);
         setLoading(false);
         return;
       }
 
       setLoading(true);
-      const admin = await checkAdmin(nextSession.user.id);
+      const { admin, instructor } = await checkRoles(nextSession.user.id);
 
       if (!isMounted || requestId !== requestIdRef.current) return;
 
       setIsAdmin(admin);
+      setIsInstructor(instructor);
       setLoading(false);
     };
 
@@ -90,10 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setIsAdmin(false);
+    setIsInstructor(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, isAdmin, isInstructor, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

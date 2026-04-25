@@ -12,7 +12,7 @@ const AdminLogin = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const { signIn, user, isAdmin, loading: authLoading } = useAuth();
+  const { signIn, user, isAdmin, isInstructor, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,15 +23,20 @@ const AdminLogin = () => {
       navigate("/admin", { replace: true });
       return;
     }
+    if (user && isInstructor) {
+      setSubmitting(false);
+      navigate("/instructor", { replace: true });
+      return;
+    }
 
     if (submitting) {
       setSubmitting(false);
 
-      if (user && !isAdmin) {
-        setError("This account does not have admin access.");
+      if (user && !isAdmin && !isInstructor) {
+        setError("This account does not have access.");
       }
     }
-  }, [user, isAdmin, authLoading, submitting, navigate]);
+  }, [user, isAdmin, isInstructor, authLoading, submitting, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

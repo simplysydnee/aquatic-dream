@@ -313,6 +313,7 @@ export type Database = {
           name: string
           phone: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -322,6 +323,7 @@ export type Database = {
           name: string
           phone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -331,6 +333,7 @@ export type Database = {
           name?: string
           phone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1048,6 +1051,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_instructor_id: { Args: never; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1082,7 +1086,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user"
+      app_role: "admin" | "moderator" | "user" | "instructor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1210,7 +1214,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "moderator", "user"],
+      app_role: ["admin", "moderator", "user", "instructor"],
     },
   },
 } as const
