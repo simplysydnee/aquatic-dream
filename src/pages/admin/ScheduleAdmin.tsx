@@ -355,6 +355,10 @@ const ScheduleAdmin = () => {
               </Badge>
             )}
           </p>
+          <div className="text-xs text-muted-foreground mt-1">
+            <span className="font-medium text-foreground">{grandHours.toFixed(1)} hrs</span> scheduled
+            {grandCost > 0 && <> · est. <span className="font-medium text-foreground">${grandCost.toFixed(2)}</span> labor</>}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => setWeekStart(subWeeks(weekStart, 1))}>
