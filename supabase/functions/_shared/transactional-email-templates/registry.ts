@@ -14,6 +14,7 @@ import { template as enrollmentConfirmation } from './enrollment-confirmation.ts
 import { template as lessonReminder } from './lesson-reminder.tsx'
 import { template as earlyAccessInvite } from './early-access-invite.tsx'
 import { template as lessonRequestReply } from './lesson-request-reply.tsx'
+import { template as lessonRequestAcknowledgment } from './lesson-request-acknowledgment.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'session-payment-link': sessionPaymentLink,
@@ -21,4 +22,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'lesson-reminder': lessonReminder,
   'early-access-invite': earlyAccessInvite,
   'lesson-request-reply': lessonRequestReply,
+  'lesson-request-acknowledgment': lessonRequestAcknowledgment,
 }

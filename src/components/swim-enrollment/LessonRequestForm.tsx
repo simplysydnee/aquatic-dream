@@ -59,7 +59,9 @@ const LessonRequestForm = () => {
       return;
     }
     setSubmitting(true);
+    const id = crypto.randomUUID();
     const { error } = await supabase.from("lesson_requests").insert({
+      id,
       parent_name: parsed.data.parentName,
       parent_email: parsed.data.parentEmail,
       parent_phone: parsed.data.parentPhone || null,
@@ -74,6 +76,21 @@ const LessonRequestForm = () => {
       toast({ title: "Something went wrong", description: "Please try again or contact us directly.", variant: "destructive" });
       return;
     }
+    // Fire-and-forget acknowledgment email — don't block UI on it
+    supabase.functions
+      .invoke("send-transactional-email", {
+        body: {
+          templateName: "lesson-request-acknowledgment",
+          recipientEmail: parsed.data.parentEmail,
+          idempotencyKey: `lesson-req-ack-${id}`,
+          templateData: {
+            parentName: parsed.data.parentName,
+            childName: parsed.data.childName,
+            lessonType: parsed.data.lessonType,
+          },
+        },
+      })
+      .catch((e) => console.error("Failed to send acknowledgment email", e));
     setSubmitted(true);
   };
 

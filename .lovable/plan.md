@@ -1,34 +1,35 @@
-## Revenue Calculation Fix
+## Auto-acknowledgment for lesson requests
 
-Fix the "Revenue Collected" stat on `/admin/enrollments` to match Stripe ($415).
+Send an automatic confirmation email the moment someone submits the private/semi-private lesson request form, so they immediately know we received it and someone will follow up.
+
+### What the email says
+
+Branded email matching the existing `lesson-request-reply.tsx` styling:
+- Subject: "We got your lesson request — Aquatic Dreams"
+- Greets the parent by first name
+- Confirms we received the request for `{childName}` (`{lessonType}` lesson)
+- Sets expectation: "Someone from our team will reach out within 1–2 business days to schedule"
+- Includes contact info (phone + email) in case they need to reach us sooner
+- Standard footer
 
 ### Changes
 
-**1. `src/pages/admin/SwimEnrollmentsAdmin.tsx`** — replace the revenue calculation (lines ~209-216) to:
-- Sum actual `payment_amount` from the DB instead of multiplying by hardcoded constants
-- Exclude rows where `payment_status = 'refunded'` or `session_fee_status = 'refunded'`
-- Fall back to constants only when `payment_amount` is null
+**1. New template** — `supabase/functions/_shared/transactional-email-templates/lesson-request-acknowledgment.tsx`
+- React Email component, same visual style as `lesson-request-reply.tsx`
+- Props: `parentName`, `childName`, `lessonType`
+- Exports `template` with `previewData` for the dashboard preview
 
-```typescript
-const revenueCollected = activeEnrollments.reduce((sum, e) => {
-  if (e.payment_status === "refunded" || e.session_fee_status === "refunded") return sum;
-  let amt = 0;
-  if (e.payment_status === "paid") {
-    amt += Number(e.payment_amount ?? (e.is_first_time ? REG_FEE : SESSION_FEE));
-  }
-  if (e.session_fee_status === "paid" && e.payment_status !== "paid") {
-    amt += SESSION_FEE;
-  }
-  return sum + amt;
-}, 0);
-```
+**2. Register it** — add the import + entry to `supabase/functions/_shared/transactional-email-templates/registry.ts` under key `lesson-request-acknowledgment`.
 
-**2. Data correction** — update Sarah Danhoff's enrollment `payment_amount` from `240` → `280` to match Stripe's actual charge.
+**3. Trigger it** — in `src/components/swim-enrollment/LessonRequestForm.tsx`, after the successful `lesson_requests` insert:
+- Capture an `id` (use `crypto.randomUUID()` and pass it in the insert) so we have an idempotency key
+- Call `supabase.functions.invoke('send-transactional-email', { body: { templateName: 'lesson-request-acknowledgment', recipientEmail: parsed.data.parentEmail, idempotencyKey: \`lesson-req-ack-${id}\`, templateData: { parentName, childName, lessonType } } })`
+- Fire-and-forget (don't block the success state on it; log errors to console only)
 
-**3. UI note** — add small "matches Stripe net" hint under the Revenue Collected card.
+**4. Deploy** — redeploy `send-transactional-email` so the new template is picked up by the running function.
 
 ### Safety
 
-- Touches ONLY display logic on the admin enrollments page
-- Does NOT modify checkout, Stripe webhooks, enrollment creation, payment processing, or any other flow
-- Data update is a single UPDATE on one row's `payment_amount` field
+- Does NOT touch the admin reply flow, the existing `lesson-request-reply` template, or any checkout/payment code
+- Email goes through the existing queued infrastructure (retry-safe, suppression-aware)
+- If the email send fails, the form still succeeds — user still sees the confirmation screen
