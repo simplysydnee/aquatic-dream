@@ -324,7 +324,7 @@ const ScheduleAdmin = () => {
     );
   };
 
-  const totalHours = (instructorId: string | null) => {
+  const totalHoursNum = (instructorId: string | null) => {
     let mins = 0;
     for (const s of shifts) {
       if (s.instructor_id !== instructorId) continue;
@@ -332,8 +332,15 @@ const ScheduleAdmin = () => {
       const [eh, em] = s.end_time.split(":").map(Number);
       mins += (eh * 60 + em) - (sh * 60 + sm);
     }
-    return (mins / 60).toFixed(1);
+    return mins / 60;
   };
+  const totalHours = (instructorId: string | null) => totalHoursNum(instructorId).toFixed(1);
+  const laborCost = (inst: Instructor) => {
+    const wage = Number(inst.hourly_wage ?? 0);
+    return totalHoursNum(inst.id) * wage;
+  };
+  const grandHours = instructors.reduce((s, i) => s + totalHoursNum(i.id), 0);
+  const grandCost = instructors.reduce((s, i) => s + laborCost(i), 0);
 
   return (
     <div className="space-y-4">
@@ -405,7 +412,10 @@ const ScheduleAdmin = () => {
                 <div key={inst.id} className="grid grid-cols-[180px_repeat(7,1fr)] border-b">
                   <div className="p-2 text-sm">
                     <div className="font-medium">{inst.name}</div>
-                    <div className="text-xs text-muted-foreground">{totalHours(inst.id)} hrs</div>
+                    <div className="text-xs text-muted-foreground">
+                      {totalHours(inst.id)} hrs
+                      {inst.hourly_wage != null && ` · $${laborCost(inst).toFixed(2)}`}
+                    </div>
                   </div>
                   {days.map((d, i) => <div key={i}>{renderCell(inst.id, d)}</div>)}
                 </div>
