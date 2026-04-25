@@ -19,7 +19,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import PositionsManager from "@/components/admin/schedule/PositionsManager";
 
-interface Instructor { id: string; name: string; is_active: boolean; email: string | null; }
+interface Instructor { id: string; name: string; is_active: boolean; email: string | null; hourly_wage: number | null; }
 interface Position { id: string; name: string; color: string; is_active: boolean; }
 interface Shift {
   id: string;
@@ -79,7 +79,7 @@ const ScheduleAdmin = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const [instRes, posRes, shiftRes, pubRes, sessRes, ldRes, ptoRes] = await Promise.all([
-      supabase.from("instructors").select("id, name, is_active, email").eq("is_active", true).order("name"),
+      supabase.from("instructors").select("id, name, is_active, email, hourly_wage").eq("is_active", true).order("name"),
       supabase.from("shift_positions").select("*").eq("is_active", true).order("name"),
       supabase.from("shifts").select("*").gte("shift_date", weekStartStr).lte("shift_date", weekEndStr),
       supabase.from("schedule_publications").select("week_start, published_at").eq("week_start", weekStartStr).maybeSingle(),
