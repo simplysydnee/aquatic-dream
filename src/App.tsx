@@ -24,6 +24,7 @@ import JobApplicationsAdmin from "./pages/admin/JobApplicationsAdmin";
 import ScheduleAdmin from "./pages/admin/ScheduleAdmin";
 import TimeOffAdmin from "./pages/admin/TimeOffAdmin";
 import TimesheetsAdmin from "./pages/admin/TimesheetsAdmin";
+import ReportsAdmin from "./pages/admin/ReportsAdmin";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
 import InstructorMySchedule from "./pages/instructor/InstructorMySchedule";
 import InstructorMyRoster from "./pages/instructor/InstructorMyRoster";
@@ -69,6 +70,7 @@ const App = () => (
               <Route path="schedule" element={<ScheduleAdmin />} />
               <Route path="time-off" element={<TimeOffAdmin />} />
               <Route path="timesheets" element={<TimesheetsAdmin />} />
+              <Route path="reports" element={<ReportsAdmin />} />
               <Route path="sessions" element={<SessionsAdmin />} />
               <Route path="careers" element={<JobPostingsAdmin />} />
               <Route path="applications" element={<JobApplicationsAdmin />} />
