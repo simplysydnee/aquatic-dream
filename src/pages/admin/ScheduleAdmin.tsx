@@ -235,8 +235,13 @@ const ScheduleAdmin = () => {
   const positionById = (id: string | null) => positions.find((p) => p.id === id);
 
   const renderCell = (instructorId: string | null, date: Date) => {
-    const key = `${instructorId ?? "open"}|${format(date, "yyyy-MM-dd")}`;
+    const dateStr = format(date, "yyyy-MM-dd");
+    const key = `${instructorId ?? "open"}|${dateStr}`;
     const cellShifts = shiftsBy.get(key) ?? [];
+    const cellClasses = instructorId
+      ? classShifts.filter((c) => c.instructor_id === instructorId && c.shift_date === dateStr)
+      : [];
+    const isEmpty = cellShifts.length === 0 && cellClasses.length === 0;
     return (
       <div
         className="min-h-[80px] border-l p-1 space-y-1 hover:bg-muted/30 transition-colors"
@@ -246,6 +251,17 @@ const ScheduleAdmin = () => {
           if (e.target === e.currentTarget) openAdd(instructorId, date);
         }}
       >
+        {cellClasses.map((c) => (
+          <div
+            key={c.key}
+            className="rounded px-2 py-1 text-xs text-white shadow-sm border border-white/30 opacity-90"
+            style={{ backgroundColor: "#0ea5e9" }}
+            title="Auto-pulled from swim sessions (read-only)"
+          >
+            <div className="font-semibold">{c.start_time.slice(0, 5)}–{c.end_time.slice(0, 5)}</div>
+            <div className="opacity-90 truncate">📚 {c.title}</div>
+          </div>
+        ))}
         {cellShifts.map((s) => {
           const pos = positionById(s.position_id);
           const color = s.color || pos?.color || "#2a5e84";
@@ -266,7 +282,7 @@ const ScheduleAdmin = () => {
             </div>
           );
         })}
-        {cellShifts.length === 0 && (
+        {isEmpty && (
           <button
             className="text-xs text-muted-foreground/60 hover:text-foreground w-full h-full text-left"
             onClick={() => openAdd(instructorId, date)}
