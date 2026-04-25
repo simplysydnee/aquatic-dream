@@ -19,7 +19,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import PositionsManager from "@/components/admin/schedule/PositionsManager";
 
-interface Instructor { id: string; name: string; is_active: boolean; email: string | null; }
+interface Instructor { id: string; name: string; is_active: boolean; email: string | null; hourly_wage: number | null; }
 interface Position { id: string; name: string; color: string; is_active: boolean; }
 interface Shift {
   id: string;
@@ -41,6 +41,13 @@ interface ClassShift {
   end_time: string;
   title: string;
 }
+interface TimeOff {
+  id: string;
+  instructor_id: string;
+  start_date: string;
+  end_date: string;
+  reason: string | null;
+}
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -50,6 +57,7 @@ const ScheduleAdmin = () => {
   const [positions, setPositions] = useState<Position[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [classShifts, setClassShifts] = useState<ClassShift[]>([]);
+  const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
   const [publication, setPublication] = useState<Publication | null>(null);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
@@ -70,8 +78,8 @@ const ScheduleAdmin = () => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [instRes, posRes, shiftRes, pubRes, sessRes, ldRes] = await Promise.all([
-      supabase.from("instructors").select("id, name, is_active, email").eq("is_active", true).order("name"),
+    const [instRes, posRes, shiftRes, pubRes, sessRes, ldRes, ptoRes] = await Promise.all([
+      supabase.from("instructors").select("id, name, is_active, email, hourly_wage").eq("is_active", true).order("name"),
       supabase.from("shift_positions").select("*").eq("is_active", true).order("name"),
       supabase.from("shifts").select("*").gte("shift_date", weekStartStr).lte("shift_date", weekEndStr),
       supabase.from("schedule_publications").select("week_start, published_at").eq("week_start", weekStartStr).maybeSingle(),
@@ -81,11 +89,16 @@ const ScheduleAdmin = () => {
       supabase.from("session_lesson_dates")
         .select("session_id, lesson_date, is_cancelled")
         .gte("lesson_date", weekStartStr).lte("lesson_date", weekEndStr),
+      supabase.from("time_off_requests")
+        .select("id, instructor_id, start_date, end_date, reason")
+        .eq("status", "approved")
+        .lte("start_date", weekEndStr).gte("end_date", weekStartStr),
     ]);
     if (instRes.data) setInstructors(instRes.data);
     if (posRes.data) setPositions(posRes.data);
     if (shiftRes.data) setShifts(shiftRes.data);
     setPublication(pubRes.data ?? null);
+    setTimeOff((ptoRes.data ?? []) as TimeOff[]);
 
     // Build read-only "class" shifts from swim sessions + lesson dates
     const sessions = sessRes.data ?? [];
@@ -234,6 +247,13 @@ const ScheduleAdmin = () => {
 
   const positionById = (id: string | null) => positions.find((p) => p.id === id);
 
+  const ptoFor = (instructorId: string | null, dateStr: string) => {
+    if (!instructorId) return null;
+    return timeOff.find(
+      (p) => p.instructor_id === instructorId && p.start_date <= dateStr && p.end_date >= dateStr,
+    ) ?? null;
+  };
+
   const renderCell = (instructorId: string | null, date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     const key = `${instructorId ?? "open"}|${dateStr}`;
@@ -242,15 +262,25 @@ const ScheduleAdmin = () => {
       ? classShifts.filter((c) => c.instructor_id === instructorId && c.shift_date === dateStr)
       : [];
     const isEmpty = cellShifts.length === 0 && cellClasses.length === 0;
+    const pto = ptoFor(instructorId, dateStr);
     return (
       <div
-        className="min-h-[80px] border-l p-1 space-y-1 hover:bg-muted/30 transition-colors"
+        className={`relative min-h-[80px] border-l p-1 space-y-1 hover:bg-muted/30 transition-colors ${pto ? "bg-rose-50/40" : ""}`}
         onDragOver={handleDragOver}
         onDrop={(e) => handleDrop(e, instructorId, date)}
         onClick={(e) => {
           if (e.target === e.currentTarget) openAdd(instructorId, date);
         }}
+        title={pto ? `Approved time off${pto.reason ? `: ${pto.reason}` : ""}` : undefined}
       >
+        {pto && (
+          <>
+            <div className="absolute inset-y-0 left-0 w-1 bg-rose-500 pointer-events-none" />
+            <div className="absolute top-1 right-1 text-[9px] font-semibold text-rose-700 bg-rose-100 px-1 rounded pointer-events-none uppercase tracking-wide">
+              PTO
+            </div>
+          </>
+        )}
         {cellClasses.map((c) => (
           <div
             key={c.key}
@@ -282,7 +312,7 @@ const ScheduleAdmin = () => {
             </div>
           );
         })}
-        {isEmpty && (
+        {isEmpty && !pto && (
           <button
             className="text-xs text-muted-foreground/60 hover:text-foreground w-full h-full text-left"
             onClick={() => openAdd(instructorId, date)}
@@ -294,7 +324,7 @@ const ScheduleAdmin = () => {
     );
   };
 
-  const totalHours = (instructorId: string | null) => {
+  const totalHoursNum = (instructorId: string | null) => {
     let mins = 0;
     for (const s of shifts) {
       if (s.instructor_id !== instructorId) continue;
@@ -302,8 +332,15 @@ const ScheduleAdmin = () => {
       const [eh, em] = s.end_time.split(":").map(Number);
       mins += (eh * 60 + em) - (sh * 60 + sm);
     }
-    return (mins / 60).toFixed(1);
+    return mins / 60;
   };
+  const totalHours = (instructorId: string | null) => totalHoursNum(instructorId).toFixed(1);
+  const laborCost = (inst: Instructor) => {
+    const wage = Number(inst.hourly_wage ?? 0);
+    return totalHoursNum(inst.id) * wage;
+  };
+  const grandHours = instructors.reduce((s, i) => s + totalHoursNum(i.id), 0);
+  const grandCost = instructors.reduce((s, i) => s + laborCost(i), 0);
 
   return (
     <div className="space-y-4">
@@ -318,6 +355,10 @@ const ScheduleAdmin = () => {
               </Badge>
             )}
           </p>
+          <div className="text-xs text-muted-foreground mt-1">
+            <span className="font-medium text-foreground">{grandHours.toFixed(1)} hrs</span> scheduled
+            {grandCost > 0 && <> · est. <span className="font-medium text-foreground">${grandCost.toFixed(2)}</span> labor</>}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => setWeekStart(subWeeks(weekStart, 1))}>
@@ -375,7 +416,10 @@ const ScheduleAdmin = () => {
                 <div key={inst.id} className="grid grid-cols-[180px_repeat(7,1fr)] border-b">
                   <div className="p-2 text-sm">
                     <div className="font-medium">{inst.name}</div>
-                    <div className="text-xs text-muted-foreground">{totalHours(inst.id)} hrs</div>
+                    <div className="text-xs text-muted-foreground">
+                      {totalHours(inst.id)} hrs
+                      {inst.hourly_wage != null && ` · $${laborCost(inst).toFixed(2)}`}
+                    </div>
                   </div>
                   {days.map((d, i) => <div key={i}>{renderCell(inst.id, d)}</div>)}
                 </div>

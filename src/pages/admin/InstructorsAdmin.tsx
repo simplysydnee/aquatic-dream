@@ -17,6 +17,7 @@ interface Instructor {
   phone: string | null;
   is_active: boolean;
   user_id: string | null;
+  hourly_wage: number | null;
   created_at: string;
 }
 
@@ -25,7 +26,7 @@ const InstructorsAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", hourly_wage: "" });
   const [inviting, setInviting] = useState<string | null>(null);
 
   const fetchInstructors = async () => {
@@ -37,13 +38,18 @@ const InstructorsAdmin = () => {
   useEffect(() => { fetchInstructors(); }, []);
 
   const resetForm = () => {
-    setForm({ name: "", email: "", phone: "" });
+    setForm({ name: "", email: "", phone: "", hourly_wage: "" });
     setEditingId(null);
   };
 
   const openEdit = (inst: Instructor) => {
     setEditingId(inst.id);
-    setForm({ name: inst.name, email: inst.email || "", phone: inst.phone || "" });
+    setForm({
+      name: inst.name,
+      email: inst.email || "",
+      phone: inst.phone || "",
+      hourly_wage: inst.hourly_wage != null ? String(inst.hourly_wage) : "",
+    });
     setDialogOpen(true);
   };
 
@@ -56,6 +62,7 @@ const InstructorsAdmin = () => {
       name: form.name.trim(),
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
+      hourly_wage: form.hourly_wage.trim() ? Number(form.hourly_wage) : null,
     };
 
     if (editingId) {
@@ -128,6 +135,7 @@ const InstructorsAdmin = () => {
               <div><Label>Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
               <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
               <div><Label>Phone</Label><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+              <div><Label>Hourly wage ($)</Label><Input type="number" min={0} step="0.01" value={form.hourly_wage} onChange={e => setForm(f => ({ ...f, hourly_wage: e.target.value }))} placeholder="e.g. 22.50" /></div>
               <Button onClick={handleSave} className="w-full">{editingId ? "Save Changes" : "Add Instructor"}</Button>
             </div>
           </DialogContent>
@@ -146,6 +154,7 @@ const InstructorsAdmin = () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
+                  <TableHead>Wage</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Login</TableHead>
                   <TableHead className="w-[140px]">Actions</TableHead>
@@ -157,6 +166,7 @@ const InstructorsAdmin = () => {
                     <TableCell className="font-medium">{inst.name}</TableCell>
                     <TableCell>{inst.email || "—"}</TableCell>
                     <TableCell>{inst.phone || "—"}</TableCell>
+                    <TableCell>{inst.hourly_wage != null ? `$${Number(inst.hourly_wage).toFixed(2)}/hr` : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                     <TableCell>
                       <Badge variant={inst.is_active ? "default" : "secondary"} className="text-xs">
                         {inst.is_active ? "Active" : "Inactive"}

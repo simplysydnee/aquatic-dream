@@ -23,12 +23,14 @@ import JobPostingsAdmin from "./pages/admin/JobPostingsAdmin";
 import JobApplicationsAdmin from "./pages/admin/JobApplicationsAdmin";
 import ScheduleAdmin from "./pages/admin/ScheduleAdmin";
 import TimeOffAdmin from "./pages/admin/TimeOffAdmin";
+import TimesheetsAdmin from "./pages/admin/TimesheetsAdmin";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
 import InstructorMySchedule from "./pages/instructor/InstructorMySchedule";
 import InstructorMyRoster from "./pages/instructor/InstructorMyRoster";
 import InstructorAvailability from "./pages/instructor/InstructorAvailability";
 import InstructorTimeOff from "./pages/instructor/InstructorTimeOff";
 import InstructorOpenShifts from "./pages/instructor/InstructorOpenShifts";
+import InstructorTimeClock from "./pages/instructor/InstructorTimeClock";
 import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
 import KioskCheckIn from "./pages/KioskCheckIn";
@@ -66,6 +68,7 @@ const App = () => (
               <Route path="instructors" element={<InstructorsAdmin />} />
               <Route path="schedule" element={<ScheduleAdmin />} />
               <Route path="time-off" element={<TimeOffAdmin />} />
+              <Route path="timesheets" element={<TimesheetsAdmin />} />
               <Route path="sessions" element={<SessionsAdmin />} />
               <Route path="careers" element={<JobPostingsAdmin />} />
               <Route path="applications" element={<JobApplicationsAdmin />} />
@@ -79,6 +82,7 @@ const App = () => (
               <Route path="availability" element={<InstructorAvailability />} />
               <Route path="time-off" element={<InstructorTimeOff />} />
               <Route path="open-shifts" element={<InstructorOpenShifts />} />
+              <Route path="time-clock" element={<InstructorTimeClock />} />
             </Route>
 
             {/* Public routes */}
