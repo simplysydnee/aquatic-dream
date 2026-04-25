@@ -67,6 +67,12 @@ const App = () => (
               <Route path="users" element={<UsersAdmin />} />
             </Route>
 
+            {/* Instructor portal */}
+            <Route path="/instructor" element={<InstructorLayout />}>
+              <Route index element={<InstructorMySchedule />} />
+              <Route path="roster" element={<InstructorMyRoster />} />
+            </Route>
+
             {/* Public routes */}
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Index />} />
