@@ -21,6 +21,7 @@ import CalendarAdmin from "./pages/admin/CalendarAdmin";
 import ClassRosterAdmin from "./pages/admin/ClassRosterAdmin";
 import JobPostingsAdmin from "./pages/admin/JobPostingsAdmin";
 import JobApplicationsAdmin from "./pages/admin/JobApplicationsAdmin";
+import ScheduleAdmin from "./pages/admin/ScheduleAdmin";
 import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
 import KioskCheckIn from "./pages/KioskCheckIn";
@@ -56,6 +57,7 @@ const App = () => (
               <Route path="lesson-requests" element={<LessonRequestsAdmin />} />
               <Route path="contacts" element={<ContactsAdmin />} />
               <Route path="instructors" element={<InstructorsAdmin />} />
+              <Route path="schedule" element={<ScheduleAdmin />} />
               <Route path="sessions" element={<SessionsAdmin />} />
               <Route path="careers" element={<JobPostingsAdmin />} />
               <Route path="applications" element={<JobApplicationsAdmin />} />
