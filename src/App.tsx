@@ -25,7 +25,9 @@ import ScheduleAdmin from "./pages/admin/ScheduleAdmin";
 import TimeOffAdmin from "./pages/admin/TimeOffAdmin";
 import TimesheetsAdmin from "./pages/admin/TimesheetsAdmin";
 import ReportsAdmin from "./pages/admin/ReportsAdmin";
+import AnnouncementsAdmin from "./pages/admin/AnnouncementsAdmin";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
+import InstructorAnnouncements from "./pages/instructor/InstructorAnnouncements";
 import InstructorMySchedule from "./pages/instructor/InstructorMySchedule";
 import InstructorMyRoster from "./pages/instructor/InstructorMyRoster";
 import InstructorAvailability from "./pages/instructor/InstructorAvailability";
@@ -71,6 +73,7 @@ const App = () => (
               <Route path="time-off" element={<TimeOffAdmin />} />
               <Route path="timesheets" element={<TimesheetsAdmin />} />
               <Route path="reports" element={<ReportsAdmin />} />
+              <Route path="announcements" element={<AnnouncementsAdmin />} />
               <Route path="sessions" element={<SessionsAdmin />} />
               <Route path="careers" element={<JobPostingsAdmin />} />
               <Route path="applications" element={<JobApplicationsAdmin />} />
@@ -85,6 +88,7 @@ const App = () => (
               <Route path="time-off" element={<InstructorTimeOff />} />
               <Route path="open-shifts" element={<InstructorOpenShifts />} />
               <Route path="time-clock" element={<InstructorTimeClock />} />
+              <Route path="announcements" element={<InstructorAnnouncements />} />
             </Route>
 
             {/* Public routes */}
