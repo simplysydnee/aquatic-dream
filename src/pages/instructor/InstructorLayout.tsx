@@ -1,11 +1,42 @@
+import { useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { CalendarClock, ClipboardList, LogOut, Loader2, CalendarCheck, CalendarOff, Hand, Clock } from "lucide-react";
+import { CalendarClock, ClipboardList, LogOut, Loader2, CalendarCheck, CalendarOff, Hand, Clock, Megaphone } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function InstructorLayout() {
   const { user, isInstructor, isAdmin, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    const loadUnread = async () => {
+      const { data: inst } = await supabase
+        .from("instructors")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!inst?.id) return;
+      const { data: anns } = await supabase
+        .from("announcements")
+        .select("id");
+      const { data: reads } = await supabase
+        .from("announcement_reads")
+        .select("announcement_id")
+        .eq("instructor_id", inst.id);
+      const readSet = new Set((reads ?? []).map((r: any) => r.announcement_id));
+      setUnread((anns ?? []).filter((a: any) => !readSet.has(a.id)).length);
+    };
+    loadUnread();
+    const channel = supabase
+      .channel("ann-unread")
+      .on("postgres_changes", { event: "*", schema: "public", table: "announcements" }, loadUnread)
+      .on("postgres_changes", { event: "*", schema: "public", table: "announcement_reads" }, loadUnread)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   if (loading) {
     return (
@@ -54,6 +85,14 @@ export default function InstructorLayout() {
           </NavLink>
           <NavLink to="/instructor/time-clock" className={({ isActive }) => `${linkBase} ${isActive ? active : ""}`}>
             <Clock className="w-4 h-4" /> Time Clock
+          </NavLink>
+          <NavLink to="/instructor/announcements" className={({ isActive }) => `${linkBase} ${isActive ? active : ""}`}>
+            <Megaphone className="w-4 h-4" /> Announcements
+            {unread > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold">
+                {unread > 99 ? "99+" : unread}
+              </span>
+            )}
           </NavLink>
         </nav>
       </header>
