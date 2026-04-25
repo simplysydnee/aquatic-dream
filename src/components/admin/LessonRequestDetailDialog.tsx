@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Phone, Send } from "lucide-react";
+import { Mail, Phone, Send, MailCheck } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface LessonRequest {
   id: string;
@@ -116,6 +117,19 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Submitted</div>
               <div>{new Date(request.created_at).toLocaleString()}</div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="mt-1 inline-flex items-center gap-1 text-xs text-green-700 cursor-help">
+                      <MailCheck className="h-3.5 w-3.5" />
+                      Auto-confirmation sent
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    A generic "we got your request" email was sent to the parent automatically when they submitted the form. This is not a personal reply — status stays "New" until you send one.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Parent</div>
@@ -172,7 +186,7 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
               <Label htmlFor="reply-body" className="text-xs">Message</Label>
               <Textarea id="reply-body" value={body} onChange={(e) => setBody(e.target.value)} rows={8} />
               <p className="text-xs text-muted-foreground mt-1">
-                Sends from your branded email. Status will be set to "Contacted" automatically.
+                This is your first <strong>personal</strong> reply (separate from the auto-confirmation the parent already received). Sending will move status from "New" to "Contacted".
               </p>
             </div>
           </div>
