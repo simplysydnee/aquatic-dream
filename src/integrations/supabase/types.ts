@@ -594,6 +594,27 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_publications: {
+        Row: {
+          id: string
+          published_at: string
+          published_by: string | null
+          week_start: string
+        }
+        Insert: {
+          id?: string
+          published_at?: string
+          published_by?: string | null
+          week_start: string
+        }
+        Update: {
+          id?: string
+          published_at?: string
+          published_by?: string | null
+          week_start?: string
+        }
+        Relationships: []
+      }
       session_lesson_dates: {
         Row: {
           cancel_reason: string | null
@@ -658,6 +679,103 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      shift_positions: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shifts: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          instructor_id: string | null
+          notes: string | null
+          position_id: string | null
+          shift_date: string
+          start_time: string
+          status: string
+          swim_session_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_time: string
+          id?: string
+          instructor_id?: string | null
+          notes?: string | null
+          position_id?: string | null
+          shift_date: string
+          start_time: string
+          status?: string
+          swim_session_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_time?: string
+          id?: string
+          instructor_id?: string | null
+          notes?: string | null
+          position_id?: string | null
+          shift_date?: string
+          start_time?: string
+          status?: string
+          swim_session_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "shift_positions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_swim_session_id_fkey"
+            columns: ["swim_session_id"]
+            isOneToOne: false
+            referencedRelation: "swim_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       suppressed_emails: {
         Row: {
