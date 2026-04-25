@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import LessonRequestDetailDialog, { LessonRequest } from "@/components/admin/LessonRequestDetailDialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CheckCircle2 } from "lucide-react";
 
 const LessonRequestsAdmin = () => {
@@ -94,9 +95,24 @@ const LessonRequestsAdmin = () => {
                   </TableCell>
                   <TableCell className="text-sm max-w-[200px] truncate">{r.preferred_times || "—"}</TableCell>
                   <TableCell>
-                    <Badge variant={r.status === "new" ? "destructive" : "secondary"} className="capitalize">
-                      {r.status}
-                    </Badge>
+                    {r.status === "new" ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="destructive" className="capitalize cursor-help">
+                              {r.status}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Auto-confirmation sent. Awaiting personal reply.
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <Badge variant="secondary" className="capitalize">
+                        {r.status}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     {r.last_replied_at ? (
