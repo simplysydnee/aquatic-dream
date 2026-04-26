@@ -554,6 +554,141 @@ export type Database = {
         }
         Relationships: []
       }
+      lesson_booking_occurrences: {
+        Row: {
+          booking_id: string
+          created_at: string
+          id: string
+          occurrence_date: string
+          paid_at: string | null
+          payment_link_sent_at: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          payment_status: string
+          pool_event_id: string | null
+          reminder_attempted_at: string | null
+          stripe_checkout_url: string | null
+          stripe_session_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          id?: string
+          occurrence_date: string
+          paid_at?: string | null
+          payment_link_sent_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_status?: string
+          pool_event_id?: string | null
+          reminder_attempted_at?: string | null
+          stripe_checkout_url?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          id?: string
+          occurrence_date?: string
+          paid_at?: string | null
+          payment_link_sent_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_status?: string
+          pool_event_id?: string | null
+          reminder_attempted_at?: string | null
+          stripe_checkout_url?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_booking_occurrences_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_booking_occurrences_pool_event_id_fkey"
+            columns: ["pool_event_id"]
+            isOneToOne: false
+            referencedRelation: "pool_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_bookings: {
+        Row: {
+          child_name: string | null
+          created_at: string
+          end_time: string
+          frequency: string | null
+          id: string
+          instructor_name: string | null
+          lesson_type: string
+          notes: string | null
+          parent_email: string
+          parent_name: string
+          parent_phone: string | null
+          pool_area: string
+          price_per_session: number
+          recur_days: string[] | null
+          recurring: boolean
+          series_end: string | null
+          series_start: string
+          start_time: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          child_name?: string | null
+          created_at?: string
+          end_time: string
+          frequency?: string | null
+          id?: string
+          instructor_name?: string | null
+          lesson_type: string
+          notes?: string | null
+          parent_email: string
+          parent_name: string
+          parent_phone?: string | null
+          pool_area?: string
+          price_per_session?: number
+          recur_days?: string[] | null
+          recurring?: boolean
+          series_end?: string | null
+          series_start: string
+          start_time: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          child_name?: string | null
+          created_at?: string
+          end_time?: string
+          frequency?: string | null
+          id?: string
+          instructor_name?: string | null
+          lesson_type?: string
+          notes?: string | null
+          parent_email?: string
+          parent_name?: string
+          parent_phone?: string | null
+          pool_area?: string
+          price_per_session?: number
+          recur_days?: string[] | null
+          recurring?: boolean
+          series_end?: string | null
+          series_start?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lesson_requests: {
         Row: {
           child_age: number

@@ -12,7 +12,9 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import SwimLessonFields from "./SwimLessonFields";
-import type { SwimLessonData, SwimmerEntry } from "./SwimLessonFields";
+import LessonBookingFields, { type LessonBookingFieldsData } from "./LessonBookingFields";
+import { getStripeEnvironment } from "@/lib/stripe";
+import type { SwimLessonData } from "./SwimLessonFields";
 import type { CalendarPoolEvent } from "@/hooks/useCalendarData";
 
 interface Props {
@@ -45,6 +47,19 @@ const defaultSwimLessonData = (): SwimLessonData => ({
   swimmers: [],
 });
 
+const defaultLessonBookingData = (lessonType: string): LessonBookingFieldsData => ({
+  parentName: "",
+  parentEmail: "",
+  parentPhone: "",
+  childName: "",
+  pricePerSession: lessonType === "private-lesson" ? 65 : 45,
+  recurring: false,
+  frequency: "weekly",
+  recurDays: [],
+  endDate: null,
+  sendPaymentLink: true,
+});
+
 const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEvent, prefillStartTime }: Props) => {
   const [eventType, setEventType] = useState("i-can-swim");
   const [title, setTitle] = useState("");
@@ -57,9 +72,11 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [swimLessonData, setSwimLessonData] = useState<SwimLessonData>(defaultSwimLessonData());
+  const [lessonBookingData, setLessonBookingData] = useState<LessonBookingFieldsData>(defaultLessonBookingData("private-lesson"));
   const { toast } = useToast();
 
   const isEditing = !!editEvent;
+  const isLessonBooking = eventType === "private-lesson" || eventType === "semi-private-lesson";
 
   useEffect(() => {
     if (editEvent) {
@@ -93,6 +110,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
     setClientName("");
     setNotes("");
     setSwimLessonData(defaultSwimLessonData());
+    setLessonBookingData(defaultLessonBookingData("private-lesson"));
   };
 
   const handleTypeChange = (type: string) => {
@@ -103,8 +121,10 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       setTitle("Swim Lesson"); setPoolArea("shallow");
     } else if (type === "private-lesson") {
       setTitle("Private Lesson"); setPoolArea("shallow");
+      setLessonBookingData((prev) => ({ ...prev, pricePerSession: 65 }));
     } else if (type === "semi-private-lesson") {
       setTitle("Semi-Private Lesson"); setPoolArea("shallow");
+      setLessonBookingData((prev) => ({ ...prev, pricePerSession: 45 }));
     } else if (type === "dive-session") {
       setTitle("Dive Training"); setPoolArea("deep");
     } else if (type === "pool-rental") {
@@ -116,7 +136,6 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
     }
   };
 
-  // Generate recurrence dates
   const generateOccurrences = (start: Date, end: Date, days: string[], freq: "weekly" | "biweekly"): Date[] => {
     const dates: Date[] = [];
     const dayMap: Record<string, number> = {
@@ -158,6 +177,8 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
 
     if (eventType === "swim-lesson") {
       await handleSwimLessonSave(effectiveTitle);
+    } else if (isLessonBooking && !isEditing) {
+      await handleLessonBookingSave(effectiveTitle);
     } else {
       await handleRegularSave(effectiveTitle);
     }
@@ -193,10 +214,134 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
     onSaved();
   };
 
+  const handleLessonBookingSave = async (effectiveTitle: string) => {
+    const lb = lessonBookingData;
+    if (!lb.parentName.trim() || !lb.parentEmail.trim()) {
+      toast({ title: "Parent name & email required", variant: "destructive" });
+      return;
+    }
+    if (lb.recurring && (lb.recurDays.length === 0 || !lb.endDate)) {
+      toast({ title: "Pick recurring days and end date", variant: "destructive" });
+      return;
+    }
+
+    // 1. Build occurrence dates
+    const eventDates: Date[] = lb.recurring && lb.endDate
+      ? generateOccurrences(eventDate, lb.endDate, lb.recurDays, lb.frequency)
+      : [eventDate];
+
+    if (eventDates.length === 0) {
+      toast({ title: "No occurrences fall within the selected range", variant: "destructive" });
+      return;
+    }
+
+    const lessonType = eventType === "private-lesson" ? "private" : "semi-private";
+    const lessonTypeLabel = lessonType === "private" ? "Private Lesson" : "Semi-Private Lesson";
+
+    // 2. Insert booking row
+    const { data: bookingRow, error: bookingErr } = await supabase
+      .from("lesson_bookings")
+      .insert({
+        lesson_type: lessonType,
+        parent_name: lb.parentName.trim(),
+        parent_email: lb.parentEmail.trim(),
+        parent_phone: lb.parentPhone.trim() || null,
+        child_name: lb.childName.trim() || null,
+        price_per_session: lb.pricePerSession,
+        instructor_name: instructorName.trim() || null,
+        pool_area: poolArea,
+        start_time: startTime,
+        end_time: endTime,
+        recurring: lb.recurring,
+        frequency: lb.recurring ? lb.frequency : null,
+        recur_days: lb.recurring ? lb.recurDays : [],
+        series_start: format(eventDates[0], "yyyy-MM-dd"),
+        series_end: format(eventDates[eventDates.length - 1], "yyyy-MM-dd"),
+        notes: notes.trim() || null,
+      } as any)
+      .select("id")
+      .single();
+
+    if (bookingErr || !bookingRow) {
+      toast({ title: "Failed to create booking", description: bookingErr?.message, variant: "destructive" });
+      return;
+    }
+
+    // 3. Insert pool_events rows
+    const titleStr = `${lessonTypeLabel} — ${(lb.childName || lb.parentName).trim()}`.trim();
+    const poolEventRows = eventDates.map((d) => ({
+      event_type: eventType,
+      title: titleStr,
+      event_date: format(d, "yyyy-MM-dd"),
+      start_time: startTime,
+      end_time: endTime,
+      pool_area: poolArea,
+      instructor_name: instructorName.trim() || null,
+      client_name: (lb.childName || lb.parentName).trim() || null,
+      notes: notes.trim() || null,
+      is_recurring: lb.recurring,
+    }));
+    const { data: insertedEvents, error: peErr } = await supabase
+      .from("pool_events")
+      .insert(poolEventRows as any)
+      .select("id, event_date");
+
+    if (peErr || !insertedEvents) {
+      toast({ title: "Calendar events failed", description: peErr?.message, variant: "destructive" });
+      return;
+    }
+
+    // 4. Insert occurrences linking each pool_event
+    const occurrenceRows = insertedEvents.map((ev) => ({
+      booking_id: bookingRow.id,
+      pool_event_id: ev.id,
+      occurrence_date: ev.event_date,
+      payment_status: "unpaid",
+    }));
+    const { data: insertedOccs, error: occErr } = await supabase
+      .from("lesson_booking_occurrences")
+      .insert(occurrenceRows as any)
+      .select("id, occurrence_date")
+      .order("occurrence_date", { ascending: true });
+
+    if (occErr || !insertedOccs) {
+      toast({ title: "Occurrences failed", description: occErr?.message, variant: "destructive" });
+      return;
+    }
+
+    // 5. Send confirmation + payment link for FIRST occurrence only
+    if (lb.sendPaymentLink && insertedOccs.length > 0) {
+      const firstOcc = insertedOccs[0];
+      try {
+        const { error: sendErr } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
+          body: {
+            occurrenceId: firstOcc.id,
+            environment: getStripeEnvironment(),
+            siteUrl: window.location.origin,
+          },
+        });
+        if (sendErr) throw sendErr;
+      } catch (e: any) {
+        toast({
+          title: "Booking saved, but confirmation email failed",
+          description: e?.message || "You can resend from the calendar block.",
+          variant: "destructive",
+        });
+      }
+    }
+
+    toast({
+      title: lb.sendPaymentLink ? "Lesson booked & email sent" : "Lesson booked",
+      description: `${insertedOccs.length} occurrence${insertedOccs.length > 1 ? "s" : ""} created`,
+    });
+    onOpenChange(false);
+    resetForm();
+    onSaved();
+  };
+
   const handleSwimLessonSave = async (effectiveTitle: string) => {
     const { swimLevel, maxStudents, recurring, frequency, recurDays, endDate, swimmers } = swimLessonData;
 
-    // Build day_of_week string for swim_session
     let dayOfWeek: string;
     if (recurring && recurDays.length > 0) {
       dayOfWeek = recurDays.join("_");
@@ -204,13 +349,11 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       dayOfWeek = format(eventDate, "EEEE").toLowerCase();
     }
 
-    // Calculate dates
     const sessionStartDate = format(eventDate, "yyyy-MM-dd");
     const sessionEndDate = recurring && endDate
       ? format(endDate, "yyyy-MM-dd")
       : sessionStartDate;
 
-    // Create swim_session
     const { data: sessionData, error: sessionError } = await supabase
       .from("swim_sessions")
       .insert({
@@ -232,7 +375,6 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       return;
     }
 
-    // Create pool_event(s)
     let eventDates: Date[];
     if (recurring && recurDays.length > 0 && endDate) {
       eventDates = generateOccurrences(eventDate, endDate, recurDays, frequency);
@@ -257,7 +399,6 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       toast({ title: "Events created partially", description: eventError.message, variant: "destructive" });
     }
 
-    // Enroll swimmers if any
     const validSwimmers = swimmers.filter((s) => s.childName && s.childAge && s.parentName && s.parentEmail);
     if (validSwimmers.length > 0) {
       const enrollRows = validSwimmers.map((s) => ({
@@ -286,7 +427,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
   };
 
   const showInstructor = ["dive-session", "i-can-swim", "private-lesson", "semi-private-lesson", "swim-lesson"].includes(eventType);
-  const showClient = ["pool-rental", "dive-session", "private-lesson", "semi-private-lesson"].includes(eventType);
+  const showLegacyClient = ["pool-rental", "dive-session"].includes(eventType);
   const showTitle = eventType === "pool-rental" || eventType === "other";
   const isSwimLesson = eventType === "swim-lesson";
 
@@ -298,7 +439,6 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
         </DialogHeader>
 
         <div className="space-y-3 text-sm">
-          {/* Event type chips */}
           <div className="flex flex-wrap gap-1.5">
             {EVENT_TYPES.map((t) => (
               <button
@@ -317,15 +457,13 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
             ))}
           </div>
 
-          {/* Title — only for types needing manual entry */}
           {showTitle && (
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" className="h-8 text-sm" />
           )}
 
-          {/* Date + times */}
           <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Date</Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">{isLessonBooking && lessonBookingData.recurring ? "First date" : "Date"}</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8">
@@ -353,22 +491,26 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
             </div>
           </div>
 
-          {/* Swim Lesson specific fields */}
           {isSwimLesson && (
             <SwimLessonFields data={swimLessonData} onChange={setSwimLessonData} />
           )}
 
-          {/* Client name */}
-          {showClient && (
+          {isLessonBooking && !isEditing && (
+            <LessonBookingFields
+              lessonType={eventType as "private-lesson" | "semi-private-lesson"}
+              data={lessonBookingData}
+              onChange={setLessonBookingData}
+            />
+          )}
+
+          {showLegacyClient && (
             <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Client name" className="h-8 text-sm" />
           )}
 
-          {/* Instructor */}
           {showInstructor && (
             <Input value={instructorName} onChange={(e) => setInstructorName(e.target.value)} placeholder="Instructor (optional)" className="h-8 text-sm" />
           )}
 
-          {/* Notes */}
           <Input
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
