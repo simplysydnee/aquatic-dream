@@ -101,12 +101,17 @@ Deno.serve(async (req) => {
       payment_link_sent_at: new Date().toISOString(),
     }).eq('id', occ.id)
 
+    // Build waiver link if booking has a token and isn't signed yet
+    const waiverLink = booking.waiver_token && !booking.waiver_signed_at
+      ? `${returnBase}/lesson-waiver/${booking.waiver_token}`
+      : undefined
+
     // Send the email
     await supabase.functions.invoke('send-transactional-email', {
       body: {
         templateName: 'lesson-booking-confirmation',
         recipientEmail: booking.parent_email,
-        idempotencyKey: `lesson-booking-${occ.id}`,
+        idempotencyKey: `lesson-booking-${occ.id}-${booking.waiver_signed_at ? 'signed' : 'unsigned'}`,
         templateData: {
           parentName: booking.parent_name,
           childName: booking.child_name,
@@ -118,6 +123,8 @@ Deno.serve(async (req) => {
           paymentLink,
           isFirstOfSeries,
           totalOccurrences: totalOccurrences || 1,
+          waiverLink,
+          waiverSigned: !!booking.waiver_signed_at,
         },
       },
     })

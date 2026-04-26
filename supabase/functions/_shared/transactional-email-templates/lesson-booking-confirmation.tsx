@@ -18,6 +18,8 @@ interface LessonBookingConfirmationProps {
   paymentLink?: string
   isFirstOfSeries?: boolean
   totalOccurrences?: number
+  waiverLink?: string
+  waiverSigned?: boolean
 }
 
 const LessonBookingConfirmationEmail = ({
@@ -31,6 +33,8 @@ const LessonBookingConfirmationEmail = ({
   paymentLink,
   isFirstOfSeries,
   totalOccurrences,
+  waiverLink,
+  waiverSigned,
 }: LessonBookingConfirmationProps) => (
   <Html lang="en" dir="ltr">
     <Head />
@@ -54,9 +58,27 @@ const LessonBookingConfirmationEmail = ({
           {instructorName && <Text style={infoText}>👤 Instructor: {instructorName}</Text>}
         </Section>
 
+        {waiverLink && !waiverSigned && (
+          <Section style={stepBox}>
+            <Text style={stepLabel}>Step 1 — Sign your waiver</Text>
+            <Text style={text}>
+              All swimmers must complete a quick liability waiver and emergency-contact form before their first lesson.
+            </Text>
+            <Section style={{ textAlign: 'center' as const, margin: '12px 0 4px' }}>
+              <Button style={waiverButton} href={waiverLink}>
+                Sign Waiver
+              </Button>
+            </Section>
+            <Text style={{ ...mutedText, textAlign: 'center' as const }}>
+              <Link href={waiverLink} style={linkStyle}>{waiverLink}</Link>
+            </Text>
+          </Section>
+        )}
+
         {paymentLink && (
-          <>
-            <Section style={{ textAlign: 'center' as const, margin: '24px 0 12px' }}>
+          <Section style={stepBox}>
+            {waiverLink && !waiverSigned && <Text style={stepLabel}>Step 2 — Pay for this lesson</Text>}
+            <Section style={{ textAlign: 'center' as const, margin: '12px 0 4px' }}>
               <Button style={button} href={paymentLink}>
                 Pay Now{amountDue ? ` — ${amountDue}` : ''}
               </Button>
@@ -65,7 +87,7 @@ const LessonBookingConfirmationEmail = ({
               Or copy this link into your browser:<br />
               <Link href={paymentLink} style={linkStyle}>{paymentLink}</Link>
             </Text>
-          </>
+          </Section>
         )}
 
         {isFirstOfSeries && totalOccurrences && totalOccurrences > 1 && (
@@ -111,6 +133,8 @@ export const template = {
     paymentLink: 'https://example.com/pay',
     isFirstOfSeries: true,
     totalOccurrences: 8,
+    waiverLink: 'https://example.com/lesson-waiver/abc123',
+    waiverSigned: false,
   },
 } satisfies TemplateEntry
 
@@ -137,3 +161,15 @@ const button = {
 const footer = { fontSize: '13px', color: '#888', margin: '30px 0 0', lineHeight: '1.5' }
 const policyBox = { backgroundColor: '#fafafa', border: '1px solid #e5e7eb', padding: '12px 16px', borderRadius: '4px', margin: '16px 0 0' }
 const policyText = { fontSize: '12px', color: '#64748b', lineHeight: '1.5', margin: '0' }
+const stepBox = { margin: '8px 0 16px' }
+const stepLabel = { fontSize: '12px', fontWeight: '700' as const, color: '#0f2343', textTransform: 'uppercase' as const, letterSpacing: '0.5px', margin: '0 0 6px' }
+const waiverButton = {
+  backgroundColor: '#0f2343',
+  color: '#ffffff',
+  padding: '14px 28px',
+  borderRadius: '8px',
+  fontSize: '16px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+}

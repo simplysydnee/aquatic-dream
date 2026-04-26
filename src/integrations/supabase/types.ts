@@ -304,8 +304,9 @@ export type Database = {
           emergency_contact_name: string
           emergency_contact_phone: string
           emergency_contact_relationship: string
-          enrollment_id: string
+          enrollment_id: string | null
           id: string
+          lesson_booking_id: string | null
           photo_release_accepted: boolean
           privacy_policy_accepted: boolean
           privacy_policy_version: string
@@ -324,8 +325,9 @@ export type Database = {
           emergency_contact_name: string
           emergency_contact_phone: string
           emergency_contact_relationship: string
-          enrollment_id: string
+          enrollment_id?: string | null
           id?: string
+          lesson_booking_id?: string | null
           photo_release_accepted?: boolean
           privacy_policy_accepted?: boolean
           privacy_policy_version?: string
@@ -344,8 +346,9 @@ export type Database = {
           emergency_contact_name?: string
           emergency_contact_phone?: string
           emergency_contact_relationship?: string
-          enrollment_id?: string
+          enrollment_id?: string | null
           id?: string
+          lesson_booking_id?: string | null
           photo_release_accepted?: boolean
           privacy_policy_accepted?: boolean
           privacy_policy_version?: string
@@ -642,6 +645,8 @@ export type Database = {
           start_time: string
           status: string
           updated_at: string
+          waiver_signed_at: string | null
+          waiver_token: string | null
         }
         Insert: {
           child_name?: string | null
@@ -664,6 +669,8 @@ export type Database = {
           start_time: string
           status?: string
           updated_at?: string
+          waiver_signed_at?: string | null
+          waiver_token?: string | null
         }
         Update: {
           child_name?: string | null
@@ -686,6 +693,8 @@ export type Database = {
           start_time?: string
           status?: string
           updated_at?: string
+          waiver_signed_at?: string | null
+          waiver_token?: string | null
         }
         Relationships: []
       }
@@ -1538,6 +1547,17 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_lesson_booking_by_waiver_token: {
+        Args: { _token: string }
+        Returns: {
+          child_name: string
+          id: string
+          lesson_type: string
+          parent_email: string
+          parent_name: string
+          waiver_signed_at: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1545,6 +1565,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      mark_lesson_waiver_signed: { Args: { _token: string }; Returns: string }
       move_to_dlq: {
         Args: {
           dlq_name: string

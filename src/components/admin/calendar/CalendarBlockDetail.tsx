@@ -12,6 +12,8 @@ import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/type
 import { Checkbox } from "@/components/ui/checkbox";
 import AddSwimmerDialog from "./AddSwimmerDialog";
 import LessonOccurrenceCheckoutDialog from "./LessonOccurrenceCheckoutDialog";
+import FrontDeskWaiverDialog from "./FrontDeskWaiverDialog";
+import { getStripeEnvironment } from "@/lib/stripe";
 
 interface SwimBlockInfo {
   kind: "swim";
@@ -70,6 +72,36 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   const [resending, setResending] = useState(false);
   const [marking, setMarking] = useState(false);
   const [showCardCheckout, setShowCardCheckout] = useState(false);
+  const [showFrontDeskWaiver, setShowFrontDeskWaiver] = useState(false);
+  const [resendingWaiver, setResendingWaiver] = useState(false);
+
+  const refetchLesson = async () => {
+    if (!eventId) return;
+    const { data } = await supabase
+      .from("lesson_booking_occurrences")
+      .select("*, lesson_bookings(*)")
+      .eq("pool_event_id", eventId)
+      .maybeSingle();
+    setLessonOcc(data || null);
+    setLessonBooking((data as any)?.lesson_bookings || null);
+  };
+
+  const handleResendWaiver = async () => {
+    if (!lessonOcc) return;
+    setResendingWaiver(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
+        body: { occurrenceId: lessonOcc.id, environment: getStripeEnvironment(), siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast.success("Waiver + payment link re-sent");
+      await refetchLesson();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to resend");
+    } finally {
+      setResendingWaiver(false);
+    }
+  };
 
   const eventId = block?.kind === "event" ? block.event.id : null;
   const isLessonEventType = block?.kind === "event" && (block.event.event_type === "private_lesson" || block.event.event_type === "semi_private_lesson");
@@ -100,7 +132,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     setSendingPaymentFor(enrollmentId);
     try {
       const { error } = await supabase.functions.invoke("send-session-payment-link", {
-        body: { enrollmentId, environment: "sandbox", siteUrl: window.location.origin },
+        body: { enrollmentId, environment: getStripeEnvironment(), siteUrl: window.location.origin },
       });
       if (error) throw error;
       toast.success("Payment link sent!");
@@ -116,7 +148,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     setResending(true);
     try {
       const { error } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
-        body: { occurrenceId: lessonOcc.id, environment: "sandbox", siteUrl: window.location.origin },
+        body: { occurrenceId: lessonOcc.id, environment: getStripeEnvironment(), siteUrl: window.location.origin },
       });
       if (error) throw error;
       toast.success("Payment link emailed to parent");
@@ -475,6 +507,33 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                         </Button>
                       </div>
                     )}
+
+                    {/* Waiver row */}
+                    <div className="pt-2 border-t border-dashed flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <Lock className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Waiver:</span>
+                        {lessonBooking.waiver_signed_at ? (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 hover:bg-green-100">
+                            Signed {format(new Date(lessonBooking.waiver_signed_at), "MMM d")}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 hover:bg-orange-100">
+                            Not signed
+                          </Badge>
+                        )}
+                      </div>
+                      {!lessonBooking.waiver_signed_at && (
+                        <div className="flex gap-1.5">
+                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" disabled={resendingWaiver} onClick={handleResendWaiver}>
+                            <Send className="w-3 h-3" />{resendingWaiver ? "Sending…" : "Resend"}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setShowFrontDeskWaiver(true)}>
+                            <Pencil className="w-3 h-3" />Open at front desk
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -517,6 +576,20 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
               }}
               occurrenceId={lessonOcc?.id || null}
               title={lessonBooking ? `Charge ${lessonBooking.parent_name} — $${Number(lessonBooking.price_per_session).toFixed(2)}` : undefined}
+            />
+
+            <FrontDeskWaiverDialog
+              open={showFrontDeskWaiver}
+              onOpenChange={setShowFrontDeskWaiver}
+              booking={lessonBooking ? {
+                id: lessonBooking.id,
+                waiver_token: lessonBooking.waiver_token,
+                parent_name: lessonBooking.parent_name,
+                parent_email: lessonBooking.parent_email,
+                child_name: lessonBooking.child_name,
+                lesson_type: lessonBooking.lesson_type,
+              } : null}
+              onSigned={refetchLesson}
             />
           </>
         )}

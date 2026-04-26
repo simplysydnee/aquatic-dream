@@ -258,6 +258,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
         series_start: format(eventDates[0], "yyyy-MM-dd"),
         series_end: format(eventDates[eventDates.length - 1], "yyyy-MM-dd"),
         notes: notes.trim() || null,
+        waiver_token: crypto.randomUUID().replace(/-/g, ""),
       } as any)
       .select("id")
       .single();
