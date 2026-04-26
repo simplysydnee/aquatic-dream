@@ -417,7 +417,70 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
               </div>
             )}
 
-            {/* Actions */}
+            {/* Lesson booking (private/semi-private) panel */}
+            {isLessonEventType && (
+              <div className="px-4 pb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Lesson Booking
+                </h4>
+                {loadingLesson && <p className="text-xs text-muted-foreground">Loading…</p>}
+                {!loadingLesson && !lessonOcc && (
+                  <p className="text-sm text-muted-foreground italic">No booking record linked to this event.</p>
+                )}
+                {!loadingLesson && lessonOcc && lessonBooking && (
+                  <div className="rounded-lg border bg-card p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">{lessonBooking.child_name || lessonBooking.parent_name}</p>
+                        <p className="text-xs text-muted-foreground">{lessonBooking.parent_name}</p>
+                      </div>
+                      <Badge className={cn(
+                        "text-[10px] px-1.5 py-0.5",
+                        lessonOcc.payment_status === "paid"
+                          ? "bg-green-100 text-green-700 hover:bg-green-100"
+                          : lessonOcc.payment_status === "comp"
+                          ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
+                          : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
+                      )}>
+                        {lessonOcc.payment_status === "paid" ? "Paid" : lessonOcc.payment_status === "comp" ? "Comp" : "Unpaid"}
+                      </Badge>
+                    </div>
+                    {lessonBooking.parent_email && (
+                      <a href={`mailto:${lessonBooking.parent_email}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+                        <Mail className="w-3 h-3" />{lessonBooking.parent_email}
+                      </a>
+                    )}
+                    {lessonBooking.parent_phone && (
+                      <a href={`tel:${lessonBooking.parent_phone}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+                        <Phone className="w-3 h-3" />{lessonBooking.parent_phone}
+                      </a>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      ${Number(lessonBooking.price_per_session).toFixed(2)} • {lessonBooking.lesson_type === "private" ? "Private" : "Semi-Private"}
+                      {lessonOcc.payment_link_sent_at && (
+                        <span> • Link sent {format(new Date(lessonOcc.payment_link_sent_at), "MMM d, h:mma")}</span>
+                      )}
+                    </div>
+
+                    {lessonOcc.payment_status !== "paid" && (
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-dashed">
+                        <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" disabled={resending} onClick={handleResendLessonLink}>
+                          <Send className="w-3 h-3" />{resending ? "Sending…" : (lessonOcc.payment_link_sent_at ? "Resend link" : "Send link")}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setShowCardCheckout(true)}>
+                          <CreditCard className="w-3 h-3" />Charge card
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 text-xs gap-1.5 col-span-2" disabled={marking} onClick={() => handleMarkPaid("cash")}>
+                          <CheckCircle2 className="w-3 h-3" />Mark paid (cash / other)
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+
             <div className="sticky bottom-0 bg-card border-t p-4 flex gap-2">
               <Button size="sm" variant="outline" onClick={onEdit} className="flex-1 gap-1.5">
                 <Pencil className="w-3.5 h-3.5" /> Edit
