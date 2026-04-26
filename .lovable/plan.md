@@ -1,105 +1,85 @@
-## Goal
-When adding a Private or Semi-Private lesson on the calendar, capture client + price, support recurring schedules, and automatically email the parent a confirmation + Stripe payment link for one session at a time. For recurring series, send the next session's link 24 hours before each subsequent lesson.
+# Private / Semi-Private Lesson Booking — Round 2
 
-## What changes
+## 1. Answer your "fix resend environment" question
 
-### 1. New `lesson_bookings` table (groups individual occurrences)
-A series-level record that owns the per-occurrence `pool_events` + per-occurrence payment rows.
+That phrasing in the toast was just a generic copy fragment from the existing send flow — there is no actual prompt the user sees called "fix resend environment". What's happening internally:
 
-```text
-lesson_bookings
-- id, lesson_type ('private' | 'semi-private')
-- parent_name, parent_email, parent_phone, child_name (optional notes)
-- price_per_session (numeric, defaults: $65 private, $45 semi-private — admin-editable)
-- instructor_name, pool_area, start_time, end_time
-- recurring (bool), frequency ('weekly'|'biweekly'), recur_days (text[]), series_start, series_end
-- status ('active'|'cancelled'), created_at
+- The booking dialog passes `environment: getStripeEnvironment()` (auto-detected: `sandbox` in preview, `live` in production) to the `send-lesson-booking-confirmation` function.
+- The "Resend payment link" button on the calendar block was hard-coded to `environment: "sandbox"` — that's a bug. It will keep working in preview but in production it would create sandbox checkout links instead of live ones.
 
-lesson_booking_occurrences
-- id, booking_id (FK), pool_event_id (FK), occurrence_date
-- payment_status ('unpaid'|'paid'|'comp'|'refunded'|'flagged_no_pay')
-- stripe_checkout_url, stripe_session_id, paid_at
-- payment_link_sent_at, reminder_attempted_at
-```
+**Fix:** Replace the hard-coded `"sandbox"` in `CalendarBlockDetail.tsx` with `getStripeEnvironment()`, same as the booking dialog. Now both initial send + resend always pick the right environment automatically — no prompt, no manual toggle needed.
 
-RLS: admins manage all; service role inserts/updates from edge functions.
+## 2. Waivers for private / semi-private lessons
 
-### 2. AddPoolEventDialog — new fields for Private/Semi-Private
-When `eventType` is `private-lesson` or `semi-private-lesson`, replace current single "Client name" input with a richer block:
+Today the legal waiver/agreement (liability, photo release, ToS, privacy, signature, emergency contact) only runs through the public group-enrollment flow. Private/semi-private bookings created from the admin calendar bypass it entirely — that's a compliance gap.
 
-- **Client picker** — searchable combobox. Pulls distinct `(parent_email, parent_name, parent_phone, child_name)` rows from `swim_enrollments`. Selecting auto-fills the four fields. "+ New client" clears the form for manual entry.
-- **Parent name, parent email, parent phone, child name** (text inputs)
-- **Price per session** — numeric, prefilled $65 (private) / $45 (semi-private), editable
-- **Recurring** checkbox — when on, show frequency (weekly/biweekly), days-of-week chips, and end date (reuses the same generator already used for swim lessons)
-- **"Send confirmation + payment link to parent" toggle** — default ON
+### How parents will sign
 
-### 3. Save flow
-On save:
-1. Generate occurrence dates (single date OR series via existing `generateOccurrences`).
-2. Insert `lesson_bookings` row (series-level).
-3. Insert one `pool_events` row per occurrence (existing behavior, preserves calendar rendering).
-4. Insert one `lesson_booking_occurrences` row per occurrence linking to its `pool_event_id`.
-5. Invoke new `send-lesson-booking-confirmation` edge function for the **first** occurrence only — it creates a Stripe checkout session for `price_per_session × 1`, emails parent the confirmation + pay link, and stamps `payment_link_sent_at` + `stripe_checkout_url`.
+1. **Automatic on first booking**
+   - When the booking dialog creates a new `lesson_bookings` row, also create a one-time `waiver_token` (random uuid, 60-day expiry, unique link).
+   - The booking confirmation email — which already goes out for the first occurrence — gets a new top section: **"Step 1: Sign your waiver"** with a button linking to `/lesson-waiver/{token}`.
+   - The Stripe payment button stays as **"Step 2: Pay for your first lesson"** in the same email.
+   - We do NOT block payment on signing, so a parent can pay first and sign later (or vice versa). Both states are tracked.
 
-### 4. New edge function: `send-lesson-booking-confirmation`
-Inputs: `occurrenceId`, `environment`.
-- Loads occurrence + parent booking.
-- Skips if `payment_status` is `paid` or `comp`.
-- Creates Stripe checkout (one-time payment, dynamic `price_data` so admin-set price works) with `metadata: { type: 'lesson_booking_occurrence', occurrenceId, bookingId }`.
-- Saves `stripe_checkout_url` + `stripe_session_id` on the occurrence.
-- Sends `lesson-booking-confirmation` transactional email with parent name, child, lesson type, date/time, instructor, amount, pay link.
-- Stamps `payment_link_sent_at`.
+2. **Public waiver page** `/lesson-waiver/:token`
+   - Reuses the existing `<LegalAgreements>` component verbatim (same waiver, photo release, ToS, privacy, signature, emergency contact — same versions you use for group enrollment).
+   - Pre-fills parent + child name from the booking.
+   - On submit, writes to `enrollment_agreements` with the booking link (see schema note below) and marks `lesson_bookings.waiver_signed_at = now()`.
+   - Shows a "Waiver complete" success state.
 
-### 5. payments-webhook update
-Extend `checkout.session.completed` handler: when `metadata.type === 'lesson_booking_occurrence'`, mark that occurrence `payment_status = 'paid'`, set `paid_at` and `stripe_session_id`.
+3. **Front-desk fallback**
+   - In the calendar block's Lesson Booking panel (the same panel that shows Paid/Unpaid + Charge Card), add a **Waiver** row:
+     - **Signed** badge with date if complete.
+     - **Not signed** + two buttons if not:
+       - **Resend waiver email** (re-sends the waiver link to parent's email)
+       - **Open at front desk** — opens a full-screen kiosk dialog with the same `<LegalAgreements>` form so a customer can sign on the studio's tablet/computer right there.
+   - The "Open at front desk" flow signs against the same token and writes the same `enrollment_agreements` row, so there's a single source of truth no matter where they signed.
 
-### 6. Cron-based 24h reminder
-- New edge function `send-lesson-occurrence-reminders` (verify_jwt = true, invoked by cron):
-  - Selects `lesson_booking_occurrences` where `occurrence_date = tomorrow (PT)`, `payment_status='unpaid'`, `payment_link_sent_at IS NULL`.
-  - For each, calls `send-lesson-booking-confirmation` (same email template/flow).
-  - Also: for occurrences where `occurrence_date = today`, `payment_status='unpaid'`, and `payment_link_sent_at` is older than ~22h → set `payment_status='flagged_no_pay'` so admin sees it (per your "flag for admin review" choice). The lesson is NOT auto-cancelled; the calendar block gets a red "Unpaid — review" badge.
-- pg_cron job runs hourly via `net.http_post` (uses anon key + project URL — inserted via insert tool, not migration).
+### Schema change
 
-### 7. Calendar block detail (`CalendarBlockDetail.tsx`)
-For private/semi-private events tied to a `lesson_booking_occurrence`, show:
-- Parent / child / phone / email
-- Price, payment status badge (Paid / Unpaid / Flagged)
-- Buttons: "Resend payment link", "Mark paid (cash/check)" (with reference field), "Mark comp"
-- For recurring: "Part of series — N occurrences" link
+The existing `enrollment_agreements` table has `enrollment_id uuid NOT NULL` referencing `swim_enrollments`. To re-use it for lesson bookings without breaking group enrollments:
 
-### 8. Email template: `lesson-booking-confirmation`
-New React Email template + registry entry. Content:
-- "Your [Private / Semi-Private] swim lesson is booked"
-- Date, time, instructor, location
-- Amount due ($X) for THIS session
-- "Pay now" button → Stripe checkout URL
-- For recurring series: footer note "This is the first of N lessons. You'll receive a separate payment link 24 hours before each upcoming lesson."
+- Make `enrollment_id` nullable.
+- Add `lesson_booking_id uuid` (nullable) referencing `lesson_bookings`.
+- Add a CHECK constraint: exactly one of `enrollment_id` / `lesson_booking_id` must be set.
+- Add `lesson_bookings.waiver_signed_at timestamptz` and `lesson_bookings.waiver_token text unique`.
+- Update the "Anyone can submit enrollment agreements" RLS policy is already permissive — fine to keep. Add a SELECT policy so the public waiver page can read its own booking by token (no PII beyond names).
 
-## Defaults & rules confirmed
-- Default price: $65 private, $45 semi-private (editable per booking)
-- Saved clients pulled from `swim_enrollments`
-- Recurring billing: 24h before each lesson via cron
-- Unpaid at lesson time → flagged for admin review (no auto-cancel)
-
-## Out of scope
-- No new dedicated `clients` table (using enrollments as the source)
-- No automatic charging — every payment goes through a hosted Stripe checkout link the parent clicks
-- No SMS reminders
-- No changes to the existing group `swim-lesson` flow
-
-## Files
+## 3. Files touched
 
 **New**
-- `supabase/migrations/<timestamp>_lesson_bookings.sql`
-- `supabase/functions/send-lesson-booking-confirmation/index.ts`
-- `supabase/functions/send-lesson-occurrence-reminders/index.ts`
-- `supabase/functions/_shared/transactional-email-templates/lesson-booking-confirmation.tsx`
-- `src/components/admin/calendar/LessonBookingFields.tsx` (client picker + recurring + price)
+- `supabase/migrations/<ts>_lesson_waivers.sql` — schema + token-lookup RPC.
+- `src/pages/LessonWaiver.tsx` — public `/lesson-waiver/:token` page.
+- `src/components/admin/calendar/FrontDeskWaiverDialog.tsx` — kiosk-mode wrapper around `<LegalAgreements>`.
 
 **Edited**
-- `src/components/admin/calendar/AddPoolEventDialog.tsx` — branch into the new fields for private/semi-private and call new save flow
-- `src/components/admin/calendar/CalendarBlockDetail.tsx` — show booking + payment controls
-- `supabase/functions/payments-webhook/index.ts` — handle `lesson_booking_occurrence` metadata
-- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register new template
-- `supabase/config.toml` — `verify_jwt = false` for `send-lesson-booking-confirmation`, `verify_jwt = true` for the cron reminder
-- pg_cron schedule (inserted via insert tool, not migration)
+- `supabase/functions/_shared/transactional-email-templates/lesson-booking-confirmation.tsx` — add "Sign waiver" CTA above the payment CTA, conditional on unsigned.
+- `supabase/functions/send-lesson-booking-confirmation/index.ts` — generate/reuse waiver token, pass `waiverLink` to template.
+- `src/components/admin/calendar/AddPoolEventDialog.tsx` — generate waiver token on insert.
+- `src/components/admin/calendar/CalendarBlockDetail.tsx` —
+  - replace hard-coded `"sandbox"` with `getStripeEnvironment()` (the "environment" fix),
+  - add Waiver section with badge + Resend + Open-at-front-desk buttons.
+- `src/App.tsx` — register `/lesson-waiver/:token` route.
+
+## 4. What the parent sees
+
+```text
+Email subject: Your private lesson is booked — please sign & pay
+
+  ┌─────────────────────────────────────┐
+  │  Hi Sarah,                          │
+  │  Aiden's first private lesson is    │
+  │  Tue Jun 10 at 4:00 PM.             │
+  │                                     │
+  │  Step 1 — Sign waiver               │
+  │  [ Sign waiver ]                    │
+  │                                     │
+  │  Step 2 — Pay for first lesson      │
+  │  [ Pay $65 ]                        │
+  │                                     │
+  │  (Future lessons get their own pay  │
+  │   link 24 h before each session.)   │
+  └─────────────────────────────────────┘
+```
+
+After approval I'll implement everything in one pass and redeploy the affected edge functions.
