@@ -13,11 +13,29 @@ export interface LessonWaiverBooking {
   child_name: string | null;
   lesson_type: string;
   waiver_signed_at: string | null;
+  instructor_name?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  series_start?: string | null;
+  series_end?: string | null;
+  recurring?: boolean | null;
+  next_occurrence_date?: string | null;
+  next_payment_status?: string | null;
+  next_checkout_url?: string | null;
 }
 
 export async function fetchLessonBookingByToken(
   token: string,
 ): Promise<LessonWaiverBooking | null> {
+  // Try the richer summary RPC first; fall back to the original on any error.
+  const summary = await supabase.rpc(
+    "get_lesson_booking_summary_by_token" as any,
+    { _token: token },
+  );
+  if (!summary.error && summary.data) {
+    const row = Array.isArray(summary.data) ? summary.data[0] : summary.data;
+    if (row) return row as LessonWaiverBooking;
+  }
   const { data, error } = await supabase.rpc(
     "get_lesson_booking_by_waiver_token" as any,
     { _token: token },
@@ -33,7 +51,6 @@ export async function submitLessonWaiver(args: {
   parentEmail: string;
   data: LegalAgreementData;
 }) {
-  // 1. Insert agreement row
   const { error: agErr } = await supabase
     .from("enrollment_agreements")
     .insert({
@@ -54,7 +71,6 @@ export async function submitLessonWaiver(args: {
     } as any);
   if (agErr) throw agErr;
 
-  // 2. Mark booking signed via RPC (works without auth for public page)
   const { error: markErr } = await supabase.rpc(
     "mark_lesson_waiver_signed" as any,
     { _token: args.token },

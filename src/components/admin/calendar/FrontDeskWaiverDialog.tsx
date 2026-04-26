@@ -72,13 +72,22 @@ const FrontDeskWaiverDialog = ({ open, onOpenChange, booking, onSigned }: Props)
             <Button onClick={() => handleClose(false)}>Close</Button>
           </div>
         ) : (
-          <LegalAgreements
-            parentName={booking.parent_name}
-            childName={booking.child_name || booking.parent_name}
-            onSubmit={handleSubmit}
-            onBack={() => handleClose(false)}
-            submitting={submitting}
-          />
+          <>
+            <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3 text-sm mb-4">
+              <strong>Front-desk mode:</strong> please hand the device to the
+              parent or guardian — they must sign personally.
+            </div>
+            <LegalAgreements
+              parentName={booking.parent_name}
+              childName={booking.child_name || booking.parent_name}
+              onSubmit={handleSubmit}
+              onBack={() => handleClose(false)}
+              submitting={submitting}
+              hideBack
+              submitLabel="Sign & Submit Waiver"
+              submittingLabel="Submitting..."
+            />
+          </>
         )}
       </DialogContent>
     </Dialog>

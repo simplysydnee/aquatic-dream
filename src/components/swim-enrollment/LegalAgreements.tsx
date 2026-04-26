@@ -49,7 +49,7 @@ const DocumentSection = ({
       <Icon className="w-4 h-4 text-primary" />
       <h4 className="font-semibold text-sm text-foreground">{title}</h4>
     </div>
-    <ScrollArea className="h-48 p-4">
+    <ScrollArea className="h-64 sm:h-48 max-h-[40vh] p-4">
       <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">
         {text}
       </pre>
@@ -84,9 +84,14 @@ interface Props {
   defaultEmergencyContactRelationship?: string;
   showAddAnother?: boolean;
   onAddAnother?: (data: LegalAgreementData) => void;
+  submitLabel?: string;
+  submittingLabel?: string;
+  hideBack?: boolean;
+  headerTitle?: string;
+  headerSubtitle?: React.ReactNode;
 }
 
-const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, showAddAnother, onAddAnother }: Props) => {
+const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
   const [form, setForm] = useState({
     waiverAccepted: false,
     privacyPolicyAccepted: false,
@@ -136,12 +141,16 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
       className="max-w-2xl mx-auto"
     >
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">
-        Legal Agreements
+        {headerTitle ?? "Legal Agreements"}
       </h3>
-      <p className="text-muted-foreground text-sm mb-6">
-        Please review and accept the following documents for{" "}
-        <span className="font-medium text-foreground">{childName}</span>'s enrollment.
-      </p>
+      <div className="text-muted-foreground text-sm mb-6">
+        {headerSubtitle ?? (
+          <p>
+            Please review and accept the following documents for{" "}
+            <span className="font-medium text-foreground">{childName}</span>'s enrollment.
+          </p>
+        )}
+      </div>
 
       {/* UETA Disclosure */}
       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-6">
@@ -318,9 +327,13 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
 
         {/* Actions */}
         <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 pt-4">
-          <Button type="button" variant="ghost" onClick={onBack} className="w-full sm:w-auto">
-            <ChevronLeft className="mr-1 w-4 h-4" /> Back
-          </Button>
+          {hideBack ? (
+            <span />
+          ) : (
+            <Button type="button" variant="ghost" onClick={onBack} className="w-full sm:w-auto">
+              <ChevronLeft className="mr-1 w-4 h-4" /> Back
+            </Button>
+          )}
           <div className="flex flex-col sm:flex-row gap-2">
             {showAddAnother && onAddAnother && (
               <Button
@@ -338,7 +351,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
               disabled={submitting}
               className="w-full sm:w-auto bg-coral hover:bg-coral/90 text-coral-foreground"
             >
-              {submitting ? "Enrolling..." : "Complete Enrollment"}{" "}
+              {submitting ? (submittingLabel ?? "Enrolling...") : (submitLabel ?? "Complete Enrollment")}{" "}
               <ChevronRight className="ml-1 w-4 h-4" />
             </Button>
           </div>
