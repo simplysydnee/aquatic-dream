@@ -72,6 +72,36 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   const [resending, setResending] = useState(false);
   const [marking, setMarking] = useState(false);
   const [showCardCheckout, setShowCardCheckout] = useState(false);
+  const [showFrontDeskWaiver, setShowFrontDeskWaiver] = useState(false);
+  const [resendingWaiver, setResendingWaiver] = useState(false);
+
+  const refetchLesson = async () => {
+    if (!eventId) return;
+    const { data } = await supabase
+      .from("lesson_booking_occurrences")
+      .select("*, lesson_bookings(*)")
+      .eq("pool_event_id", eventId)
+      .maybeSingle();
+    setLessonOcc(data || null);
+    setLessonBooking((data as any)?.lesson_bookings || null);
+  };
+
+  const handleResendWaiver = async () => {
+    if (!lessonOcc) return;
+    setResendingWaiver(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
+        body: { occurrenceId: lessonOcc.id, environment: getStripeEnvironment(), siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast.success("Waiver + payment link re-sent");
+      await refetchLesson();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to resend");
+    } finally {
+      setResendingWaiver(false);
+    }
+  };
 
   const eventId = block?.kind === "event" ? block.event.id : null;
   const isLessonEventType = block?.kind === "event" && (block.event.event_type === "private_lesson" || block.event.event_type === "semi_private_lesson");
