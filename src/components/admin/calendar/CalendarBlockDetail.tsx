@@ -503,6 +503,21 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                 onSaved={onRefetch || (() => {})}
               />
             )}
+
+            <LessonOccurrenceCheckoutDialog
+              open={showCardCheckout}
+              onOpenChange={(o) => {
+                setShowCardCheckout(o);
+                if (!o && lessonOcc) {
+                  // refresh after close in case payment completed
+                  supabase.from("lesson_booking_occurrences").select("*, lesson_bookings(*)").eq("id", lessonOcc.id).maybeSingle().then(({ data }) => {
+                    setLessonOcc(data); setLessonBooking((data as any)?.lesson_bookings || null);
+                  });
+                }
+              }}
+              occurrenceId={lessonOcc?.id || null}
+              title={lessonBooking ? `Charge ${lessonBooking.parent_name} — $${Number(lessonBooking.price_per_session).toFixed(2)}` : undefined}
+            />
           </>
         )}
       </div>
