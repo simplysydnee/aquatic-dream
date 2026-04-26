@@ -52,9 +52,10 @@ serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const obj = event.data.object;
-        // Session-fee follow-up payment from send-session-payment-link
         if (obj?.metadata?.type === "session_fee" && obj?.metadata?.enrollmentId) {
           await handleSessionFeePaid(obj);
+        } else if (obj?.metadata?.type === "lesson_booking_occurrence" && obj?.metadata?.occurrenceId) {
+          await handleLessonBookingPaid(obj);
         } else {
           await handleCheckoutCompleted(obj);
         }
@@ -283,7 +284,27 @@ async function handleSessionFeePaid(checkoutSession: any) {
   }
 }
 
-async function sendEnrollmentConfirmation(enrollmentId: string) {
+async function handleLessonBookingPaid(checkoutSession: any) {
+  const occurrenceId = checkoutSession.metadata?.occurrenceId;
+  if (!occurrenceId) {
+    console.warn("Lesson booking callback missing occurrenceId");
+    return;
+  }
+  const stripeId = checkoutSession.payment_intent || checkoutSession.id;
+  const { error } = await supabase
+    .from("lesson_booking_occurrences")
+    .update({
+      payment_status: "paid",
+      stripe_session_id: stripeId,
+      paid_at: new Date().toISOString(),
+    })
+    .eq("id", occurrenceId);
+  if (error) {
+    console.error("Failed to mark lesson occurrence paid:", occurrenceId, error);
+  } else {
+    console.log("Lesson occurrence marked paid:", occurrenceId);
+  }
+}
   try {
     const { data: enrollment, error: enrollErr } = await supabase
       .from("swim_enrollments")
