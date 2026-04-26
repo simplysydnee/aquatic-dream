@@ -12,6 +12,8 @@ import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/type
 import { Checkbox } from "@/components/ui/checkbox";
 import AddSwimmerDialog from "./AddSwimmerDialog";
 import LessonOccurrenceCheckoutDialog from "./LessonOccurrenceCheckoutDialog";
+import FrontDeskWaiverDialog from "./FrontDeskWaiverDialog";
+import { getStripeEnvironment } from "@/lib/stripe";
 
 interface SwimBlockInfo {
   kind: "swim";
@@ -100,7 +102,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     setSendingPaymentFor(enrollmentId);
     try {
       const { error } = await supabase.functions.invoke("send-session-payment-link", {
-        body: { enrollmentId, environment: "sandbox", siteUrl: window.location.origin },
+        body: { enrollmentId, environment: getStripeEnvironment(), siteUrl: window.location.origin },
       });
       if (error) throw error;
       toast.success("Payment link sent!");
@@ -116,7 +118,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     setResending(true);
     try {
       const { error } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
-        body: { occurrenceId: lessonOcc.id, environment: "sandbox", siteUrl: window.location.origin },
+        body: { occurrenceId: lessonOcc.id, environment: getStripeEnvironment(), siteUrl: window.location.origin },
       });
       if (error) throw error;
       toast.success("Payment link emailed to parent");
