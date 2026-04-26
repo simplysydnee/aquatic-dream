@@ -507,6 +507,33 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                         </Button>
                       </div>
                     )}
+
+                    {/* Waiver row */}
+                    <div className="pt-2 border-t border-dashed flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <Lock className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Waiver:</span>
+                        {lessonBooking.waiver_signed_at ? (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 hover:bg-green-100">
+                            Signed {format(new Date(lessonBooking.waiver_signed_at), "MMM d")}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 hover:bg-orange-100">
+                            Not signed
+                          </Badge>
+                        )}
+                      </div>
+                      {!lessonBooking.waiver_signed_at && (
+                        <div className="flex gap-1.5">
+                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" disabled={resendingWaiver} onClick={handleResendWaiver}>
+                            <Send className="w-3 h-3" />{resendingWaiver ? "Sending…" : "Resend"}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setShowFrontDeskWaiver(true)}>
+                            <Pencil className="w-3 h-3" />Open at front desk
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -549,6 +576,20 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
               }}
               occurrenceId={lessonOcc?.id || null}
               title={lessonBooking ? `Charge ${lessonBooking.parent_name} — $${Number(lessonBooking.price_per_session).toFixed(2)}` : undefined}
+            />
+
+            <FrontDeskWaiverDialog
+              open={showFrontDeskWaiver}
+              onOpenChange={setShowFrontDeskWaiver}
+              booking={lessonBooking ? {
+                id: lessonBooking.id,
+                waiver_token: lessonBooking.waiver_token,
+                parent_name: lessonBooking.parent_name,
+                parent_email: lessonBooking.parent_email,
+                child_name: lessonBooking.child_name,
+                lesson_type: lessonBooking.lesson_type,
+              } : null}
+              onSigned={refetchLesson}
             />
           </>
         )}
