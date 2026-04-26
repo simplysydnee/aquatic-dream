@@ -1558,6 +1558,26 @@ export type Database = {
           waiver_signed_at: string
         }[]
       }
+      get_lesson_booking_summary_by_token: {
+        Args: { _token: string }
+        Returns: {
+          child_name: string
+          end_time: string
+          id: string
+          instructor_name: string
+          lesson_type: string
+          next_checkout_url: string
+          next_occurrence_date: string
+          next_payment_status: string
+          parent_email: string
+          parent_name: string
+          recurring: boolean
+          series_end: string
+          series_start: string
+          start_time: string
+          waiver_signed_at: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
