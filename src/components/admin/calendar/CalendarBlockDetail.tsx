@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope } from "lucide-react";
+import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import type { ICSSession } from "./CalendarDayView";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import AddSwimmerDialog from "./AddSwimmerDialog";
+import LessonOccurrenceCheckoutDialog from "./LessonOccurrenceCheckoutDialog";
 
 interface SwimBlockInfo {
   kind: "swim";
@@ -63,6 +64,35 @@ function fmtICSTime(iso: string) {
 const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: Props) => {
   const [showAddSwimmer, setShowAddSwimmer] = useState(false);
   const [sendingPaymentFor, setSendingPaymentFor] = useState<string | null>(null);
+  const [lessonOcc, setLessonOcc] = useState<any | null>(null);
+  const [lessonBooking, setLessonBooking] = useState<any | null>(null);
+  const [loadingLesson, setLoadingLesson] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [marking, setMarking] = useState(false);
+  const [showCardCheckout, setShowCardCheckout] = useState(false);
+
+  const eventId = block?.kind === "event" ? block.event.id : null;
+  const isLessonEventType = block?.kind === "event" && (block.event.event_type === "private_lesson" || block.event.event_type === "semi_private_lesson");
+
+  useEffect(() => {
+    let active = true;
+    if (!eventId || !isLessonEventType) {
+      setLessonOcc(null); setLessonBooking(null); return;
+    }
+    setLoadingLesson(true);
+    (async () => {
+      const { data } = await supabase
+        .from("lesson_booking_occurrences")
+        .select("*, lesson_bookings(*)")
+        .eq("pool_event_id", eventId)
+        .maybeSingle();
+      if (!active) return;
+      setLessonOcc(data || null);
+      setLessonBooking((data as any)?.lesson_bookings || null);
+      setLoadingLesson(false);
+    })();
+    return () => { active = false; };
+  }, [eventId, isLessonEventType]);
 
   if (!block) return null;
 
@@ -79,6 +109,39 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     } finally {
       setSendingPaymentFor(null);
     }
+  };
+
+  const handleResendLessonLink = async () => {
+    if (!lessonOcc) return;
+    setResending(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
+        body: { occurrenceId: lessonOcc.id, environment: "sandbox", siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast.success("Payment link emailed to parent");
+      const { data } = await supabase.from("lesson_booking_occurrences").select("*, lesson_bookings(*)").eq("id", lessonOcc.id).maybeSingle();
+      setLessonOcc(data); setLessonBooking((data as any)?.lesson_bookings || null);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to resend");
+    } finally { setResending(false); }
+  };
+
+  const handleMarkPaid = async (method: "cash" | "manual") => {
+    if (!lessonOcc) return;
+    setMarking(true);
+    try {
+      const { error } = await supabase
+        .from("lesson_booking_occurrences")
+        .update({ payment_status: "paid", paid_at: new Date().toISOString(), payment_method: method })
+        .eq("id", lessonOcc.id);
+      if (error) throw error;
+      toast.success(`Marked paid (${method})`);
+      const { data } = await supabase.from("lesson_booking_occurrences").select("*, lesson_bookings(*)").eq("id", lessonOcc.id).maybeSingle();
+      setLessonOcc(data); setLessonBooking((data as any)?.lesson_bookings || null);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to mark paid");
+    } finally { setMarking(false); }
   };
 
   const isSwim = block.kind === "swim";
