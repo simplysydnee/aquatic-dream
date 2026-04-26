@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Careers from "./pages/Careers";
 import SwimLessons from "./pages/SwimLessons";
 import SwimEnrollment from "./pages/SwimEnrollment";
+import LessonWaiver from "./pages/LessonWaiver";
 import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
 import ProtectedRoute from "./components/admin/ProtectedRoute";
@@ -90,6 +91,9 @@ const App = () => (
               <Route path="time-clock" element={<InstructorTimeClock />} />
               <Route path="announcements" element={<InstructorAnnouncements />} />
             </Route>
+
+            {/* Standalone full-screen flows (no public layout chrome) */}
+            <Route path="/lesson-waiver/:token" element={<LessonWaiver />} />
 
             {/* Public routes */}
             <Route element={<PublicLayout />}>
