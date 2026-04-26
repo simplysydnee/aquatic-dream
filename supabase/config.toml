@@ -27,3 +27,5 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.send-lesson-occurrence-reminders]
     verify_jwt = false
+  [functions.create-lesson-occurrence-checkout]
+    verify_jwt = false

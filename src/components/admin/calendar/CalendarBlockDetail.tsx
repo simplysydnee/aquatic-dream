@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope } from "lucide-react";
+import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import type { ICSSession } from "./CalendarDayView";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import AddSwimmerDialog from "./AddSwimmerDialog";
+import LessonOccurrenceCheckoutDialog from "./LessonOccurrenceCheckoutDialog";
 
 interface SwimBlockInfo {
   kind: "swim";
@@ -63,6 +64,35 @@ function fmtICSTime(iso: string) {
 const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: Props) => {
   const [showAddSwimmer, setShowAddSwimmer] = useState(false);
   const [sendingPaymentFor, setSendingPaymentFor] = useState<string | null>(null);
+  const [lessonOcc, setLessonOcc] = useState<any | null>(null);
+  const [lessonBooking, setLessonBooking] = useState<any | null>(null);
+  const [loadingLesson, setLoadingLesson] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [marking, setMarking] = useState(false);
+  const [showCardCheckout, setShowCardCheckout] = useState(false);
+
+  const eventId = block?.kind === "event" ? block.event.id : null;
+  const isLessonEventType = block?.kind === "event" && (block.event.event_type === "private_lesson" || block.event.event_type === "semi_private_lesson");
+
+  useEffect(() => {
+    let active = true;
+    if (!eventId || !isLessonEventType) {
+      setLessonOcc(null); setLessonBooking(null); return;
+    }
+    setLoadingLesson(true);
+    (async () => {
+      const { data } = await supabase
+        .from("lesson_booking_occurrences")
+        .select("*, lesson_bookings(*)")
+        .eq("pool_event_id", eventId)
+        .maybeSingle();
+      if (!active) return;
+      setLessonOcc(data || null);
+      setLessonBooking((data as any)?.lesson_bookings || null);
+      setLoadingLesson(false);
+    })();
+    return () => { active = false; };
+  }, [eventId, isLessonEventType]);
 
   if (!block) return null;
 
@@ -79,6 +109,39 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     } finally {
       setSendingPaymentFor(null);
     }
+  };
+
+  const handleResendLessonLink = async () => {
+    if (!lessonOcc) return;
+    setResending(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
+        body: { occurrenceId: lessonOcc.id, environment: "sandbox", siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast.success("Payment link emailed to parent");
+      const { data } = await supabase.from("lesson_booking_occurrences").select("*, lesson_bookings(*)").eq("id", lessonOcc.id).maybeSingle();
+      setLessonOcc(data); setLessonBooking((data as any)?.lesson_bookings || null);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to resend");
+    } finally { setResending(false); }
+  };
+
+  const handleMarkPaid = async (method: "cash" | "manual") => {
+    if (!lessonOcc) return;
+    setMarking(true);
+    try {
+      const { error } = await supabase
+        .from("lesson_booking_occurrences")
+        .update({ payment_status: "paid", paid_at: new Date().toISOString(), payment_method: method })
+        .eq("id", lessonOcc.id);
+      if (error) throw error;
+      toast.success(`Marked paid (${method})`);
+      const { data } = await supabase.from("lesson_booking_occurrences").select("*, lesson_bookings(*)").eq("id", lessonOcc.id).maybeSingle();
+      setLessonOcc(data); setLessonBooking((data as any)?.lesson_bookings || null);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to mark paid");
+    } finally { setMarking(false); }
   };
 
   const isSwim = block.kind === "swim";
@@ -354,7 +417,70 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
               </div>
             )}
 
-            {/* Actions */}
+            {/* Lesson booking (private/semi-private) panel */}
+            {isLessonEventType && (
+              <div className="px-4 pb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Lesson Booking
+                </h4>
+                {loadingLesson && <p className="text-xs text-muted-foreground">Loading…</p>}
+                {!loadingLesson && !lessonOcc && (
+                  <p className="text-sm text-muted-foreground italic">No booking record linked to this event.</p>
+                )}
+                {!loadingLesson && lessonOcc && lessonBooking && (
+                  <div className="rounded-lg border bg-card p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">{lessonBooking.child_name || lessonBooking.parent_name}</p>
+                        <p className="text-xs text-muted-foreground">{lessonBooking.parent_name}</p>
+                      </div>
+                      <Badge className={cn(
+                        "text-[10px] px-1.5 py-0.5",
+                        lessonOcc.payment_status === "paid"
+                          ? "bg-green-100 text-green-700 hover:bg-green-100"
+                          : lessonOcc.payment_status === "comp"
+                          ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
+                          : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
+                      )}>
+                        {lessonOcc.payment_status === "paid" ? "Paid" : lessonOcc.payment_status === "comp" ? "Comp" : "Unpaid"}
+                      </Badge>
+                    </div>
+                    {lessonBooking.parent_email && (
+                      <a href={`mailto:${lessonBooking.parent_email}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+                        <Mail className="w-3 h-3" />{lessonBooking.parent_email}
+                      </a>
+                    )}
+                    {lessonBooking.parent_phone && (
+                      <a href={`tel:${lessonBooking.parent_phone}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+                        <Phone className="w-3 h-3" />{lessonBooking.parent_phone}
+                      </a>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      ${Number(lessonBooking.price_per_session).toFixed(2)} • {lessonBooking.lesson_type === "private" ? "Private" : "Semi-Private"}
+                      {lessonOcc.payment_link_sent_at && (
+                        <span> • Link sent {format(new Date(lessonOcc.payment_link_sent_at), "MMM d, h:mma")}</span>
+                      )}
+                    </div>
+
+                    {lessonOcc.payment_status !== "paid" && (
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-dashed">
+                        <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" disabled={resending} onClick={handleResendLessonLink}>
+                          <Send className="w-3 h-3" />{resending ? "Sending…" : (lessonOcc.payment_link_sent_at ? "Resend link" : "Send link")}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setShowCardCheckout(true)}>
+                          <CreditCard className="w-3 h-3" />Charge card
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 text-xs gap-1.5 col-span-2" disabled={marking} onClick={() => handleMarkPaid("cash")}>
+                          <CheckCircle2 className="w-3 h-3" />Mark paid (cash / other)
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+
             <div className="sticky bottom-0 bg-card border-t p-4 flex gap-2">
               <Button size="sm" variant="outline" onClick={onEdit} className="flex-1 gap-1.5">
                 <Pencil className="w-3.5 h-3.5" /> Edit
@@ -377,6 +503,21 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                 onSaved={onRefetch || (() => {})}
               />
             )}
+
+            <LessonOccurrenceCheckoutDialog
+              open={showCardCheckout}
+              onOpenChange={(o) => {
+                setShowCardCheckout(o);
+                if (!o && lessonOcc) {
+                  // refresh after close in case payment completed
+                  supabase.from("lesson_booking_occurrences").select("*, lesson_bookings(*)").eq("id", lessonOcc.id).maybeSingle().then(({ data }) => {
+                    setLessonOcc(data); setLessonBooking((data as any)?.lesson_bookings || null);
+                  });
+                }
+              }}
+              occurrenceId={lessonOcc?.id || null}
+              title={lessonBooking ? `Charge ${lessonBooking.parent_name} — $${Number(lessonBooking.price_per_session).toFixed(2)}` : undefined}
+            />
           </>
         )}
       </div>
