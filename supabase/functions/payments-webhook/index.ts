@@ -305,6 +305,8 @@ async function handleLessonBookingPaid(checkoutSession: any) {
     console.log("Lesson occurrence marked paid:", occurrenceId);
   }
 }
+
+async function sendEnrollmentConfirmation(enrollmentId: string) {
   try {
     const { data: enrollment, error: enrollErr } = await supabase
       .from("swim_enrollments")
