@@ -24,7 +24,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Mail, RefreshCw, Loader2, Eye } from "lucide-react";
+import { ChevronDown, ChevronRight, Mail, RefreshCw, Loader2, Eye, EyeOff } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import EmailPreviewDialog, { type EmailPreviewData } from "@/components/admin/EmailPreviewDialog";
@@ -278,21 +278,29 @@ export default function EmailLogAdmin() {
                             {r.error_message || ""}
                           </TableCell>
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={!r.metadata?.html}
-                              onClick={() => setPreviewEmail({
-                                template_name: r.template_name,
-                                recipient_email: r.recipient_email,
-                                status: r.status,
-                                created_at: r.created_at,
-                                metadata: r.metadata,
-                              })}
-                              title={r.metadata?.html ? "View email" : "Preview not available"}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            {r.metadata?.html ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setPreviewEmail({
+                                  template_name: r.template_name,
+                                  recipient_email: r.recipient_email,
+                                  status: r.status,
+                                  created_at: r.created_at,
+                                  metadata: r.metadata,
+                                })}
+                                title="View email"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <span
+                                className="inline-flex h-9 w-9 items-center justify-center text-muted-foreground/50"
+                                title="Preview not available for this email"
+                              >
+                                <EyeOff className="h-4 w-4" />
+                              </span>
+                            )}
                           </TableCell>
                         </TableRow>
                         <CollapsibleContent asChild>
