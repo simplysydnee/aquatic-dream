@@ -114,6 +114,9 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Child</div>
               <div className="font-medium">{request.child_name} (age {request.child_age})</div>
+              {request.child_dob && (
+                <div className="text-xs text-muted-foreground">DOB: {new Date(request.child_dob).toLocaleDateString()}</div>
+              )}
             </div>
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Submitted</div>
