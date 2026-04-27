@@ -1,55 +1,34 @@
-## Email Log Admin Page
+## Goal
+Remove the upper age cap on private/semi-private lesson requests. Replace the "child age" number field with a Date of Birth picker that auto-calculates age. No upper limit — admins decide eligibility when they follow up.
 
-Add a new admin page at `/admin/emails` that shows every email the system has sent, with filtering and search.
+## Changes
 
-### What you'll see
+### 1. Public Lesson Request Form (`src/components/swim-enrollment/LessonRequestForm.tsx`)
+- Replace the "Child's Age" number input with a **Date of Birth** date picker (shadcn DatePicker in a Popover, matching the pattern used in `SwimAssessment.tsx`).
+- Auto-calculate age from DOB on submit and on display ("Age: 14" shown beneath the picker so the parent sees what we're recording).
+- Update Zod schema:
+  - Remove `childAge: z.number().min(3).max(12)`.
+  - Add `childDob: z.date()` (required, must be in the past, not more than ~100 years ago).
+  - Derive `childAge` from DOB before insert (no min/max enforced).
+- Submit payload: send computed `child_age` (integer) and new `child_dob` (ISO date) to `lesson_requests`.
 
-**Summary cards (top of page)**
-- Total emails
-- Sent (green)
-- Failed (red)
-- Suppressed (yellow)
-- Pending (gray)
+### 2. Database (`lesson_requests` table)
+- Add nullable column `child_dob date` via migration so the admin has the exact DOB on file (existing rows stay null).
 
-Counts reflect the currently active filters.
+### 3. Admin Lesson Request Detail Dialog (`src/components/admin/LessonRequestDetailDialog.tsx`)
+- Display Date of Birth alongside Age when present.
+- (Already has no age restrictions — no other changes needed.)
 
-**Filter bar**
-- Time range: Last 24h / 7 days / 30 days / All time / Custom date range
-- Template type: dropdown populated from distinct `template_name` values (e.g., `lesson-booking-confirmation`, `enrollment-confirmation`, `auth_emails`, etc.) — multi-select with "All" default
-- Status: All / Sent / Failed / Suppressed / Pending
-- Search box: filter by recipient email
+### 4. Admin "Add Pool Event" / Lesson Booking flow (`AddPoolEventDialog.tsx`)
+- The swimmer rows already accept any age (input has `min={1} max={18}` in `AddSwimmerDialog`, but `AddPoolEventDialog` has no validation on age). Bump `AddSwimmerDialog`'s max from 18 to 99 so admins can manually book teens/adults for private lessons too.
 
-Default view: All time, all templates, all statuses (no filters applied) — you'll see everything immediately, then narrow as needed.
+## What stays the same
+- Group enrollment (`SwimAssessment.tsx`) keeps its 3–12 age range — group classes are still kids-only.
+- Pricing, payment flow, RLS policies — unchanged.
+- The acknowledgment email and admin notification flow — unchanged (already age-agnostic).
 
-**Email log table**
-Columns:
-- Timestamp (sortable, newest first by default)
-- Template name (friendly label)
-- Recipient email
-- Status (color-coded badge)
-- Error message (shown inline for failed/dlq rows, truncated with hover for full text)
-
-Paginated at 50 rows per page with prev/next controls.
-
-**Row actions**
-- Click a row to expand and see full metadata (message_id, full error, JSON metadata payload)
-
-### Where it lives
-
-New sidebar entry **"Email Log"** under the existing admin nav, with a Mail icon, placed after "Announcements". Admin-only (uses existing `ProtectedRoute`).
-
-### Technical notes
-
-- New route `/admin/emails` → `EmailLogAdmin.tsx` page
-- Queries the `email_send_log` table directly via the Supabase client
-- **Deduplication**: a single email writes multiple rows (pending → sent/failed) sharing the same `message_id`. The query uses `DISTINCT ON (message_id)` ordered by `created_at DESC` so each email appears once with its latest status. Implemented as a Postgres view (`email_log_latest`) created via migration so the client query stays simple and indexed.
-- RLS: `email_send_log` currently only allows `service_role` to read. Add a new policy allowing admins (`has_role(auth.uid(), 'admin')`) to SELECT — required so the admin UI can read logs directly without an edge function.
-- Sidebar update in `AdminSidebar.tsx` to add the new menu item.
-- Route registration in `App.tsx`.
-
-### Files touched
-
-- New: `src/pages/admin/EmailLogAdmin.tsx`
-- New: `supabase/migrations/<timestamp>_email_log_view_and_policy.sql` (creates `email_log_latest` view + admin SELECT policy)
-- Edit: `src/App.tsx` (add route)
-- Edit: `src/components/admin/AdminSidebar.tsx` (add nav item)
+## Files touched
+- **Edit**: `src/components/swim-enrollment/LessonRequestForm.tsx` (DOB picker + age calc)
+- **Edit**: `src/components/admin/LessonRequestDetailDialog.tsx` (show DOB)
+- **Edit**: `src/components/admin/calendar/AddSwimmerDialog.tsx` (raise max age cap)
+- **Migration**: add `child_dob date` column to `lesson_requests`

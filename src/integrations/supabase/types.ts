@@ -701,6 +701,7 @@ export type Database = {
       lesson_requests: {
         Row: {
           child_age: number
+          child_dob: string | null
           child_name: string
           created_at: string
           id: string
@@ -717,6 +718,7 @@ export type Database = {
         }
         Insert: {
           child_age: number
+          child_dob?: string | null
           child_name: string
           created_at?: string
           id?: string
@@ -733,6 +735,7 @@ export type Database = {
         }
         Update: {
           child_age?: number
+          child_dob?: string | null
           child_name?: string
           created_at?: string
           id?: string

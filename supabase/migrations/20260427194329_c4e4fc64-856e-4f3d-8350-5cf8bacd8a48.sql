@@ -1,0 +1,1 @@
+ALTER TABLE public.lesson_requests ADD COLUMN IF NOT EXISTS child_dob date;
