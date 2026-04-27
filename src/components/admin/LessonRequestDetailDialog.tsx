@@ -18,6 +18,7 @@ export interface LessonRequest {
   parent_phone: string | null;
   child_name: string;
   child_age: number;
+  child_dob?: string | null;
   lesson_type: string;
   preferred_times: string | null;
   notes: string | null;
