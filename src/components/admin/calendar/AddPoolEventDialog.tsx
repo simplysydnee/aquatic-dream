@@ -510,7 +510,11 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
           )}
 
           {showInstructor && (
-            <Input value={instructorName} onChange={(e) => setInstructorName(e.target.value)} placeholder="Instructor (optional)" className="h-8 text-sm" />
+            <InstructorPicker
+              value={instructorName}
+              onChange={setInstructorName}
+              refreshKey={open}
+            />
           )}
 
           <Input
