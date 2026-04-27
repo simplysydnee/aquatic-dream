@@ -24,9 +24,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Mail, RefreshCw, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Mail, RefreshCw, Loader2, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import EmailPreviewDialog, { type EmailPreviewData } from "@/components/admin/EmailPreviewDialog";
 
 type EmailRow = {
   id: string;
@@ -76,6 +77,7 @@ export default function EmailLogAdmin() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [previewEmail, setPreviewEmail] = useState<EmailPreviewData | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -95,15 +97,23 @@ export default function EmailLogAdmin() {
       return;
     }
 
-    // Deduplicate by message_id, keeping latest (data already DESC by created_at)
-    const seen = new Set<string>();
-    const deduped: EmailRow[] = [];
+    // Deduplicate by message_id, keeping the latest row but merging in
+    // metadata from any earlier row in the same group (the rendered HTML is
+    // stored on the initial `pending` insert, not on the later `sent` row).
+    const groups = new Map<string, EmailRow>();
     for (const r of (data || []) as EmailRow[]) {
       const key = r.message_id || r.id;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      deduped.push(r);
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, r);
+      } else if (!existing.metadata && r.metadata) {
+        // Keep the latest row's status/error but inherit metadata from the older row
+        groups.set(key, { ...existing, metadata: r.metadata });
+      }
     }
+    const deduped: EmailRow[] = Array.from(groups.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
     setRows(deduped);
     setLoading(false);
   };
@@ -245,6 +255,7 @@ export default function EmailLogAdmin() {
                   <TableHead>Recipient</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Error</TableHead>
+                  <TableHead className="w-20 text-right">View</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -266,10 +277,27 @@ export default function EmailLogAdmin() {
                           <TableCell className="max-w-xs truncate text-sm text-red-700" title={r.error_message || ""}>
                             {r.error_message || ""}
                           </TableCell>
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={!r.metadata?.html}
+                              onClick={() => setPreviewEmail({
+                                template_name: r.template_name,
+                                recipient_email: r.recipient_email,
+                                status: r.status,
+                                created_at: r.created_at,
+                                metadata: r.metadata,
+                              })}
+                              title={r.metadata?.html ? "View email" : "Preview not available"}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                         <CollapsibleContent asChild>
                           <TableRow>
-                            <TableCell colSpan={6} className="bg-muted/30">
+                            <TableCell colSpan={7} className="bg-muted/30">
                               <div className="space-y-2 text-sm py-2">
                                 <div><span className="font-medium">Message ID:</span> <span className="font-mono text-xs">{r.message_id || "—"}</span></div>
                                 {r.error_message && (
@@ -278,12 +306,16 @@ export default function EmailLogAdmin() {
                                     <pre className="whitespace-pre-wrap text-xs bg-background p-2 rounded border border-border">{r.error_message}</pre>
                                   </div>
                                 )}
-                                {r.metadata && (
-                                  <div>
-                                    <div className="font-medium">Metadata:</div>
-                                    <pre className="whitespace-pre-wrap text-xs bg-background p-2 rounded border border-border">{JSON.stringify(r.metadata, null, 2)}</pre>
-                                  </div>
-                                )}
+                                {r.metadata && (() => {
+                                  const { html: _h, ...rest } = r.metadata || {};
+                                  if (!Object.keys(rest).length) return null;
+                                  return (
+                                    <div>
+                                      <div className="font-medium">Metadata:</div>
+                                      <pre className="whitespace-pre-wrap text-xs bg-background p-2 rounded border border-border">{JSON.stringify(rest, null, 2)}</pre>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -309,6 +341,12 @@ export default function EmailLogAdmin() {
           )}
         </CardContent>
       </Card>
+
+      <EmailPreviewDialog
+        email={previewEmail}
+        open={!!previewEmail}
+        onOpenChange={(o) => { if (!o) setPreviewEmail(null); }}
+      />
     </div>
   );
 }
