@@ -161,7 +161,7 @@ const AddSwimmerDialog = ({
               </div>
               <div>
                 <Label htmlFor="child-age">Age *</Label>
-                <Input id="child-age" type="number" min={1} max={18} value={childAge} onChange={(e) => setChildAge(e.target.value)} placeholder="Age" />
+                <Input id="child-age" type="number" min={1} max={99} value={childAge} onChange={(e) => setChildAge(e.target.value)} placeholder="Age" />
               </div>
             </div>
 

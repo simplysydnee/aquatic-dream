@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,18 +6,32 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CheckCircle, ArrowRight, DollarSign } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CheckCircle, ArrowRight, DollarSign, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { cn } from "@/lib/utils";
 import { PRICING } from "./types";
+
+const calcAge = (dob: Date): number => {
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  return age;
+};
 
 const requestSchema = z.object({
   parentName: z.string().trim().min(1, "Required").max(100),
   parentEmail: z.string().trim().email("Invalid email").max(255),
   parentPhone: z.string().trim().max(20).optional(),
   childName: z.string().trim().min(1, "Required").max(100),
-  childAge: z.number().min(3).max(12),
+  childDob: z.date({ required_error: "Date of birth is required" })
+    .refine((d) => d <= new Date(), { message: "Date of birth must be in the past" })
+    .refine((d) => d >= new Date("1920-01-01"), { message: "Please enter a valid date" }),
   lessonType: z.enum(["private", "semi-private"]),
   preferredTimes: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(500).optional(),
@@ -32,24 +46,23 @@ const LessonRequestForm = () => {
     parentEmail: "",
     parentPhone: "",
     childName: "",
-    childAge: "",
+    childDob: undefined as Date | undefined,
     lessonType: "private" as "private" | "semi-private",
     preferredTimes: "",
     notes: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const update = (key: string, value: string) => {
-    setForm({ ...form, [key]: value });
+  const computedAge = useMemo(() => (form.childDob ? calcAge(form.childDob) : null), [form.childDob]);
+
+  const update = (key: string, value: unknown) => {
+    setForm({ ...form, [key]: value } as typeof form);
     if (errors[key]) setErrors({ ...errors, [key]: "" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = requestSchema.safeParse({
-      ...form,
-      childAge: parseInt(form.childAge) || 0,
-    });
+    const parsed = requestSchema.safeParse(form);
     if (!parsed.success) {
       const fieldErrors: Record<string, string> = {};
       parsed.error.issues.forEach((issue) => {
@@ -60,13 +73,16 @@ const LessonRequestForm = () => {
     }
     setSubmitting(true);
     const id = crypto.randomUUID();
+    const childAge = calcAge(parsed.data.childDob);
+    const dobIso = format(parsed.data.childDob, "yyyy-MM-dd");
     const { error } = await supabase.from("lesson_requests").insert({
       id,
       parent_name: parsed.data.parentName,
       parent_email: parsed.data.parentEmail,
       parent_phone: parsed.data.parentPhone || null,
       child_name: parsed.data.childName,
-      child_age: parsed.data.childAge,
+      child_age: childAge,
+      child_dob: dobIso,
       lesson_type: parsed.data.lessonType,
       preferred_times: parsed.data.preferredTimes || null,
       notes: parsed.data.notes || null,
@@ -114,7 +130,7 @@ const LessonRequestForm = () => {
   return (
     <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="max-w-lg mx-auto">
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">Request a Private or Semi-Private Lesson</h3>
-      <p className="text-muted-foreground text-sm mb-6">Fill out the form and we'll get back to you to schedule.</p>
+      <p className="text-muted-foreground text-sm mb-6">Fill out the form and we'll get back to you to schedule. Open to all ages.</p>
 
       <div className="flex items-center gap-4 text-sm bg-accent/50 border border-accent rounded-lg p-3 mb-6">
         <DollarSign className="w-4 h-4 text-primary shrink-0" />
@@ -143,16 +159,47 @@ const LessonRequestForm = () => {
             {errors.parentName && <p className="text-xs text-destructive mt-1">{errors.parentName}</p>}
           </div>
           <div>
-            <Label htmlFor="childName">Child's Name *</Label>
+            <Label htmlFor="childName">Swimmer's Name *</Label>
             <Input id="childName" value={form.childName} onChange={(e) => update("childName", e.target.value)} className="mt-1" />
             {errors.childName && <p className="text-xs text-destructive mt-1">{errors.childName}</p>}
           </div>
         </div>
 
         <div>
-          <Label htmlFor="childAge">Child's Age *</Label>
-          <Input id="childAge" type="number" min={3} max={12} value={form.childAge} onChange={(e) => update("childAge", e.target.value)} className="mt-1 max-w-[100px]" />
-          {errors.childAge && <p className="text-xs text-destructive mt-1">{errors.childAge}</p>}
+          <Label htmlFor="childDob">Swimmer's Date of Birth *</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  "mt-1 w-full justify-start text-left font-normal",
+                  !form.childDob && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {form.childDob ? format(form.childDob, "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={form.childDob}
+                onSelect={(d) => update("childDob", d)}
+                disabled={(date) => date > new Date() || date < new Date("1920-01-01")}
+                captionLayout="dropdown-buttons"
+                fromYear={1920}
+                toYear={new Date().getFullYear()}
+                defaultMonth={form.childDob ?? new Date(new Date().getFullYear() - 8, 0)}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+          {computedAge !== null && (
+            <p className="text-xs text-muted-foreground mt-1">Age: {computedAge}</p>
+          )}
+          {errors.childDob && <p className="text-xs text-destructive mt-1">{errors.childDob}</p>}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
