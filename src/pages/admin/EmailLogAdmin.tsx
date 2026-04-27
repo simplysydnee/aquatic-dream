@@ -77,6 +77,7 @@ export default function EmailLogAdmin() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [previewEmail, setPreviewEmail] = useState<EmailPreviewData | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
