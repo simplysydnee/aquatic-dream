@@ -1,83 +1,36 @@
-# Lesson Waiver UX Polish
+## Goal
 
-Fix the 7 issues identified in the waiver review. **Critical constraint:** the shared `LegalAgreements` component is also used by the group-class enrollment flow — all changes there must be additive (new optional props), with defaults preserving existing behavior. No changes to enrollment data shape, RPCs, RLS, or pricing logic.
+In the admin's **Add Event** dialog (`AddPoolEventDialog`), replace the free-text "Instructor (optional)" input with a **dropdown of active instructors** pulled from the `instructors` table. Instructors continue to have **no booking ability** in their portal — all private/semi-private bookings remain admin-only.
 
-## Files changed
+## What changes
 
-### 1. `src/pages/LessonWaiver.tsx` (parent-facing waiver page)
-- **Add booking summary card** above `LegalAgreements`: lesson type, date(s), time, instructor, child name. Pull this from a new lightweight RPC field set (see #3 below).
-- **Smarter success state**: after signing, check if there's an unpaid first occurrence with a Stripe checkout URL. If yes → "Next: complete payment" with primary CTA to Stripe link. If paid/none → keep current "You're all set" message.
-- **Better error state**: replace dead-end "Return home" with a contact block (phone + email mailto with prefilled subject "Waiver link issue") so parents have a recovery path.
-- Pass new props (see #4) to suppress the "Add Another Swimmer" path and customize submit button label to **"Sign & Submit Waiver"**.
+**Single field swap** in `src/components/admin/calendar/AddPoolEventDialog.tsx`:
 
-### 2. `src/components/admin/calendar/FrontDeskWaiverDialog.tsx`
-- Add a small **"Have parent/guardian sign below"** helper banner at top so staff don't sign for the parent.
-- Suppress the dialog's Back button (front-desk mode uses dialog close X instead) by passing the new `hideBack` prop, OR confirm-on-back. Going with `hideBack` for simplicity.
+- Remove the free-text `<Input>` for instructor name (line 512)
+- Add a searchable instructor picker (Combobox using shadcn `Command` inside a `Popover`) that:
+  - Loads `instructors` where `is_active = true`, sorted by name
+  - Shows "— No instructor —" as the first option (to clear / leave unassigned)
+  - Stores the selected instructor's **name** into the existing `instructorName` state (no schema change — the rest of the save logic already reads from this state)
+  - Pre-fills if editing an existing event whose `instructor_name` matches an active instructor
+- If the existing event's `instructor_name` doesn't match any active instructor (legacy data, deactivated instructor), show that name as a non-selectable hint so it's not silently dropped, with a "Change…" affordance
 
-### 3. `src/lib/lessonWaiver.ts` + new RPC
-- New SECURITY DEFINER RPC `get_lesson_booking_summary_by_token(_token text)` returning current fields plus: `instructor_name`, `start_time`, `end_time`, `series_start`, `series_end`, `recurring`, and the next unpaid occurrence's `stripe_checkout_url` + `payment_status` + `occurrence_date`. Keeps token-gated public access; no RLS change to base tables.
-- Update `fetchLessonBookingByToken` to return the richer shape; extend `LessonWaiverBooking` type.
-
-### 4. `src/components/swim-enrollment/LegalAgreements.tsx` (additive only)
-- Add optional props (all default to current behavior so group enrollment is unchanged):
-  - `submitLabel?: string` (default `"Complete Enrollment"`)
-  - `submittingLabel?: string` (default `"Enrolling..."`)
-  - `hideBack?: boolean` (default `false`)
-  - `headerTitle?: string` / `headerSubtitle?: ReactNode` (default current copy)
-- No logic, schema, or required-field changes. Existing call sites work as-is.
-
-### 5. `supabase/functions/_shared/transactional-email-templates/lesson-booking-confirmation.tsx`
-- Already conditionally hides the waiver step when `waiverSigned=true` — verify the send function passes the freshest `waiverSigned` value at the moment of resend so reopened/resent emails reflect current status. Small fix in `send-lesson-booking-confirmation/index.ts` to re-read `waiver_signed_at` before render.
-
-### 6. Mobile scroll handling in `LegalAgreements.tsx`
-- Replace fixed `h-48` `ScrollArea` with responsive height: `h-64 sm:h-48` and add `max-h-[40vh]` cap. Keeps desktop look; phones get a noticeably easier scroll target. This is the only behavioral tweak to the shared component — visual only, no API change.
-
-## Database migration
-
-```sql
-create or replace function public.get_lesson_booking_summary_by_token(_token text)
-returns table (
-  id uuid, parent_name text, parent_email text, child_name text,
-  lesson_type text, waiver_signed_at timestamptz,
-  instructor_name text, start_time time, end_time time,
-  series_start date, series_end date, recurring boolean,
-  next_occurrence_date date, next_payment_status text, next_checkout_url text
-)
-language sql stable security definer set search_path = public
-as $$
-  with b as (
-    select * from public.lesson_bookings where waiver_token = _token limit 1
-  ),
-  nxt as (
-    select o.occurrence_date, o.payment_status, o.stripe_checkout_url
-      from public.lesson_booking_occurrences o
-      join b on o.booking_id = b.id
-     where o.payment_status <> 'paid'
-     order by o.occurrence_date asc
-     limit 1
-  )
-  select b.id, b.parent_name, b.parent_email, b.child_name,
-         b.lesson_type, b.waiver_signed_at,
-         b.instructor_name, b.start_time, b.end_time,
-         b.series_start, b.series_end, b.recurring,
-         nxt.occurrence_date, nxt.payment_status, nxt.stripe_checkout_url
-    from b left join nxt on true;
-$$;
-```
-
-Existing `get_lesson_booking_by_waiver_token` is kept for backward compat.
+**Applies to all event types** in the dialog (private, semi-private, swim lesson, dive, rental, etc.) — they all share the same instructor field.
 
 ## What does NOT change
 
-- `swim_enrollments` table, group enrollment flow, pricing, registration fee logic
-- `LegalAgreements` validation schema, required fields, signature logic, UETA disclosure
-- All existing RPCs, RLS policies on `lesson_bookings`, `enrollment_agreements`
-- Stripe integration, webhook, payment links
-- Group class enrollment pages and components (no imports touched besides shared component which stays backward compatible)
+- No changes to the instructor portal (no self-booking)
+- No RLS changes — admin-only stays admin-only
+- No schema changes — `pool_events.instructor_name` and `lesson_bookings.instructor_name` stay as `text` columns storing the name string
+- Email confirmation, Stripe link, occurrences logic — all untouched
 
-## Verification after build
+## Technical notes
 
-1. Open existing group enrollment `/swim-enrollment` flow → confirm legal step renders identically and submits.
-2. Open a lesson waiver link → see new summary card, sign, see payment CTA if unpaid.
-3. Front-desk dialog → Back button hidden, helper banner visible, sign succeeds.
-4. Resend confirmation email after waiver signed → email no longer shows Step 1.
+- New small component `src/components/admin/calendar/InstructorPicker.tsx` (or inline) using `Command` + `Popover`, ~60 lines
+- Fetch instructors once when the dialog opens (not on every keystroke)
+- Search is client-side filter (typically <30 instructors)
+
+## Out of scope
+
+- Storing `instructor_id` (foreign key) instead of name — would require schema migration and backfill; flag for later if you want stronger data integrity
+- Letting instructors create their own bookings
+- Filtering instructors by availability/conflicts at the selected time (could add later as a warning)
