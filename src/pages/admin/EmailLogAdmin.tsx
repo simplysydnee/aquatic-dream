@@ -341,6 +341,12 @@ export default function EmailLogAdmin() {
           )}
         </CardContent>
       </Card>
+
+      <EmailPreviewDialog
+        email={previewEmail}
+        open={!!previewEmail}
+        onOpenChange={(o) => { if (!o) setPreviewEmail(null); }}
+      />
     </div>
   );
 }
