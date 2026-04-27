@@ -24,9 +24,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Mail, RefreshCw, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Mail, RefreshCw, Loader2, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import EmailPreviewDialog, { type EmailPreviewData } from "@/components/admin/EmailPreviewDialog";
 
 type EmailRow = {
   id: string;
