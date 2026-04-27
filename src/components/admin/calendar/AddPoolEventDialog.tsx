@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import SwimLessonFields from "./SwimLessonFields";
 import LessonBookingFields, { type LessonBookingFieldsData } from "./LessonBookingFields";
+import InstructorPicker from "./InstructorPicker";
 import { getStripeEnvironment } from "@/lib/stripe";
 import type { SwimLessonData } from "./SwimLessonFields";
 import type { CalendarPoolEvent } from "@/hooks/useCalendarData";
