@@ -97,15 +97,23 @@ export default function EmailLogAdmin() {
       return;
     }
 
-    // Deduplicate by message_id, keeping latest (data already DESC by created_at)
-    const seen = new Set<string>();
-    const deduped: EmailRow[] = [];
+    // Deduplicate by message_id, keeping the latest row but merging in
+    // metadata from any earlier row in the same group (the rendered HTML is
+    // stored on the initial `pending` insert, not on the later `sent` row).
+    const groups = new Map<string, EmailRow>();
     for (const r of (data || []) as EmailRow[]) {
       const key = r.message_id || r.id;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      deduped.push(r);
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, r);
+      } else if (!existing.metadata && r.metadata) {
+        // Keep the latest row's status/error but inherit metadata from the older row
+        groups.set(key, { ...existing, metadata: r.metadata });
+      }
     }
+    const deduped: EmailRow[] = Array.from(groups.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
     setRows(deduped);
     setLoading(false);
   };
