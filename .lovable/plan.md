@@ -1,36 +1,55 @@
-## Goal
+## Email Log Admin Page
 
-In the admin's **Add Event** dialog (`AddPoolEventDialog`), replace the free-text "Instructor (optional)" input with a **dropdown of active instructors** pulled from the `instructors` table. Instructors continue to have **no booking ability** in their portal — all private/semi-private bookings remain admin-only.
+Add a new admin page at `/admin/emails` that shows every email the system has sent, with filtering and search.
 
-## What changes
+### What you'll see
 
-**Single field swap** in `src/components/admin/calendar/AddPoolEventDialog.tsx`:
+**Summary cards (top of page)**
+- Total emails
+- Sent (green)
+- Failed (red)
+- Suppressed (yellow)
+- Pending (gray)
 
-- Remove the free-text `<Input>` for instructor name (line 512)
-- Add a searchable instructor picker (Combobox using shadcn `Command` inside a `Popover`) that:
-  - Loads `instructors` where `is_active = true`, sorted by name
-  - Shows "— No instructor —" as the first option (to clear / leave unassigned)
-  - Stores the selected instructor's **name** into the existing `instructorName` state (no schema change — the rest of the save logic already reads from this state)
-  - Pre-fills if editing an existing event whose `instructor_name` matches an active instructor
-- If the existing event's `instructor_name` doesn't match any active instructor (legacy data, deactivated instructor), show that name as a non-selectable hint so it's not silently dropped, with a "Change…" affordance
+Counts reflect the currently active filters.
 
-**Applies to all event types** in the dialog (private, semi-private, swim lesson, dive, rental, etc.) — they all share the same instructor field.
+**Filter bar**
+- Time range: Last 24h / 7 days / 30 days / All time / Custom date range
+- Template type: dropdown populated from distinct `template_name` values (e.g., `lesson-booking-confirmation`, `enrollment-confirmation`, `auth_emails`, etc.) — multi-select with "All" default
+- Status: All / Sent / Failed / Suppressed / Pending
+- Search box: filter by recipient email
 
-## What does NOT change
+Default view: All time, all templates, all statuses (no filters applied) — you'll see everything immediately, then narrow as needed.
 
-- No changes to the instructor portal (no self-booking)
-- No RLS changes — admin-only stays admin-only
-- No schema changes — `pool_events.instructor_name` and `lesson_bookings.instructor_name` stay as `text` columns storing the name string
-- Email confirmation, Stripe link, occurrences logic — all untouched
+**Email log table**
+Columns:
+- Timestamp (sortable, newest first by default)
+- Template name (friendly label)
+- Recipient email
+- Status (color-coded badge)
+- Error message (shown inline for failed/dlq rows, truncated with hover for full text)
 
-## Technical notes
+Paginated at 50 rows per page with prev/next controls.
 
-- New small component `src/components/admin/calendar/InstructorPicker.tsx` (or inline) using `Command` + `Popover`, ~60 lines
-- Fetch instructors once when the dialog opens (not on every keystroke)
-- Search is client-side filter (typically <30 instructors)
+**Row actions**
+- Click a row to expand and see full metadata (message_id, full error, JSON metadata payload)
 
-## Out of scope
+### Where it lives
 
-- Storing `instructor_id` (foreign key) instead of name — would require schema migration and backfill; flag for later if you want stronger data integrity
-- Letting instructors create their own bookings
-- Filtering instructors by availability/conflicts at the selected time (could add later as a warning)
+New sidebar entry **"Email Log"** under the existing admin nav, with a Mail icon, placed after "Announcements". Admin-only (uses existing `ProtectedRoute`).
+
+### Technical notes
+
+- New route `/admin/emails` → `EmailLogAdmin.tsx` page
+- Queries the `email_send_log` table directly via the Supabase client
+- **Deduplication**: a single email writes multiple rows (pending → sent/failed) sharing the same `message_id`. The query uses `DISTINCT ON (message_id)` ordered by `created_at DESC` so each email appears once with its latest status. Implemented as a Postgres view (`email_log_latest`) created via migration so the client query stays simple and indexed.
+- RLS: `email_send_log` currently only allows `service_role` to read. Add a new policy allowing admins (`has_role(auth.uid(), 'admin')`) to SELECT — required so the admin UI can read logs directly without an edge function.
+- Sidebar update in `AdminSidebar.tsx` to add the new menu item.
+- Route registration in `App.tsx`.
+
+### Files touched
+
+- New: `src/pages/admin/EmailLogAdmin.tsx`
+- New: `supabase/migrations/<timestamp>_email_log_view_and_policy.sql` (creates `email_log_latest` view + admin SELECT policy)
+- Edit: `src/App.tsx` (add route)
+- Edit: `src/components/admin/AdminSidebar.tsx` (add nav item)
