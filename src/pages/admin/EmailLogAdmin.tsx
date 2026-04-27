@@ -255,6 +255,7 @@ export default function EmailLogAdmin() {
                   <TableHead>Recipient</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Error</TableHead>
+                  <TableHead className="w-20 text-right">View</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
