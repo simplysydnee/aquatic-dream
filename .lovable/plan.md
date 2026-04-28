@@ -1,35 +1,81 @@
-## Goal
+## Root cause of "Past Client" mislabel
 
-Expand the **Clients** filter chips and switch the swimmer list to **infinite scroll**.
+The `session_periods` table has stale 2025 dates:
 
-## Filter chips (grouped)
+```text
+Session 1: 2025-06-08 → 2025-07-02
+Session 2: 2025-07-13 → 2025-08-06
+```
 
-Replace the single chip row with three labeled groups:
+Today is April 2026, so every enrollment in those sessions ended ~10 months ago → "Past Client." John Poses and Kaira Kang are flagged this way because their sessions look long-finished, when really they should be **upcoming 2026 sessions**.
 
-**Status**
-- All · New Inquiry · Enrolled · Active · Upcoming · Unpaid · Past
+**Fix:** bump the period dates to 2026 (and bump matching `swim_sessions.session_start_date` / `session_end_date`). I'll preview the exact rows for approval before running the update so the owner can confirm Session 1 = June 2026 and Session 2 = July 2026 before anything changes.
 
-**Request Status**
-- Any Request · Request · New · Request · Contacted · Request · Scheduled
+After the date fix, John & Kaira will correctly show as **Enrolled · Upcoming**.
 
-**Lesson Type**
-- Private · Semi-Private · Group
+---
 
-Filters remain single-select (one active filter at a time, like today). Lesson Type matches if the swimmer has any request, enrollment, or booking of that `lesson_type` (`private`, `semi-private`, `group`).
+## Everything else you asked for
 
-## Infinite scroll
+### 1. Phone formatting (`555-555-5555`)
+New `src/lib/phone.ts` with `formatPhone()` (handles `5555555555`, `+15555555555`, `(555) 555-5555`). Apply on:
+- Clients list rows
+- Swimmer detail drawer
+- Lesson request detail dialog
+`tel:` links keep raw digits.
 
-- Render **25 swimmers** initially.
-- Wrap the list in a scrollable container with a max height (`calc(100vh - 22rem)`) so it scrolls inside the page rather than pushing the filter bar off-screen.
-- Place a sentinel `<div>` at the bottom; an `IntersectionObserver` (200px rootMargin) loads the next 25 when it enters view.
-- Reset to 25 whenever the search text or filter chip changes.
-- Show "Loading more… (X of Y)" while more remain, then "— End of list —" when exhausted.
+### 2. Color-coded level tags (match Class Roster)
+Reuse `LEVEL_BADGE_COLORS` from `src/components/swim-enrollment/types.ts` (white/red/yellow/blue/green hex codes already used on Class Roster) for the level badge on:
+- Each swimmer card in the Clients list
+- The swimmer detail drawer header
 
-## Files
+### 3. Internal comments — shared between Clients & Lesson Requests
 
-- **Edit only**: `src/pages/admin/ClientsAdmin.tsx`
-  - Expand the `Filter` type and `FILTER_GROUPS` constant
-  - Add `visibleCount` state + `IntersectionObserver` effect
-  - Wrap list in scrollable container with sentinel
+**New table `internal_comments`:**
+```text
+id, target_type ('swimmer' | 'lesson_request'),
+target_key (text), body, author_id, author_name,
+created_at, updated_at
+```
+- Swimmer key = `lower(child_name)|lower(parent_email)` (matches existing `swimmerKey` in `useSwimmers.ts`)
+- Lesson request key = `lesson_request.id`
 
-No DB, no other component changes.
+RLS: authenticated admins only (select/insert/update/delete own).
+
+**New `InternalCommentsPanel` component** — list of notes with author + timestamp, textarea + "Add note" button, edit/delete on own notes, realtime updates.
+
+Mounted in:
+- `SwimmerDetailDrawer.tsx` → new **Notes** tab
+- `LessonRequestDetailDialog.tsx` → new **Internal Notes** section above the Reply form (so staff can document call attempts, voicemails, etc.)
+
+Small **note-count badge** on the swimmer card and the lesson request row so staff see at a glance there are notes.
+
+### 4. Rename "Timeline" → "Enrollments & Lessons"
+In `SwimmerDetailDrawer.tsx`, change the tab label and split entries under two headings:
+- **Enrollments** — session name, dates, level, payment status
+- **Lessons & Requests** — booking type, date range, request status
+
+Sorted newest first. Each entry stays clickable.
+
+---
+
+## Files touched
+
+**New**
+- `src/lib/phone.ts`
+- `src/components/admin/InternalCommentsPanel.tsx`
+- `src/hooks/useInternalComments.ts`
+- Migration: create `internal_comments` table + RLS
+- Data update: `session_periods` + `swim_sessions` 2025 → 2026 (preview before running)
+
+**Edited**
+- `src/pages/admin/ClientsAdmin.tsx` — phone formatting, level color, note badge
+- `src/components/admin/clients/SwimmerDetailDrawer.tsx` — tab rename + split, Notes tab, phone, level color
+- `src/components/admin/LessonRequestDetailDialog.tsx` — phone, internal notes section
+- `src/pages/admin/LessonRequestsAdmin.tsx` — note-count badge
+
+---
+
+## One question before I start
+
+For the **2025 → 2026 date fix on session_periods + swim_sessions**: should I just shift everything forward exactly **one year** (2025-06-08 → 2026-06-08, etc.), or do you want to set custom new dates for Session 1 and Session 2?
