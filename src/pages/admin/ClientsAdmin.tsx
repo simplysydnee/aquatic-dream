@@ -303,8 +303,14 @@ export default function ClientsAdmin() {
                 <span className="font-semibold text-foreground">{s.child_name}</span>
                 {s.child_age != null && <span className="text-sm text-muted-foreground">({s.child_age})</span>}
                 {s.swim_level && (
-                  <Badge variant="outline" className="text-[10px] uppercase">
+                  <Badge variant="outline" className={cn("text-[10px] uppercase font-bold", levelClass(s.swim_level))}>
                     {s.swim_level}
+                  </Badge>
+                )}
+                {commentCounts[s.key] > 0 && (
+                  <Badge variant="secondary" className="gap-1 text-[10px] h-5">
+                    <MessageSquare className="h-3 w-3" />
+                    {commentCounts[s.key]}
                   </Badge>
                 )}
               </div>
@@ -320,7 +326,7 @@ export default function ClientsAdmin() {
                 {s.parent_phone && (
                   <span className="inline-flex items-center gap-1">
                     <Phone className="h-3 w-3" />
-                    {s.parent_phone}
+                    {formatPhone(s.parent_phone)}
                   </span>
                 )}
               </div>
