@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Mail, Phone, Send, MailCheck } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
+import { formatPhone, phoneHref } from "@/lib/phone";
 
 export interface LessonRequest {
   id: string;
@@ -142,8 +144,8 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
                 <Mail className="h-3 w-3" /> {request.parent_email}
               </a>
               {request.parent_phone && (
-                <a href={`tel:${request.parent_phone}`} className="flex items-center gap-1 text-primary hover:underline">
-                  <Phone className="h-3 w-3" /> {request.parent_phone}
+                <a href={phoneHref(request.parent_phone)} className="flex items-center gap-1 text-primary hover:underline">
+                  <Phone className="h-3 w-3" /> {formatPhone(request.parent_phone)}
                 </a>
               )}
             </div>
