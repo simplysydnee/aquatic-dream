@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import LessonRequestDetailDialog, { LessonRequest } from "@/components/admin/LessonRequestDetailDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, MessageSquare } from "lucide-react";
+import { formatPhone } from "@/lib/phone";
+import { useCommentCounts } from "@/hooks/useInternalComments";
 
 const LessonRequestsAdmin = () => {
   const [requests, setRequests] = useState<LessonRequest[]>([]);
@@ -33,6 +35,9 @@ const LessonRequestsAdmin = () => {
     setSelected(r);
     setDialogOpen(true);
   };
+
+  const requestIds = useMemo(() => requests.map((r) => r.id), [requests]);
+  const commentCounts = useCommentCounts("lesson_request", requestIds);
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
 
@@ -81,7 +86,17 @@ const LessonRequestsAdmin = () => {
                   className="cursor-pointer hover:bg-muted/40"
                   onClick={() => openRequest(r)}
                 >
-                  <TableCell className="font-medium">{r.child_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-1.5">
+                      {r.child_name}
+                      {commentCounts[r.id] > 0 && (
+                        <Badge variant="secondary" className="gap-1 text-[10px] h-5">
+                          <MessageSquare className="h-3 w-3" />
+                          {commentCounts[r.id]}
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{r.child_age}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={r.lesson_type === "private" ? "bg-purple-50 text-purple-700 border-purple-300" : "bg-blue-50 text-blue-700 border-blue-300"}>
@@ -91,7 +106,7 @@ const LessonRequestsAdmin = () => {
                   <TableCell>
                     <div>{r.parent_name}</div>
                     <div className="text-xs text-muted-foreground">{r.parent_email}</div>
-                    {r.parent_phone && <div className="text-xs text-muted-foreground">{r.parent_phone}</div>}
+                    {r.parent_phone && <div className="text-xs text-muted-foreground">{formatPhone(r.parent_phone)}</div>}
                   </TableCell>
                   <TableCell className="text-sm max-w-[200px] truncate">{r.preferred_times || "—"}</TableCell>
                   <TableCell>
