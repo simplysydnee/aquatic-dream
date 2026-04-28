@@ -3,9 +3,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, User, Calendar, BookOpen, CreditCard, Waves } from "lucide-react";
+import { Mail, Phone, User, BookOpen, Waves, Calendar } from "lucide-react";
 import type { Swimmer } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "./SwimmerStatusBadges";
+import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
+import { formatPhone, phoneHref } from "@/lib/phone";
+import { LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
+import { cn } from "@/lib/utils";
 
 interface Props {
   swimmer: Swimmer | null;
@@ -20,6 +24,14 @@ interface Props {
 const fmtDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—");
 const fmtDateTime = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
 
+const levelClass = (level?: string | null) => {
+  if (!level) return "";
+  const key = level.toLowerCase() as SwimLevel;
+  const c = LEVEL_BADGE_COLORS[key];
+  if (!c) return "";
+  return cn(c.bg, c.text, "ring-1", c.ring, "border-transparent");
+};
+
 export default function SwimmerDetailDrawer({
   swimmer,
   siblings,
@@ -31,47 +43,56 @@ export default function SwimmerDetailDrawer({
 }: Props) {
   if (!swimmer) return null;
 
-  // Build chronological timeline
-  const timeline: Array<{ id: string; date: string; kind: "request" | "enrollment" | "booking"; label: string; sub: string; onClick?: () => void }> = [];
-  swimmer.requests.forEach((r) =>
-    timeline.push({
+  // Split entries into Enrollments vs Lessons & Requests, newest first.
+  const enrollmentEntries = [...swimmer.enrollments]
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+    .map((e) => ({
+      id: e.id,
+      date: e.created_at,
+      title: e.session?.period?.name || "Session",
+      sub: `${e.swim_level || "—"} · ${e.session?.day_of_week || "—"} · Pay: ${e.payment_status}${
+        e.is_first_time ? ` · Reg fee: ${e.session_fee_status}` : ""
+      }`,
+      level: e.swim_level,
+      onClick: () => onOpenEnrollment(e.id),
+    }));
+
+  const lessonEntries = [
+    ...swimmer.requests.map((r) => ({
       id: `req-${r.id}`,
       date: r.created_at,
-      kind: "request",
-      label: `Lesson Request · ${r.lesson_type}`,
+      kind: "request" as const,
+      title: `Lesson Request · ${r.lesson_type}`,
       sub: `Status: ${r.status}${r.preferred_times ? ` · Prefers: ${r.preferred_times}` : ""}`,
       onClick: () => onOpenRequest(r.id),
-    }),
-  );
-  swimmer.enrollments.forEach((e) =>
-    timeline.push({
-      id: `enr-${e.id}`,
-      date: e.created_at,
-      kind: "enrollment",
-      label: `Enrollment · ${e.session?.period?.name || "Session"}`,
-      sub: `${e.swim_level || "—"} · ${e.session?.day_of_week || "—"} · Pay: ${e.payment_status}${e.is_first_time ? ` · Reg fee: ${e.session_fee_status}` : ""}`,
-      onClick: () => onOpenEnrollment(e.id),
-    }),
-  );
-  swimmer.bookings.forEach((b) =>
-    timeline.push({
+    })),
+    ...swimmer.bookings.map((b) => ({
       id: `bk-${b.id}`,
       date: b.created_at,
-      kind: "booking",
-      label: `Booking · ${b.lesson_type}`,
+      kind: "booking" as const,
+      title: `Booking · ${b.lesson_type}`,
       sub: `${b.series_start} → ${b.series_end || "ongoing"} · ${b.start_time}-${b.end_time}`,
-    }),
-  );
-  timeline.sort((a, b) => (a.date < b.date ? 1 : -1));
+      onClick: undefined,
+    })),
+  ].sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  const totalActivity = enrollmentEntries.length + lessonEntries.length;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl p-0 flex flex-col">
         <SheetHeader className="p-6 border-b">
-          <SheetTitle className="text-xl flex items-center gap-2">
+          <SheetTitle className="text-xl flex items-center gap-2 flex-wrap">
             <User className="h-5 w-5 text-primary" />
             {swimmer.child_name}
-            {swimmer.child_age != null && <span className="text-muted-foreground font-normal text-base">({swimmer.child_age})</span>}
+            {swimmer.child_age != null && (
+              <span className="text-muted-foreground font-normal text-base">({swimmer.child_age})</span>
+            )}
+            {swimmer.swim_level && (
+              <Badge variant="outline" className={cn("text-[10px] uppercase font-bold", levelClass(swimmer.swim_level))}>
+                {swimmer.swim_level}
+              </Badge>
+            )}
           </SheetTitle>
           <SwimmerStatusBadges statuses={swimmer.statuses} className="mt-2" />
         </SheetHeader>
@@ -79,7 +100,8 @@ export default function SwimmerDetailDrawer({
         <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
           <TabsList className="mx-6 mt-4 self-start">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline ({timeline.length})</TabsTrigger>
+            <TabsTrigger value="activity">Enrollments & Lessons ({totalActivity})</TabsTrigger>
+            <TabsTrigger value="notes">Notes</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="flex-1">
@@ -102,8 +124,8 @@ export default function SwimmerDetailDrawer({
                     <Mail className="h-3.5 w-3.5" />{swimmer.parent_email}
                   </a>
                   {swimmer.parent_phone && (
-                    <a href={`tel:${swimmer.parent_phone}`} className="flex items-center gap-2 text-primary hover:underline">
-                      <Phone className="h-3.5 w-3.5" />{swimmer.parent_phone}
+                    <a href={phoneHref(swimmer.parent_phone)} className="flex items-center gap-2 text-primary hover:underline">
+                      <Phone className="h-3.5 w-3.5" />{formatPhone(swimmer.parent_phone)}
                     </a>
                   )}
                 </div>
@@ -137,7 +159,12 @@ export default function SwimmerDetailDrawer({
                         onClick={() => onSelectSwimmer(sib)}
                         className="w-full flex items-center justify-between rounded-md border p-2.5 text-left hover:bg-muted/50 transition-colors"
                       >
-                        <span className="text-sm font-medium">{sib.child_name} {sib.child_age != null && <span className="text-muted-foreground font-normal">({sib.child_age})</span>}</span>
+                        <span className="text-sm font-medium">
+                          {sib.child_name}{" "}
+                          {sib.child_age != null && (
+                            <span className="text-muted-foreground font-normal">({sib.child_age})</span>
+                          )}
+                        </span>
                         <Badge variant="outline" className="text-xs">{sib.primary_status.label}</Badge>
                       </button>
                     ))}
@@ -146,31 +173,84 @@ export default function SwimmerDetailDrawer({
               )}
             </TabsContent>
 
-            <TabsContent value="timeline" className="p-6 mt-0">
-              {timeline.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No activity yet.</p>
-              ) : (
-                <ol className="relative border-l border-border pl-5 space-y-4">
-                  {timeline.map((item) => {
-                    const Icon = item.kind === "request" ? BookOpen : item.kind === "enrollment" ? Waves : Calendar;
-                    return (
-                      <li key={item.id} className="relative">
-                        <span className="absolute -left-[27px] flex h-5 w-5 items-center justify-center rounded-full bg-background border">
-                          <Icon className="h-3 w-3 text-primary" />
-                        </span>
-                        <div className="text-xs text-muted-foreground">{fmtDateTime(item.date)}</div>
-                        <div className="font-medium text-sm">{item.label}</div>
-                        <div className="text-xs text-muted-foreground">{item.sub}</div>
-                        {item.onClick && (
-                          <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-xs" onClick={item.onClick}>
+            <TabsContent value="activity" className="p-6 mt-0 space-y-6">
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <Waves className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-sm">Enrollments ({enrollmentEntries.length})</h3>
+                </div>
+                {enrollmentEntries.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">No session enrollments.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {enrollmentEntries.map((e) => (
+                      <div key={e.id} className="rounded-md border p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-xs text-muted-foreground">{fmtDateTime(e.date)}</div>
+                            <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
+                              {e.title}
+                              {e.level && (
+                                <Badge variant="outline" className={cn("text-[10px] uppercase", levelClass(e.level))}>
+                                  {e.level}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{e.sub}</div>
+                          </div>
+                          <Button variant="link" size="sm" className="h-auto p-0 text-xs shrink-0" onClick={e.onClick}>
                             Open →
                           </Button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
-              )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-sm">Lessons & Requests ({lessonEntries.length})</h3>
+                </div>
+                {lessonEntries.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">No lesson requests or private bookings.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {lessonEntries.map((item) => {
+                      const Icon = item.kind === "request" ? BookOpen : Calendar;
+                      return (
+                        <div key={item.id} className="rounded-md border p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-xs text-muted-foreground">{fmtDateTime(item.date)}</div>
+                              <div className="font-medium text-sm flex items-center gap-1.5">
+                                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                                {item.title}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">{item.sub}</div>
+                            </div>
+                            {item.onClick && (
+                              <Button variant="link" size="sm" className="h-auto p-0 text-xs shrink-0" onClick={item.onClick}>
+                                Open →
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </TabsContent>
+
+            <TabsContent value="notes" className="p-6 mt-0">
+              <InternalCommentsPanel
+                targetType="swimmer"
+                targetKey={swimmer.key}
+                title="Internal Notes"
+                emptyHint="No internal notes for this swimmer yet. Add the first one below."
+              />
             </TabsContent>
           </ScrollArea>
         </Tabs>

@@ -4,13 +4,24 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Mail, Phone, User as UserIcon, SlidersHorizontal, X } from "lucide-react";
+import { Search, Mail, Phone, User as UserIcon, SlidersHorizontal, X, MessageSquare } from "lucide-react";
 import { useSwimmers, type Swimmer, type SwimmerStatusKey } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "@/components/admin/clients/SwimmerStatusBadges";
 import SwimmerDetailDrawer from "@/components/admin/clients/SwimmerDetailDrawer";
 import LessonRequestDetailDialog, { type LessonRequest } from "@/components/admin/LessonRequestDetailDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { formatPhone } from "@/lib/phone";
+import { LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
+import { useCommentCounts } from "@/hooks/useInternalComments";
+
+const levelClass = (level?: string | null) => {
+  if (!level) return "";
+  const key = level.toLowerCase() as SwimLevel;
+  const c = LEVEL_BADGE_COLORS[key];
+  if (!c) return "";
+  return cn(c.bg, c.text, "ring-1", c.ring, "border-transparent");
+};
 
 type Filter =
   | "all"
@@ -159,6 +170,8 @@ export default function ClientsAdmin() {
   }, [filtered.length, visibleCount]);
 
   const visible = filtered.slice(0, visibleCount);
+  const visibleKeys = useMemo(() => visible.map((v) => v.key), [visible]);
+  const commentCounts = useCommentCounts("swimmer", visibleKeys);
 
   const siblingsOf = (s: Swimmer) =>
     swimmers.filter((x) => x.parent_email.toLowerCase() === s.parent_email.toLowerCase() && x.key !== s.key);
@@ -290,8 +303,14 @@ export default function ClientsAdmin() {
                 <span className="font-semibold text-foreground">{s.child_name}</span>
                 {s.child_age != null && <span className="text-sm text-muted-foreground">({s.child_age})</span>}
                 {s.swim_level && (
-                  <Badge variant="outline" className="text-[10px] uppercase">
+                  <Badge variant="outline" className={cn("text-[10px] uppercase font-bold", levelClass(s.swim_level))}>
                     {s.swim_level}
+                  </Badge>
+                )}
+                {commentCounts[s.key] > 0 && (
+                  <Badge variant="secondary" className="gap-1 text-[10px] h-5">
+                    <MessageSquare className="h-3 w-3" />
+                    {commentCounts[s.key]}
                   </Badge>
                 )}
               </div>
@@ -307,7 +326,7 @@ export default function ClientsAdmin() {
                 {s.parent_phone && (
                   <span className="inline-flex items-center gap-1">
                     <Phone className="h-3 w-3" />
-                    {s.parent_phone}
+                    {formatPhone(s.parent_phone)}
                   </span>
                 )}
               </div>
