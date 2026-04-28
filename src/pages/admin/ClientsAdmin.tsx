@@ -170,6 +170,8 @@ export default function ClientsAdmin() {
   }, [filtered.length, visibleCount]);
 
   const visible = filtered.slice(0, visibleCount);
+  const visibleKeys = useMemo(() => visible.map((v) => v.key), [visible]);
+  const commentCounts = useCommentCounts("swimmer", visibleKeys);
 
   const siblingsOf = (s: Swimmer) =>
     swimmers.filter((x) => x.parent_email.toLowerCase() === s.parent_email.toLowerCase() && x.key !== s.key);
