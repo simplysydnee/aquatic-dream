@@ -3,7 +3,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Mail, Phone, User as UserIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, Mail, Phone, User as UserIcon, SlidersHorizontal, X } from "lucide-react";
 import { useSwimmers, type Swimmer, type SwimmerStatusKey } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "@/components/admin/clients/SwimmerStatusBadges";
 import SwimmerDetailDrawer from "@/components/admin/clients/SwimmerDetailDrawer";
@@ -187,59 +188,93 @@ export default function ClientsAdmin() {
     );
   }
 
+  const activeFilterLabel =
+    FILTER_GROUPS.flatMap((g) => g.items).find((i) => i.key === filter)?.label ?? "All";
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-display font-bold text-foreground">Clients</h2>
-          <p className="text-sm text-muted-foreground">
-            One row per swimmer. Search across requests, enrollments, and bookings.
-          </p>
-        </div>
-        <Badge variant="outline" className="text-sm">
-          {filtered.length} of {swimmers.length}
-        </Badge>
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-2xl font-display font-bold text-foreground">Clients</h2>
+        <p className="text-sm text-muted-foreground">
+          One row per swimmer. Search across requests, enrollments, and bookings.
+        </p>
       </div>
 
       <Card>
-        <CardContent className="p-4 space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search swimmer, parent, email, or phone…"
-              className="pl-9"
-            />
-          </div>
-          <div className="space-y-2">
-            {FILTER_GROUPS.map((group) => (
-              <div key={group.label} className="flex flex-wrap items-start gap-2">
-                <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold w-28 shrink-0 pt-1.5">
-                  {group.label}
-                </span>
-                <div className="flex flex-wrap gap-1.5 flex-1">
-                  {group.items.map((f) => (
-                    <Button
-                      key={f.key}
-                      variant={filter === f.key ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFilter(f.key)}
-                      className="h-7 text-xs"
-                    >
-                      {f.label}
+        <CardContent className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search swimmer, parent, email, or phone…"
+                className="pl-9"
+              />
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="default" className="shrink-0 gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline">Filter</span>
+                  {filter !== "all" && (
+                    <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                      {activeFilterLabel}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm">Filters</h4>
+                  {filter !== "all" && (
+                    <Button variant="ghost" size="sm" onClick={() => setFilter("all")} className="h-7 text-xs gap-1">
+                      <X className="h-3 w-3" /> Clear
                     </Button>
-                  ))}
+                  )}
                 </div>
-              </div>
-            ))}
+                {FILTER_GROUPS.map((group) => (
+                  <div key={group.label} className="space-y-1.5">
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
+                      {group.label}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.items.map((f) => (
+                        <Button
+                          key={f.key}
+                          variant={filter === f.key ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setFilter(f.key)}
+                          className="h-7 text-xs"
+                        >
+                          {f.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </PopoverContent>
+            </Popover>
           </div>
         </CardContent>
       </Card>
 
+      <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+        <span>
+          Showing <span className="font-semibold text-foreground">{Math.min(visibleCount, filtered.length)}</span> of{" "}
+          <span className="font-semibold text-foreground">{filtered.length}</span>
+          {filtered.length !== swimmers.length && <span> · {swimmers.length} total</span>}
+        </span>
+        {filter !== "all" && (
+          <button onClick={() => setFilter("all")} className="text-primary hover:underline inline-flex items-center gap-1">
+            <X className="h-3 w-3" /> Clear filter
+          </button>
+        )}
+      </div>
+
       <div
         ref={scrollRef}
-        className="space-y-2 max-h-[calc(100vh-22rem)] overflow-y-auto pr-1 rounded-lg border bg-muted/20 p-2"
+        className="space-y-2 max-h-[calc(100vh-18rem)] overflow-y-auto pr-1 rounded-lg border bg-muted/20 p-2"
       >
         {visible.map((s) => (
           <button
