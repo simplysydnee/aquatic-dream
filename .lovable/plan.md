@@ -1,89 +1,104 @@
-# Fix Monica Prieto Overcharge — Option A
+## Goal
 
-## What happened (confirmed from data)
+1. Delete the one-off `admin-fix-monica-overcharge` edge function (no longer needed).
+2. Fix the broken interaction between the `enforce_first_time_swimmer` DB trigger and the `payments-webhook` insert path that produced Monica's confusing row state and risks future financial discrepancies.
+3. Correct Monica's two enrollment rows so the data matches what was actually charged.
 
-Monica Prieto (`mprieto20042000@yahoo.com`) enrolled child **John Poses** in **two** Reef Explorers sessions:
-- Row 1: `is_first_time=true`, session `64287fc1...` (Jun 8 – Jul 2), DB `session_price=$240`
-- Row 2: `is_first_time=false`, session `7650a624...` (Jul 13 – Aug 6), DB `session_price=$240`
+## Root cause: trigger ↔ webhook conflict
 
-Both rows share the **same Stripe checkout** `cs_live_b1xyOr74R9PdpjlSAKrIocC8SXqV1CXbq7cWTtJorrZXGoL7WZC6DL7VAO`. Both have `payment_status=not_required` and `session_fee_status=paid`.
+Three things collide today:
 
-**Expected charge**: $45 reg fee (first-time) + $240 (first session) + $240 (second session) = **$525**, OR if the first-time rule applied (reg fee only at checkout, $240 day-1), then $45 + $240 = **$285**.
+- **`create-checkout`** decides what to charge in Stripe based ONLY on the `isFirstTime` flag the client sent. Returning → `swim_session_fee` × N sessions. First-time → one `registration_fee` ($45). It does NOT consult the DB.
+- **`payments-webhook`** inserts enrollment rows with `is_first_time` / `registration_fee` / `payment_status` consistent with what was charged.
+- **`enforce_first_time_swimmer` trigger** (`BEFORE INSERT`) overrides those values: if no prior committed row exists for `(parent_email, child_name)`, it forces `is_first_time=true` and `registration_fee=45` — even if Stripe never collected $45.
 
-**Actual Stripe charge**: $560 — consistent with **$280 × 2 sessions** and no $45 reg fee billed (the first-time rule appears to have been bypassed because both rows ended up `payment_status=not_required`; this is a second bug).
+Symptoms confirmed in DB:
 
-## Root cause
+- **Monica / John Poses (2 sessions, returning):** Stripe charged 2 × $280 (now refunded $80 → $480 net = 2 × $240). Webhook tried to insert two returning rows. Trigger flipped row 1 to `is_first_time=true, registration_fee=45` because no prior John Poses row existed. Row 2 was inserted second, saw row 1, kept `is_first_time=false`. Net effect: DB claims $45 reg fee was paid that was never charged, and `payment_status='not_required'` on the "first-time" row contradicts `registration_fee=45`.
+- **Casey Turk / Giana Bansal (first-time, 2 sessions each):** First row `payment_amount=$45 / paid`, second row `payment_amount=$0 / not_required`. This part is actually correct (one $45 fee per child).
+- **General risk:** any returning customer enrolling a child with no prior DB record gets silently flipped to first-time in the DB, creating a permanent $45 phantom receivable.
 
-`create-checkout` resolves line items by Stripe `lookup_key='swim_session_fee'`. Whatever amount lives on that Stripe price is what the customer pays — the DB `swim_sessions.session_price` ($240) is ignored. The Stripe price for this lookup key is currently **$280**, so each returning-session line item charged $280.
+## Changes
 
-The `payments-webhook` reconciler only flags **undercharges** (Stripe < DB sum), so the +$80 overcharge passed silently.
+### 1. Delete one-off function
 
-## The fix (Option A)
+Remove `supabase/functions/admin-fix-monica-overcharge/` and call `supabase--delete_edge_functions` to deprovision it.
 
-### 1. Issue $80 refund to Monica
+### 2. Make the trigger respect the webhook
 
-Partial refund on `cs_live_b1xyOr74R9PdpjlSAKrIocC8SXqV1CXbq7cWTtJorrZXGoL7WZC6DL7VAO` for $80.00 via a one-off admin script (edge function invocation using `createStripeClient('live')` → `stripe.refunds.create({ payment_intent, amount: 8000, reason: 'requested_by_customer' })`). Log the refund ID on both enrollment rows in a new `session_fee_refund_stripe_id` column (added in step 3).
+Rewrite `enforce_first_time_swimmer` so it only sets defaults when the inserter did NOT explicitly stamp `is_first_time` and `registration_fee`. The webhook is the authoritative source because it knows what Stripe actually charged.
 
-### 2. Sync Stripe `swim_session_fee` price to $240
+New behavior:
 
-Use `payments--create_price` to create a new price with `id='swim_session_fee'`, `amount=24000`, `currency='usd'`, `quantity_min=1`, `quantity_max=1`. Stripe transfers the `lookup_key` to the new price automatically; old $280 price is archived. Future checkouts immediately use $240.
+- If the row being inserted already has `is_first_time` AND `registration_fee` set (i.e. `IS NOT NULL`), trust them and pass through unchanged. The webhook always sets both, so this is the normal path.
+- Only when both are NULL (legacy/manual paths that skip the values) does it auto-detect first-time status from prior rows and stamp $45.
+- Keep behavior identical for `admin-create-enrollment` (admin path already supplies these fields explicitly, so it will be unchanged).
 
-### 3. Strict two-way reconciliation in `payments-webhook`
+This eliminates the silent flip while preserving the safety net for inserts that omit the fields.
 
-In the `checkout.session.completed` handler, after computing the expected total from the DB rows being inserted (registration_fee sum + session_price sum for returning rows), compare to `session.amount_total`:
-- If `stripe_total < expected`: log `RECONCILIATION_UNDERCHARGE` (existing behavior).
-- If `stripe_total > expected`: log `RECONCILIATION_OVERCHARGE` with the delta, the session ID, and the enrollment IDs, and insert a row into a new `payment_reconciliation_alerts` table so admins see it on the dashboard.
-- If equal: proceed silently.
+### 3. Webhook: enforce one reg fee per child per checkout
 
-Do NOT block the enrollment insert in either case — the customer already paid; we just need visibility.
+In `payments-webhook` `handleCheckoutCompleted`, the current logic already only stamps `registration_fee=45` on `i === 0` for first-time children. Verify and tighten the comment. No functional change expected, but add an explicit assertion: for returning children we set `registration_fee=0` and `payment_status='not_required'` on every row — which combined with the trigger fix above will now persist correctly.
 
-### 4. Audit other affected customers
+### 4. Reconcile Monica's two rows
 
-Run a one-off SQL audit:
+One-off SQL migration to reflect what was actually charged ($240 per session, $0 reg fee, no first-time):
+
+- Row `b8985e08…` (currently is_first_time=true, registration_fee=45): set `is_first_time=false`, `registration_fee=0`. Keep `payment_amount=240`, `session_fee_status='paid'`, `session_fee_stripe_id`, `session_fee_paid_at`.
+- Row `34c143e2…` (already is_first_time=false): no change needed beyond verification.
+- Both rows already carry the $40-each refund record from yesterday's fix.
+
+### 5. Audit query (informational, no change)
+
+Run a SELECT to surface any other rows where `registration_fee=45` but the child's parent has prior committed enrollments — these are likely other victims of the same trigger flip. Report findings to user; do not auto-modify.
+
+## Technical details
+
+**Files modified**
+- DELETE: `supabase/functions/admin-fix-monica-overcharge/index.ts`
+- NEW migration: rewrite `public.enforce_first_time_swimmer()` function body
+- NEW migration: UPDATE statement for Monica's row `b8985e08-0884-4bd3-8dc4-8bea97e86217`
+- EDIT: `supabase/functions/payments-webhook/index.ts` — comment clarification + explicit nulling guard for returning rows (defensive)
+
+**Trigger function (new body, sketch)**
+
 ```sql
--- Pseudocode — actual query joins swim_enrollments to grouped Stripe session totals
-SELECT session_fee_stripe_id, COUNT(*), SUM(...)
-FROM swim_enrollments
-WHERE session_fee_status='paid' AND session_fee_stripe_id LIKE 'cs_live_%'
-GROUP BY session_fee_stripe_id;
-```
-Then for each `cs_live_*`, fetch the actual Stripe `amount_total` and compare to the expected $240 × returning-row-count + $45 × first-time-row-count. List any other customer who paid $280/session and queue refunds.
+CREATE OR REPLACE FUNCTION public.enforce_first_time_swimmer()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+DECLARE prior_count INTEGER;
+BEGIN
+  -- If the caller stamped both fields, trust them (webhook + admin path).
+  IF NEW.is_first_time IS NOT NULL AND NEW.registration_fee IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
 
-### 5. Schema additions
+  SELECT COUNT(*) INTO prior_count
+  FROM public.swim_enrollments
+  WHERE lower(parent_email) = lower(NEW.parent_email)
+    AND lower(trim(child_name)) = lower(trim(NEW.child_name))
+    AND id <> COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid);
 
-```sql
-ALTER TABLE swim_enrollments
-  ADD COLUMN session_fee_refund_stripe_id text,
-  ADD COLUMN session_fee_refund_amount numeric,
-  ADD COLUMN session_fee_refund_at timestamptz;
+  IF prior_count = 0 THEN
+    NEW.is_first_time := COALESCE(NEW.is_first_time, true);
+    NEW.registration_fee := COALESCE(NEW.registration_fee, 45);
+  ELSE
+    NEW.is_first_time := COALESCE(NEW.is_first_time, false);
+    NEW.registration_fee := COALESCE(NEW.registration_fee, 0);
+  END IF;
 
-CREATE TABLE payment_reconciliation_alerts (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  stripe_checkout_session_id text NOT NULL,
-  expected_amount numeric NOT NULL,
-  actual_amount numeric NOT NULL,
-  delta numeric NOT NULL,
-  direction text NOT NULL CHECK (direction IN ('overcharge','undercharge')),
-  enrollment_ids uuid[],
-  resolved_at timestamptz,
-  resolved_by uuid,
-  notes text,
-  created_at timestamptz DEFAULT now()
-);
-ALTER TABLE payment_reconciliation_alerts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Admins manage alerts" ON payment_reconciliation_alerts
-  FOR ALL TO authenticated USING (has_role(auth.uid(),'admin'));
+  RETURN NEW;
+END;
+$$;
 ```
 
-## Files to change
+**Out of scope for this fix**
 
-- **New migration**: schema additions above
-- **`supabase/functions/payments-webhook/index.ts`**: add two-way reconciliation + alert insert
-- **New edge function `admin-refund-session-fee`**: takes `enrollmentId` + `amountCents`, creates Stripe refund, writes refund fields back to row (used both for Monica now and any future overcharge resolution)
-- **Stripe price sync** via `payments--create_price` (no code change, tool call)
-- **Audit script** (one-off): list all live `cs_*` checkouts where Stripe total > expected DB sum
+- No change to `create-checkout` line-item logic — current rule (first-time → $45 only; returning → $240 × sessions) matches the stated business rule and is correct.
+- No change to Stripe price (already $240 after yesterday).
+- Reconciliation alerts table and `payments-webhook` two-way reconciliation stay as-is.
 
-## Out of scope (flag for follow-up)
+## After approval, expected outcome
 
-- The `payment_status=not_required` on Monica's first-time row suggests the first-time/$45-reg-fee branching also misfired for her — worth a separate investigation, but **not** part of this fix. (May simply be that admin reclassified, or the multi-child first-time path collapsed both into "returning". I'll need to re-read `create-checkout` line-item logic and webhook insert path to confirm before touching it.)
-- Architectural Option B (DB-driven `price_data`) is deferred — Option A keeps the lookup-key contract intact and is the minimum change to stop the bleeding.
+- Monica's DB: 2 returning rows, $240 each, no phantom reg fee, refund record intact.
+- Future returning customers: trigger no longer overrides webhook values.
+- Future first-time customers: still pay $45 at checkout, still get one $45 reg fee row, $240 session fee due day 1 — unchanged.
