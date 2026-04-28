@@ -195,14 +195,29 @@ async function handleCheckoutCompleted(session: any) {
     });
   });
 
-  // Reconciliation: sum of what we're recording must not exceed what Stripe actually charged.
+  // Two-way reconciliation: flag both undercharges (Stripe < expected) AND
+  // overcharges (Stripe > expected). Customer already paid; never block insert.
   const computedTotal = enrollmentRows.reduce((sum, r) => sum + Number(r.payment_amount || 0), 0);
-  if (stripeAmountTotal > 0 && computedTotal > stripeAmountTotal + 0.01) {
+  const delta = Math.round((stripeAmountTotal - computedTotal) * 100) / 100;
+  if (stripeAmountTotal > 0 && Math.abs(delta) > 0.01) {
+    const direction = delta > 0 ? "overcharge" : "undercharge";
+    const tag = direction === "overcharge" ? "RECONCILIATION_OVERCHARGE" : "RECONCILIATION_UNDERCHARGE";
     console.error(
-      `RECONCILIATION MISMATCH for session ${sessionId}: ` +
-      `Stripe charged $${stripeAmountTotal}, but enrollment rows sum to $${computedTotal}. ` +
-      `Inserting rows anyway, but this needs admin review.`
+      `${tag} for session ${sessionId}: Stripe=$${stripeAmountTotal} expected=$${computedTotal} delta=$${delta}`
     );
+    // Persist alert (non-blocking — never throw past this point)
+    try {
+      await supabase.from("payment_reconciliation_alerts").insert({
+        stripe_checkout_session_id: sessionId,
+        expected_amount: computedTotal,
+        actual_amount: stripeAmountTotal,
+        delta: Math.abs(delta),
+        direction,
+        customer_email: payload.children[0]?.parentEmail || null,
+      });
+    } catch (alertErr) {
+      console.error("Failed to insert reconciliation alert:", alertErr);
+    }
   } else {
     console.log(`Reconciliation OK: Stripe=$${stripeAmountTotal} rows=$${computedTotal}`);
   }
