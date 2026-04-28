@@ -199,25 +199,15 @@ async function handleCheckoutCompleted(session: any) {
   // overcharges (Stripe > expected). Customer already paid; never block insert.
   const computedTotal = enrollmentRows.reduce((sum, r) => sum + Number(r.payment_amount || 0), 0);
   const delta = Math.round((stripeAmountTotal - computedTotal) * 100) / 100;
-  if (stripeAmountTotal > 0 && Math.abs(delta) > 0.01) {
-    const direction = delta > 0 ? "overcharge" : "undercharge";
+  const hasMismatch = stripeAmountTotal > 0 && Math.abs(delta) > 0.01;
+  const direction: "overcharge" | "undercharge" | null = hasMismatch
+    ? (delta > 0 ? "overcharge" : "undercharge")
+    : null;
+  if (hasMismatch) {
     const tag = direction === "overcharge" ? "RECONCILIATION_OVERCHARGE" : "RECONCILIATION_UNDERCHARGE";
     console.error(
       `${tag} for session ${sessionId}: Stripe=$${stripeAmountTotal} expected=$${computedTotal} delta=$${delta}`
     );
-    // Persist alert (non-blocking — never throw past this point)
-    try {
-      await supabase.from("payment_reconciliation_alerts").insert({
-        stripe_checkout_session_id: sessionId,
-        expected_amount: computedTotal,
-        actual_amount: stripeAmountTotal,
-        delta: Math.abs(delta),
-        direction,
-        customer_email: payload.children[0]?.parentEmail || null,
-      });
-    } catch (alertErr) {
-      console.error("Failed to insert reconciliation alert:", alertErr);
-    }
   } else {
     console.log(`Reconciliation OK: Stripe=$${stripeAmountTotal} rows=$${computedTotal}`);
   }
@@ -233,6 +223,23 @@ async function handleCheckoutCompleted(session: any) {
   }
 
   console.log(`Inserted ${insertedEnrollments.length} enrollments for session ${sessionId}`);
+
+  // Persist reconciliation alert with enrollment IDs (non-blocking).
+  if (hasMismatch && direction) {
+    try {
+      await supabase.from("payment_reconciliation_alerts").insert({
+        stripe_checkout_session_id: sessionId,
+        expected_amount: computedTotal,
+        actual_amount: stripeAmountTotal,
+        delta: Math.abs(delta),
+        direction,
+        enrollment_ids: insertedEnrollments.map((e) => e.id),
+        customer_email: payload.children[0]?.parentEmail || null,
+      });
+    } catch (alertErr) {
+      console.error("Failed to insert reconciliation alert:", alertErr);
+    }
+  }
 
   // 6. Build agreement rows mapped to enrollment IDs (one agreement per enrollment row)
   let idx = 0;
