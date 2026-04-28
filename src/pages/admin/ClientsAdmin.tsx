@@ -4,13 +4,24 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Mail, Phone, User as UserIcon, SlidersHorizontal, X } from "lucide-react";
+import { Search, Mail, Phone, User as UserIcon, SlidersHorizontal, X, MessageSquare } from "lucide-react";
 import { useSwimmers, type Swimmer, type SwimmerStatusKey } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "@/components/admin/clients/SwimmerStatusBadges";
 import SwimmerDetailDrawer from "@/components/admin/clients/SwimmerDetailDrawer";
 import LessonRequestDetailDialog, { type LessonRequest } from "@/components/admin/LessonRequestDetailDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { formatPhone } from "@/lib/phone";
+import { LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
+import { useCommentCounts } from "@/hooks/useInternalComments";
+
+const levelClass = (level?: string | null) => {
+  if (!level) return "";
+  const key = level.toLowerCase() as SwimLevel;
+  const c = LEVEL_BADGE_COLORS[key];
+  if (!c) return "";
+  return cn(c.bg, c.text, "ring-1", c.ring, "border-transparent");
+};
 
 type Filter =
   | "all"
