@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,28 +11,99 @@ import LessonRequestDetailDialog, { type LessonRequest } from "@/components/admi
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | "new_inquiry" | "active" | "upcoming" | "unpaid" | "past" | "has_request";
+type Filter =
+  | "all"
+  | "new_inquiry"
+  | "enrolled"
+  | "active"
+  | "upcoming"
+  | "unpaid"
+  | "past"
+  | "has_request"
+  | "req_new"
+  | "req_contacted"
+  | "req_scheduled"
+  | "lesson_private"
+  | "lesson_semi"
+  | "lesson_group";
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "new_inquiry", label: "New Inquiry" },
-  { key: "active", label: "Active" },
-  { key: "upcoming", label: "Upcoming" },
-  { key: "unpaid", label: "Unpaid" },
-  { key: "past", label: "Past" },
-  { key: "has_request", label: "Has Request" },
+const FILTER_GROUPS: { label: string; items: { key: Filter; label: string }[] }[] = [
+  {
+    label: "Status",
+    items: [
+      { key: "all", label: "All" },
+      { key: "new_inquiry", label: "New Inquiry" },
+      { key: "enrolled", label: "Enrolled" },
+      { key: "active", label: "Active" },
+      { key: "upcoming", label: "Upcoming" },
+      { key: "unpaid", label: "Unpaid" },
+      { key: "past", label: "Past" },
+    ],
+  },
+  {
+    label: "Request Status",
+    items: [
+      { key: "has_request", label: "Any Request" },
+      { key: "req_new", label: "Request · New" },
+      { key: "req_contacted", label: "Request · Contacted" },
+      { key: "req_scheduled", label: "Request · Scheduled" },
+    ],
+  },
+  {
+    label: "Lesson Type",
+    items: [
+      { key: "lesson_private", label: "Private" },
+      { key: "lesson_semi", label: "Semi-Private" },
+      { key: "lesson_group", label: "Group" },
+    ],
+  },
 ];
+
+const PAGE_SIZE = 25;
+
+const hasLessonType = (s: Swimmer, type: "private" | "semi-private" | "group") => {
+  return (
+    s.requests.some((r) => r.lesson_type === type) ||
+    s.enrollments.some((e) => e.lesson_type === type) ||
+    s.bookings.some((b) => b.lesson_type === type)
+  );
+};
 
 const matchFilter = (s: Swimmer, f: Filter) => {
   if (f === "all") return true;
   const keys = new Set<SwimmerStatusKey>(s.statuses.map((x) => x.key));
-  if (f === "new_inquiry") return keys.has("new_inquiry");
-  if (f === "active") return keys.has("enrolled_active") || keys.has("booking_active");
-  if (f === "upcoming") return keys.has("enrolled_upcoming");
-  if (f === "unpaid") return keys.has("unpaid");
-  if (f === "past") return keys.has("past_client");
-  if (f === "has_request")
-    return keys.has("lesson_requested_new") || keys.has("lesson_requested_contacted") || keys.has("lesson_requested_scheduled");
+  switch (f) {
+    case "new_inquiry":
+      return keys.has("new_inquiry");
+    case "enrolled":
+      return keys.has("enrolled_active") || keys.has("enrolled_upcoming");
+    case "active":
+      return keys.has("enrolled_active") || keys.has("booking_active");
+    case "upcoming":
+      return keys.has("enrolled_upcoming");
+    case "unpaid":
+      return keys.has("unpaid");
+    case "past":
+      return keys.has("past_client");
+    case "has_request":
+      return (
+        keys.has("lesson_requested_new") ||
+        keys.has("lesson_requested_contacted") ||
+        keys.has("lesson_requested_scheduled")
+      );
+    case "req_new":
+      return keys.has("lesson_requested_new");
+    case "req_contacted":
+      return keys.has("lesson_requested_contacted");
+    case "req_scheduled":
+      return keys.has("lesson_requested_scheduled");
+    case "lesson_private":
+      return hasLessonType(s, "private");
+    case "lesson_semi":
+      return hasLessonType(s, "semi-private");
+    case "lesson_group":
+      return hasLessonType(s, "group");
+  }
   return true;
 };
 
@@ -42,6 +113,9 @@ export default function ClientsAdmin() {
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<Swimmer | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // Lesson request dialog
   const [activeRequest, setActiveRequest] = useState<LessonRequest | null>(null);
@@ -61,6 +135,30 @@ export default function ClientsAdmin() {
     });
   }, [swimmers, search, filter]);
 
+  // Reset visible count + scroll position when filter/search changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [search, filter]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
+        }
+      },
+      { root: scrollRef.current, rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [filtered.length, visibleCount]);
+
+  const visible = filtered.slice(0, visibleCount);
+
   const siblingsOf = (s: Swimmer) =>
     swimmers.filter((x) => x.parent_email.toLowerCase() === s.parent_email.toLowerCase() && x.key !== s.key);
 
@@ -78,7 +176,6 @@ export default function ClientsAdmin() {
   };
 
   const openEnrollment = (id: string) => {
-    // Deep-link to the enrollments admin page (existing dialog lives there)
     window.location.href = `/admin/enrollments?enrollment=${id}`;
   };
 
@@ -115,24 +212,36 @@ export default function ClientsAdmin() {
               className="pl-9"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {FILTERS.map((f) => (
-              <Button
-                key={f.key}
-                variant={filter === f.key ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter(f.key)}
-                className="h-8"
-              >
-                {f.label}
-              </Button>
+          <div className="space-y-2">
+            {FILTER_GROUPS.map((group) => (
+              <div key={group.label} className="flex flex-wrap items-start gap-2">
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold w-28 shrink-0 pt-1.5">
+                  {group.label}
+                </span>
+                <div className="flex flex-wrap gap-1.5 flex-1">
+                  {group.items.map((f) => (
+                    <Button
+                      key={f.key}
+                      variant={filter === f.key ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilter(f.key)}
+                      className="h-7 text-xs"
+                    >
+                      {f.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </CardContent>
       </Card>
 
-      <div className="space-y-2">
-        {filtered.map((s) => (
+      <div
+        ref={scrollRef}
+        className="space-y-2 max-h-[calc(100vh-22rem)] overflow-y-auto pr-1 rounded-lg border bg-muted/20 p-2"
+      >
+        {visible.map((s) => (
           <button
             key={s.key}
             onClick={() => openSwimmer(s)}
@@ -175,10 +284,18 @@ export default function ClientsAdmin() {
             </div>
           </button>
         ))}
+
         {filtered.length === 0 && (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">No swimmers match.</CardContent>
-          </Card>
+          <div className="py-12 text-center text-muted-foreground text-sm">No swimmers match.</div>
+        )}
+
+        {visibleCount < filtered.length && (
+          <div ref={sentinelRef} className="py-6 text-center text-xs text-muted-foreground">
+            Loading more… ({visibleCount} of {filtered.length})
+          </div>
+        )}
+        {visibleCount >= filtered.length && filtered.length > PAGE_SIZE && (
+          <div className="py-4 text-center text-xs text-muted-foreground">— End of list —</div>
         )}
       </div>
 
