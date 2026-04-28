@@ -1,4 +1,4 @@
-import { Users, Waves, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText, PanelLeftClose, PanelLeft, UserCheck, Layers, CalendarClock, CalendarOff, Clock, BarChart3, Megaphone, Mail } from "lucide-react";
+import { Users, Waves, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText, PanelLeftClose, PanelLeft, UserCheck, Layers, CalendarClock, CalendarOff, Clock, BarChart3, Megaphone, Mail, IdCard } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ export function AdminSidebar() {
     { title: "Reports", url: "/admin/reports", icon: BarChart3, badge: 0 },
     { title: "Announcements", url: "/admin/announcements", icon: Megaphone, badge: 0 },
     { title: "Email Log", url: "/admin/emails", icon: Mail, badge: 0 },
+    { title: "Clients", url: "/admin/clients", icon: IdCard, badge: 0 },
     { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves, badge: 0 },
     { title: "Lesson Requests", url: "/admin/lesson-requests", icon: BookOpen, badge: newLessonRequests },
     { title: "Contact Inquiries", url: "/admin/contacts", icon: MessageSquare, badge: newContacts },
