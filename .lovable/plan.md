@@ -1,81 +1,49 @@
-## Root cause of "Past Client" mislabel
+## Reorganize Admin Sidebar into Collapsible Groups
 
-The `session_periods` table has stale 2025 dates:
+Restructure the admin sidebar from one flat list of 17 items into 6 collapsible, scannable groups so admins/staff always know where to look.
 
-```text
-Session 1: 2025-06-08 → 2025-07-02
-Session 2: 2025-07-13 → 2025-08-06
-```
+### New Group Structure
 
-Today is April 2026, so every enrollment in those sessions ended ~10 months ago → "Past Client." John Poses and Kaira Kang are flagged this way because their sessions look long-finished, when really they should be **upcoming 2026 sessions**.
+**Operations** (daily-use items)
+- Calendar
+- Class Roster
+- Announcements
 
-**Fix:** bump the period dates to 2026 (and bump matching `swim_sessions.session_start_date` / `session_end_date`). I'll preview the exact rows for approval before running the update so the owner can confirm Session 1 = June 2026 and Session 2 = July 2026 before anything changes.
+**Clients & Inquiries**
+- Clients
+- Swim Enrollments
+- Lesson Requests (badge)
+- Contact Inquiries (badge)
 
-After the date fix, John & Kaira will correctly show as **Enrolled · Upcoming**.
+**Programs**
+- Sessions
+- Reports
 
----
+**Staff**
+- Instructors
+- Schedule
+- Time Off & Trades
+- Timesheets
 
-## Everything else you asked for
+**Hiring**
+- Job Postings
+- Applications (badge)
 
-### 1. Phone formatting (`555-555-5555`)
-New `src/lib/phone.ts` with `formatPhone()` (handles `5555555555`, `+15555555555`, `(555) 555-5555`). Apply on:
-- Clients list rows
-- Swimmer detail drawer
-- Lesson request detail dialog
-`tel:` links keep raw digits.
+**System**
+- Email Log
+- User Management
 
-### 2. Color-coded level tags (match Class Roster)
-Reuse `LEVEL_BADGE_COLORS` from `src/components/swim-enrollment/types.ts` (white/red/yellow/blue/green hex codes already used on Class Roster) for the level badge on:
-- Each swimmer card in the Clients list
-- The swimmer detail drawer header
+### Behavior
 
-### 3. Internal comments — shared between Clients & Lesson Requests
+- **Collapsible groups**: Each group header is a clickable chevron toggle (shadcn `Collapsible` inside `SidebarGroup`).
+- **Auto-expand active group**: On load, the group containing the current route opens automatically.
+- **Persisted state**: Open/closed state per group saved to `localStorage` (`admin-sidebar-groups`) so it survives reloads.
+- **Bubble-up badges**: When a group is collapsed, sum of child badges (e.g., new Lesson Requests + new Contacts) appears as a single red pill on the group header.
+- **Icon-collapsed sidebar**: When the entire sidebar is icon-collapsed, group labels hide and items render as a flat icon list (current behavior preserved), with red dot indicators for any badge.
+- **Active route**: Highlighted as today.
 
-**New table `internal_comments`:**
-```text
-id, target_type ('swimmer' | 'lesson_request'),
-target_key (text), body, author_id, author_name,
-created_at, updated_at
-```
-- Swimmer key = `lower(child_name)|lower(parent_email)` (matches existing `swimmerKey` in `useSwimmers.ts`)
-- Lesson request key = `lesson_request.id`
+### Files
 
-RLS: authenticated admins only (select/insert/update/delete own).
+- Edit `src/components/admin/AdminSidebar.tsx` — replace the flat `items` array with a `groups` array, render each as a `Collapsible` `SidebarGroup`, add localStorage persistence, auto-expand based on `useLocation`, compute bubble-up badge sums.
 
-**New `InternalCommentsPanel` component** — list of notes with author + timestamp, textarea + "Add note" button, edit/delete on own notes, realtime updates.
-
-Mounted in:
-- `SwimmerDetailDrawer.tsx` → new **Notes** tab
-- `LessonRequestDetailDialog.tsx` → new **Internal Notes** section above the Reply form (so staff can document call attempts, voicemails, etc.)
-
-Small **note-count badge** on the swimmer card and the lesson request row so staff see at a glance there are notes.
-
-### 4. Rename "Timeline" → "Enrollments & Lessons"
-In `SwimmerDetailDrawer.tsx`, change the tab label and split entries under two headings:
-- **Enrollments** — session name, dates, level, payment status
-- **Lessons & Requests** — booking type, date range, request status
-
-Sorted newest first. Each entry stays clickable.
-
----
-
-## Files touched
-
-**New**
-- `src/lib/phone.ts`
-- `src/components/admin/InternalCommentsPanel.tsx`
-- `src/hooks/useInternalComments.ts`
-- Migration: create `internal_comments` table + RLS
-- Data update: `session_periods` + `swim_sessions` 2025 → 2026 (preview before running)
-
-**Edited**
-- `src/pages/admin/ClientsAdmin.tsx` — phone formatting, level color, note badge
-- `src/components/admin/clients/SwimmerDetailDrawer.tsx` — tab rename + split, Notes tab, phone, level color
-- `src/components/admin/LessonRequestDetailDialog.tsx` — phone, internal notes section
-- `src/pages/admin/LessonRequestsAdmin.tsx` — note-count badge
-
----
-
-## One question before I start
-
-For the **2025 → 2026 date fix on session_periods + swim_sessions**: should I just shift everything forward exactly **one year** (2025-06-08 → 2026-06-08, etc.), or do you want to set custom new dates for Session 1 and Session 2?
+No database, route, or other component changes needed.
