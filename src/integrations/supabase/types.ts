@@ -785,6 +785,51 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_reconciliation_alerts: {
+        Row: {
+          actual_amount: number
+          created_at: string
+          customer_email: string | null
+          delta: number
+          direction: string
+          enrollment_ids: string[] | null
+          expected_amount: number
+          id: string
+          notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          stripe_checkout_session_id: string
+        }
+        Insert: {
+          actual_amount: number
+          created_at?: string
+          customer_email?: string | null
+          delta: number
+          direction: string
+          enrollment_ids?: string[] | null
+          expected_amount: number
+          id?: string
+          notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          stripe_checkout_session_id: string
+        }
+        Update: {
+          actual_amount?: number
+          created_at?: string
+          customer_email?: string | null
+          delta?: number
+          direction?: string
+          enrollment_ids?: string[] | null
+          expected_amount?: number
+          id?: string
+          notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          stripe_checkout_session_id?: string
+        }
+        Relationships: []
+      }
       pending_enrollments: {
         Row: {
           created_at: string
@@ -1155,6 +1200,10 @@ export type Database = {
           payment_status: string
           registration_fee: number | null
           session_fee_paid_at: string | null
+          session_fee_refund_amount: number | null
+          session_fee_refund_at: string | null
+          session_fee_refund_reason: string | null
+          session_fee_refund_stripe_id: string | null
           session_fee_status: string
           session_fee_stripe_id: string | null
           session_id: string | null
@@ -1184,6 +1233,10 @@ export type Database = {
           payment_status?: string
           registration_fee?: number | null
           session_fee_paid_at?: string | null
+          session_fee_refund_amount?: number | null
+          session_fee_refund_at?: string | null
+          session_fee_refund_reason?: string | null
+          session_fee_refund_stripe_id?: string | null
           session_fee_status?: string
           session_fee_stripe_id?: string | null
           session_id?: string | null
@@ -1213,6 +1266,10 @@ export type Database = {
           payment_status?: string
           registration_fee?: number | null
           session_fee_paid_at?: string | null
+          session_fee_refund_amount?: number | null
+          session_fee_refund_at?: string | null
+          session_fee_refund_reason?: string | null
+          session_fee_refund_stripe_id?: string | null
           session_fee_status?: string
           session_fee_stripe_id?: string | null
           session_id?: string | null
