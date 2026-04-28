@@ -66,9 +66,23 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Authoritative amount = what Stripe will actually charge.
+    // Derive amountDue from the resolved Stripe price (not the DB session_price)
+    // so the email can never advertise a different number than what gets billed.
+    const stripePrice = prices.data[0]
+    const stripeAmountDollars = (stripePrice.unit_amount ?? 0) / 100
+    if (stripeAmountDollars > 0 && Math.abs(stripeAmountDollars - sessionFee) > 0.01) {
+      console.warn(
+        `Price drift detected for enrollment ${enrollmentId}: ` +
+        `swim_sessions.session_price=$${sessionFee} vs Stripe swim_session_fee=$${stripeAmountDollars}. ` +
+        `Charging Stripe amount ($${stripeAmountDollars}); update the DB or rotate the Stripe price to resolve.`
+      )
+    }
+    const chargeAmount = stripeAmountDollars > 0 ? stripeAmountDollars : sessionFee
+
     const returnBase = siteUrl || 'https://aquatic-dream-quest.lovable.app'
     const checkoutSession = await stripe.checkout.sessions.create({
-      line_items: [{ price: prices.data[0].id, quantity: 1 }],
+      line_items: [{ price: stripePrice.id, quantity: 1 }],
       mode: 'payment',
       success_url: `${returnBase}/swim-enrollment?step=done`,
       cancel_url: `${returnBase}/swim-enrollment`,
