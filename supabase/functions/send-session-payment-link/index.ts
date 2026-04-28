@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
           parentName: enrollment.parent_name,
           childName: enrollment.child_name,
           sessionInfo,
-          amountDue: `$${sessionFee}`,
+          amountDue: `$${chargeAmount}`,
           paymentLink,
           dueDate,
         },
