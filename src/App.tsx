@@ -28,6 +28,7 @@ import TimesheetsAdmin from "./pages/admin/TimesheetsAdmin";
 import ReportsAdmin from "./pages/admin/ReportsAdmin";
 import AnnouncementsAdmin from "./pages/admin/AnnouncementsAdmin";
 import EmailLogAdmin from "./pages/admin/EmailLogAdmin";
+import ClientsAdmin from "./pages/admin/ClientsAdmin";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
 import InstructorAnnouncements from "./pages/instructor/InstructorAnnouncements";
 import InstructorMySchedule from "./pages/instructor/InstructorMySchedule";
@@ -67,6 +68,7 @@ const App = () => (
             >
               <Route index element={<CalendarAdmin />} />
               <Route path="roster" element={<ClassRosterAdmin />} />
+              <Route path="clients" element={<ClientsAdmin />} />
               <Route path="enrollments" element={<SwimEnrollmentsAdmin />} />
               <Route path="lesson-requests" element={<LessonRequestsAdmin />} />
               <Route path="contacts" element={<ContactsAdmin />} />

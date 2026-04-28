@@ -1,60 +1,97 @@
 ## Goal
 
-Add a **"View Email"** action to each row in `/admin/emails` so you can see the actual subject + rendered HTML of the email that was sent (not just the metadata).
+Add a unified **Clients** tab in the admin dashboard listing **one row per swimmer (child)** — Airtable-style — so the owner has a single searchable place to find any kid who has ever interacted with the business, with dynamic statuses pulled from lesson requests, enrollments, and bookings.
 
-## Approach
+## Identity model
 
-Emails are React Email templates rendered server-side at send time. We don't currently store the rendered HTML. The cleanest approach is:
+A "client row" = **one swimmer (child)**, identified by:
+`lower(trim(child_name)) + '|' + lower(parent_email)`
 
-1. **Capture template data** when an email is sent (small change to send pipeline).
-2. **Re-render on demand** in a new admin-only edge function using the stored template name + data.
-3. **Add a "View" button** in the Email Log that opens a dialog showing the subject and rendered HTML in an iframe.
+This matches the dedup key already used in `enforce_first_time_swimmer`. Siblings appear as separate rows but share parent contact info (and group together visually under the parent name).
 
-This avoids bloating the database with HTML for every email, keeps renders always up-to-date with template changes, and gives admins true "see what was sent" visibility.
+## Data sources merged per swimmer
 
-## Changes
+For each swimmer, pull and attach:
+- **lesson_requests** — by parent_email + child_name
+- **swim_enrollments** — by parent_email + child_name (joined to `swim_sessions` + `session_periods` for date ranges)
+- **lesson_bookings** — by parent_email + child_name (series_start / series_end / recurring)
 
-### 1. Database migration
-- Backfill is not needed. New sends will populate `email_send_log.metadata` with `{ template_data: {...} }`. Existing rows without it will show a friendly "Preview unavailable for older emails" message.
+## Status pills (dynamic, Airtable-like)
 
-### 2. Send pipeline updates
-Update these edge functions to write `template_data` into `metadata` on the initial `pending` insert (and propagate on retries):
-- `supabase/functions/send-transactional-email/index.ts`
-- `supabase/functions/process-email-queue/index.ts`
-- `supabase/functions/auth-email-hook/index.ts` (auth emails — store the auth event payload, redacting tokens)
+Each swimmer row shows a stack of pills computed live:
 
-Sensitive values (unsubscribe tokens, magic links, OTPs, password reset tokens) will be **redacted** before storage and re-injected with placeholder text like `[redacted-link]` at render time.
+| Pill | When |
+|---|---|
+| `Lesson Requested · New / Contacted / Scheduled` | Open `lesson_requests` row exists; sub-status mirrors the request |
+| `Enrolled · Active` | Has enrollment whose session_period end_date >= today |
+| `Enrolled · Upcoming` | Session start_date is in the future |
+| `Booking Active` | `lesson_bookings` with `series_end >= today` (or recurring + null end) |
+| `Unpaid` | Active enrollment with `payment_status != 'paid'` or `session_fee_status != 'paid'` |
+| `Past Client` | Only past enrollments/bookings, nothing active or pending |
+| `New Inquiry` | Only a lesson request exists, no enrollments ever |
 
-### 3. New edge function: `render-email-preview`
-- Admin-only (verifies caller has `admin` role via JWT + `has_role`).
-- Input: `{ log_id }`.
-- Looks up the row, finds the template in the registry, re-renders with stored `template_data`, returns `{ subject, html }`.
-- For `auth_emails` rows, uses the auth email templates in `supabase/functions/_shared/email-templates/`.
-- For rows with no stored data, returns a 404 with a clear message.
+Pills recompute automatically when admin updates a request or enrollment.
 
-### 4. Email Log UI (`src/pages/admin/EmailLogAdmin.tsx`)
-- Add a **"View"** button (eye icon) in each table row, next to the chevron.
-- Clicking opens a new `EmailPreviewDialog` component:
-  - Header: subject + recipient + sent timestamp + status badge.
-  - Body: rendered HTML inside a sandboxed `<iframe srcDoc={html}>` so styles don't leak into the admin UI.
-  - Footer: "Open in new tab" button (opens HTML in a blob URL).
-- Loading state while fetching from the edge function.
-- Empty state for older rows with no captured data.
+## Page layout (`/admin/clients`)
 
-## Files
+```
+┌─ Clients ───────────────────────────────────────────────┐
+│  [Search: swimmer, parent, email, phone]   [Filter ▾]   │
+│  Chips: All | New Inquiry | Active | Upcoming |         │
+│         Unpaid | Past | Has Request                     │
+│                                                          │
+│  ┌─ Row per swimmer ────────────────────────────────┐   │
+│  │ Logan Yarick (3) · Preschool                     │   │
+│  │ Parent: Vikki Yarick · vblansit@gmail.com        │   │
+│  │ [Enrolled · Spring '26] [Paid]                   │   │
+│  │ Last activity: Apr 28, 2026                      │   │
+│  └──────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ Ryker (16) · —                                    │   │
+│  │ Parent: Sutton Lucas · aquaticdreamsca@gmail.com │   │
+│  │ [Lesson Requested · New] [Private]                │   │
+│  └──────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────┘
+```
 
-**New:**
-- `supabase/functions/render-email-preview/index.ts`
-- `supabase/functions/render-email-preview/deno.json`
-- `src/components/admin/EmailPreviewDialog.tsx`
+Click a row → **Swimmer Detail Drawer** with tabs:
+- **Overview** — child info (name, age, DOB, level, medical notes), parent contact, current status pills, sibling links (other swimmers under same parent email)
+- **Timeline** — chronological feed: every request, enrollment, booking, payment for this swimmer
+- **Quick actions** — open underlying `LessonRequestDetailDialog` or `EnrollmentDetailDialog`
 
-**Edited:**
-- `src/pages/admin/EmailLogAdmin.tsx` — add View button + dialog wiring
-- `supabase/functions/send-transactional-email/index.ts` — store template_data in metadata
-- `supabase/functions/process-email-queue/index.ts` — same
-- `supabase/functions/auth-email-hook/index.ts` — same (with token redaction)
+Default sort: most recent activity first. Sortable columns: name, age, last activity, status.
 
-## Notes
+## Search behavior
 
-- Re-rendering means the preview reflects the **current** template code, not the exact bytes sent. If a template was edited after the send, the preview shows the updated layout with the original data. This is usually what admins want; happy to instead store rendered HTML if you prefer historical fidelity (trade-off: ~10-50KB per row in DB).
-- Sensitive tokens are never stored or shown in previews.
+Single search box matches against: swimmer name, parent name, parent email, parent phone. Debounced, client-side over the merged list.
+
+## Technical implementation
+
+**New files**
+- `src/pages/admin/ClientsAdmin.tsx` — page
+- `src/components/admin/clients/SwimmerRow.tsx` — single swimmer row
+- `src/components/admin/clients/SwimmerDetailDrawer.tsx` — side drawer with Overview + Timeline tabs
+- `src/components/admin/clients/SwimmerStatusBadges.tsx` — pill renderer
+- `src/hooks/useSwimmers.ts` — fetches the 3 tables in parallel, builds `Map<swimmerKey, SwimmerRecord>`, computes statuses, exposes `{ swimmers, loading, refetch }`
+
+**Edited files**
+- `src/components/admin/AdminSidebar.tsx` — add `Clients` nav item (icon: `Users` or `IdCard`), route `/admin/clients`, placed just above "Swim Enrollments"
+- `src/App.tsx` — register `<Route path="clients" element={<ClientsAdmin />} />` inside the `/admin` block
+
+**Data fetching**
+- 3 parallel `supabase.from(...)` selects on `lesson_requests`, `swim_enrollments` (joined to `swim_sessions(...session_periods(*))`), `lesson_bookings`.
+- Merge in JS: build `Map<childKey, SwimmerRecord>` keyed by `lower(name)|lower(email)`.
+- Status computation pure — runs every render off merged data.
+- Realtime: subscribe to `lesson_requests` and `swim_enrollments` postgres_changes so pills stay live without refresh.
+
+**No DB schema changes** — pure read/aggregation. No migration.
+
+**Reuse existing dialogs** — clicking a request entry opens `LessonRequestDetailDialog`; clicking an enrollment opens `EnrollmentDetailDialog`. Status updates inside those trigger refetch via realtime.
+
+## Out of scope (this pass)
+- Editing swimmer/parent contact info from this view (lives on underlying rows)
+- Merging duplicates with mismatched name spellings
+- Per-swimmer notes/tags (would need a new `swimmer_notes` table — possible follow-up)
+
+## Summary
+One new admin page listing one row per swimmer, with dynamic status pills aggregated from lesson requests + enrollments + bookings. ~5 new files, sidebar entry, one route. No DB changes. Reuses existing detail dialogs.
