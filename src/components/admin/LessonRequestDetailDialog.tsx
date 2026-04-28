@@ -182,6 +182,15 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
             </div>
           )}
 
+          <div className="border-t pt-4">
+            <InternalCommentsPanel
+              targetType="lesson_request"
+              targetKey={request.id}
+              title="Internal Notes"
+              emptyHint="Document call attempts, voicemails, or anything other staff should know."
+            />
+          </div>
+
           <div className="border-t pt-4 space-y-3">
             <div className="font-semibold text-foreground">Reply via Email</div>
             <div>
