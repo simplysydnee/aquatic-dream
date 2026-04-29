@@ -8,7 +8,7 @@ interface StarfishCurriculumBadgeProps {
   onDark?: boolean;
 }
 
-const ALT = "Starfish Aquatics Institute curriculum partner";
+const ALT = "Starfish Aquatics Institute curriculum";
 
 /**
  * Credits Starfish Aquatics Institute as our curriculum provider.
@@ -45,7 +45,7 @@ export default function StarfishCurriculumBadge({
           <img src={starfishLogo} alt={ALT} className="h-8 w-auto" loading="lazy" />
         </div>
         <span className="text-xs opacity-80">
-          Starfish Aquatics Institute curriculum partner
+          Lessons taught using the Starfish Aquatics Institute curriculum
         </span>
       </div>
     );
