@@ -29,3 +29,5 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.create-lesson-occurrence-checkout]
     verify_jwt = false
+  [functions.cancel-enrollment-refund]
+    verify_jwt = true
