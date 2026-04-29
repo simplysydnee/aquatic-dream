@@ -13,6 +13,19 @@ import SessionEnrollmentCards from "@/components/admin/SessionEnrollmentCards";
 import { Progress } from "@/components/ui/progress";
 import { Eye, CheckCircle, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Enrollment {
   id: string;
@@ -105,9 +118,69 @@ const SwimEnrollmentsAdmin = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Cancellation flow state
+  const [cancelTarget, setCancelTarget] = useState<Enrollment | null>(null);
+  const [cancelRefund, setCancelRefund] = useState(true);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+
   const updateStatus = async (id: string, status: string) => {
+    if (status === "cancelled") {
+      const target = enrollments.find((e) => e.id === id);
+      if (target) {
+        setCancelTarget(target);
+        setCancelReason("");
+        // Default refund=true only if there's something refundable
+        const hasRefundable =
+          (target.payment_status === "paid" && !!target.stripe_payment_id) ||
+          (target.session_fee_status === "paid" && !!target.session_fee_stripe_id);
+        setCancelRefund(hasRefundable);
+      }
+      return;
+    }
     await supabase.from("swim_enrollments").update({ status }).eq("id", id);
     setEnrollments((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
+  };
+
+  const confirmCancellation = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("cancel-enrollment-refund", {
+        body: {
+          enrollmentId: cancelTarget.id,
+          refund: cancelRefund,
+          environment: "live",
+          reason: cancelReason || "Admin cancellation",
+        },
+      });
+      if (error || !data?.success) {
+        throw new Error(error?.message || data?.error || "Cancellation failed");
+      }
+      const refunded = (data.refundResults || []).filter((r: { refundId?: string }) => r.refundId);
+      const failed = (data.refundResults || []).filter((r: { error?: string }) => r.error);
+      toast({
+        title: "Enrollment cancelled",
+        description: refunded.length
+          ? `Refunded ${refunded.length} charge${refunded.length > 1 ? "s" : ""} via Stripe.`
+          : cancelRefund
+            ? "No refundable charges found."
+            : "Cancelled without refund.",
+      });
+      if (failed.length) {
+        toast({
+          title: "Some refunds failed",
+          description: failed.map((r: { error?: string }) => r.error).join("; "),
+          variant: "destructive",
+        });
+      }
+      await fetchData();
+      setCancelTarget(null);
+    } catch (e) {
+      toast({ title: "Failed to cancel", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const updatePaymentStatus = async (enrollment: Enrollment, payment_status: string) => {
