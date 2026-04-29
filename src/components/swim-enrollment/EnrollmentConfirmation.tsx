@@ -6,6 +6,7 @@ import { CheckCircle, ArrowRight, Calendar, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, SwimLevel, PRICING, getGroupName, getAgeGroup, getLevelLabel } from "./types";
 import { supabase } from "@/integrations/supabase/client";
+import LevelBadge from "@/components/LevelBadge";
 
 function formatClassDate(d: string) {
   const date = new Date(d + "T00:00:00");
@@ -107,6 +108,17 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
     >
       <Card className="border-primary/20 bg-gradient-to-br from-accent to-card">
         <CardContent className="pt-8 pb-6 px-6">
+          {isMulti ? (
+            <div className="flex justify-center gap-2 mb-3">
+              {displayChildren.slice(0, 4).map((c, i) => (
+                <LevelBadge key={i} level={c.level} size={56} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex justify-center mb-3">
+              <LevelBadge level={level} size={120} className="drop-shadow-md" />
+            </div>
+          )}
           <CheckCircle className="w-12 h-12 text-primary mx-auto mb-4" />
           <h3 className="font-display text-2xl font-bold text-foreground mb-2">
             You're All Set!

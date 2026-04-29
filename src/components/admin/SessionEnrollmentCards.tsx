@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import { ChevronDown, Users } from "lucide-react";
 import { useState } from "react";
+import LevelBadge from "@/components/LevelBadge";
 
 interface SessionInfo {
   id: string;
@@ -157,10 +158,13 @@ function SessionCard({ session, enrolled }: { session: SessionInfo; enrolled: En
   return (
     <Card className={isFull ? "border-red-300" : ""}>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">
-            {session.session_name || groupName}
-          </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {levelInfo && <LevelBadge level={session.swim_level as SwimLevel} size={36} />}
+            <CardTitle className="text-sm font-medium truncate">
+              {session.session_name || groupName}
+            </CardTitle>
+          </div>
           <Badge variant="outline" className={levelInfo?.color || ""}>
             {groupName}
           </Badge>

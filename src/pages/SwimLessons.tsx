@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, Star, ChevronRight, DollarSign, Calendar, Clock, ShoppingBag, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import LevelBadge from "@/components/LevelBadge";
+import type { SwimLevel } from "@/components/swim-enrollment/types";
 
 /* ───────── curriculum data ───────── */
 
@@ -166,8 +168,8 @@ function CurriculumCard({ item, index }: { item: typeof preschoolCurriculum[0]; 
       <Card className={`h-full border ${item.borderColor} bg-gradient-to-br ${item.gradient} hover:shadow-xl transition-all duration-300 overflow-hidden`}>
         <CardContent className="p-0">
           <div className="flex flex-col items-center pt-8 pb-4 px-6">
-            <div className={`w-24 h-24 rounded-full ${item.badgeBg} ring-4 ${item.badgeRing} shadow-lg mb-4 flex items-center justify-center`}>
-              <span className={`font-display text-2xl font-bold ${item.accentColor}`}>{item.letter}</span>
+            <div className="mb-4 drop-shadow-md">
+              <LevelBadge level={item.color.toLowerCase() as SwimLevel} size={112} />
             </div>
             <h3 className="font-display text-2xl font-bold text-foreground">{item.group}</h3>
             <div className="flex items-center gap-2 mt-1 mb-0.5">

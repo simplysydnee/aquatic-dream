@@ -1,38 +1,59 @@
 ## Goal
 
-Verify the amounts in (1) the "session payment link" email parents get before lessons start, (2) the `send-session-payment-link` edge function, and (3) the public `create-checkout` enrollment flow. Make sure they all agree on $240 session fee + $45 first-time registration fee.
+Take the single uploaded image with all 5 swim level badges, split them into 5 transparent PNGs (one per level), and incorporate them into the app as a reusable component used in the most visible swim-curriculum spots.
 
-## What I checked
+## Step 1 — Split the badge image
 
-| Surface | Source of amount | Result |
-|---|---|---|
-| `create-checkout/index.ts` (public enrollment Stripe checkout) | Stripe `lookup_keys`: `registration_fee` (first-time, 1×) + `swim_session_fee` (returning, 1× per session). Server-resolved via `stripe.prices.list`. | Correct. Verified `swim_session_fee` → `price_1TLpsBKA8zyjuHUAVGYTJU0D` (the new $240 price set yesterday) and `registration_fee` → `price_1TLpsBKA8zyjuHUAXYvrRWh9`. |
-| `send-session-payment-link/index.ts` (Day-1 $240 link to first-timers) | `enrollment.swim_sessions.session_price` (DB) → drives the email body's `amountDue`; Stripe charge uses `lookup_keys: ['swim_session_fee']` (i.e. $240). | Correct. Audited `swim_sessions`: every active row has `session_price = 240`. Email shows `$${session_price}`, Stripe charges $240. |
-| `session-payment-link.tsx` email template | `amountDue` prop from caller (renders `$240` today). | Correct. |
-| `enrollment-confirmation.tsx` email template | Receives `registrationFeePaid` ($45) and `sessionFeeDue` ($240) from `payments-webhook`. | Correct. Defaults shown only if caller omits the value; webhook always passes the actual amount. |
-| `create-lesson-occurrence-checkout` + `send-lesson-booking-confirmation` (private/semi-private lessons, separate flow) | `lesson_bookings.price_per_session` (DB, default $65). | Correct — these are private lessons, not 8-week group sessions; not in scope of the $240/$45 rule. |
+Use Python (Pillow) to crop the uploaded image into 5 separate squares and remove the white background to transparent PNGs. Approximate crop layout (top row of 3, bottom row of 2 centered):
 
-DB sweep of every `session_fee_status='due_day_1'` row confirms the per-row math the email/link will quote matches what Stripe will charge:
-- First-timers (paid $45 reg fee at checkout): `payment_amount=45`, `registration_fee=45`, session fee link will quote $240 → matches Stripe.
-- Returning Mejia grace rows: link will quote $240 → matches Stripe.
-- Waived/comp Erwin + Destiny rows: `send-session-payment-link` correctly refuses to send (status guard).
+```text
+[White: Little Fins] [Red: Reef Explorers] [Yellow: Sea Scouts]
+        [Blue: Deep Sea Divers]  [Green: Ocean Masters]
+```
 
-## Conclusion
+Save to `src/assets/level-badges/`:
+- `little-fins.png` (White / Preschool 1)
+- `reef-explorers.png` (Red / Preschool 2)
+- `sea-scouts.png` (Yellow / School Age 1)
+- `deep-sea-divers.png` (Blue / School Age 2)
+- `ocean-masters.png` (Green / School Age 3)
 
-Amounts are already accurate end-to-end. The fixes from the previous two loops (Stripe price corrected to $240, trigger respecting webhook values, Monica's row reconciled) closed the prior gaps. Nothing in the email or checkout layer is misquoting today.
+Each badge will be ~512×512, white pixels keyed to alpha so the circular badge sits cleanly on any background.
 
-## Optional defensive hardening (recommended, small)
+## Step 2 — Reusable `<LevelBadge />` component
 
-One small drift risk: `send-session-payment-link` reads the **dollar amount** from `swim_sessions.session_price` for the email, but charges via the `swim_session_fee` Stripe lookup_key — two independent sources. They agree today ($240 each), but if someone changes the DB price without rotating the Stripe price (or vice versa), the email would advertise an amount different from what Stripe collects.
+Create `src/components/LevelBadge.tsx`:
+- Props: `level: SwimLevel` (white | red | yellow | blue | green), `size?: number` (default 96), `className?: string`
+- Imports the 5 PNGs as ES6 modules and maps `SwimLevel → image`
+- Renders an `<img>` with proper `alt` (e.g. "Reef Explorers level badge") and rounded styling
 
-Proposed fix:
-1. In `send-session-payment-link/index.ts`, after fetching the Stripe price object, read `prices.data[0].unit_amount` (cents → dollars), and use **that** value as `amountDue` in the email instead of `session_price`. This guarantees the email always quotes the exact amount Stripe will charge.
-2. Add a sanity log if `swim_sessions.session_price` and the Stripe price disagree, so admins notice configuration drift.
+This reuses the existing `SwimLevel` type from `src/components/swim-enrollment/types.ts`, so no new type system needed.
 
-No DB schema changes. No template changes. ~10 lines in one edge function.
+## Step 3 — Drop badges into the app
 
-## Files touched (if you approve the optional hardening)
+Three high-visibility placements (no layout rewrites — minimal swap-ins):
 
-- `supabase/functions/send-session-payment-link/index.ts` — derive `amountDue` from the resolved Stripe price object; log mismatch warning.
+1. **Public Swim Lessons page** (`src/pages/SwimLessons.tsx`)
+   - Replace the small color-dot/letter on each level card with the actual `<LevelBadge />` (~80px) above the level name.
 
-If you'd rather leave it as-is (since amounts are correct today), I'll just confirm the audit and stop.
+2. **Enrollment Confirmation** (`src/components/swim-enrollment/EnrollmentConfirmation.tsx`)
+   - Show the badge for the recommended/assigned level next to the "You're enrolled in…" headline (~120px hero size).
+
+3. **Admin Class Roster headers** (`src/pages/admin/ClassRosterAdmin.tsx`) + **Session Enrollment Cards** (`src/components/admin/SessionEnrollmentCards.tsx`)
+   - Small badge (~40px) next to each class group header so admins/instructors can visually scan rosters.
+
+## Step 4 — Save brand memory
+
+Add a `mem://brand/level-badges` entry recording the 5 badge file paths + which `SwimLevel` each maps to, and reference it from `mem://index.md`. Future requests will then auto-use the correct badge per level.
+
+## Out of scope
+
+- No changes to colors, copy, or business logic.
+- Email templates stay text-only for now (badges can be added later once hosted on a public bucket).
+- The existing `LEVEL_BADGE_COLORS` / colored dot styling stays intact as a fallback.
+
+## Technical notes
+
+- Pillow background-removal: convert to RGBA, set pixels with `R>240 & G>240 & B>240` to alpha=0, then crop on alpha bbox per badge tile.
+- Vite handles `import badge from "@/assets/level-badges/little-fins.png"` natively — no config changes.
+- Component is presentational only; no data fetching or state.
