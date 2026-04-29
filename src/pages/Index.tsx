@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import StarfishCurriculumBadge from "@/components/StarfishCurriculumBadge";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -131,6 +132,7 @@ const SwimProgramPanel = () => (
               <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> $45 registration fee (swim bag, cap & goggles)</li>
               <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Monday & Wednesday summer sessions</li>
             </ul>
+            <StarfishCurriculumBadge variant="inline" className="mb-8 p-4 rounded-xl bg-background/60 border border-border" />
             <div className="flex flex-col sm:flex-row gap-3">
               <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl">
                 <Link to="/swim-enrollment">Enroll Now <ChevronRight className="ml-1 w-4 h-4" /></Link>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import StarfishCurriculumBadge from "@/components/StarfishCurriculumBadge";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -367,6 +368,9 @@ const SwimLessons = () => {
             <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
               <Link to="/swim-enrollment">Find Your Level & Enroll</Link>
             </Button>
+            <div className="mt-10 max-w-xl">
+              <StarfishCurriculumBadge variant="stacked" className="md:items-start md:text-left" />
+            </div>
           </motion.div>
         </div>
       </section>

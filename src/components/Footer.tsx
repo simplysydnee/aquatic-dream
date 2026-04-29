@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Phone, Mail, MapPin, Instagram } from "lucide-react";
 import logoMain from "@/assets/logo-main.png";
+import StarfishCurriculumBadge from "@/components/StarfishCurriculumBadge";
 
 const Footer = () => {
   return (
@@ -49,13 +50,16 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-secondary-foreground/10 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-secondary-foreground/50">
-            © {new Date().getFullYear()} Aquatic Dreams. All rights reserved.
-          </p>
-          <p className="text-xs text-secondary-foreground/50 font-display italic">
-            Swim. Dive. Dream.
-          </p>
+        <div className="mt-12 pt-8 border-t border-secondary-foreground/10 flex flex-col gap-6">
+          <StarfishCurriculumBadge variant="compact" onDark className="justify-center md:justify-start" />
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-xs text-secondary-foreground/50">
+              © {new Date().getFullYear()} Aquatic Dreams. All rights reserved.
+            </p>
+            <p className="text-xs text-secondary-foreground/50 font-display italic">
+              Swim. Dive. Dream.
+            </p>
+          </div>
         </div>
       </div>
     </footer>
