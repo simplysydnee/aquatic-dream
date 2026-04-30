@@ -254,7 +254,7 @@ const SwimEnrollmentsAdmin = () => {
     }
   };
 
-  const filtered = enrollments.filter((e) => {
+  const matchesSearchAndFilters = (e: Enrollment) => {
     const matchSearch = search === "" ||
       e.child_name.toLowerCase().includes(search.toLowerCase()) ||
       e.parent_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -264,13 +264,19 @@ const SwimEnrollmentsAdmin = () => {
     const matchPeriod = periodFilter === "all" || (e.session_id && sessions[e.session_id]?.session_period_id === periodFilter);
     const matchAge = ageFilter === "all" || (e.session_id && sessions[e.session_id]?.age_group === ageFilter);
     return matchSearch && matchPayment && matchSession && matchPeriod && matchAge;
-  });
+  };
+
+  // "All Enrollments" tab EXCLUDES cancelled — they live on their own tab.
+  const filtered = enrollments.filter((e) => e.status !== "cancelled" && matchesSearchAndFilters(e));
+  const cancelledList = enrollments.filter((e) => e.status === "cancelled" && matchesSearchAndFilters(e));
 
   // Filter-aware metrics: when any filter is active, scope to filtered; else use full set.
   const anyFilterActive =
     search !== "" || paymentFilter !== "all" || sessionFilter !== "all" ||
     periodFilter !== "all" || ageFilter !== "all";
-  const scope = anyFilterActive ? filtered : enrollments;
+  // Metrics scope excludes cancelled (they're on their own tab).
+  const nonCancelled = enrollments.filter((e) => e.status !== "cancelled");
+  const scope = anyFilterActive ? filtered : nonCancelled;
 
   const isActive = (e: Enrollment) => e.status === "confirmed";
   const activeEnrollments = scope.filter(isActive);
@@ -349,7 +355,7 @@ const SwimEnrollmentsAdmin = () => {
     seatsPeriodFilter === "all" ? "All Sessions" :
     sessionPeriods.find((p) => p.id === seatsPeriodFilter)?.name || "";
 
-  const cancelledCount = scope.filter((e) => e.status === "cancelled").length;
+  const cancelledCount = enrollments.filter((e) => e.status === "cancelled").length;
   const refundedCount = scope.filter((e) => e.payment_status === "refunded").length;
   const waivedCount = scope.filter((e) => e.payment_status === "waived").length;
   const firstTimeOnRoster = activeEnrollments.filter((e) => e.is_first_time).length;
@@ -485,6 +491,9 @@ const SwimEnrollmentsAdmin = () => {
         <TabsList>
           <TabsTrigger value="all">All Enrollments</TabsTrigger>
           <TabsTrigger value="by-session">By Session</TabsTrigger>
+          <TabsTrigger value="cancelled">
+            Cancelled{cancelledCount > 0 && <span className="ml-1.5 text-xs opacity-70">({cancelledCount})</span>}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -681,9 +690,97 @@ const SwimEnrollmentsAdmin = () => {
         <TabsContent value="by-session">
           <SessionEnrollmentCards
             sessions={sessions}
-            enrollments={enrollments}
+            enrollments={nonCancelled}
             sessionPeriods={sessionPeriods}
           />
+        </TabsContent>
+
+        <TabsContent value="cancelled" className="space-y-4">
+          <div className="text-sm text-muted-foreground">
+            Cancelled enrollments are hidden from the main views. Use the status dropdown to restore one if needed.
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Child</TableHead>
+                    <TableHead>Age</TableHead>
+                    <TableHead>Level</TableHead>
+                    <TableHead>Parent</TableHead>
+                    <TableHead>Session</TableHead>
+                    <TableHead>Reg Fee</TableHead>
+                    <TableHead>Session Fee</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Cancelled</TableHead>
+                    <TableHead className="w-[60px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cancelledList.map((e) => {
+                    const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
+                    const ageGroup = getAgeGroup(e.child_age);
+                    const groupName = levelInfo ? getGroupName(e.swim_level as SwimLevel, ageGroup) : e.swim_level;
+                    const session = e.session_id ? sessions[e.session_id] : null;
+                    return (
+                      <TableRow key={e.id} className="opacity-80">
+                        <TableCell className="font-medium">{e.child_name}</TableCell>
+                        <TableCell>{e.child_age}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={levelInfo?.color || ""}>{groupName}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div>{e.parent_name}</div>
+                          <div className="text-xs text-muted-foreground">{e.parent_email}</div>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
+                            {e.payment_status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={sessionFeeColor(e.session_fee_status)}>
+                            {e.session_fee_status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
+                            <SelectTrigger className={`w-[130px] h-8 ${enrollmentStateColor(e.status)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="confirmed">Confirmed</SelectItem>
+                              <SelectItem value="waitlist">Waitlist</SelectItem>
+                              <SelectItem value="no_show">No-show</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(e.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {cancelledList.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        No cancelled enrollments
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
