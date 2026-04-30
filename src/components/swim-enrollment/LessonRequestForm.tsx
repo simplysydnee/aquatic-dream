@@ -162,16 +162,31 @@ const LessonRequestForm = () => {
           </RadioGroup>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="parentName">Parent / Guardian Name *</Label>
-            <Input id="parentName" value={form.parentName} onChange={(e) => update("parentName", e.target.value)} className="mt-1" />
-            {errors.parentName && <p className="text-xs text-destructive mt-1">{errors.parentName}</p>}
+        <div>
+          <Label className="text-sm font-semibold">Parent / Guardian Name *</Label>
+          <div className="grid gap-3 sm:grid-cols-2 mt-1">
+            <div>
+              <Input placeholder="First name" value={form.parentFirstName} onChange={(e) => update("parentFirstName", e.target.value)} />
+              {errors.parentFirstName && <p className="text-xs text-destructive mt-1">{errors.parentFirstName}</p>}
+            </div>
+            <div>
+              <Input placeholder="Last name" value={form.parentLastName} onChange={(e) => update("parentLastName", e.target.value)} />
+              {errors.parentLastName && <p className="text-xs text-destructive mt-1">{errors.parentLastName}</p>}
+            </div>
           </div>
-          <div>
-            <Label htmlFor="childName">Swimmer's Name *</Label>
-            <Input id="childName" value={form.childName} onChange={(e) => update("childName", e.target.value)} className="mt-1" />
-            {errors.childName && <p className="text-xs text-destructive mt-1">{errors.childName}</p>}
+        </div>
+
+        <div>
+          <Label className="text-sm font-semibold">Swimmer's Full Name *</Label>
+          <div className="grid gap-3 sm:grid-cols-2 mt-1">
+            <div>
+              <Input placeholder="First name" value={form.childFirstName} onChange={(e) => update("childFirstName", e.target.value)} />
+              {errors.childFirstName && <p className="text-xs text-destructive mt-1">{errors.childFirstName}</p>}
+            </div>
+            <div>
+              <Input placeholder="Last name" value={form.childLastName} onChange={(e) => update("childLastName", e.target.value)} />
+              {errors.childLastName && <p className="text-xs text-destructive mt-1">{errors.childLastName}</p>}
+            </div>
           </div>
         </div>
 
