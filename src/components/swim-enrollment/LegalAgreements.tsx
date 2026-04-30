@@ -257,18 +257,31 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
           <p className="text-xs text-muted-foreground">
             Required per the liability waiver. This person will be contacted in case of emergency.
           </p>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
             <div>
-              <Label htmlFor="emergencyContactName" className="text-xs">Name</Label>
+              <Label htmlFor="emergencyContactFirstName" className="text-xs">First Name</Label>
               <Input
-                id="emergencyContactName"
-                value={form.emergencyContactName}
-                onChange={(e) => update("emergencyContactName", e.target.value)}
+                id="emergencyContactFirstName"
+                value={form.emergencyContactFirstName}
+                onChange={(e) => update("emergencyContactFirstName", e.target.value)}
                 className="mt-1"
-                placeholder="Full name"
+                placeholder="First name"
               />
-              {errors.emergencyContactName && (
-                <p className="text-xs text-destructive mt-1">{errors.emergencyContactName}</p>
+              {errors.emergencyContactFirstName && (
+                <p className="text-xs text-destructive mt-1">{errors.emergencyContactFirstName}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="emergencyContactLastName" className="text-xs">Last Name</Label>
+              <Input
+                id="emergencyContactLastName"
+                value={form.emergencyContactLastName}
+                onChange={(e) => update("emergencyContactLastName", e.target.value)}
+                className="mt-1"
+                placeholder="Last name"
+              />
+              {errors.emergencyContactLastName && (
+                <p className="text-xs text-destructive mt-1">{errors.emergencyContactLastName}</p>
               )}
             </div>
             <div>
