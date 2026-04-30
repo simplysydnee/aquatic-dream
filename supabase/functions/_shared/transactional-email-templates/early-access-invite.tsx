@@ -5,7 +5,7 @@ import {
 import type { TemplateEntry } from './registry.ts'
 
 const SITE_NAME = "Aquatic Dreams"
-const LOGO_URL = 'https://jilrijklnehbfuulykty.supabase.co/storage/v1/object/public/email-assets/AQD_Favicon.png'
+const LOGO_URL = 'https://jilrijklnehbfuulykty.supabase.co/storage/v1/object/public/email-assets/aqd-email-logo.jpg'
 const ENROLL_URL = 'https://aquatic-dream-quest.lovable.app/swim-enrollment'
 
 interface EarlyAccessInviteProps {
@@ -69,7 +69,7 @@ export const template = {
 
 const main = { backgroundColor: '#ffffff', fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }
 const container = { padding: '30px 25px', maxWidth: '560px', margin: '0 auto' }
-const logo = { margin: '0 0 10px' }
+const logo = { display: 'block', margin: '0 0 10px' }
 const h1 = { fontSize: '24px', fontWeight: '700' as const, color: '#0f2343', margin: '0 0 10px', fontFamily: "'Playfair Display', Georgia, serif" }
 const hr = { borderColor: '#5badcb', borderWidth: '2px', margin: '15px 0 25px' }
 const text = { fontSize: '15px', color: '#333', lineHeight: '1.6', margin: '0 0 16px' }

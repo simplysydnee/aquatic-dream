@@ -13,7 +13,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import AddSwimmerDialog from "./AddSwimmerDialog";
 import LessonOccurrenceCheckoutDialog from "./LessonOccurrenceCheckoutDialog";
 import FrontDeskWaiverDialog from "./FrontDeskWaiverDialog";
+import FrontDeskEnrollmentWaiverDialog from "./FrontDeskEnrollmentWaiverDialog";
+import EditSwimmerDialog, { type EditTarget } from "./EditSwimmerDialog";
 import { getStripeEnvironment } from "@/lib/stripe";
+import { ClipboardSignature } from "lucide-react";
 
 interface SwimBlockInfo {
   kind: "swim";
@@ -74,6 +77,8 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   const [showCardCheckout, setShowCardCheckout] = useState(false);
   const [showFrontDeskWaiver, setShowFrontDeskWaiver] = useState(false);
   const [resendingWaiver, setResendingWaiver] = useState(false);
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [enrWaiverTarget, setEnrWaiverTarget] = useState<{ id: string; parent_name: string; parent_email: string; child_name: string } | null>(null);
 
   const refetchLesson = async () => {
     if (!eventId) return;
@@ -384,6 +389,21 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                                   ✓ In
                                 </span>
                               )}
+                              <button
+                                title="Edit swimmer info"
+                                onClick={() => setEditTarget({
+                                  kind: "swim_enrollment",
+                                  id: enr.id,
+                                  child_name: enr.child_name,
+                                  child_age: enr.child_age ?? null,
+                                  parent_name: enr.parent_name,
+                                  parent_email: enr.parent_email || "",
+                                  parent_phone: enr.parent_phone || null,
+                                })}
+                                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
                             </div>
                           </div>
 
@@ -421,8 +441,21 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                               </a>
                             </div>
                           ) : (
-                            <div className="mt-2 pl-[52px] pt-2 border-t border-dashed">
-                              <p className="text-[10px] text-muted-foreground italic">No emergency contact on file</p>
+                            <div className="mt-2 pl-[52px] pt-2 border-t border-dashed space-y-2">
+                              <p className="text-[10px] text-muted-foreground italic">No waiver / emergency contact on file</p>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="h-7 text-xs gap-1.5"
+                                onClick={() => setEnrWaiverTarget({
+                                  id: enr.id,
+                                  parent_name: enr.parent_name,
+                                  parent_email: enr.parent_email || "",
+                                  child_name: enr.child_name,
+                                })}
+                              >
+                                <ClipboardSignature className="w-3 h-3" /> Complete Waivers
+                              </Button>
                             </div>
                           )}
 
@@ -462,12 +495,28 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                 {!loadingLesson && lessonOcc && lessonBooking && (
                   <div className="rounded-lg border bg-card p-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{lessonBooking.child_name || lessonBooking.parent_name}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium truncate">{lessonBooking.child_name || lessonBooking.parent_name}</p>
+                          <button
+                            title="Edit swimmer info"
+                            onClick={() => setEditTarget({
+                              kind: "lesson_booking",
+                              id: lessonBooking.id,
+                              child_name: lessonBooking.child_name,
+                              parent_name: lessonBooking.parent_name,
+                              parent_email: lessonBooking.parent_email,
+                              parent_phone: lessonBooking.parent_phone || null,
+                            })}
+                            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        </div>
                         <p className="text-xs text-muted-foreground">{lessonBooking.parent_name}</p>
                       </div>
                       <Badge className={cn(
-                        "text-[10px] px-1.5 py-0.5",
+                        "text-[10px] px-1.5 py-0.5 shrink-0",
                         lessonOcc.payment_status === "paid"
                           ? "bg-green-100 text-green-700 hover:bg-green-100"
                           : lessonOcc.payment_status === "comp"
@@ -509,7 +558,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                     )}
 
                     {/* Waiver row */}
-                    <div className="pt-2 border-t border-dashed flex items-center justify-between gap-2 flex-wrap">
+                    <div className="pt-2 border-t border-dashed space-y-2">
                       <div className="flex items-center gap-1.5 text-xs">
                         <Lock className="w-3 h-3 text-muted-foreground" />
                         <span className="text-muted-foreground">Waiver:</span>
@@ -524,12 +573,17 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                         )}
                       </div>
                       {!lessonBooking.waiver_signed_at && (
-                        <div className="flex gap-1.5">
-                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" disabled={resendingWaiver} onClick={handleResendWaiver}>
-                            <Send className="w-3 h-3" />{resendingWaiver ? "Sending…" : "Resend"}
+                        <div className="flex flex-col gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="h-8 text-xs gap-1.5 w-full"
+                            onClick={() => setShowFrontDeskWaiver(true)}
+                          >
+                            <ClipboardSignature className="w-3.5 h-3.5" /> Complete Waivers
                           </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setShowFrontDeskWaiver(true)}>
-                            <Pencil className="w-3 h-3" />Open at front desk
+                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" disabled={resendingWaiver} onClick={handleResendWaiver}>
+                            <Send className="w-3 h-3" />{resendingWaiver ? "Sending…" : "Resend waiver email"}
                           </Button>
                         </div>
                       )}
@@ -590,6 +644,25 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                 lesson_type: lessonBooking.lesson_type,
               } : null}
               onSigned={refetchLesson}
+            />
+
+            <EditSwimmerDialog
+              open={!!editTarget}
+              onOpenChange={(o) => { if (!o) setEditTarget(null); }}
+              target={editTarget}
+              onSaved={() => {
+                if (editTarget?.kind === "lesson_booking") refetchLesson();
+                onRefetch?.();
+              }}
+            />
+
+            <FrontDeskEnrollmentWaiverDialog
+              open={!!enrWaiverTarget}
+              onOpenChange={(o) => { if (!o) setEnrWaiverTarget(null); }}
+              enrollment={enrWaiverTarget}
+              onSigned={() => {
+                onRefetch?.();
+              }}
             />
           </>
         )}
