@@ -10,11 +10,15 @@ const supabase = createClient(
 interface ChildPayload {
   level: string;
   childName: string;
+  childFirstName?: string;
+  childLastName?: string;
   childAge: number;
   childDob: string | null;
   sessionIds: string[];
   isFirstTime: boolean;
   parentName: string;
+  parentFirstName?: string;
+  parentLastName?: string;
   parentEmail: string;
   parentPhone: string | null;
   medicalNotes: string | null;
@@ -26,6 +30,8 @@ interface ChildPayload {
     termsAccepted: boolean;
     signatureText: string;
     emergencyContactName: string;
+    emergencyContactFirstName?: string;
+    emergencyContactLastName?: string;
     emergencyContactPhone: string;
     emergencyContactRelationship: string;
   };
