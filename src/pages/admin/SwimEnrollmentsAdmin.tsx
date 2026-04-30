@@ -737,18 +737,8 @@ const SwimEnrollmentsAdmin = () => {
                           {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
-                            {e.payment_status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={sessionFeeColor(e.session_fee_status)}>
-                            {e.session_fee_status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
                           <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
-                            <SelectTrigger className={`w-[130px] h-8 ${enrollmentStateColor(e.status)}`}>
+                            <SelectTrigger className={`w-[140px] h-9 font-semibold ${enrollmentStateColor(e.status)}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -758,6 +748,16 @@ const SwimEnrollmentsAdmin = () => {
                               <SelectItem value="cancelled">Cancelled</SelectItem>
                             </SelectContent>
                           </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
+                            {e.payment_status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={sessionFeeColor(e.session_fee_status)}>
+                            {e.session_fee_status}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(e.created_at).toLocaleDateString()}
