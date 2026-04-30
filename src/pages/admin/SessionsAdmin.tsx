@@ -309,6 +309,10 @@ const SessionsAdmin = () => {
 
     // Auto-generate class dates
     if (inserted && period) {
+      // Format Date as YYYY-MM-DD using local components — toISOString() converts
+      // to UTC and can shift dates by one day depending on the runtime timezone.
+      const fmtLocalYMD = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       for (const [idx, insertedRow] of inserted.entries()) {
         const rowDow = rows[idx].day_of_week as string;
         // Parse day nums from the day_of_week string (works for both "Monday" and "monday_wednesday")
@@ -317,7 +321,7 @@ const SessionsAdmin = () => {
         const cur = new Date(period.start_date + "T00:00:00");
         const endD = new Date(period.end_date + "T00:00:00");
         while (cur <= endD) {
-          if (dayNums.includes(cur.getDay())) classDates.push(cur.toISOString().slice(0, 10));
+          if (dayNums.includes(cur.getDay())) classDates.push(fmtLocalYMD(cur));
           cur.setDate(cur.getDate() + 1);
         }
         if (classDates.length > 0) {

@@ -1,79 +1,63 @@
-# Book Lesson From Lesson Request
+## The bug
 
-Add a **"Book Lesson"** button inside the Lesson Request detail dialog so admins can convert a request into a confirmed booking + calendar event without leaving the page. The picker is shift-aware: it suggests open time slots based on which instructors are scheduled to work that day, but always allows manual override.
+Sessions are correctly stored as `monday_wednesday`, but every row in `session_lesson_dates` for the active sessions landed on **Tue/Thu** instead of **Mon/Wed** — exactly one day off. Verified directly:
 
-## UX Flow
-
-```text
-Lesson Requests page
-  └─ Click row → LessonRequestDetailDialog opens
-       ├─ [Send Reply] (existing)
-       └─ [Book Lesson]  ← NEW
-              │
-              ▼
-       BookFromRequestDialog
-        ┌──────────────────────────────────────┐
-        │ Parent / Child (prefilled, locked)   │
-        │ Lesson type (private / semi)          │
-        │ Pick a date  [calendar]               │
-        │                                       │
-        │ Suggested slots for this date:        │
-        │   • Sarah   8:00–9:00  (open)         │
-        │   • Sarah   9:00–10:00 (open)         │
-        │   • Mark    4:00–5:00  (open)         │
-        │   ⓘ No instructor scheduled? Manual ▼ │
-        │                                       │
-        │ — OR —                                │
-        │ Manual: instructor [picker]           │
-        │         time  [HH:MM] – [HH:MM]       │
-        │         pool area [shallow/deep]      │
-        │                                       │
-        │ □ Recurring weekly until [date]       │
-        │ □ Send confirmation + payment link    │
-        │                                       │
-        │           [Cancel]  [Book Lesson]     │
-        └──────────────────────────────────────┘
-              │
-              ▼
-       On success:
-        • lesson_bookings row created
-        • pool_events row(s) created (visible on calendar)
-        • lesson_booking_occurrences row(s) created
-        • Optional: confirmation email + Stripe link sent
-        • Lesson request status auto-flips to "scheduled"
-        • Toast + dialog closes
+```
+Session 1 (Jun 8 – Jul 2)  →  stored as Jun 9 (Tue), Jun 11 (Thu), Jun 16 (Tue) …
+Session 2 (Jul 13 – Aug 6) →  same Tue/Thu pattern
+Total: 512 wrong rows across all active classes
 ```
 
-## How "Suggested Slots" Works
+That's why the enrollment "Pick Your Sessions" screen shows *Tue, Jun 9 / Thu, Jun 11 / …* underneath each time slot.
 
-For the selected date:
+## Root cause
 
-1. Query `shifts` where `shift_date = pickedDate` AND `status = 'published'` AND `instructor_id IS NOT NULL`. These are confirmed working hours per instructor.
-2. Query `pool_events` for the same date to know what's already booked.
-3. For each shift, slice it into 30-min increments matching the lesson length (default 60 min for private, 45 min for semi). Drop any increment that overlaps an existing pool event in the same pool area.
-4. Render the result as clickable chips grouped by instructor. Clicking a chip auto-fills instructor, start, and end time.
+Both `src/pages/admin/SessionsAdmin.tsx` (auto-generate on create) and `src/components/admin/ManageDatesModal.tsx` (regenerate button) use the same fragile pattern:
 
-If no shifts are published for that date, show: *"No instructors scheduled for this date — use Manual entry below."*
+```ts
+const cur = new Date(period.start_date + "T00:00:00"); // local midnight
+…
+classDates.push(cur.toISOString().slice(0, 10));        // converts to UTC → off-by-one in some TZ
+```
 
-## Manual Override
+When the browser/runtime timezone is **ahead of UTC** (e.g. an admin in Europe creates the session, or the row was seeded from a UTC+TZ context), `toISOString()` rolls each date forward by a day — producing Tue/Thu from a Mon/Wed iteration. The day-of-week filter is local but the serialization is UTC, so the two disagree.
 
-Always shown beneath the suggestions. Uses the existing `InstructorPicker` (lists all active instructors regardless of shifts) plus time/pool inputs. No shift is required to book — the admin can assign an instructor whose shift hasn't been created yet.
+## Fix
 
-## Reuse vs New
+Two parts: repair the data, then prevent the bug from recurring.
 
-- **Reuse**: `InstructorPicker`, `LessonBookingFields` (parent/child/recurring fields), the `lesson_bookings` + `pool_events` + `lesson_booking_occurrences` insert sequence from `AddPoolEventDialog.handleLessonBookingSave`, and the `send-lesson-booking-confirmation` edge function.
-- **New**: `BookFromRequestDialog.tsx` (lighter wrapper around the booking save logic, prefilled from the lesson request), and a small `useAvailableSlots(date)` hook that returns suggestions from shifts minus pool events.
+### 1. Repair the data (migration)
 
-## Status Sync
+For every row in `session_lesson_dates` whose date does not match its parent session's `day_of_week`, regenerate the dates from scratch using SQL `generate_series` (timezone-safe, no JS Date involved). For each affected session:
 
-After a successful booking, update `lesson_requests.status = 'scheduled'` and patch the parent row in `LessonRequestsAdmin` via the existing `onUpdated` callback so the list reflects it without a refetch.
+- delete existing `session_lesson_dates` rows that aren't tied to a confirmed enrollment occurrence
+- re-insert the correct Mon/Wed (or whatever `day_of_week` says) dates between `session_start_date` and `session_end_date`
+- preserve any per-date `is_cancelled` / `cancel_reason` flags by keying on the *position* (1st class, 2nd class, …) where possible, otherwise reset to defaults
 
-## Technical Details
+### 2. Code fixes (both files)
 
-- New file: `src/components/admin/BookFromRequestDialog.tsx`
-- New file: `src/hooks/useAvailableSlots.ts` — returns `{ instructorName, start, end }[]` for a given date by joining `shifts` (published, has instructor) with `instructors.name` and subtracting overlapping `pool_events`.
-- Edit: `src/components/admin/LessonRequestDetailDialog.tsx` — add "Book Lesson" button in the footer, wire dialog state.
-- Default lesson duration: 60 min for private (`$65`), 45 min for semi-private (`$45`) — matching `defaultLessonBookingData` in `AddPoolEventDialog`.
-- Default pool area: `shallow`.
-- Insert flow mirrors `handleLessonBookingSave` (booking → pool_events → occurrences → optional confirmation email via `send-lesson-booking-confirmation` with `getStripeEnvironment()`).
-- Suggested-slot generation runs client-side; no new edge function needed.
+Replace the broken `toISOString().slice(0,10)` serialization with a local-date formatter so the day used in `getDay()` is the same day written to the database:
+
+```ts
+const fmtLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+```
+
+Files to edit:
+- `src/pages/admin/SessionsAdmin.tsx` — line 320 (auto-generate after `INSERT swim_sessions`)
+- `src/components/admin/ManageDatesModal.tsx` — line 50 (`generateLessonDates` helper used by the "Regenerate dates" button)
+
+Also tighten the day parser in `SessionsAdmin.tsx` line 315 — the current `.charAt(0).toUpperCase() + d.slice(1)` then lookup in a capitalized `dayMap` works, but switch to a single lowercase map shared with `ManageDatesModal.tsx` to remove duplicate maps.
+
+## Verification
+
+After running the migration and shipping the code fix:
+
+1. Re-query `session_lesson_dates` — every row's `EXTRACT(DOW FROM lesson_date)` must match the session's `day_of_week` (1+3 for `monday_wednesday`, etc.).
+2. Reload `/swim-enrollment`, pick a Session 1 spot — chips should now read **Mon, Jun 8 · Wed, Jun 10 · Mon, Jun 15 …** through **Wed, Jul 1 · Thu, Jul 2** (final make-up day if applicable).
+3. Open the admin **Manage Dates** modal on a class and click "Regenerate" — the regenerated set should be Mon/Wed, not shifted.
+
+## Out of scope
+
+- No changes to enrollment/payment flow, calendar, or emails.
+- No schema changes — just data correction in `session_lesson_dates` and the two TS files.
