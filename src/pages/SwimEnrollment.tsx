@@ -47,8 +47,8 @@ const SwimEnrollment = () => {
 
   // Multi-child state
   const [completedChildren, setCompletedChildren] = useState<ChildEnrollment[]>([]);
-  const [sharedParent, setSharedParent] = useState<{ name: string; email: string; phone: string } | null>(null);
-  const [sharedEmergency, setSharedEmergency] = useState<{ name: string; phone: string; relationship: string } | null>(null);
+  const [sharedParent, setSharedParent] = useState<{ firstName: string; lastName: string; email: string; phone: string } | null>(null);
+  const [sharedEmergency, setSharedEmergency] = useState<{ firstName: string; lastName: string; phone: string; relationship: string } | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
