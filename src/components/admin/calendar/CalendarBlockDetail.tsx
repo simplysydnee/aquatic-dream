@@ -645,6 +645,25 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
               } : null}
               onSigned={refetchLesson}
             />
+
+            <EditSwimmerDialog
+              open={!!editTarget}
+              onOpenChange={(o) => { if (!o) setEditTarget(null); }}
+              target={editTarget}
+              onSaved={() => {
+                if (editTarget?.kind === "lesson_booking") refetchLesson();
+                onRefetch?.();
+              }}
+            />
+
+            <FrontDeskEnrollmentWaiverDialog
+              open={!!enrWaiverTarget}
+              onOpenChange={(o) => { if (!o) setEnrWaiverTarget(null); }}
+              enrollment={enrWaiverTarget}
+              onSigned={() => {
+                onRefetch?.();
+              }}
+            />
           </>
         )}
       </div>
