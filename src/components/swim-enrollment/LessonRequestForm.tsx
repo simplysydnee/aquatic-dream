@@ -79,12 +79,18 @@ const LessonRequestForm = () => {
     const id = crypto.randomUUID();
     const childAge = calcAge(parsed.data.childDob);
     const dobIso = format(parsed.data.childDob, "yyyy-MM-dd");
+    const parentName = `${parsed.data.parentFirstName} ${parsed.data.parentLastName}`.trim();
+    const childName = `${parsed.data.childFirstName} ${parsed.data.childLastName}`.trim();
     const { error } = await supabase.from("lesson_requests").insert({
       id,
-      parent_name: parsed.data.parentName,
+      parent_name: parentName,
+      parent_first_name: parsed.data.parentFirstName,
+      parent_last_name: parsed.data.parentLastName,
       parent_email: parsed.data.parentEmail,
       parent_phone: parsed.data.parentPhone || null,
-      child_name: parsed.data.childName,
+      child_name: childName,
+      child_first_name: parsed.data.childFirstName,
+      child_last_name: parsed.data.childLastName,
       child_age: childAge,
       child_dob: dobIso,
       lesson_type: parsed.data.lessonType,
@@ -104,8 +110,8 @@ const LessonRequestForm = () => {
           recipientEmail: parsed.data.parentEmail,
           idempotencyKey: `lesson-req-ack-${id}`,
           templateData: {
-            parentName: parsed.data.parentName,
-            childName: parsed.data.childName,
+            parentName,
+            childName,
             lessonType: parsed.data.lessonType,
           },
         },
