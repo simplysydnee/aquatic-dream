@@ -379,7 +379,8 @@ const SwimEnrollment = () => {
               onSubmit={handleInfoSubmit}
               onBack={() => setStep("session")}
               submitting={false}
-              defaultParentName={sharedParent?.name}
+              defaultParentFirstName={sharedParent?.firstName}
+              defaultParentLastName={sharedParent?.lastName}
               defaultParentEmail={sharedParent?.email}
               defaultParentPhone={sharedParent?.phone}
             />
@@ -391,7 +392,8 @@ const SwimEnrollment = () => {
               onSubmit={handleLegalSubmit}
               onBack={() => setStep("info")}
               submitting={submitting}
-              defaultEmergencyContactName={sharedEmergency?.name}
+              defaultEmergencyContactFirstName={sharedEmergency?.firstName}
+              defaultEmergencyContactLastName={sharedEmergency?.lastName}
               defaultEmergencyContactPhone={sharedEmergency?.phone}
               defaultEmergencyContactRelationship={sharedEmergency?.relationship}
               showAddAnother={true}
