@@ -289,6 +289,8 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       .select("id, event_date");
 
     if (peErr || !insertedEvents) {
+      // Roll back the orphaned booking row so it doesn't pollute future lookups
+      await supabase.from("lesson_bookings").delete().eq("id", bookingRow.id);
       toast({ title: "Calendar events failed", description: peErr?.message, variant: "destructive" });
       return;
     }
