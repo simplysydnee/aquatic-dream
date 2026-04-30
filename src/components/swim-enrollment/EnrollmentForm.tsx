@@ -9,10 +9,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { z } from "zod";
 
 const enrollmentSchema = z.object({
-  parentName: z.string().trim().min(1, "Required").max(100),
+  parentFirstName: z.string().trim().min(1, "Required").max(100),
+  parentLastName: z.string().trim().min(1, "Required").max(100),
   parentEmail: z.string().trim().email("Invalid email").max(255),
   parentPhone: z.string().trim().max(20).optional(),
-  childName: z.string().trim().min(1, "Required").max(100),
+  childFirstName: z.string().trim().min(1, "Required").max(100),
+  childLastName: z.string().trim().min(1, "Required").max(100),
   notes: z.string().trim().max(500).optional(),
   isFirstTime: z.enum(["yes", "no"], { required_error: "Please select one" }),
   hasMedical: z.enum(["yes", "no"], { required_error: "Please select one" }),
@@ -22,23 +24,33 @@ const enrollmentSchema = z.object({
   { message: "Please describe the medical conditions or allergies", path: ["medicalNotes"] }
 );
 
-export type EnrollmentFormData = z.infer<typeof enrollmentSchema>;
+type ParsedEnrollment = z.infer<typeof enrollmentSchema>;
+
+// Public surface kept backward-compatible: includes derived combined `parentName` and `childName`
+// so the rest of the flow (checkout payload, Stripe metadata, emails) keeps working without changes.
+export type EnrollmentFormData = ParsedEnrollment & {
+  parentName: string;
+  childName: string;
+};
 
 interface Props {
   onSubmit: (data: EnrollmentFormData) => void;
   onBack: () => void;
   submitting: boolean;
-  defaultParentName?: string;
+  defaultParentFirstName?: string;
+  defaultParentLastName?: string;
   defaultParentEmail?: string;
   defaultParentPhone?: string;
 }
 
-const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentName, defaultParentEmail, defaultParentPhone }: Props) => {
+const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentFirstName, defaultParentLastName, defaultParentEmail, defaultParentPhone }: Props) => {
   const [form, setForm] = useState({
-    parentName: defaultParentName || "",
+    parentFirstName: defaultParentFirstName || "",
+    parentLastName: defaultParentLastName || "",
     parentEmail: defaultParentEmail || "",
     parentPhone: defaultParentPhone || "",
-    childName: "",
+    childFirstName: "",
+    childLastName: "",
     notes: "",
     isFirstTime: "" as "" | "yes" | "no",
     hasMedical: "" as "" | "yes" | "no",
@@ -58,7 +70,12 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentName, defau
       return;
     }
     setErrors({});
-    onSubmit(result.data);
+    const d = result.data;
+    onSubmit({
+      ...d,
+      parentName: `${d.parentFirstName} ${d.parentLastName}`.trim(),
+      childName: `${d.childFirstName} ${d.childLastName}`.trim(),
+    });
   };
 
   const update = (key: string, value: string) => {
@@ -76,30 +93,57 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentName, defau
         Parent & Child Info
       </h3>
       <p className="text-muted-foreground text-sm mb-6">
-        Almost there! We just need a few details.
+        Almost there! We just need a few details. Please use your swimmer's full legal name.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="parentName">Parent / Guardian Name *</Label>
-            <Input
-              id="parentName"
-              value={form.parentName}
-              onChange={(e) => update("parentName", e.target.value)}
-              className="mt-1"
-            />
-            {errors.parentName && <p className="text-xs text-destructive mt-1">{errors.parentName}</p>}
+        {/* Parent / Guardian */}
+        <div>
+          <Label className="text-sm font-semibold">Parent / Guardian Name *</Label>
+          <div className="grid gap-3 sm:grid-cols-2 mt-1">
+            <div>
+              <Input
+                id="parentFirstName"
+                placeholder="First name"
+                value={form.parentFirstName}
+                onChange={(e) => update("parentFirstName", e.target.value)}
+              />
+              {errors.parentFirstName && <p className="text-xs text-destructive mt-1">{errors.parentFirstName}</p>}
+            </div>
+            <div>
+              <Input
+                id="parentLastName"
+                placeholder="Last name"
+                value={form.parentLastName}
+                onChange={(e) => update("parentLastName", e.target.value)}
+              />
+              {errors.parentLastName && <p className="text-xs text-destructive mt-1">{errors.parentLastName}</p>}
+            </div>
           </div>
-          <div>
-            <Label htmlFor="childName">Child's Name *</Label>
-            <Input
-              id="childName"
-              value={form.childName}
-              onChange={(e) => update("childName", e.target.value)}
-              className="mt-1"
-            />
-            {errors.childName && <p className="text-xs text-destructive mt-1">{errors.childName}</p>}
+        </div>
+
+        {/* Child / Swimmer */}
+        <div>
+          <Label className="text-sm font-semibold">Swimmer's Full Name *</Label>
+          <div className="grid gap-3 sm:grid-cols-2 mt-1">
+            <div>
+              <Input
+                id="childFirstName"
+                placeholder="First name"
+                value={form.childFirstName}
+                onChange={(e) => update("childFirstName", e.target.value)}
+              />
+              {errors.childFirstName && <p className="text-xs text-destructive mt-1">{errors.childFirstName}</p>}
+            </div>
+            <div>
+              <Input
+                id="childLastName"
+                placeholder="Last name"
+                value={form.childLastName}
+                onChange={(e) => update("childLastName", e.target.value)}
+              />
+              {errors.childLastName && <p className="text-xs text-destructive mt-1">{errors.childLastName}</p>}
+            </div>
           </div>
         </div>
 
