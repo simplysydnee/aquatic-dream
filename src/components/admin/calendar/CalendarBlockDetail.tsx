@@ -389,6 +389,21 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                                   ✓ In
                                 </span>
                               )}
+                              <button
+                                title="Edit swimmer info"
+                                onClick={() => setEditTarget({
+                                  kind: "swim_enrollment",
+                                  id: enr.id,
+                                  child_name: enr.child_name,
+                                  child_age: enr.child_age ?? null,
+                                  parent_name: enr.parent_name,
+                                  parent_email: enr.parent_email || "",
+                                  parent_phone: enr.parent_phone || null,
+                                })}
+                                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
                             </div>
                           </div>
 
