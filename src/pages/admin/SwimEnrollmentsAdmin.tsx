@@ -563,10 +563,10 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Level</TableHead>
                     <TableHead>Parent</TableHead>
                     <TableHead>Session</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Reg Fee</TableHead>
                     <TableHead>Session Fee</TableHead>
                     <TableHead>Method / Ref</TableHead>
-                    <TableHead>Enrollment State</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="w-[100px]"></TableHead>
                   </TableRow>
@@ -592,6 +592,19 @@ const SwimEnrollmentsAdmin = () => {
                         </TableCell>
                         <TableCell className="text-sm">
                           {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
+                            <SelectTrigger className={`w-[140px] h-9 font-semibold ${enrollmentStateColor(e.status)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="confirmed">Confirmed</SelectItem>
+                              <SelectItem value="waitlist">Waitlist</SelectItem>
+                              <SelectItem value="no_show">No-show</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell>
                           {e.is_first_time && e.payment_status !== "not_required" ? (
@@ -637,19 +650,6 @@ const SwimEnrollmentsAdmin = () => {
                           ) : (
                             <span className="text-muted-foreground italic">none</span>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
-                            <SelectTrigger className={`w-[130px] h-8 ${enrollmentStateColor(e.status)}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="confirmed">Confirmed</SelectItem>
-                              <SelectItem value="waitlist">Waitlist</SelectItem>
-                              <SelectItem value="no_show">No-show</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(e.created_at).toLocaleDateString()}
@@ -709,9 +709,9 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Level</TableHead>
                     <TableHead>Parent</TableHead>
                     <TableHead>Session</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Reg Fee</TableHead>
                     <TableHead>Session Fee</TableHead>
-                    <TableHead>Status</TableHead>
                     <TableHead>Cancelled</TableHead>
                     <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
@@ -737,18 +737,8 @@ const SwimEnrollmentsAdmin = () => {
                           {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
-                            {e.payment_status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={sessionFeeColor(e.session_fee_status)}>
-                            {e.session_fee_status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
                           <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
-                            <SelectTrigger className={`w-[130px] h-8 ${enrollmentStateColor(e.status)}`}>
+                            <SelectTrigger className={`w-[140px] h-9 font-semibold ${enrollmentStateColor(e.status)}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -758,6 +748,16 @@ const SwimEnrollmentsAdmin = () => {
                               <SelectItem value="cancelled">Cancelled</SelectItem>
                             </SelectContent>
                           </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
+                            {e.payment_status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={sessionFeeColor(e.session_fee_status)}>
+                            {e.session_fee_status}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(e.created_at).toLocaleDateString()}
