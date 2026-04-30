@@ -254,7 +254,7 @@ const SwimEnrollmentsAdmin = () => {
     }
   };
 
-  const filtered = enrollments.filter((e) => {
+  const matchesSearchAndFilters = (e: Enrollment) => {
     const matchSearch = search === "" ||
       e.child_name.toLowerCase().includes(search.toLowerCase()) ||
       e.parent_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -264,7 +264,11 @@ const SwimEnrollmentsAdmin = () => {
     const matchPeriod = periodFilter === "all" || (e.session_id && sessions[e.session_id]?.session_period_id === periodFilter);
     const matchAge = ageFilter === "all" || (e.session_id && sessions[e.session_id]?.age_group === ageFilter);
     return matchSearch && matchPayment && matchSession && matchPeriod && matchAge;
-  });
+  };
+
+  // "All Enrollments" tab EXCLUDES cancelled — they live on their own tab.
+  const filtered = enrollments.filter((e) => e.status !== "cancelled" && matchesSearchAndFilters(e));
+  const cancelledList = enrollments.filter((e) => e.status === "cancelled" && matchesSearchAndFilters(e));
 
   // Filter-aware metrics: when any filter is active, scope to filtered; else use full set.
   const anyFilterActive =
