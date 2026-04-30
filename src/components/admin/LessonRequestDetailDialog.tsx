@@ -209,14 +209,27 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-2 flex-wrap">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          <Button variant="secondary" onClick={() => setBookOpen(true)}>
+            <CalendarPlus className="h-4 w-4 mr-2" />
+            Book Lesson
+          </Button>
           <Button onClick={handleSendReply} disabled={sending}>
             <Send className="h-4 w-4 mr-2" />
             {sending ? "Sending…" : "Send Reply"}
           </Button>
         </DialogFooter>
       </DialogContent>
+      <BookFromRequestDialog
+        request={request}
+        open={bookOpen}
+        onOpenChange={setBookOpen}
+        onBooked={(updated) => {
+          setStatus(updated.status);
+          onUpdated(updated);
+        }}
+      />
     </Dialog>
   );
 }
