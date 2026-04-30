@@ -24,6 +24,8 @@ interface ChildEnrollment {
   childAge: number;
   childDob: string;
   childName: string;
+  childFirstName: string;
+  childLastName: string;
   sessionIds: string[];
   enrollmentData: EnrollmentFormData;
   legalData: LegalAgreementData;
