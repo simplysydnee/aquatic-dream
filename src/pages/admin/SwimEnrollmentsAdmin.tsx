@@ -709,9 +709,9 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Level</TableHead>
                     <TableHead>Parent</TableHead>
                     <TableHead>Session</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Reg Fee</TableHead>
                     <TableHead>Session Fee</TableHead>
-                    <TableHead>Status</TableHead>
                     <TableHead>Cancelled</TableHead>
                     <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
