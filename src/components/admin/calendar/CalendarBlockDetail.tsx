@@ -77,6 +77,8 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   const [showCardCheckout, setShowCardCheckout] = useState(false);
   const [showFrontDeskWaiver, setShowFrontDeskWaiver] = useState(false);
   const [resendingWaiver, setResendingWaiver] = useState(false);
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [enrWaiverTarget, setEnrWaiverTarget] = useState<{ id: string; parent_name: string; parent_email: string; child_name: string } | null>(null);
 
   const refetchLesson = async () => {
     if (!eventId) return;
