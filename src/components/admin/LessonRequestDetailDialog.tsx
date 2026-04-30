@@ -44,6 +44,7 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("new");
+  const [bookOpen, setBookOpen] = useState(false);
 
   useEffect(() => {
     if (!request) return;
