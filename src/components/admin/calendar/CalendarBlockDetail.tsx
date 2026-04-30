@@ -13,7 +13,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import AddSwimmerDialog from "./AddSwimmerDialog";
 import LessonOccurrenceCheckoutDialog from "./LessonOccurrenceCheckoutDialog";
 import FrontDeskWaiverDialog from "./FrontDeskWaiverDialog";
+import FrontDeskEnrollmentWaiverDialog from "./FrontDeskEnrollmentWaiverDialog";
+import EditSwimmerDialog, { type EditTarget } from "./EditSwimmerDialog";
 import { getStripeEnvironment } from "@/lib/stripe";
+import { ClipboardSignature } from "lucide-react";
 
 interface SwimBlockInfo {
   kind: "swim";
