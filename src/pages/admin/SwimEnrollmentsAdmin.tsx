@@ -274,7 +274,9 @@ const SwimEnrollmentsAdmin = () => {
   const anyFilterActive =
     search !== "" || paymentFilter !== "all" || sessionFilter !== "all" ||
     periodFilter !== "all" || ageFilter !== "all";
-  const scope = anyFilterActive ? filtered : enrollments;
+  // Metrics scope excludes cancelled (they're on their own tab).
+  const nonCancelled = enrollments.filter((e) => e.status !== "cancelled");
+  const scope = anyFilterActive ? filtered : nonCancelled;
 
   const isActive = (e: Enrollment) => e.status === "confirmed";
   const activeEnrollments = scope.filter(isActive);
