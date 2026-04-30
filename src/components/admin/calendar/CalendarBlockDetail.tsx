@@ -441,8 +441,21 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                               </a>
                             </div>
                           ) : (
-                            <div className="mt-2 pl-[52px] pt-2 border-t border-dashed">
-                              <p className="text-[10px] text-muted-foreground italic">No emergency contact on file</p>
+                            <div className="mt-2 pl-[52px] pt-2 border-t border-dashed space-y-2">
+                              <p className="text-[10px] text-muted-foreground italic">No waiver / emergency contact on file</p>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="h-7 text-xs gap-1.5"
+                                onClick={() => setEnrWaiverTarget({
+                                  id: enr.id,
+                                  parent_name: enr.parent_name,
+                                  parent_email: enr.parent_email || "",
+                                  child_name: enr.child_name,
+                                })}
+                              >
+                                <ClipboardSignature className="w-3 h-3" /> Complete Waivers
+                              </Button>
                             </div>
                           )}
 
