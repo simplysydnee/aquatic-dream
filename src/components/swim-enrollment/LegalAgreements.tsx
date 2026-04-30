@@ -20,12 +20,19 @@ const legalSchema = z.object({
   termsAccepted: z.literal(true, { errorMap: () => ({ message: "You must accept the terms of service" }) }),
   photoReleaseAccepted: z.enum(["yes", "no"], { errorMap: () => ({ message: "Please select Yes or No" }) }),
   signatureText: z.string().trim().min(2, "Please type your full legal name"),
-  emergencyContactName: z.string().trim().min(1, "Required"),
+  emergencyContactFirstName: z.string().trim().min(1, "Required"),
+  emergencyContactLastName: z.string().trim().min(1, "Required"),
   emergencyContactPhone: z.string().trim().min(7, "Valid phone number required"),
   emergencyContactRelationship: z.string().trim().min(1, "Required"),
 });
 
-export type LegalAgreementData = z.infer<typeof legalSchema>;
+type ParsedLegal = z.infer<typeof legalSchema>;
+
+// Public surface keeps the legacy combined `emergencyContactName` so downstream
+// payload shape (signer agreement insert, emails) stays unchanged.
+export type LegalAgreementData = ParsedLegal & {
+  emergencyContactName: string;
+};
 
 const DocumentSection = ({
   title,
