@@ -86,7 +86,8 @@ interface Props {
   onSubmit: (data: LegalAgreementData) => void;
   onBack: () => void;
   submitting: boolean;
-  defaultEmergencyContactName?: string;
+  defaultEmergencyContactFirstName?: string;
+  defaultEmergencyContactLastName?: string;
   defaultEmergencyContactPhone?: string;
   defaultEmergencyContactRelationship?: string;
   showAddAnother?: boolean;
@@ -98,14 +99,15 @@ interface Props {
   headerSubtitle?: React.ReactNode;
 }
 
-const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
+const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
   const [form, setForm] = useState({
     waiverAccepted: false,
     privacyPolicyAccepted: false,
     termsAccepted: false,
     photoReleaseAccepted: "" as any,
     signatureText: parentName || "",
-    emergencyContactName: defaultEmergencyContactName || "",
+    emergencyContactFirstName: defaultEmergencyContactFirstName || "",
+    emergencyContactLastName: defaultEmergencyContactLastName || "",
     emergencyContactPhone: defaultEmergencyContactPhone || "",
     emergencyContactRelationship: defaultEmergencyContactRelationship || "",
   });
@@ -122,7 +124,10 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
       return null;
     }
     setErrors({});
-    return result.data;
+    return {
+      ...result.data,
+      emergencyContactName: `${result.data.emergencyContactFirstName} ${result.data.emergencyContactLastName}`.trim(),
+    };
   };
 
   const handleSubmit = (e: React.FormEvent) => {
