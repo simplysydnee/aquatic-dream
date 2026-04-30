@@ -38,16 +38,21 @@ function parseDaysOfWeek(daysOfWeek: string): number[] {
     .filter(n => n !== undefined);
 }
 
+// Format a Date as YYYY-MM-DD using local components — never toISOString,
+// which converts to UTC and can shift the date by a day in non-UTC timezones.
+function fmtLocalYMD(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function generateLessonDates(start: string, end: string, daysOfWeek: string): string[] {
   const allowedDays = parseDaysOfWeek(daysOfWeek);
   if (allowedDays.length === 0) return [];
   const dates: string[] = [];
-  const s = new Date(start + "T00:00:00");
+  const cur = new Date(start + "T00:00:00");
   const e = new Date(end + "T00:00:00");
-  const cur = new Date(s);
   while (cur <= e) {
     if (allowedDays.includes(cur.getDay())) {
-      dates.push(cur.toISOString().slice(0, 10));
+      dates.push(fmtLocalYMD(cur));
     }
     cur.setDate(cur.getDate() + 1);
   }
