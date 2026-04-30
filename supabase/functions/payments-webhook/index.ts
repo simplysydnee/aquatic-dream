@@ -10,11 +10,15 @@ const supabase = createClient(
 interface ChildPayload {
   level: string;
   childName: string;
+  childFirstName?: string;
+  childLastName?: string;
   childAge: number;
   childDob: string | null;
   sessionIds: string[];
   isFirstTime: boolean;
   parentName: string;
+  parentFirstName?: string;
+  parentLastName?: string;
   parentEmail: string;
   parentPhone: string | null;
   medicalNotes: string | null;
@@ -26,6 +30,8 @@ interface ChildPayload {
     termsAccepted: boolean;
     signatureText: string;
     emergencyContactName: string;
+    emergencyContactFirstName?: string;
+    emergencyContactLastName?: string;
     emergencyContactPhone: string;
     emergencyContactRelationship: string;
   };
@@ -171,9 +177,13 @@ async function handleCheckoutCompleted(session: any) {
         swim_level: child.level,
         session_id: sid,
         parent_name: child.parentName,
+        parent_first_name: child.parentFirstName ?? null,
+        parent_last_name: child.parentLastName ?? null,
         parent_email: child.parentEmail,
         parent_phone: child.parentPhone,
         child_name: child.childName,
+        child_first_name: child.childFirstName ?? null,
+        child_last_name: child.childLastName ?? null,
         child_age: child.childAge,
         child_dob: child.childDob,
         medical_notes: child.medicalNotes,
@@ -254,12 +264,16 @@ async function handleCheckoutCompleted(session: any) {
         terms_accepted: child.agreement.termsAccepted,
         signature_text: child.agreement.signatureText,
         signer_name: child.parentName,
+        signer_first_name: child.parentFirstName ?? null,
+        signer_last_name: child.parentLastName ?? null,
         signer_email: child.parentEmail,
         signer_ip: payload.signerIp,
         waiver_version: payload.versions.waiver,
         tos_version: payload.versions.tos,
         privacy_policy_version: payload.versions.privacy,
         emergency_contact_name: child.agreement.emergencyContactName,
+        emergency_contact_first_name: child.agreement.emergencyContactFirstName ?? null,
+        emergency_contact_last_name: child.agreement.emergencyContactLastName ?? null,
         emergency_contact_phone: child.agreement.emergencyContactPhone,
         emergency_contact_relationship: child.agreement.emergencyContactRelationship,
       };

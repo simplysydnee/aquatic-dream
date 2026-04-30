@@ -301,6 +301,8 @@ export type Database = {
       enrollment_agreements: {
         Row: {
           created_at: string
+          emergency_contact_first_name: string | null
+          emergency_contact_last_name: string | null
           emergency_contact_name: string
           emergency_contact_phone: string
           emergency_contact_relationship: string
@@ -313,7 +315,9 @@ export type Database = {
           signature_text: string
           signed_at: string
           signer_email: string
+          signer_first_name: string | null
           signer_ip: string | null
+          signer_last_name: string | null
           signer_name: string
           terms_accepted: boolean
           tos_version: string
@@ -322,6 +326,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          emergency_contact_first_name?: string | null
+          emergency_contact_last_name?: string | null
           emergency_contact_name: string
           emergency_contact_phone: string
           emergency_contact_relationship: string
@@ -334,7 +340,9 @@ export type Database = {
           signature_text: string
           signed_at?: string
           signer_email: string
+          signer_first_name?: string | null
           signer_ip?: string | null
+          signer_last_name?: string | null
           signer_name: string
           terms_accepted?: boolean
           tos_version?: string
@@ -343,6 +351,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          emergency_contact_first_name?: string | null
+          emergency_contact_last_name?: string | null
           emergency_contact_name?: string
           emergency_contact_phone?: string
           emergency_contact_relationship?: string
@@ -355,7 +365,9 @@ export type Database = {
           signature_text?: string
           signed_at?: string
           signer_email?: string
+          signer_first_name?: string | null
           signer_ip?: string | null
+          signer_last_name?: string | null
           signer_name?: string
           terms_accepted?: boolean
           tos_version?: string
@@ -658,6 +670,8 @@ export type Database = {
       }
       lesson_bookings: {
         Row: {
+          child_first_name: string | null
+          child_last_name: string | null
           child_name: string | null
           created_at: string
           end_time: string
@@ -667,6 +681,8 @@ export type Database = {
           lesson_type: string
           notes: string | null
           parent_email: string
+          parent_first_name: string | null
+          parent_last_name: string | null
           parent_name: string
           parent_phone: string | null
           pool_area: string
@@ -682,6 +698,8 @@ export type Database = {
           waiver_token: string | null
         }
         Insert: {
+          child_first_name?: string | null
+          child_last_name?: string | null
           child_name?: string | null
           created_at?: string
           end_time: string
@@ -691,6 +709,8 @@ export type Database = {
           lesson_type: string
           notes?: string | null
           parent_email: string
+          parent_first_name?: string | null
+          parent_last_name?: string | null
           parent_name: string
           parent_phone?: string | null
           pool_area?: string
@@ -706,6 +726,8 @@ export type Database = {
           waiver_token?: string | null
         }
         Update: {
+          child_first_name?: string | null
+          child_last_name?: string | null
           child_name?: string | null
           created_at?: string
           end_time?: string
@@ -715,6 +737,8 @@ export type Database = {
           lesson_type?: string
           notes?: string | null
           parent_email?: string
+          parent_first_name?: string | null
+          parent_last_name?: string | null
           parent_name?: string
           parent_phone?: string | null
           pool_area?: string
@@ -735,6 +759,8 @@ export type Database = {
         Row: {
           child_age: number
           child_dob: string | null
+          child_first_name: string | null
+          child_last_name: string | null
           child_name: string
           created_at: string
           id: string
@@ -743,6 +769,8 @@ export type Database = {
           lesson_type: string
           notes: string | null
           parent_email: string
+          parent_first_name: string | null
+          parent_last_name: string | null
           parent_name: string
           parent_phone: string | null
           preferred_times: string | null
@@ -752,6 +780,8 @@ export type Database = {
         Insert: {
           child_age: number
           child_dob?: string | null
+          child_first_name?: string | null
+          child_last_name?: string | null
           child_name: string
           created_at?: string
           id?: string
@@ -760,6 +790,8 @@ export type Database = {
           lesson_type?: string
           notes?: string | null
           parent_email: string
+          parent_first_name?: string | null
+          parent_last_name?: string | null
           parent_name: string
           parent_phone?: string | null
           preferred_times?: string | null
@@ -769,6 +801,8 @@ export type Database = {
         Update: {
           child_age?: number
           child_dob?: string | null
+          child_first_name?: string | null
+          child_last_name?: string | null
           child_name?: string
           created_at?: string
           id?: string
@@ -777,6 +811,8 @@ export type Database = {
           lesson_type?: string
           notes?: string | null
           parent_email?: string
+          parent_first_name?: string | null
+          parent_last_name?: string | null
           parent_name?: string
           parent_phone?: string | null
           preferred_times?: string | null
@@ -853,6 +889,8 @@ export type Database = {
       }
       pool_events: {
         Row: {
+          client_first_name: string | null
+          client_last_name: string | null
           client_name: string | null
           created_at: string
           end_time: string
@@ -869,6 +907,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          client_first_name?: string | null
+          client_last_name?: string | null
           client_name?: string | null
           created_at?: string
           end_time: string
@@ -885,6 +925,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          client_first_name?: string | null
+          client_last_name?: string | null
           client_name?: string | null
           created_at?: string
           end_time?: string
@@ -1182,6 +1224,8 @@ export type Database = {
         Row: {
           child_age: number
           child_dob: string | null
+          child_first_name: string | null
+          child_last_name: string | null
           child_name: string
           created_at: string
           id: string
@@ -1190,6 +1234,8 @@ export type Database = {
           medical_notes: string | null
           notes: string | null
           parent_email: string
+          parent_first_name: string | null
+          parent_last_name: string | null
           parent_name: string
           parent_phone: string | null
           payment_amount: number | null
@@ -1215,6 +1261,8 @@ export type Database = {
         Insert: {
           child_age: number
           child_dob?: string | null
+          child_first_name?: string | null
+          child_last_name?: string | null
           child_name: string
           created_at?: string
           id?: string
@@ -1223,6 +1271,8 @@ export type Database = {
           medical_notes?: string | null
           notes?: string | null
           parent_email: string
+          parent_first_name?: string | null
+          parent_last_name?: string | null
           parent_name: string
           parent_phone?: string | null
           payment_amount?: number | null
@@ -1248,6 +1298,8 @@ export type Database = {
         Update: {
           child_age?: number
           child_dob?: string | null
+          child_first_name?: string | null
+          child_last_name?: string | null
           child_name?: string
           created_at?: string
           id?: string
@@ -1256,6 +1308,8 @@ export type Database = {
           medical_notes?: string | null
           notes?: string | null
           parent_email?: string
+          parent_first_name?: string | null
+          parent_last_name?: string | null
           parent_name?: string
           parent_phone?: string | null
           payment_amount?: number | null

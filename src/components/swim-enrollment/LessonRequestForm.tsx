@@ -25,10 +25,12 @@ const calcAge = (dob: Date): number => {
 };
 
 const requestSchema = z.object({
-  parentName: z.string().trim().min(1, "Required").max(100),
+  parentFirstName: z.string().trim().min(1, "Required").max(100),
+  parentLastName: z.string().trim().min(1, "Required").max(100),
   parentEmail: z.string().trim().email("Invalid email").max(255),
   parentPhone: z.string().trim().max(20).optional(),
-  childName: z.string().trim().min(1, "Required").max(100),
+  childFirstName: z.string().trim().min(1, "Required").max(100),
+  childLastName: z.string().trim().min(1, "Required").max(100),
   childDob: z.date({ required_error: "Date of birth is required" })
     .refine((d) => d <= new Date(), { message: "Date of birth must be in the past" })
     .refine((d) => d >= new Date("1920-01-01"), { message: "Please enter a valid date" }),
@@ -42,10 +44,12 @@ const LessonRequestForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const [form, setForm] = useState({
-    parentName: "",
+    parentFirstName: "",
+    parentLastName: "",
     parentEmail: "",
     parentPhone: "",
-    childName: "",
+    childFirstName: "",
+    childLastName: "",
     childDob: undefined as Date | undefined,
     lessonType: "private" as "private" | "semi-private",
     preferredTimes: "",
@@ -75,12 +79,18 @@ const LessonRequestForm = () => {
     const id = crypto.randomUUID();
     const childAge = calcAge(parsed.data.childDob);
     const dobIso = format(parsed.data.childDob, "yyyy-MM-dd");
+    const parentName = `${parsed.data.parentFirstName} ${parsed.data.parentLastName}`.trim();
+    const childName = `${parsed.data.childFirstName} ${parsed.data.childLastName}`.trim();
     const { error } = await supabase.from("lesson_requests").insert({
       id,
-      parent_name: parsed.data.parentName,
+      parent_name: parentName,
+      parent_first_name: parsed.data.parentFirstName,
+      parent_last_name: parsed.data.parentLastName,
       parent_email: parsed.data.parentEmail,
       parent_phone: parsed.data.parentPhone || null,
-      child_name: parsed.data.childName,
+      child_name: childName,
+      child_first_name: parsed.data.childFirstName,
+      child_last_name: parsed.data.childLastName,
       child_age: childAge,
       child_dob: dobIso,
       lesson_type: parsed.data.lessonType,
@@ -100,8 +110,8 @@ const LessonRequestForm = () => {
           recipientEmail: parsed.data.parentEmail,
           idempotencyKey: `lesson-req-ack-${id}`,
           templateData: {
-            parentName: parsed.data.parentName,
-            childName: parsed.data.childName,
+            parentName,
+            childName,
             lessonType: parsed.data.lessonType,
           },
         },
@@ -152,16 +162,31 @@ const LessonRequestForm = () => {
           </RadioGroup>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="parentName">Parent / Guardian Name *</Label>
-            <Input id="parentName" value={form.parentName} onChange={(e) => update("parentName", e.target.value)} className="mt-1" />
-            {errors.parentName && <p className="text-xs text-destructive mt-1">{errors.parentName}</p>}
+        <div>
+          <Label className="text-sm font-semibold">Parent / Guardian Name *</Label>
+          <div className="grid gap-3 sm:grid-cols-2 mt-1">
+            <div>
+              <Input placeholder="First name" value={form.parentFirstName} onChange={(e) => update("parentFirstName", e.target.value)} />
+              {errors.parentFirstName && <p className="text-xs text-destructive mt-1">{errors.parentFirstName}</p>}
+            </div>
+            <div>
+              <Input placeholder="Last name" value={form.parentLastName} onChange={(e) => update("parentLastName", e.target.value)} />
+              {errors.parentLastName && <p className="text-xs text-destructive mt-1">{errors.parentLastName}</p>}
+            </div>
           </div>
-          <div>
-            <Label htmlFor="childName">Swimmer's Name *</Label>
-            <Input id="childName" value={form.childName} onChange={(e) => update("childName", e.target.value)} className="mt-1" />
-            {errors.childName && <p className="text-xs text-destructive mt-1">{errors.childName}</p>}
+        </div>
+
+        <div>
+          <Label className="text-sm font-semibold">Swimmer's Full Name *</Label>
+          <div className="grid gap-3 sm:grid-cols-2 mt-1">
+            <div>
+              <Input placeholder="First name" value={form.childFirstName} onChange={(e) => update("childFirstName", e.target.value)} />
+              {errors.childFirstName && <p className="text-xs text-destructive mt-1">{errors.childFirstName}</p>}
+            </div>
+            <div>
+              <Input placeholder="Last name" value={form.childLastName} onChange={(e) => update("childLastName", e.target.value)} />
+              {errors.childLastName && <p className="text-xs text-destructive mt-1">{errors.childLastName}</p>}
+            </div>
           </div>
         </div>
 

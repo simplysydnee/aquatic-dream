@@ -20,12 +20,19 @@ const legalSchema = z.object({
   termsAccepted: z.literal(true, { errorMap: () => ({ message: "You must accept the terms of service" }) }),
   photoReleaseAccepted: z.enum(["yes", "no"], { errorMap: () => ({ message: "Please select Yes or No" }) }),
   signatureText: z.string().trim().min(2, "Please type your full legal name"),
-  emergencyContactName: z.string().trim().min(1, "Required"),
+  emergencyContactFirstName: z.string().trim().min(1, "Required"),
+  emergencyContactLastName: z.string().trim().min(1, "Required"),
   emergencyContactPhone: z.string().trim().min(7, "Valid phone number required"),
   emergencyContactRelationship: z.string().trim().min(1, "Required"),
 });
 
-export type LegalAgreementData = z.infer<typeof legalSchema>;
+type ParsedLegal = z.infer<typeof legalSchema>;
+
+// Public surface keeps the legacy combined `emergencyContactName` so downstream
+// payload shape (signer agreement insert, emails) stays unchanged.
+export type LegalAgreementData = ParsedLegal & {
+  emergencyContactName: string;
+};
 
 const DocumentSection = ({
   title,
@@ -79,7 +86,8 @@ interface Props {
   onSubmit: (data: LegalAgreementData) => void;
   onBack: () => void;
   submitting: boolean;
-  defaultEmergencyContactName?: string;
+  defaultEmergencyContactFirstName?: string;
+  defaultEmergencyContactLastName?: string;
   defaultEmergencyContactPhone?: string;
   defaultEmergencyContactRelationship?: string;
   showAddAnother?: boolean;
@@ -91,14 +99,15 @@ interface Props {
   headerSubtitle?: React.ReactNode;
 }
 
-const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
+const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
   const [form, setForm] = useState({
     waiverAccepted: false,
     privacyPolicyAccepted: false,
     termsAccepted: false,
     photoReleaseAccepted: "" as any,
     signatureText: parentName || "",
-    emergencyContactName: defaultEmergencyContactName || "",
+    emergencyContactFirstName: defaultEmergencyContactFirstName || "",
+    emergencyContactLastName: defaultEmergencyContactLastName || "",
     emergencyContactPhone: defaultEmergencyContactPhone || "",
     emergencyContactRelationship: defaultEmergencyContactRelationship || "",
   });
@@ -115,7 +124,10 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
       return null;
     }
     setErrors({});
-    return result.data;
+    return {
+      ...result.data,
+      emergencyContactName: `${result.data.emergencyContactFirstName} ${result.data.emergencyContactLastName}`.trim(),
+    };
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -245,18 +257,31 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
           <p className="text-xs text-muted-foreground">
             Required per the liability waiver. This person will be contacted in case of emergency.
           </p>
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
             <div>
-              <Label htmlFor="emergencyContactName" className="text-xs">Name</Label>
+              <Label htmlFor="emergencyContactFirstName" className="text-xs">First Name</Label>
               <Input
-                id="emergencyContactName"
-                value={form.emergencyContactName}
-                onChange={(e) => update("emergencyContactName", e.target.value)}
+                id="emergencyContactFirstName"
+                value={form.emergencyContactFirstName}
+                onChange={(e) => update("emergencyContactFirstName", e.target.value)}
                 className="mt-1"
-                placeholder="Full name"
+                placeholder="First name"
               />
-              {errors.emergencyContactName && (
-                <p className="text-xs text-destructive mt-1">{errors.emergencyContactName}</p>
+              {errors.emergencyContactFirstName && (
+                <p className="text-xs text-destructive mt-1">{errors.emergencyContactFirstName}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="emergencyContactLastName" className="text-xs">Last Name</Label>
+              <Input
+                id="emergencyContactLastName"
+                value={form.emergencyContactLastName}
+                onChange={(e) => update("emergencyContactLastName", e.target.value)}
+                className="mt-1"
+                placeholder="Last name"
+              />
+              {errors.emergencyContactLastName && (
+                <p className="text-xs text-destructive mt-1">{errors.emergencyContactLastName}</p>
               )}
             </div>
             <div>

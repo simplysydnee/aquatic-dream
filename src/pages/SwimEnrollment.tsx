@@ -24,6 +24,8 @@ interface ChildEnrollment {
   childAge: number;
   childDob: string;
   childName: string;
+  childFirstName: string;
+  childLastName: string;
   sessionIds: string[];
   enrollmentData: EnrollmentFormData;
   legalData: LegalAgreementData;
@@ -45,8 +47,8 @@ const SwimEnrollment = () => {
 
   // Multi-child state
   const [completedChildren, setCompletedChildren] = useState<ChildEnrollment[]>([]);
-  const [sharedParent, setSharedParent] = useState<{ name: string; email: string; phone: string } | null>(null);
-  const [sharedEmergency, setSharedEmergency] = useState<{ name: string; phone: string; relationship: string } | null>(null);
+  const [sharedParent, setSharedParent] = useState<{ firstName: string; lastName: string; email: string; phone: string } | null>(null);
+  const [sharedEmergency, setSharedEmergency] = useState<{ firstName: string; lastName: string; phone: string; relationship: string } | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
@@ -101,7 +103,12 @@ const SwimEnrollment = () => {
 
     // Save shared parent info for sibling pre-fill
     if (!sharedParent) {
-      setSharedParent({ name: data.parentName, email: data.parentEmail, phone: data.parentPhone || "" });
+      setSharedParent({
+        firstName: data.parentFirstName,
+        lastName: data.parentLastName,
+        email: data.parentEmail,
+        phone: data.parentPhone || "",
+      });
     }
 
     setStep("legal");
@@ -113,7 +120,8 @@ const SwimEnrollment = () => {
     // Save emergency contact for next sibling
     if (!sharedEmergency) {
       setSharedEmergency({
-        name: legalData.emergencyContactName,
+        firstName: legalData.emergencyContactFirstName,
+        lastName: legalData.emergencyContactLastName,
         phone: legalData.emergencyContactPhone,
         relationship: legalData.emergencyContactRelationship,
       });
@@ -124,6 +132,8 @@ const SwimEnrollment = () => {
       childAge,
       childDob,
       childName: enrollmentData.childName,
+      childFirstName: enrollmentData.childFirstName,
+      childLastName: enrollmentData.childLastName,
       sessionIds,
       enrollmentData,
       legalData,
@@ -149,7 +159,8 @@ const SwimEnrollment = () => {
     // Save emergency contact
     if (!sharedEmergency) {
       setSharedEmergency({
-        name: legalData.emergencyContactName,
+        firstName: legalData.emergencyContactFirstName,
+        lastName: legalData.emergencyContactLastName,
         phone: legalData.emergencyContactPhone,
         relationship: legalData.emergencyContactRelationship,
       });
@@ -161,6 +172,8 @@ const SwimEnrollment = () => {
       childAge,
       childDob,
       childName: enrollmentData.childName,
+      childFirstName: enrollmentData.childFirstName,
+      childLastName: enrollmentData.childLastName,
       sessionIds,
       enrollmentData,
       legalData,
@@ -232,11 +245,15 @@ const SwimEnrollment = () => {
       children: allChildren.map(child => ({
         level: child.level,
         childName: child.enrollmentData.childName,
+        childFirstName: child.enrollmentData.childFirstName,
+        childLastName: child.enrollmentData.childLastName,
         childAge: child.childAge,
         childDob: child.childDob || null,
         sessionIds: child.sessionIds,
         isFirstTime: child.isFirstTime,
         parentName: child.enrollmentData.parentName,
+        parentFirstName: child.enrollmentData.parentFirstName,
+        parentLastName: child.enrollmentData.parentLastName,
         parentEmail: child.enrollmentData.parentEmail,
         parentPhone: child.enrollmentData.parentPhone || null,
         medicalNotes: child.enrollmentData.hasMedical === "yes" ? (child.enrollmentData.medicalNotes || null) : null,
@@ -248,6 +265,8 @@ const SwimEnrollment = () => {
           termsAccepted: child.legalData.termsAccepted,
           signatureText: child.legalData.signatureText,
           emergencyContactName: child.legalData.emergencyContactName,
+          emergencyContactFirstName: child.legalData.emergencyContactFirstName,
+          emergencyContactLastName: child.legalData.emergencyContactLastName,
           emergencyContactPhone: child.legalData.emergencyContactPhone,
           emergencyContactRelationship: child.legalData.emergencyContactRelationship,
         },
@@ -366,7 +385,8 @@ const SwimEnrollment = () => {
               onSubmit={handleInfoSubmit}
               onBack={() => setStep("session")}
               submitting={false}
-              defaultParentName={sharedParent?.name}
+              defaultParentFirstName={sharedParent?.firstName}
+              defaultParentLastName={sharedParent?.lastName}
               defaultParentEmail={sharedParent?.email}
               defaultParentPhone={sharedParent?.phone}
             />
@@ -378,7 +398,8 @@ const SwimEnrollment = () => {
               onSubmit={handleLegalSubmit}
               onBack={() => setStep("info")}
               submitting={submitting}
-              defaultEmergencyContactName={sharedEmergency?.name}
+              defaultEmergencyContactFirstName={sharedEmergency?.firstName}
+              defaultEmergencyContactLastName={sharedEmergency?.lastName}
               defaultEmergencyContactPhone={sharedEmergency?.phone}
               defaultEmergencyContactRelationship={sharedEmergency?.relationship}
               showAddAnother={true}
