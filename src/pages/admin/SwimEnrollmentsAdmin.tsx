@@ -355,7 +355,7 @@ const SwimEnrollmentsAdmin = () => {
     seatsPeriodFilter === "all" ? "All Sessions" :
     sessionPeriods.find((p) => p.id === seatsPeriodFilter)?.name || "";
 
-  const cancelledCount = scope.filter((e) => e.status === "cancelled").length;
+  const cancelledCount = enrollments.filter((e) => e.status === "cancelled").length;
   const refundedCount = scope.filter((e) => e.payment_status === "refunded").length;
   const waivedCount = scope.filter((e) => e.payment_status === "waived").length;
   const firstTimeOnRoster = activeEnrollments.filter((e) => e.is_first_time).length;
