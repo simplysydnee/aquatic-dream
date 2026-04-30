@@ -25,10 +25,12 @@ const calcAge = (dob: Date): number => {
 };
 
 const requestSchema = z.object({
-  parentName: z.string().trim().min(1, "Required").max(100),
+  parentFirstName: z.string().trim().min(1, "Required").max(100),
+  parentLastName: z.string().trim().min(1, "Required").max(100),
   parentEmail: z.string().trim().email("Invalid email").max(255),
   parentPhone: z.string().trim().max(20).optional(),
-  childName: z.string().trim().min(1, "Required").max(100),
+  childFirstName: z.string().trim().min(1, "Required").max(100),
+  childLastName: z.string().trim().min(1, "Required").max(100),
   childDob: z.date({ required_error: "Date of birth is required" })
     .refine((d) => d <= new Date(), { message: "Date of birth must be in the past" })
     .refine((d) => d >= new Date("1920-01-01"), { message: "Please enter a valid date" }),
@@ -42,10 +44,12 @@ const LessonRequestForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const [form, setForm] = useState({
-    parentName: "",
+    parentFirstName: "",
+    parentLastName: "",
     parentEmail: "",
     parentPhone: "",
-    childName: "",
+    childFirstName: "",
+    childLastName: "",
     childDob: undefined as Date | undefined,
     lessonType: "private" as "private" | "semi-private",
     preferredTimes: "",
