@@ -563,10 +563,10 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Level</TableHead>
                     <TableHead>Parent</TableHead>
                     <TableHead>Session</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Reg Fee</TableHead>
                     <TableHead>Session Fee</TableHead>
                     <TableHead>Method / Ref</TableHead>
-                    <TableHead>Enrollment State</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="w-[100px]"></TableHead>
                   </TableRow>
