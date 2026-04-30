@@ -8,10 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Phone, Send, MailCheck } from "lucide-react";
+import { Mail, Phone, Send, MailCheck, CalendarPlus } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
 import { formatPhone, phoneHref } from "@/lib/phone";
+import BookFromRequestDialog from "@/components/admin/BookFromRequestDialog";
 
 export interface LessonRequest {
   id: string;
