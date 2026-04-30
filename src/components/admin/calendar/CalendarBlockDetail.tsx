@@ -558,7 +558,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                     )}
 
                     {/* Waiver row */}
-                    <div className="pt-2 border-t border-dashed flex items-center justify-between gap-2 flex-wrap">
+                    <div className="pt-2 border-t border-dashed space-y-2">
                       <div className="flex items-center gap-1.5 text-xs">
                         <Lock className="w-3 h-3 text-muted-foreground" />
                         <span className="text-muted-foreground">Waiver:</span>
@@ -573,12 +573,17 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                         )}
                       </div>
                       {!lessonBooking.waiver_signed_at && (
-                        <div className="flex gap-1.5">
-                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" disabled={resendingWaiver} onClick={handleResendWaiver}>
-                            <Send className="w-3 h-3" />{resendingWaiver ? "Sending…" : "Resend"}
+                        <div className="flex flex-col gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="h-8 text-xs gap-1.5 w-full"
+                            onClick={() => setShowFrontDeskWaiver(true)}
+                          >
+                            <ClipboardSignature className="w-3.5 h-3.5" /> Complete Waivers
                           </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setShowFrontDeskWaiver(true)}>
-                            <Pencil className="w-3 h-3" />Open at front desk
+                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" disabled={resendingWaiver} onClick={handleResendWaiver}>
+                            <Send className="w-3 h-3" />{resendingWaiver ? "Sending…" : "Resend waiver email"}
                           </Button>
                         </div>
                       )}
