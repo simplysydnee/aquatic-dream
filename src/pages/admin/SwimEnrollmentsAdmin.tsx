@@ -491,6 +491,9 @@ const SwimEnrollmentsAdmin = () => {
         <TabsList>
           <TabsTrigger value="all">All Enrollments</TabsTrigger>
           <TabsTrigger value="by-session">By Session</TabsTrigger>
+          <TabsTrigger value="cancelled">
+            Cancelled{cancelledCount > 0 && <span className="ml-1.5 text-xs opacity-70">({cancelledCount})</span>}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
