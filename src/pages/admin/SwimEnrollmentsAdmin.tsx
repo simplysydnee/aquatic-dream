@@ -594,6 +594,19 @@ const SwimEnrollmentsAdmin = () => {
                           {session ? `${session.session_name || ""} ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                         </TableCell>
                         <TableCell>
+                          <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
+                            <SelectTrigger className={`w-[140px] h-9 font-semibold ${enrollmentStateColor(e.status)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="confirmed">Confirmed</SelectItem>
+                              <SelectItem value="waitlist">Waitlist</SelectItem>
+                              <SelectItem value="no_show">No-show</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
                           {e.is_first_time && e.payment_status !== "not_required" ? (
                             <Select value={e.payment_status} onValueChange={(v) => updatePaymentStatus(e, v)}>
                               <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
@@ -637,19 +650,6 @@ const SwimEnrollmentsAdmin = () => {
                           ) : (
                             <span className="text-muted-foreground italic">none</span>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <Select value={e.status} onValueChange={(v) => updateStatus(e.id, v)}>
-                            <SelectTrigger className={`w-[130px] h-8 ${enrollmentStateColor(e.status)}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="confirmed">Confirmed</SelectItem>
-                              <SelectItem value="waitlist">Waitlist</SelectItem>
-                              <SelectItem value="no_show">No-show</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(e.created_at).toLocaleDateString()}
