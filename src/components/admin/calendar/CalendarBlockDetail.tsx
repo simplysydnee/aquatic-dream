@@ -495,12 +495,28 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                 {!loadingLesson && lessonOcc && lessonBooking && (
                   <div className="rounded-lg border bg-card p-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{lessonBooking.child_name || lessonBooking.parent_name}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium truncate">{lessonBooking.child_name || lessonBooking.parent_name}</p>
+                          <button
+                            title="Edit swimmer info"
+                            onClick={() => setEditTarget({
+                              kind: "lesson_booking",
+                              id: lessonBooking.id,
+                              child_name: lessonBooking.child_name,
+                              parent_name: lessonBooking.parent_name,
+                              parent_email: lessonBooking.parent_email,
+                              parent_phone: lessonBooking.parent_phone || null,
+                            })}
+                            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        </div>
                         <p className="text-xs text-muted-foreground">{lessonBooking.parent_name}</p>
                       </div>
                       <Badge className={cn(
-                        "text-[10px] px-1.5 py-0.5",
+                        "text-[10px] px-1.5 py-0.5 shrink-0",
                         lessonOcc.payment_status === "paid"
                           ? "bg-green-100 text-green-700 hover:bg-green-100"
                           : lessonOcc.payment_status === "comp"
