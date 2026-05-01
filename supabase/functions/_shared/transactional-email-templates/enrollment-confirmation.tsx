@@ -60,6 +60,8 @@ const EnrollmentConfirmationEmail = ({
   dueDate,
   totalPaid,
   paymentReference,
+  icsLink,
+  googleCalendarLink,
   sessionInfo,
 }: EnrollmentConfirmationProps) => {
   const timeRange = startTime
