@@ -278,3 +278,25 @@ const footer = { fontSize: '13px', color: '#888', margin: '30px 0 0', lineHeight
 const policyBox = { backgroundColor: '#fafafa', border: '1px solid #e5e7eb', padding: '12px 16px', borderRadius: '4px', margin: '0 0 16px' }
 const policyHeading = { fontSize: '12px', fontWeight: '700' as const, color: '#475569', textTransform: 'uppercase' as const, letterSpacing: '0.05em', margin: '0 0 6px' }
 const policyText = { fontSize: '12px', color: '#64748b', lineHeight: '1.5', margin: '0' }
+const calBtnPrimary = {
+  backgroundColor: '#5badcb',
+  color: '#ffffff',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+}
+const calBtnSecondary = {
+  backgroundColor: '#ffffff',
+  color: '#0f2343',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+  border: '1.5px solid #0f2343',
+}
+
