@@ -203,3 +203,24 @@ const waiverButton = {
   textDecoration: 'none',
   display: 'inline-block' as const,
 }
+const calBtnPrimary = {
+  backgroundColor: '#5badcb',
+  color: '#ffffff',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+}
+const calBtnSecondary = {
+  backgroundColor: '#ffffff',
+  color: '#0f2343',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+  border: '1.5px solid #0f2343',
+}
