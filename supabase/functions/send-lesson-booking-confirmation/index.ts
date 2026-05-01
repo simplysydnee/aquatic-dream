@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       : undefined
 
     // Build "Add to Calendar" links (works on iPhone, Android, Outlook + Google)
-    const calTitle = `${childName(booking)} — ${lessonTypeLabel} (Aquatic Dreams)`
+    const calTitle = `${booking.child_name || booking.parent_name || 'Swim'} — ${lessonTypeLabel} (Aquatic Dreams)`
     const calDesc = `${lessonTypeLabel} at Aquatic Dreams${booking.instructor_name ? ` with ${booking.instructor_name}` : ''}. Questions? (209) 577-3483 or info@aquaticdreamsswim.com`
     const { icsUrl, googleUrl } = buildCalendarLinks({
       uid: occ.id,
