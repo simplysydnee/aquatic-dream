@@ -1,56 +1,61 @@
-# Plan — Email Logo Fix + Calendar Swimmer Edit + Front-Desk Waiver Hookup
+# Add "Add to Calendar" to Lesson Emails
 
-## 1. Fix logo loading in transactional emails
+Yes — we can add a one-tap "Add to Calendar" feature that works on iPhone (Apple Calendar), Android (Google/Samsung Calendar), and Outlook directly from the email.
 
-**Diagnosis**
-- All 8 email templates point `LOGO_URL` to `email-assets/AQD_Favicon.png` in Supabase Storage.
-- The file is public and returns HTTP 200, but it's **478 KB** for a tiny 80×80 logo. Many email clients (Yahoo, Outlook, mobile clients) silently drop oversized remote images, and Gmail's "images hidden" warning is more aggressive on heavy images. That matches the broken-image placeholder in the Yahoo screenshot you sent.
-- Root cause: oversized PNG, not the URL.
+## How It Works
 
-**Fix (no other email-format changes)**
-- Upload an optimized small PNG (`aqd-email-logo.png`, ~160×160 @ ~10–25 KB) to the `email-assets` bucket via a one-off migration / storage upload.
-- Bump `LOGO_URL` constant in all 8 templates to the new file.
-- Add a `display: block` style + explicit `width`/`height` HTML attributes (we already pass these) — no other styling/layout changes.
-- Redeploy `send-transactional-email` edge function so the new templates take effect.
+The cleanest cross-device approach uses two links in the email:
 
-Templates touched (constant only): `early-access-invite`, `enrollment-confirmation`, `instructor-schedule`, `lesson-booking-confirmation`, `lesson-reminder`, `lesson-request-acknowledgment`, `lesson-request-reply`, `session-payment-link`.
+1. **Add to Calendar (Apple / Outlook / Android)** — links to a `.ics` calendar file. iPhone Mail, Outlook, and Android Gmail all natively recognize this and prompt the user to add it with one tap.
+2. **Add to Google Calendar** — a `https://calendar.google.com/calendar/render?...` URL that opens Google Calendar pre-filled.
 
-## 2. Calendar event detail — Edit Swimmer (pencil) for private/semi-private bookings
+This dual-button pattern is the industry standard (used by Eventbrite, Calendly, Airbnb) because no single format covers all phones.
 
-In `src/components/admin/calendar/CalendarBlockDetail.tsx`, inside the existing **Lesson Booking** panel (the block that shows for `private_lesson` / `semi_private_lesson` events):
+## Implementation Plan
 
-- Add a small **pencil icon button** next to the swimmer name row.
-- Clicking it opens an inline edit form (or compact dialog) with these fields, prefilled from `lesson_bookings`:
-  - Child name
-  - Parent name
-  - Parent email
-  - Parent phone
-- **Save** updates the `lesson_bookings` row (`update().eq('id', booking.id)`), shows a success toast (`"Swimmer info updated"`), and refetches the booking so the panel reflects new values.
-- **Cancel** discards.
-- Validation: name + email required; email format check.
+### 1. New edge function: `lesson-calendar-ics`
+- Public endpoint (no auth) at `/functions/v1/lesson-calendar-ics?booking=<id>` (and a variant for group enrollments).
+- Looks up the booking/occurrence in `lesson_bookings` / `pool_events`.
+- Returns a valid `.ics` file with:
+  - `SUMMARY`: e.g. "Tommy's Private Swim Lesson — Aquatic Dreams"
+  - `DTSTART` / `DTEND` in America/Los_Angeles timezone
+  - `LOCATION`: facility address from the contact-info memory
+  - `DESCRIPTION`: instructor name, lesson type, contact info
+  - `UID`: stable per booking so updates replace (not duplicate) the event
+- Headers: `Content-Type: text/calendar; charset=utf-8` and `Content-Disposition: attachment; filename="aquatic-dreams-lesson.ics"`.
 
-Also add the same pencil edit affordance for **swim-class roster entries** (the `isSwim` enrollment cards) — opens an edit dialog that updates `swim_enrollments` (`child_name`, `child_age`, `parent_name`, `parent_email`, `parent_phone`) and refetches.
+### 2. Update `lesson-booking-confirmation.tsx` template
+- Add new optional props: `icsLink?: string`, `googleCalendarLink?: string`.
+- Add a new `Section` after the date/time info box with two side-by-side buttons:
+  - **📅 Add to Calendar** (links to `icsLink` — works on iPhone/Outlook/Android)
+  - **Add to Google Calendar** (links to `googleCalendarLink`)
+- Style consistent with existing maritime palette (teal `#5badcb` primary, navy `#0f2343` secondary).
+- No changes to any other email formatting.
 
-## 3. Conditional "Complete Waivers" button
+### 3. Update `lesson-reminder.tsx` template
+- Same two buttons added to the 24-hour reminder email so parents who didn't add it earlier get another chance.
 
-There is already a `FrontDeskWaiverDialog` component wired into the lesson-booking panel as **"Open at front desk"**. We will:
+### 4. Update senders to pass the new props
+Update the three places that send these emails to compute and pass the links:
+- `send-lesson-booking-confirmation/index.ts`
+- `send-lesson-occurrence-reminders/index.ts`
+- `send-lesson-reminders/index.ts`
 
-- **Rename** the button label to **"Complete Waivers"** with a clipboard/pencil icon to match your wording.
-- Keep the existing condition: button only appears when `lessonBooking.waiver_signed_at` is null. (Already correct.)
-- Make the button more visible — promote it from the small inline waiver row to a primary-style button at the bottom of the booking panel, alongside the existing actions, so front-desk staff don't miss it.
-- For **swim-class enrollments** (group classes), check `enrollment_agreements` for that enrollment. If no agreement exists, show the same **"Complete Waivers"** button on that swimmer's roster card. It opens `FrontDeskWaiverDialog` (or the equivalent enrollment-waiver flow) prefilled for that swimmer; on submit it writes an `enrollment_agreements` row and the button disappears.
+The Google Calendar URL is built inline (no API call needed):
+```
+https://calendar.google.com/calendar/render?action=TEMPLATE
+  &text=<title>&dates=<start>/<end>&location=<addr>&details=<desc>
+```
 
-No new tables. No schema changes.
+The `.ics` URL points at the new edge function with the booking ID.
 
-## Files to edit
+## What I Will NOT Touch
+- Email logo, layout, colors, footer, or any other formatting per your earlier instruction.
+- Other email templates (enrollment confirmation, payment links, etc.) — only the two lesson emails get the calendar buttons. (Happy to add to enrollment confirmation too if you want — just say the word.)
 
-- `supabase/functions/_shared/transactional-email-templates/*.tsx` — LOGO_URL constant only (8 files).
-- New asset: upload `aqd-email-logo.png` to `email-assets` storage bucket.
-- `src/components/admin/calendar/CalendarBlockDetail.tsx` — add edit swimmer state, edit form, conditional Complete Waivers button placement/label.
-- New small component: `src/components/admin/calendar/EditSwimmerDialog.tsx` for the inline edit form (booking + enrollment variants).
-- Possibly extend `FrontDeskWaiverDialog` to also handle a `swim_enrollment` target (or add a sibling component) for group-class waivers.
+## Files
+- **New**: `supabase/functions/lesson-calendar-ics/index.ts`
+- **Edited**: `lesson-booking-confirmation.tsx`, `lesson-reminder.tsx`, and the three sender edge functions above.
 
-## What stays untouched
-
-- Email template HTML, colors, layout, copy — **no changes** beyond the logo URL constant.
-- All other calendar / scheduling logic, payment flow, edge functions besides redeploying the email sender.
+## Open Question
+Should I also add the calendar buttons to the **group class enrollment confirmation** email (for the 8-week sessions), or keep it lesson-only for now?
