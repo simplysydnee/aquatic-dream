@@ -17,6 +17,8 @@ interface LessonReminderProps {
   levelLabel?: string
   sessionStartDate?: string
   sessionEndDate?: string
+  icsLink?: string
+  googleCalendarLink?: string
 }
 
 const LessonReminderEmail = ({
