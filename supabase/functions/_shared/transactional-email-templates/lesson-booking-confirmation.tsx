@@ -20,6 +20,8 @@ interface LessonBookingConfirmationProps {
   totalOccurrences?: number
   waiverLink?: string
   waiverSigned?: boolean
+  icsLink?: string
+  googleCalendarLink?: string
 }
 
 const LessonBookingConfirmationEmail = ({
