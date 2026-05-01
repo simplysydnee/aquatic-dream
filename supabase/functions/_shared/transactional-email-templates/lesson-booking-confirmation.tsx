@@ -62,6 +62,30 @@ const LessonBookingConfirmationEmail = ({
           {instructorName && <Text style={infoText}>👤 Instructor: {instructorName}</Text>}
         </Section>
 
+        {(icsLink || googleCalendarLink) && (
+          <Section style={{ textAlign: 'center' as const, margin: '0 0 20px' }}>
+            <Text style={{ ...mutedText, textAlign: 'center' as const, margin: '0 0 8px' }}>
+              Add this lesson to your calendar:
+            </Text>
+            {icsLink && (
+              <Button style={calBtnPrimary} href={icsLink}>
+                📅 Add to Calendar
+              </Button>
+            )}
+            {googleCalendarLink && (
+              <>
+                {icsLink && <span style={{ display: 'inline-block', width: '8px' }}>&nbsp;</span>}
+                <Button style={calBtnSecondary} href={googleCalendarLink}>
+                  Google Calendar
+                </Button>
+              </>
+            )}
+            <Text style={{ ...mutedText, textAlign: 'center' as const, margin: '8px 0 0', fontSize: '11px' }}>
+              "Add to Calendar" works on iPhone, Android, and Outlook.
+            </Text>
+          </Section>
+        )}
+
         {waiverLink && !waiverSigned && (
           <Section style={stepBox}>
             <Text style={stepLabel}>Step 1 — Sign your waiver</Text>
