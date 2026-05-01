@@ -1,6 +1,6 @@
 import * as React from 'npm:react@18.3.1'
 import {
-  Body, Container, Head, Heading, Html, Img, Preview, Text, Hr, Section,
+  Body, Button, Container, Head, Heading, Html, Img, Preview, Text, Hr, Section,
 } from 'npm:@react-email/components@0.0.22'
 import type { TemplateEntry } from './registry.ts'
 
@@ -28,6 +28,9 @@ interface EnrollmentConfirmationProps {
   dueDate?: string
   totalPaid?: string
   paymentReference?: string
+  // Add to calendar
+  icsLink?: string
+  googleCalendarLink?: string
   // Legacy compat
   sessionInfo?: string
 }
