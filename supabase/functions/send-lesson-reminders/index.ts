@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { buildCalendarLinks } from '../_shared/calendar-links.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -147,6 +148,23 @@ Deno.serve(async (req) => {
     const sessionStartDate = formatLongDate(session.session_start_date)
     const sessionEndDate = formatLongDate(session.session_end_date)
 
+    // Build "Add to Calendar" links if we have start/end times
+    let icsLink: string | undefined
+    let googleCalendarLink: string | undefined
+    if (session.start_time && session.end_time) {
+      const links = buildCalendarLinks({
+        uid: `enroll-${enrollment.id}-${tomorrowStr}`,
+        title: `${enrollment.child_name || 'Swim'} — Swim Lesson (Aquatic Dreams)`,
+        date: tomorrowStr,
+        start: session.start_time,
+        end: session.end_time,
+        location: '1212 Kansas Ave, Modesto, CA 95351',
+        description: `Aquatic Dreams swim lesson${periodName ? ` — ${periodName}` : ''}. Questions? (209) 577-3483`,
+      })
+      icsLink = links.icsUrl
+      googleCalendarLink = links.googleUrl
+    }
+
     const templateData = {
       parentName: enrollment.parent_name,
       childName: enrollment.child_name,
@@ -156,6 +174,8 @@ Deno.serve(async (req) => {
       levelLabel: getLevelLabel(enrollment.swim_level, enrollment.child_age),
       sessionStartDate,
       sessionEndDate,
+      icsLink,
+      googleCalendarLink,
     }
 
     try {

@@ -1,6 +1,6 @@
 import * as React from 'npm:react@18.3.1'
 import {
-  Body, Container, Head, Heading, Html, Img, Preview, Text, Hr, Section,
+  Body, Container, Head, Heading, Html, Img, Preview, Text, Hr, Section, Button,
 } from 'npm:@react-email/components@0.0.22'
 import type { TemplateEntry } from './registry.ts'
 
@@ -17,6 +17,8 @@ interface LessonReminderProps {
   levelLabel?: string
   sessionStartDate?: string
   sessionEndDate?: string
+  icsLink?: string
+  googleCalendarLink?: string
 }
 
 const LessonReminderEmail = ({
@@ -28,6 +30,8 @@ const LessonReminderEmail = ({
   levelLabel,
   sessionStartDate,
   sessionEndDate,
+  icsLink,
+  googleCalendarLink,
 }: LessonReminderProps) => (
   <Html lang="en" dir="ltr">
     <Head />
@@ -80,6 +84,30 @@ const LessonReminderEmail = ({
           </Text>
         </Section>
 
+        {(icsLink || googleCalendarLink) && (
+          <Section style={{ textAlign: 'center' as const, margin: '0 0 20px' }}>
+            <Text style={{ fontSize: '12px', color: '#666', textAlign: 'center' as const, margin: '0 0 8px' }}>
+              Add this lesson to your calendar:
+            </Text>
+            {icsLink && (
+              <Button style={calBtnPrimary} href={icsLink}>
+                📅 Add to Calendar
+              </Button>
+            )}
+            {googleCalendarLink && (
+              <>
+                {icsLink && <span style={{ display: 'inline-block', width: '8px' }}>&nbsp;</span>}
+                <Button style={calBtnSecondary} href={googleCalendarLink}>
+                  Google Calendar
+                </Button>
+              </>
+            )}
+            <Text style={{ fontSize: '11px', color: '#888', textAlign: 'center' as const, margin: '8px 0 0' }}>
+              "Add to Calendar" works on iPhone, Android, and Outlook.
+            </Text>
+          </Section>
+        )}
+
         <Text style={text}>
           Please arrive a few minutes early and bring a towel and swimsuit. See you at the pool!
         </Text>
@@ -118,6 +146,8 @@ export const template = {
     levelLabel: 'Little Fins — Preschool 1 (White)',
     sessionStartDate: 'June 8, 2025',
     sessionEndDate: 'July 2, 2025',
+    icsLink: 'https://example.com/cal.ics',
+    googleCalendarLink: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
   },
 } satisfies TemplateEntry
 
@@ -130,3 +160,24 @@ const text = { fontSize: '15px', color: '#333', lineHeight: '1.6', margin: '0 0 
 const infoBox = { backgroundColor: '#f0f7fa', borderLeft: '4px solid #5badcb', padding: '12px 16px', borderRadius: '4px', margin: '0 0 16px' }
 const infoText = { fontSize: '14px', color: '#0f2343', margin: '0' }
 const footer = { fontSize: '13px', color: '#888', margin: '30px 0 0', lineHeight: '1.5' }
+const calBtnPrimary = {
+  backgroundColor: '#5badcb',
+  color: '#ffffff',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+}
+const calBtnSecondary = {
+  backgroundColor: '#ffffff',
+  color: '#0f2343',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+  border: '1.5px solid #0f2343',
+}

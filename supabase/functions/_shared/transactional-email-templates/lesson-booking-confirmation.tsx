@@ -20,6 +20,8 @@ interface LessonBookingConfirmationProps {
   totalOccurrences?: number
   waiverLink?: string
   waiverSigned?: boolean
+  icsLink?: string
+  googleCalendarLink?: string
 }
 
 const LessonBookingConfirmationEmail = ({
@@ -35,6 +37,8 @@ const LessonBookingConfirmationEmail = ({
   totalOccurrences,
   waiverLink,
   waiverSigned,
+  icsLink,
+  googleCalendarLink,
 }: LessonBookingConfirmationProps) => (
   <Html lang="en" dir="ltr">
     <Head />
@@ -57,6 +61,30 @@ const LessonBookingConfirmationEmail = ({
           {lessonTime && <Text style={infoText}>🕐 {lessonTime}</Text>}
           {instructorName && <Text style={infoText}>👤 Instructor: {instructorName}</Text>}
         </Section>
+
+        {(icsLink || googleCalendarLink) && (
+          <Section style={{ textAlign: 'center' as const, margin: '0 0 20px' }}>
+            <Text style={{ ...mutedText, textAlign: 'center' as const, margin: '0 0 8px' }}>
+              Add this lesson to your calendar:
+            </Text>
+            {icsLink && (
+              <Button style={calBtnPrimary} href={icsLink}>
+                📅 Add to Calendar
+              </Button>
+            )}
+            {googleCalendarLink && (
+              <>
+                {icsLink && <span style={{ display: 'inline-block', width: '8px' }}>&nbsp;</span>}
+                <Button style={calBtnSecondary} href={googleCalendarLink}>
+                  Google Calendar
+                </Button>
+              </>
+            )}
+            <Text style={{ ...mutedText, textAlign: 'center' as const, margin: '8px 0 0', fontSize: '11px' }}>
+              "Add to Calendar" works on iPhone, Android, and Outlook.
+            </Text>
+          </Section>
+        )}
 
         {waiverLink && !waiverSigned && (
           <Section style={stepBox}>
@@ -135,6 +163,8 @@ export const template = {
     totalOccurrences: 8,
     waiverLink: 'https://example.com/lesson-waiver/abc123',
     waiverSigned: false,
+    icsLink: 'https://example.com/cal.ics',
+    googleCalendarLink: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
   },
 } satisfies TemplateEntry
 
@@ -172,4 +202,25 @@ const waiverButton = {
   fontWeight: '600' as const,
   textDecoration: 'none',
   display: 'inline-block' as const,
+}
+const calBtnPrimary = {
+  backgroundColor: '#5badcb',
+  color: '#ffffff',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+}
+const calBtnSecondary = {
+  backgroundColor: '#ffffff',
+  color: '#0f2343',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+  border: '1.5px solid #0f2343',
 }

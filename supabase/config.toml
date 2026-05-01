@@ -31,3 +31,5 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.cancel-enrollment-refund]
     verify_jwt = true
+  [functions.lesson-calendar-ics]
+    verify_jwt = false
