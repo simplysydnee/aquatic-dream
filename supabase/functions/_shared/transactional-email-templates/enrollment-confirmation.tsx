@@ -130,6 +130,33 @@ const EnrollmentConfirmationEmail = ({
             </Section>
           )}
 
+          {/* Add to Calendar */}
+          {(icsLink || googleCalendarLink) && (
+            <Section style={{ textAlign: 'center' as const, margin: '0 0 20px' }}>
+              <Text style={{ fontSize: '13px', color: '#64748b', textAlign: 'center' as const, margin: '0 0 8px' }}>
+                Add all lessons to your calendar:
+              </Text>
+              {icsLink && (
+                <Button style={calBtnPrimary} href={icsLink}>
+                  📅 Add All Lessons to Calendar
+                </Button>
+              )}
+              {googleCalendarLink && (
+                <>
+                  {icsLink && <span style={{ display: 'inline-block', width: '8px' }}>&nbsp;</span>}
+                  <Button style={calBtnSecondary} href={googleCalendarLink}>
+                    Google Calendar
+                  </Button>
+                </>
+              )}
+              {icsLink && googleCalendarLink && (
+                <Text style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'center' as const, margin: '8px 0 0' }}>
+                  Tip: "Add All Lessons" adds every class at once. Google Calendar adds the first lesson only.
+                </Text>
+              )}
+            </Section>
+          )}
+
           {/* Location */}
           <Section style={infoBox}>
             <Text style={infoText}>📍 {ADDRESS}</Text>
