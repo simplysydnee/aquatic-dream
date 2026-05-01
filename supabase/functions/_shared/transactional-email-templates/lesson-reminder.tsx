@@ -146,6 +146,8 @@ export const template = {
     levelLabel: 'Little Fins — Preschool 1 (White)',
     sessionStartDate: 'June 8, 2025',
     sessionEndDate: 'July 2, 2025',
+    icsLink: 'https://example.com/cal.ics',
+    googleCalendarLink: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
   },
 } satisfies TemplateEntry
 
@@ -158,3 +160,24 @@ const text = { fontSize: '15px', color: '#333', lineHeight: '1.6', margin: '0 0 
 const infoBox = { backgroundColor: '#f0f7fa', borderLeft: '4px solid #5badcb', padding: '12px 16px', borderRadius: '4px', margin: '0 0 16px' }
 const infoText = { fontSize: '14px', color: '#0f2343', margin: '0' }
 const footer = { fontSize: '13px', color: '#888', margin: '30px 0 0', lineHeight: '1.5' }
+const calBtnPrimary = {
+  backgroundColor: '#5badcb',
+  color: '#ffffff',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+}
+const calBtnSecondary = {
+  backgroundColor: '#ffffff',
+  color: '#0f2343',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+  border: '1.5px solid #0f2343',
+}
