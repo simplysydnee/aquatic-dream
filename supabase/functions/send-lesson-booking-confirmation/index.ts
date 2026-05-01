@@ -107,6 +107,19 @@ Deno.serve(async (req) => {
       ? `${returnBase}/lesson-waiver/${booking.waiver_token}`
       : undefined
 
+    // Build "Add to Calendar" links (works on iPhone, Android, Outlook + Google)
+    const calTitle = `${childName(booking)} — ${lessonTypeLabel} (Aquatic Dreams)`
+    const calDesc = `${lessonTypeLabel} at Aquatic Dreams${booking.instructor_name ? ` with ${booking.instructor_name}` : ''}. Questions? (209) 577-3483 or info@aquaticdreamsswim.com`
+    const { icsUrl, googleUrl } = buildCalendarLinks({
+      uid: occ.id,
+      title: calTitle,
+      date: occ.occurrence_date,
+      start: booking.start_time,
+      end: booking.end_time,
+      location: '1212 Kansas Ave, Modesto, CA 95351',
+      description: calDesc,
+    })
+
     // Send the email
     await supabase.functions.invoke('send-transactional-email', {
       body: {
@@ -126,6 +139,8 @@ Deno.serve(async (req) => {
           totalOccurrences: totalOccurrences || 1,
           waiverLink,
           waiverSigned: !!booking.waiver_signed_at,
+          icsLink: icsUrl,
+          googleCalendarLink: googleUrl,
         },
       },
     })
