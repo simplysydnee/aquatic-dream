@@ -1,6 +1,6 @@
 import * as React from 'npm:react@18.3.1'
 import {
-  Body, Container, Head, Heading, Html, Img, Preview, Text, Hr, Section,
+  Body, Button, Container, Head, Heading, Html, Img, Preview, Text, Hr, Section,
 } from 'npm:@react-email/components@0.0.22'
 import type { TemplateEntry } from './registry.ts'
 
@@ -28,6 +28,9 @@ interface EnrollmentConfirmationProps {
   dueDate?: string
   totalPaid?: string
   paymentReference?: string
+  // Add to calendar
+  icsLink?: string
+  googleCalendarLink?: string
   // Legacy compat
   sessionInfo?: string
 }
@@ -57,6 +60,8 @@ const EnrollmentConfirmationEmail = ({
   dueDate,
   totalPaid,
   paymentReference,
+  icsLink,
+  googleCalendarLink,
   sessionInfo,
 }: EnrollmentConfirmationProps) => {
   const timeRange = startTime
@@ -122,6 +127,33 @@ const EnrollmentConfirmationEmail = ({
               <Text style={infoText}>
                 {lessonDates.join('  •  ')}
               </Text>
+            </Section>
+          )}
+
+          {/* Add to Calendar */}
+          {(icsLink || googleCalendarLink) && (
+            <Section style={{ textAlign: 'center' as const, margin: '0 0 20px' }}>
+              <Text style={{ fontSize: '13px', color: '#64748b', textAlign: 'center' as const, margin: '0 0 8px' }}>
+                Add all lessons to your calendar:
+              </Text>
+              {icsLink && (
+                <Button style={calBtnPrimary} href={icsLink}>
+                  📅 Add All Lessons to Calendar
+                </Button>
+              )}
+              {googleCalendarLink && (
+                <>
+                  {icsLink && <span style={{ display: 'inline-block', width: '8px' }}>&nbsp;</span>}
+                  <Button style={calBtnSecondary} href={googleCalendarLink}>
+                    Google Calendar
+                  </Button>
+                </>
+              )}
+              {icsLink && googleCalendarLink && (
+                <Text style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'center' as const, margin: '8px 0 0' }}>
+                  Tip: "Add All Lessons" adds every class at once. Google Calendar adds the first lesson only.
+                </Text>
+              )}
             </Section>
           )}
 
@@ -246,3 +278,25 @@ const footer = { fontSize: '13px', color: '#888', margin: '30px 0 0', lineHeight
 const policyBox = { backgroundColor: '#fafafa', border: '1px solid #e5e7eb', padding: '12px 16px', borderRadius: '4px', margin: '0 0 16px' }
 const policyHeading = { fontSize: '12px', fontWeight: '700' as const, color: '#475569', textTransform: 'uppercase' as const, letterSpacing: '0.05em', margin: '0 0 6px' }
 const policyText = { fontSize: '12px', color: '#64748b', lineHeight: '1.5', margin: '0' }
+const calBtnPrimary = {
+  backgroundColor: '#5badcb',
+  color: '#ffffff',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+}
+const calBtnSecondary = {
+  backgroundColor: '#ffffff',
+  color: '#0f2343',
+  padding: '10px 18px',
+  borderRadius: '6px',
+  fontSize: '14px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+  border: '1.5px solid #0f2343',
+}
+

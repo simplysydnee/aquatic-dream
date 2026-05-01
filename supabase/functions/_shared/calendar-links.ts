@@ -70,3 +70,47 @@ export function buildCalendarLinks(input: CalendarEventInput): { icsUrl: string;
 
   return { icsUrl, googleUrl }
 }
+
+export interface SessionCalendarEventInput {
+  uid: string
+  title: string
+  dates: string[] // array of YYYY-MM-DD (Pacific Time wall clock)
+  start: string
+  end: string
+  location?: string
+  description?: string
+}
+
+// Multi-date variant for 8-week group sessions.
+// - icsUrl downloads a single .ics containing all VEVENTs (one per date).
+// - googleUrl pre-fills Google Calendar with the FIRST date only,
+//   since Google's render endpoint only supports one event per call.
+export function buildSessionCalendarLinks(
+  input: SessionCalendarEventInput
+): { icsUrl: string; googleUrl: string } {
+  const params = new URLSearchParams({
+    uid: input.uid,
+    title: input.title,
+    dates: input.dates.join(','),
+    start: input.start,
+    end: input.end,
+  })
+  if (input.location) params.set('location', input.location)
+  if (input.description) params.set('desc', input.description)
+  const icsUrl = `${ICS_BASE}?${params.toString()}`
+
+  const firstDate = input.dates[0]
+  const gStart = ptWallClockToUtc(firstDate, input.start)
+  const gEnd = ptWallClockToUtc(firstDate, input.end)
+  const g = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: input.title,
+    dates: `${gStart}/${gEnd}`,
+  })
+  if (input.location) g.set('location', input.location)
+  if (input.description) g.set('details', input.description)
+  const googleUrl = `https://calendar.google.com/calendar/render?${g.toString()}`
+
+  return { icsUrl, googleUrl }
+}
+

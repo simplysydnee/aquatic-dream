@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { type StripeEnv, verifyWebhook } from "../_shared/stripe.ts";
+import { buildSessionCalendarLinks } from "../_shared/calendar-links.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -422,6 +423,32 @@ async function sendEnrollmentConfirmation(enrollmentId: string) {
         ? formatLongDate(lessonDates[0].lesson_date)
         : sessionStartDate;
 
+    // Build "Add to Calendar" links if we have lesson dates + session times.
+    let icsLink: string | undefined;
+    let googleCalendarLink: string | undefined;
+    if (
+      lessonDates && lessonDates.length > 0 &&
+      session?.start_time && session?.end_time
+    ) {
+      const titleParts = [
+        enrollment.child_name ? `${enrollment.child_name}'s Swim Lesson` : 'Swim Lesson',
+        groupName ? `— ${groupName}` : '',
+        levelLabel ? `(${levelLabel})` : '',
+        '— Aquatic Dreams',
+      ].filter(Boolean);
+      const links = buildSessionCalendarLinks({
+        uid: `enroll-${enrollmentId}`,
+        title: titleParts.join(' '),
+        dates: lessonDates.map((d) => d.lesson_date),
+        start: session.start_time,
+        end: session.end_time,
+        location: '1212 Kansas Ave, Modesto, CA 95351',
+        description: 'Aquatic Dreams swim lesson. Questions: info@aquaticdreamsswim.com / (209) 577-3483',
+      });
+      icsLink = links.icsUrl;
+      googleCalendarLink = links.googleUrl;
+    }
+
     await supabase.functions.invoke("send-transactional-email", {
       body: {
         templateName: "enrollment-confirmation",
@@ -446,6 +473,8 @@ async function sendEnrollmentConfirmation(enrollmentId: string) {
           dueDate: firstClassDate,
           totalPaid: !isFirstTime ? `$${paidOnThisRow || sessionPrice}` : undefined,
           paymentReference: enrollment.stripe_payment_id || undefined,
+          icsLink,
+          googleCalendarLink,
         },
       },
     });
