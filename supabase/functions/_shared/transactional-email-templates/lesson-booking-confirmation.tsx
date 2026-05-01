@@ -163,6 +163,8 @@ export const template = {
     totalOccurrences: 8,
     waiverLink: 'https://example.com/lesson-waiver/abc123',
     waiverSigned: false,
+    icsLink: 'https://example.com/cal.ics',
+    googleCalendarLink: 'https://calendar.google.com/calendar/render?action=TEMPLATE',
   },
 } satisfies TemplateEntry
 
