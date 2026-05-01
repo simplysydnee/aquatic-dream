@@ -37,6 +37,8 @@ const LessonBookingConfirmationEmail = ({
   totalOccurrences,
   waiverLink,
   waiverSigned,
+  icsLink,
+  googleCalendarLink,
 }: LessonBookingConfirmationProps) => (
   <Html lang="en" dir="ltr">
     <Head />
