@@ -84,6 +84,30 @@ const LessonReminderEmail = ({
           </Text>
         </Section>
 
+        {(icsLink || googleCalendarLink) && (
+          <Section style={{ textAlign: 'center' as const, margin: '0 0 20px' }}>
+            <Text style={{ fontSize: '12px', color: '#666', textAlign: 'center' as const, margin: '0 0 8px' }}>
+              Add this lesson to your calendar:
+            </Text>
+            {icsLink && (
+              <Button style={calBtnPrimary} href={icsLink}>
+                📅 Add to Calendar
+              </Button>
+            )}
+            {googleCalendarLink && (
+              <>
+                {icsLink && <span style={{ display: 'inline-block', width: '8px' }}>&nbsp;</span>}
+                <Button style={calBtnSecondary} href={googleCalendarLink}>
+                  Google Calendar
+                </Button>
+              </>
+            )}
+            <Text style={{ fontSize: '11px', color: '#888', textAlign: 'center' as const, margin: '8px 0 0' }}>
+              "Add to Calendar" works on iPhone, Android, and Outlook.
+            </Text>
+          </Section>
+        )}
+
         <Text style={text}>
           Please arrive a few minutes early and bring a towel and swimsuit. See you at the pool!
         </Text>
