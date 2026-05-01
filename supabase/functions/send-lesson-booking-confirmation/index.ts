@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { createStripeClient, type StripeEnv } from '../_shared/stripe.ts'
+import { buildCalendarLinks } from '../_shared/calendar-links.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
