@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { buildCalendarLinks } from '../_shared/calendar-links.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
