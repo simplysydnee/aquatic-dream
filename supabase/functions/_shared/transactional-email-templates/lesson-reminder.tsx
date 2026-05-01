@@ -30,6 +30,8 @@ const LessonReminderEmail = ({
   levelLabel,
   sessionStartDate,
   sessionEndDate,
+  icsLink,
+  googleCalendarLink,
 }: LessonReminderProps) => (
   <Html lang="en" dir="ltr">
     <Head />
