@@ -109,7 +109,12 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   };
 
   const eventId = block?.kind === "event" ? block.event.id : null;
-  const isLessonEventType = block?.kind === "event" && (block.event.event_type === "private_lesson" || block.event.event_type === "semi_private_lesson");
+  const isLessonEventType = block?.kind === "event" && (
+    block.event.event_type === "private-lesson" ||
+    block.event.event_type === "semi-private-lesson" ||
+    block.event.event_type === "private_lesson" ||
+    block.event.event_type === "semi_private_lesson"
+  );
 
   useEffect(() => {
     let active = true;
