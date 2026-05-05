@@ -33,6 +33,7 @@ export interface LessonBookingFieldsData {
   recurDays: string[];
   endDate: Date | null;
   sendPaymentLink: boolean;
+  billSeriesUpfront: boolean;
 }
 
 interface ClientOption {
