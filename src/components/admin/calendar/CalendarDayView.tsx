@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import CalendarBlockDetail from "./CalendarBlockDetail";
 import type { BlockInfo } from "./CalendarBlockDetail";
 import type { ActivityType } from "./CalendarFilterBar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 /* ── ICS session from Airtable edge function ── */
 export interface ICSSession {
@@ -224,9 +225,17 @@ const CalendarDayView = ({
     [poolEvents, dateStr]
   );
 
-  const adEvents = todayEvents.filter(
+  const adEventsAll = todayEvents.filter(
     (e) => !["dive-session", "pool-rental", "i-can-swim", "maintenance", "swim-lesson"].includes(e.event_type)
   );
+  const lessonEvents = adEventsAll.filter(
+    (e) => e.event_type === "private-lesson" || e.event_type === "semi-private-lesson"
+  );
+  const walkInEvents = adEventsAll.filter(
+    (e) => e.event_type !== "private-lesson" && e.event_type !== "semi-private-lesson"
+  );
+  // Keep adEvents for column rendering (all of them render in the AD column)
+  const adEvents = adEventsAll;
   const swimLessonEvents = todayEvents.filter((e) => e.event_type === "swim-lesson");
   const diveRentalEvents = todayEvents.filter(
     (e) => ["dive-session", "pool-rental", "maintenance"].includes(e.event_type)
@@ -345,17 +354,18 @@ const CalendarDayView = ({
     dimmed: boolean,
     onClick?: () => void,
     isICS?: boolean,
-    actions?: React.ReactNode
+    actions?: React.ReactNode,
+    tooltip?: React.ReactNode
   ) => {
     const top = minutesToTop(startMins);
     const height = durationHeight(startMins, endMins);
     const colors = BLOCK_COLORS[colorKey] || BLOCK_COLORS.other;
 
-    return (
+    const blockEl = (
       <div
         key={key}
         className={cn(
-          "absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden transition-opacity cursor-pointer hover:shadow-md",
+          "absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden transition-opacity cursor-pointer hover:shadow-md z-10",
           dimmed && "opacity-[0.12]"
         )}
         style={{
@@ -365,7 +375,11 @@ const CalendarDayView = ({
           borderLeftColor: colors.border,
           color: colors.text,
         }}
-        onClick={onClick}
+        onMouseMove={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
       >
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
@@ -379,9 +393,20 @@ const CalendarDayView = ({
         </div>
       </div>
     );
+
+    if (!tooltip) return blockEl;
+    return (
+      <Tooltip key={key} delayDuration={150}>
+        <TooltipTrigger asChild>{blockEl}</TooltipTrigger>
+        <TooltipContent side="right" className="max-w-xs">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    );
   };
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="border rounded-lg bg-card overflow-hidden">
       {/* ── Group headers ── */}
       <div className="flex border-b">
@@ -410,16 +435,25 @@ const CalendarDayView = ({
             {todaySessions.length === 0 && adEvents.length === 0 ? (
               <span className="font-normal opacity-70">— No groups today</span>
             ) : (
-              <span className="flex items-center gap-1.5 font-normal">
-                <span title="Classes scheduled today" className="px-1.5 py-0.5 rounded bg-white/60">
-                  {todaySessions.length} {todaySessions.length === 1 ? "class" : "classes"}
-                </span>
-                <span title="Confirmed enrollments across today's classes" className="px-1.5 py-0.5 rounded bg-white/60">
-                  {todaySwimmerCount} {todaySwimmerCount === 1 ? "swimmer" : "swimmers"}
-                </span>
-                {adEvents.length > 0 && (
-                  <span title="Walk-ins and private/semi-private events" className="px-1.5 py-0.5 rounded bg-white/60">
-                    {adEvents.length} {adEvents.length === 1 ? "event" : "events"}
+              <span className="flex items-center gap-1.5 font-normal flex-wrap">
+                {todaySessions.length > 0 && (
+                  <span title="Classes scheduled today" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {todaySessions.length} {todaySessions.length === 1 ? "class" : "classes"}
+                  </span>
+                )}
+                {todaySwimmerCount > 0 && (
+                  <span title="Confirmed enrollments across today's classes" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {todaySwimmerCount} {todaySwimmerCount === 1 ? "swimmer" : "swimmers"}
+                  </span>
+                )}
+                {lessonEvents.length > 0 && (
+                  <span title="Private and semi-private lessons" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {lessonEvents.length} {lessonEvents.length === 1 ? "lesson" : "lessons"}
+                  </span>
+                )}
+                {walkInEvents.length > 0 && (
+                  <span title="Walk-ins and other events" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {walkInEvents.length} {walkInEvents.length === 1 ? "event" : "events"}
                   </span>
                 )}
               </span>
@@ -556,7 +590,16 @@ const CalendarDayView = ({
                     subtitle,
                     false,
                     () => setDetailBlock({ kind: "ics", session: s }),
-                    true
+                    true,
+                    undefined,
+                    <div className="space-y-1 text-xs">
+                      <p className="font-semibold">{label}</p>
+                      <p>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</p>
+                      {s.instructor_name && <p>Instructor: {s.instructor_name}</p>}
+                      {s.session_type && <p>Type: {s.session_type}</p>}
+                      <p>Status: {s.status}</p>
+                      <p>{s.confirmed_bookings}/{s.max_capacity} booked</p>
+                    </div>
                   );
                 })}
 
@@ -574,58 +617,77 @@ const CalendarDayView = ({
                 const levelColor = LEVEL_COLORS[s.swim_level] || BLOCK_COLORS["swim"];
 
                 return (
-                  <div
-                    key={s.id}
-                    className="absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden cursor-pointer hover:shadow-md z-10"
-                    onMouseMove={(e) => e.stopPropagation()}
-                    style={{
-                      top: `${top}px`,
-                      height: `${height}px`,
-                      backgroundColor: levelColor.bg,
-                      borderLeftColor: levelColor.border,
-                      color: levelColor.text,
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDetailBlock({
-                        kind: "swim",
-                        session: s,
-                        enrollments: sessionEnrollments,
-                        attendance: attendance.filter((a) => a.session_id === s.id),
-                        agreements,
-                        dateStr,
-                      });
-                    }}
-                  >
-                    <p className="text-xs font-semibold truncate leading-tight">
-                      {levelInfo?.name || s.swim_level}
-                    </p>
-                    {height > 28 && s.session_name && (
-                      <p className="text-[10px] opacity-70 truncate leading-tight">
-                        {s.session_name}
-                      </p>
-                    )}
-                    {height > 40 && (
-                      <p className="text-[10px] truncate leading-tight mt-0.5 opacity-60">
-                        {sessionEnrollments.length}/{s.max_students} swimmers
-                      </p>
-                    )}
-                    {height > 56 && sessionEnrollments.length > 0 && (
-                      <div className="mt-1 space-y-0.5">
-                        {sessionEnrollments.slice(0, Math.floor((height - 56) / 14)).map((enr) => (
-                          <p key={enr.id} className="text-[10px] truncate leading-tight flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 shrink-0" />
-                            {enr.child_name}
-                          </p>
-                        ))}
-                        {sessionEnrollments.length > Math.floor((height - 56) / 14) && (
-                          <p className="text-[10px] opacity-50 truncate">
-                            +{sessionEnrollments.length - Math.floor((height - 56) / 14)} more
+                  <Tooltip key={s.id} delayDuration={150}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className="absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden cursor-pointer hover:shadow-md z-10"
+                        onMouseMove={(e) => e.stopPropagation()}
+                        style={{
+                          top: `${top}px`,
+                          height: `${height}px`,
+                          backgroundColor: levelColor.bg,
+                          borderLeftColor: levelColor.border,
+                          color: levelColor.text,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDetailBlock({
+                            kind: "swim",
+                            session: s,
+                            enrollments: sessionEnrollments,
+                            attendance: attendance.filter((a) => a.session_id === s.id),
+                            agreements,
+                            dateStr,
+                          });
+                        }}
+                      >
+                        <p className="text-xs font-semibold truncate leading-tight">
+                          {levelInfo?.name || s.swim_level}
+                        </p>
+                        {height > 28 && s.session_name && (
+                          <p className="text-[10px] opacity-70 truncate leading-tight">
+                            {s.session_name}
                           </p>
                         )}
+                        {height > 40 && (
+                          <p className="text-[10px] truncate leading-tight mt-0.5 opacity-60">
+                            {sessionEnrollments.length}/{s.max_students} swimmers
+                          </p>
+                        )}
+                        {height > 56 && sessionEnrollments.length > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            {sessionEnrollments.slice(0, Math.floor((height - 56) / 14)).map((enr) => (
+                              <p key={enr.id} className="text-[10px] truncate leading-tight flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 shrink-0" />
+                                {enr.child_name}
+                              </p>
+                            ))}
+                            {sessionEnrollments.length > Math.floor((height - 56) / 14) && (
+                              <p className="text-[10px] opacity-50 truncate">
+                                +{sessionEnrollments.length - Math.floor((height - 56) / 14)} more
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      <div className="space-y-1 text-xs">
+                        <p className="font-semibold">{levelInfo?.name || s.swim_level}{s.session_name ? ` · ${s.session_name}` : ""}</p>
+                        <p>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</p>
+                        {s.instructors?.name && <p>Instructor: {s.instructors.name}</p>}
+                        <p>{sessionEnrollments.length}/{s.max_students} swimmers</p>
+                        {sessionEnrollments.length > 0 && (
+                          <ul className="mt-1 space-y-0.5">
+                            {sessionEnrollments.slice(0, 5).map((enr) => (
+                              <li key={enr.id}>• {enr.child_name} (age {enr.child_age})</li>
+                            ))}
+                            {sessionEnrollments.length > 5 && <li>+{sessionEnrollments.length - 5} more</li>}
+                          </ul>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 );
               })}
 
@@ -660,6 +722,14 @@ const CalendarDayView = ({
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
+                  </div>,
+                  <div className="space-y-1 text-xs">
+                    <p className="font-semibold">{e.title}</p>
+                    <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
+                    <p className="capitalize">Type: {e.event_type.replace(/-/g, " ")}</p>
+                    {e.instructor_name && <p>Instructor: {e.instructor_name}</p>}
+                    {e.pool_area && <p>Area: {e.pool_area}</p>}
+                    {e.notes && <p className="opacity-80">{e.notes}</p>}
                   </div>
                 );
               })}
@@ -694,6 +764,14 @@ const CalendarDayView = ({
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
+                  </div>,
+                  <div className="space-y-1 text-xs">
+                    <p className="font-semibold">{e.title}</p>
+                    <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
+                    <p>Type: Swim Lesson</p>
+                    {e.instructor_name && <p>Instructor: {e.instructor_name}</p>}
+                    {e.pool_area && <p>Area: {e.pool_area}</p>}
+                    {e.notes && <p className="opacity-80">{e.notes}</p>}
                   </div>
                 );
               })}
@@ -728,6 +806,14 @@ const CalendarDayView = ({
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
+                  </div>,
+                  <div className="space-y-1 text-xs">
+                    <p className="font-semibold">{e.title}</p>
+                    <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
+                    <p className="capitalize">Type: {e.event_type.replace(/-/g, " ")}</p>
+                    {e.instructor_name && <p>Instructor: {e.instructor_name}</p>}
+                    {e.pool_area && <p>Area: {e.pool_area}</p>}
+                    {e.notes && <p className="opacity-80">{e.notes}</p>}
                   </div>
                 );
               })}
@@ -776,6 +862,7 @@ const CalendarDayView = ({
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </TooltipProvider>
   );
 };
 

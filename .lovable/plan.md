@@ -1,79 +1,41 @@
-# Add "Add to Calendar" Buttons to Group Class Enrollment Confirmation Email
+## Calendar UX fixes
 
-Extend the calendar feature to the 8-week group class enrollment confirmation email. Parents will be able to add **all lessons in the session at once** with a single tap, plus an option to add individual lessons.
+Three small fixes to `src/components/admin/calendar/CalendarDayView.tsx`.
 
-## What the Parent Will See
+### 1. Clicking an event opens "Add Event" instead of the detail panel
 
-After successful enrollment, the confirmation email will get a new "Add to Calendar" section right after the Lesson Dates list. It contains:
+Each column has an `onClick` handler that calls `handleEmptySlotClick` → `onAddEvent`. The AD swim-session block stops propagation, but the blocks rendered through `renderBlock` (pool events, swim-lesson events, dive/rental events, ICS sessions) do **not** — so clicking them bubbles up to the column and opens AddPoolEventDialog on top of the detail panel.
 
-1. **📅 Add All Lessons to Calendar** (primary button) — downloads a single `.ics` file containing all 8 (or however many) lesson occurrences. iPhone Mail, Outlook, and Android Gmail open this natively and add every lesson in one action.
-2. **Add to Google Calendar (All Lessons)** (secondary button) — opens Google Calendar with all 8 events queued. (Google Calendar's render URL only supports one event at a time, so this falls back to opening just the first lesson with a note that the .ics file is the recommended path for adding all of them. We'll keep the wording honest.)
+Fix: in `renderBlock`, wrap the existing `onClick` so it calls `e.stopPropagation()` before invoking the handler. Also stop propagation on the inner Edit / Delete buttons' parent div (already done individually, fine) and on the action buttons themselves (already done).
 
-No other formatting, layout, colors, or content of the email will change.
+### 2. No hover preview for events
 
-## Implementation
+Add a lightweight tooltip on every block showing key info without having to click.
 
-### 1. Extend the `lesson-calendar-ics` edge function to support multiple events
+- Wrap each block in `Tooltip` / `TooltipTrigger` / `TooltipContent` from `@/components/ui/tooltip` (already in project).
+- Tooltip content per block type:
+  - **ICS**: client/session type, instructor, time range, status, capacity (`confirmed_bookings/max_capacity`).
+  - **AD swim session**: level name, session name, time, instructor, swimmer count + first 3 swimmer names.
+  - **Pool event (private/semi-private/swim-lesson/dive/rental)**: title, time, instructor, pool area, notes.
+- Ensure a `TooltipProvider` wraps the day view (add at the root of `CalendarDayView` return if not already provided globally).
+- `delayDuration={150}` so it appears quickly but doesn't flicker on pass-through.
 
-Currently it accepts `date`, `start`, `end` and emits one `VEVENT`. Add a new param style:
+### 3. Private/semi-private lessons counted as "events" in the AD header
 
-- `dates=YYYY-MM-DD,YYYY-MM-DD,...` (comma-separated list)
-- When `dates` is present (multi-event mode), it ignores `date` and emits one `VEVENT` per date, all sharing the same `start`/`end`/`title`/`location`. Each event gets a unique UID derived from `uid` + the date (e.g. `enroll-<id>-2025-06-09@aquaticdreamsswim.com`) so re-imports update the right event without duplicates.
-- Single-event mode (existing behavior using `date`) stays untouched — the lesson booking emails keep working unchanged.
+The header counts `adEvents.length` (which includes `private-lesson` and `semi-private-lesson` rows from `pool_events`) as generic "events". Re-bucket so lessons are labelled correctly:
 
-Filename for multi-event downloads: `aquatic-dreams-session.ics`.
+- Split `adEvents` into:
+  - `lessonEvents` → `event_type` in `["private-lesson", "semi-private-lesson"]`
+  - `walkInEvents` → everything else currently in `adEvents`
+- Header chips become:
+  - `{N} class(es)` (existing, from `todaySessions`)
+  - `{N} swimmer(s)` (existing)
+  - `{N} lesson(s)` when `lessonEvents.length > 0` (new)
+  - `{N} event(s)` only when `walkInEvents.length > 0` (existing label, narrower scope)
+- Rendering of the blocks themselves stays unchanged (still in the AD column, with their existing colors).
 
-### 2. Add a multi-event helper to `_shared/calendar-links.ts`
+### Files touched
 
-New helper `buildSessionCalendarLinks({ uid, title, dates: string[], start, end, location, description })` that returns:
-- `icsUrl` — points at the edge function with `dates=` param
-- `googleUrl` — Google Calendar render URL pre-filled with the **first** lesson (since Google only takes one event per render call). The button label in the email will be worded so the user understands the .ics is the way to add them all.
+- `src/components/admin/calendar/CalendarDayView.tsx` — only file changed.
 
-The existing `buildCalendarLinks` (single event) stays as-is for the lesson emails.
-
-### 3. Update `enrollment-confirmation.tsx` template
-
-Add two optional props: `icsLink?: string`, `googleCalendarLink?: string`.
-
-Right after the existing "Lesson Dates" infoBox, render a new `Section` with:
-- A small caption: "Add all lessons to your calendar"
-- Primary button "📅 Add All Lessons to Calendar" → `icsLink`
-- Secondary button "Add to Google Calendar" → `googleCalendarLink`
-
-Reuse the same `calBtnPrimary` / `calBtnSecondary` styles already added to the lesson templates so it matches visually. No other styles, sections, or footer text change.
-
-Buttons render only when the props are present (so previews and any legacy callers still work).
-
-### 4. Update `payments-webhook/index.ts` `sendEnrollmentConfirmation`
-
-After fetching `lessonDates`, build calendar links:
-
-```text
-uid = `enroll-${enrollmentId}`
-title = `${childName}'s Swim Lesson — ${groupName} (${levelLabel}) — Aquatic Dreams`
-dates = lessonDates.map(d => d.lesson_date)
-start = session.start_time
-end   = session.end_time
-location = '1212 Kansas Ave, Modesto, CA 95351'
-description = `Instructor will be confirmed on day 1. Questions: info@aquaticdreamsswim.com / (209) 577-3483`
-```
-
-Pass `icsLink` and `googleCalendarLink` into `templateData`. Skip if there are no lesson dates or no session times (defensive — buttons just won't render).
-
-## Files
-
-**Edited**
-- `supabase/functions/lesson-calendar-ics/index.ts` — add multi-date support
-- `supabase/functions/_shared/calendar-links.ts` — add `buildSessionCalendarLinks`
-- `supabase/functions/_shared/transactional-email-templates/enrollment-confirmation.tsx` — add buttons
-- `supabase/functions/payments-webhook/index.ts` — generate + pass links
-
-**Deploy**
-- `lesson-calendar-ics`, `send-transactional-email`, `payments-webhook`
-
-## Notes / Honest Caveats
-
-- **iOS / Apple Calendar / Outlook / Android native**: One tap adds all 8 lessons. This is the best experience and the path most parents will use from the email.
-- **Google Calendar**: The "render" URL only supports a single event, so the Google button will pre-fill the **first** lesson. Parents who use Google Calendar can either tap the .ics button (Google Calendar on Android opens .ics fine) or add the remaining lessons manually. We'll word the secondary button as "Add to Google Calendar" with a small caption clarifying that the .ics adds all of them.
-- **No other email changes** per your earlier instruction — only the new section is added.
-- **UIDs are stable per (enrollment, date)** so if a parent re-imports after a date change, calendars update the existing event instead of duplicating.
+No DB / edge-function changes.
