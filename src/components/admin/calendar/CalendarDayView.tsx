@@ -590,7 +590,16 @@ const CalendarDayView = ({
                     subtitle,
                     false,
                     () => setDetailBlock({ kind: "ics", session: s }),
-                    true
+                    true,
+                    undefined,
+                    <div className="space-y-1 text-xs">
+                      <p className="font-semibold">{label}</p>
+                      <p>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</p>
+                      {s.instructor_name && <p>Instructor: {s.instructor_name}</p>}
+                      {s.session_type && <p>Type: {s.session_type}</p>}
+                      <p>Status: {s.status}</p>
+                      <p>{s.confirmed_bookings}/{s.max_capacity} booked</p>
+                    </div>
                   );
                 })}
 
