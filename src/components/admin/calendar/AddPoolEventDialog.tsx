@@ -59,6 +59,7 @@ const defaultLessonBookingData = (lessonType: string): LessonBookingFieldsData =
   recurDays: [],
   endDate: null,
   sendPaymentLink: true,
+  billSeriesUpfront: true,
 });
 
 const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEvent, prefillStartTime }: Props) => {
@@ -313,18 +314,30 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       return;
     }
 
-    // 5. Send confirmation + payment link for FIRST occurrence only
+    // 5. Send confirmation + payment link
     if (lb.sendPaymentLink && insertedOccs.length > 0) {
-      const firstOcc = insertedOccs[0];
+      const useSeries = lb.recurring && lb.billSeriesUpfront && insertedOccs.length > 1;
       try {
-        const { error: sendErr } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
-          body: {
-            occurrenceId: firstOcc.id,
-            environment: getStripeEnvironment(),
-            siteUrl: window.location.origin,
-          },
-        });
-        if (sendErr) throw sendErr;
+        if (useSeries) {
+          const { error: sendErr } = await supabase.functions.invoke("send-lesson-series-confirmation", {
+            body: {
+              bookingId: bookingRow.id,
+              environment: getStripeEnvironment(),
+              siteUrl: window.location.origin,
+            },
+          });
+          if (sendErr) throw sendErr;
+        } else {
+          const firstOcc = insertedOccs[0];
+          const { error: sendErr } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
+            body: {
+              occurrenceId: firstOcc.id,
+              environment: getStripeEnvironment(),
+              siteUrl: window.location.origin,
+            },
+          });
+          if (sendErr) throw sendErr;
+        }
       } catch (e: any) {
         toast({
           title: "Booking saved, but confirmation email failed",
