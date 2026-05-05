@@ -764,6 +764,14 @@ const CalendarDayView = ({
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
+                  </div>,
+                  <div className="space-y-1 text-xs">
+                    <p className="font-semibold">{e.title}</p>
+                    <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
+                    <p>Type: Swim Lesson</p>
+                    {e.instructor_name && <p>Instructor: {e.instructor_name}</p>}
+                    {e.pool_area && <p>Area: {e.pool_area}</p>}
+                    {e.notes && <p className="opacity-80">{e.notes}</p>}
                   </div>
                 );
               })}
