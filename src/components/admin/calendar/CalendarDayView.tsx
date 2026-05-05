@@ -354,17 +354,18 @@ const CalendarDayView = ({
     dimmed: boolean,
     onClick?: () => void,
     isICS?: boolean,
-    actions?: React.ReactNode
+    actions?: React.ReactNode,
+    tooltip?: React.ReactNode
   ) => {
     const top = minutesToTop(startMins);
     const height = durationHeight(startMins, endMins);
     const colors = BLOCK_COLORS[colorKey] || BLOCK_COLORS.other;
 
-    return (
+    const blockEl = (
       <div
         key={key}
         className={cn(
-          "absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden transition-opacity cursor-pointer hover:shadow-md",
+          "absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden transition-opacity cursor-pointer hover:shadow-md z-10",
           dimmed && "opacity-[0.12]"
         )}
         style={{
@@ -374,7 +375,11 @@ const CalendarDayView = ({
           borderLeftColor: colors.border,
           color: colors.text,
         }}
-        onClick={onClick}
+        onMouseMove={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
       >
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0 flex-1">
@@ -387,6 +392,16 @@ const CalendarDayView = ({
           {actions}
         </div>
       </div>
+    );
+
+    if (!tooltip) return blockEl;
+    return (
+      <Tooltip key={key} delayDuration={150}>
+        <TooltipTrigger asChild>{blockEl}</TooltipTrigger>
+        <TooltipContent side="right" className="max-w-xs">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
     );
   };
 
