@@ -617,58 +617,77 @@ const CalendarDayView = ({
                 const levelColor = LEVEL_COLORS[s.swim_level] || BLOCK_COLORS["swim"];
 
                 return (
-                  <div
-                    key={s.id}
-                    className="absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden cursor-pointer hover:shadow-md z-10"
-                    onMouseMove={(e) => e.stopPropagation()}
-                    style={{
-                      top: `${top}px`,
-                      height: `${height}px`,
-                      backgroundColor: levelColor.bg,
-                      borderLeftColor: levelColor.border,
-                      color: levelColor.text,
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDetailBlock({
-                        kind: "swim",
-                        session: s,
-                        enrollments: sessionEnrollments,
-                        attendance: attendance.filter((a) => a.session_id === s.id),
-                        agreements,
-                        dateStr,
-                      });
-                    }}
-                  >
-                    <p className="text-xs font-semibold truncate leading-tight">
-                      {levelInfo?.name || s.swim_level}
-                    </p>
-                    {height > 28 && s.session_name && (
-                      <p className="text-[10px] opacity-70 truncate leading-tight">
-                        {s.session_name}
-                      </p>
-                    )}
-                    {height > 40 && (
-                      <p className="text-[10px] truncate leading-tight mt-0.5 opacity-60">
-                        {sessionEnrollments.length}/{s.max_students} swimmers
-                      </p>
-                    )}
-                    {height > 56 && sessionEnrollments.length > 0 && (
-                      <div className="mt-1 space-y-0.5">
-                        {sessionEnrollments.slice(0, Math.floor((height - 56) / 14)).map((enr) => (
-                          <p key={enr.id} className="text-[10px] truncate leading-tight flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 shrink-0" />
-                            {enr.child_name}
-                          </p>
-                        ))}
-                        {sessionEnrollments.length > Math.floor((height - 56) / 14) && (
-                          <p className="text-[10px] opacity-50 truncate">
-                            +{sessionEnrollments.length - Math.floor((height - 56) / 14)} more
+                  <Tooltip key={s.id} delayDuration={150}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className="absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden cursor-pointer hover:shadow-md z-10"
+                        onMouseMove={(e) => e.stopPropagation()}
+                        style={{
+                          top: `${top}px`,
+                          height: `${height}px`,
+                          backgroundColor: levelColor.bg,
+                          borderLeftColor: levelColor.border,
+                          color: levelColor.text,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDetailBlock({
+                            kind: "swim",
+                            session: s,
+                            enrollments: sessionEnrollments,
+                            attendance: attendance.filter((a) => a.session_id === s.id),
+                            agreements,
+                            dateStr,
+                          });
+                        }}
+                      >
+                        <p className="text-xs font-semibold truncate leading-tight">
+                          {levelInfo?.name || s.swim_level}
+                        </p>
+                        {height > 28 && s.session_name && (
+                          <p className="text-[10px] opacity-70 truncate leading-tight">
+                            {s.session_name}
                           </p>
                         )}
+                        {height > 40 && (
+                          <p className="text-[10px] truncate leading-tight mt-0.5 opacity-60">
+                            {sessionEnrollments.length}/{s.max_students} swimmers
+                          </p>
+                        )}
+                        {height > 56 && sessionEnrollments.length > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            {sessionEnrollments.slice(0, Math.floor((height - 56) / 14)).map((enr) => (
+                              <p key={enr.id} className="text-[10px] truncate leading-tight flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 shrink-0" />
+                                {enr.child_name}
+                              </p>
+                            ))}
+                            {sessionEnrollments.length > Math.floor((height - 56) / 14) && (
+                              <p className="text-[10px] opacity-50 truncate">
+                                +{sessionEnrollments.length - Math.floor((height - 56) / 14)} more
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      <div className="space-y-1 text-xs">
+                        <p className="font-semibold">{levelInfo?.name || s.swim_level}{s.session_name ? ` · ${s.session_name}` : ""}</p>
+                        <p>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</p>
+                        {s.instructors?.name && <p>Instructor: {s.instructors.name}</p>}
+                        <p>{sessionEnrollments.length}/{s.max_students} swimmers</p>
+                        {sessionEnrollments.length > 0 && (
+                          <ul className="mt-1 space-y-0.5">
+                            {sessionEnrollments.slice(0, 5).map((enr) => (
+                              <li key={enr.id}>• {enr.child_name} (age {enr.child_age})</li>
+                            ))}
+                            {sessionEnrollments.length > 5 && <li>+{sessionEnrollments.length - 5} more</li>}
+                          </ul>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 );
               })}
 
