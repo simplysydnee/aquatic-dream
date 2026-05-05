@@ -406,6 +406,7 @@ const CalendarDayView = ({
   };
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="border rounded-lg bg-card overflow-hidden">
       {/* ── Group headers ── */}
       <div className="flex border-b">
