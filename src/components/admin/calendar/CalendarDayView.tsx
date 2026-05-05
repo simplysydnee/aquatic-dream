@@ -419,16 +419,25 @@ const CalendarDayView = ({
             {todaySessions.length === 0 && adEvents.length === 0 ? (
               <span className="font-normal opacity-70">— No groups today</span>
             ) : (
-              <span className="flex items-center gap-1.5 font-normal">
-                <span title="Classes scheduled today" className="px-1.5 py-0.5 rounded bg-white/60">
-                  {todaySessions.length} {todaySessions.length === 1 ? "class" : "classes"}
-                </span>
-                <span title="Confirmed enrollments across today's classes" className="px-1.5 py-0.5 rounded bg-white/60">
-                  {todaySwimmerCount} {todaySwimmerCount === 1 ? "swimmer" : "swimmers"}
-                </span>
-                {adEvents.length > 0 && (
-                  <span title="Walk-ins and private/semi-private events" className="px-1.5 py-0.5 rounded bg-white/60">
-                    {adEvents.length} {adEvents.length === 1 ? "event" : "events"}
+              <span className="flex items-center gap-1.5 font-normal flex-wrap">
+                {todaySessions.length > 0 && (
+                  <span title="Classes scheduled today" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {todaySessions.length} {todaySessions.length === 1 ? "class" : "classes"}
+                  </span>
+                )}
+                {todaySwimmerCount > 0 && (
+                  <span title="Confirmed enrollments across today's classes" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {todaySwimmerCount} {todaySwimmerCount === 1 ? "swimmer" : "swimmers"}
+                  </span>
+                )}
+                {lessonEvents.length > 0 && (
+                  <span title="Private and semi-private lessons" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {lessonEvents.length} {lessonEvents.length === 1 ? "lesson" : "lessons"}
+                  </span>
+                )}
+                {walkInEvents.length > 0 && (
+                  <span title="Walk-ins and other events" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {walkInEvents.length} {walkInEvents.length === 1 ? "event" : "events"}
                   </span>
                 )}
               </span>
