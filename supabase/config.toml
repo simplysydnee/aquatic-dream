@@ -25,6 +25,8 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = true
   [functions.send-lesson-booking-confirmation]
     verify_jwt = false
+  [functions.send-lesson-series-confirmation]
+    verify_jwt = false
   [functions.send-lesson-occurrence-reminders]
     verify_jwt = false
   [functions.create-lesson-occurrence-checkout]
