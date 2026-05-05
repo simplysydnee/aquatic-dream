@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import CalendarBlockDetail from "./CalendarBlockDetail";
 import type { BlockInfo } from "./CalendarBlockDetail";
 import type { ActivityType } from "./CalendarFilterBar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 /* ── ICS session from Airtable edge function ── */
 export interface ICSSession {
