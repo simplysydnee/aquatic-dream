@@ -810,6 +810,7 @@ const CalendarDayView = ({
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </TooltipProvider>
   );
 };
 
