@@ -63,6 +63,8 @@ serve(async (req) => {
           await handleSessionFeePaid(obj);
         } else if (obj?.metadata?.type === "lesson_booking_occurrence" && obj?.metadata?.occurrenceId) {
           await handleLessonBookingPaid(obj);
+        } else if (obj?.metadata?.type === "lesson_booking_series" && obj?.metadata?.bookingId) {
+          await handleLessonSeriesPaid(obj);
         } else {
           await handleCheckoutCompleted(obj);
         }
@@ -340,6 +342,42 @@ async function handleLessonBookingPaid(checkoutSession: any) {
     console.error("Failed to mark lesson occurrence paid:", occurrenceId, error);
   } else {
     console.log("Lesson occurrence marked paid:", occurrenceId);
+  }
+}
+
+async function handleLessonSeriesPaid(checkoutSession: any) {
+  const bookingId = checkoutSession.metadata?.bookingId;
+  if (!bookingId) {
+    console.warn("Lesson series callback missing bookingId");
+    return;
+  }
+  const stripeId = checkoutSession.payment_intent || checkoutSession.id;
+  // Mark all unpaid occurrences for this booking as paid
+  const { data: occs, error: fetchErr } = await supabase
+    .from("lesson_booking_occurrences")
+    .select("id, payment_status")
+    .eq("booking_id", bookingId);
+  if (fetchErr) {
+    console.error("Failed to load occurrences for series:", bookingId, fetchErr);
+    return;
+  }
+  const toUpdate = (occs || []).filter((o: any) => o.payment_status !== "paid").map((o: any) => o.id);
+  if (toUpdate.length === 0) {
+    console.log("Series already fully paid:", bookingId);
+    return;
+  }
+  const { error } = await supabase
+    .from("lesson_booking_occurrences")
+    .update({
+      payment_status: "paid",
+      stripe_session_id: stripeId,
+      paid_at: new Date().toISOString(),
+    })
+    .in("id", toUpdate);
+  if (error) {
+    console.error("Failed to mark series paid:", bookingId, error);
+  } else {
+    console.log(`Series marked paid: ${bookingId} (${toUpdate.length} occurrences)`);
   }
 }
 
