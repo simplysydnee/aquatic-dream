@@ -22,6 +22,10 @@ interface LessonBookingConfirmationProps {
   waiverSigned?: boolean
   icsLink?: string
   googleCalendarLink?: string
+  // Series mode (single payment for whole recurring series)
+  seriesMode?: boolean
+  totalAmountDue?: string // "$520.00"
+  scheduleList?: { date: string; time: string }[]
 }
 
 const LessonBookingConfirmationEmail = ({
@@ -39,6 +43,9 @@ const LessonBookingConfirmationEmail = ({
   waiverSigned,
   icsLink,
   googleCalendarLink,
+  seriesMode,
+  totalAmountDue,
+  scheduleList,
 }: LessonBookingConfirmationProps) => (
   <Html lang="en" dir="ltr">
     <Head />
