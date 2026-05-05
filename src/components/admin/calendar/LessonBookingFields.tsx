@@ -33,6 +33,7 @@ export interface LessonBookingFieldsData {
   recurDays: string[];
   endDate: Date | null;
   sendPaymentLink: boolean;
+  billSeriesUpfront: boolean;
 }
 
 interface ClientOption {
@@ -243,6 +244,24 @@ const LessonBookingFields = ({ lessonType, data, onChange }: Props) => {
         </div>
       )}
 
+      {/* Bill series upfront (only meaningful when recurring) */}
+      {data.recurring && (
+        <div className="flex items-start gap-2 rounded-md bg-primary/5 p-2 border border-primary/20">
+          <Checkbox
+            id="bill-series-upfront"
+            checked={data.billSeriesUpfront}
+            onCheckedChange={(c) => update({ billSeriesUpfront: !!c })}
+            className="mt-0.5"
+          />
+          <Label htmlFor="bill-series-upfront" className="text-xs cursor-pointer leading-snug">
+            Charge entire series in one payment <span className="text-muted-foreground">(recommended — less to manage)</span>
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              Otherwise a payment link is emailed before each lesson.
+            </div>
+          </Label>
+        </div>
+      )}
+
       {/* Send confirmation toggle */}
       <div className="flex items-start gap-2 rounded-md bg-muted/40 p-2 border">
         <Checkbox
@@ -252,8 +271,11 @@ const LessonBookingFields = ({ lessonType, data, onChange }: Props) => {
           className="mt-0.5"
         />
         <Label htmlFor="send-pay-link" className="text-xs cursor-pointer leading-snug">
-          Email parent a confirmation + Stripe payment link for the first lesson
-          {data.recurring && " (subsequent lessons get links 24h before each)"}
+          {data.recurring && data.billSeriesUpfront
+            ? "Email parent a confirmation + Stripe link for the full series"
+            : data.recurring
+            ? "Email parent a confirmation + Stripe link for the first lesson (subsequent get links 24h before each)"
+            : "Email parent a confirmation + Stripe payment link"}
         </Label>
       </div>
     </div>

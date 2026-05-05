@@ -59,6 +59,7 @@ const defaultLessonBookingData = (lessonType: string): LessonBookingFieldsData =
   recurDays: [],
   endDate: null,
   sendPaymentLink: true,
+  billSeriesUpfront: true,
 });
 
 const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEvent, prefillStartTime }: Props) => {
@@ -209,6 +210,31 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       return;
     }
 
+    // If we're editing a lesson-booking pool_event, sync the linked occurrence so
+    // calendar/reminder emails reflect the new date+time. NEVER touch payment fields.
+    if (isEditing && (eventType === "private-lesson" || eventType === "semi-private-lesson")) {
+      const { data: occ } = await supabase
+        .from("lesson_booking_occurrences")
+        .select("id, booking_id")
+        .eq("pool_event_id", editEvent!.id)
+        .maybeSingle();
+      if (occ) {
+        await supabase.from("lesson_booking_occurrences")
+          .update({ occurrence_date: format(eventDate, "yyyy-MM-dd") })
+          .eq("id", occ.id);
+        // Sync time on the parent booking only when this is the only occurrence (single lesson)
+        const { count } = await supabase
+          .from("lesson_booking_occurrences")
+          .select("*", { count: "exact", head: true })
+          .eq("booking_id", occ.booking_id);
+        if ((count || 0) <= 1) {
+          await supabase.from("lesson_bookings")
+            .update({ start_time: startTime, end_time: endTime, pool_area: poolArea, instructor_name: instructorName.trim() || null })
+            .eq("id", occ.booking_id);
+        }
+      }
+    }
+
     toast({ title: isEditing ? "Event updated" : "Event added" });
     onOpenChange(false);
     resetForm();
@@ -313,18 +339,30 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       return;
     }
 
-    // 5. Send confirmation + payment link for FIRST occurrence only
+    // 5. Send confirmation + payment link
     if (lb.sendPaymentLink && insertedOccs.length > 0) {
-      const firstOcc = insertedOccs[0];
+      const useSeries = lb.recurring && lb.billSeriesUpfront && insertedOccs.length > 1;
       try {
-        const { error: sendErr } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
-          body: {
-            occurrenceId: firstOcc.id,
-            environment: getStripeEnvironment(),
-            siteUrl: window.location.origin,
-          },
-        });
-        if (sendErr) throw sendErr;
+        if (useSeries) {
+          const { error: sendErr } = await supabase.functions.invoke("send-lesson-series-confirmation", {
+            body: {
+              bookingId: bookingRow.id,
+              environment: getStripeEnvironment(),
+              siteUrl: window.location.origin,
+            },
+          });
+          if (sendErr) throw sendErr;
+        } else {
+          const firstOcc = insertedOccs[0];
+          const { error: sendErr } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
+            body: {
+              occurrenceId: firstOcc.id,
+              environment: getStripeEnvironment(),
+              siteUrl: window.location.origin,
+            },
+          });
+          if (sendErr) throw sendErr;
+        }
       } catch (e: any) {
         toast({
           title: "Booking saved, but confirmation email failed",
