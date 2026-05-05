@@ -50,7 +50,9 @@ const LessonBookingConfirmationEmail = ({
   <Html lang="en" dir="ltr">
     <Head />
     <Preview>
-      Your {lessonTypeLabel || 'lesson'} is booked{lessonDate ? ` for ${lessonDate}` : ''} — pay {amountDue || ''} to confirm
+      {seriesMode
+        ? `Your ${lessonTypeLabel || 'lesson'} series is booked — pay ${totalAmountDue || ''} to confirm`
+        : `Your ${lessonTypeLabel || 'lesson'} is booked${lessonDate ? ` for ${lessonDate}` : ''} — pay ${amountDue || ''} to confirm`}
     </Preview>
     <Body style={main}>
       <Container style={container}>
@@ -59,24 +61,37 @@ const LessonBookingConfirmationEmail = ({
         <Hr style={hr} />
         <Text style={text}>{parentName ? `Hi ${parentName},` : 'Hello,'}</Text>
         <Text style={text}>
-          {childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'}</strong> is booked.
-          Please complete payment below to confirm your spot.
+          {seriesMode ? (
+            <>{childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'} series</strong> ({scheduleList?.length || totalOccurrences} lessons) is booked. One payment covers the whole series — pay below to confirm.</>
+          ) : (
+            <>{childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'}</strong> is booked. Please complete payment below to confirm your spot.</>
+          )}
         </Text>
 
-        <Section style={infoBox}>
-          {lessonDate && <Text style={infoText}>📅 {lessonDate}</Text>}
-          {lessonTime && <Text style={infoText}>🕐 {lessonTime}</Text>}
-          {instructorName && <Text style={infoText}>👤 Instructor: {instructorName}</Text>}
-        </Section>
+        {seriesMode && scheduleList && scheduleList.length > 0 ? (
+          <Section style={infoBox}>
+            <Text style={{ ...infoText, fontWeight: 700 as const }}>📅 Schedule ({scheduleList.length} lessons)</Text>
+            {scheduleList.map((s, i) => (
+              <Text key={i} style={infoText}>• {s.date} — {s.time}</Text>
+            ))}
+            {instructorName && <Text style={infoText}>👤 Instructor: {instructorName}</Text>}
+          </Section>
+        ) : (
+          <Section style={infoBox}>
+            {lessonDate && <Text style={infoText}>📅 {lessonDate}</Text>}
+            {lessonTime && <Text style={infoText}>🕐 {lessonTime}</Text>}
+            {instructorName && <Text style={infoText}>👤 Instructor: {instructorName}</Text>}
+          </Section>
+        )}
 
         {(icsLink || googleCalendarLink) && (
           <Section style={{ textAlign: 'center' as const, margin: '0 0 20px' }}>
             <Text style={{ ...mutedText, textAlign: 'center' as const, margin: '0 0 8px' }}>
-              Add this lesson to your calendar:
+              {seriesMode ? 'Add all lessons to your calendar:' : 'Add this lesson to your calendar:'}
             </Text>
             {icsLink && (
               <Button style={calBtnPrimary} href={icsLink}>
-                📅 Add to Calendar
+                📅 {seriesMode ? 'Add All to Calendar' : 'Add to Calendar'}
               </Button>
             )}
             {googleCalendarLink && (
@@ -112,10 +127,12 @@ const LessonBookingConfirmationEmail = ({
 
         {paymentLink && (
           <Section style={stepBox}>
-            {waiverLink && !waiverSigned && <Text style={stepLabel}>Step 2 — Pay for this lesson</Text>}
+            {waiverLink && !waiverSigned && <Text style={stepLabel}>{seriesMode ? 'Step 2 — Pay for the full series' : 'Step 2 — Pay for this lesson'}</Text>}
             <Section style={{ textAlign: 'center' as const, margin: '12px 0 4px' }}>
               <Button style={button} href={paymentLink}>
-                Pay Now{amountDue ? ` — ${amountDue}` : ''}
+                {seriesMode
+                  ? `Pay Full Series${totalAmountDue ? ` — ${totalAmountDue}` : ''}`
+                  : `Pay Now${amountDue ? ` — ${amountDue}` : ''}`}
               </Button>
             </Section>
             <Text style={{ ...mutedText, textAlign: 'center' as const }}>
@@ -125,7 +142,15 @@ const LessonBookingConfirmationEmail = ({
           </Section>
         )}
 
-        {isFirstOfSeries && totalOccurrences && totalOccurrences > 1 && (
+        {seriesMode && totalOccurrences && totalOccurrences > 1 ? (
+          <Section style={policyBox}>
+            <Text style={policyText}>
+              <strong>One payment covers all {totalOccurrences} lessons.</strong> No
+              additional charges — your spot is secured for the entire series. To
+              reschedule a specific date, just reply to this email or call us.
+            </Text>
+          </Section>
+        ) : isFirstOfSeries && totalOccurrences && totalOccurrences > 1 && (
           <Section style={policyBox}>
             <Text style={policyText}>
               <strong>This is the first of {totalOccurrences} scheduled lessons.</strong> You'll
