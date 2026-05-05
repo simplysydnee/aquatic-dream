@@ -225,9 +225,17 @@ const CalendarDayView = ({
     [poolEvents, dateStr]
   );
 
-  const adEvents = todayEvents.filter(
+  const adEventsAll = todayEvents.filter(
     (e) => !["dive-session", "pool-rental", "i-can-swim", "maintenance", "swim-lesson"].includes(e.event_type)
   );
+  const lessonEvents = adEventsAll.filter(
+    (e) => e.event_type === "private-lesson" || e.event_type === "semi-private-lesson"
+  );
+  const walkInEvents = adEventsAll.filter(
+    (e) => e.event_type !== "private-lesson" && e.event_type !== "semi-private-lesson"
+  );
+  // Keep adEvents for column rendering (all of them render in the AD column)
+  const adEvents = adEventsAll;
   const swimLessonEvents = todayEvents.filter((e) => e.event_type === "swim-lesson");
   const diveRentalEvents = todayEvents.filter(
     (e) => ["dive-session", "pool-rental", "maintenance"].includes(e.event_type)
