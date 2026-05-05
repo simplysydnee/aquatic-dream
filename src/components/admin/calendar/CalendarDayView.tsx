@@ -732,6 +732,9 @@ const CalendarDayView = ({
                     {e.notes && <p className="opacity-80">{e.notes}</p>}
                   </div>
                 );
+              })}
+
+            {/* ── Swim Lesson pool events — in first AD column ── */}
             {col.group === "ad" && col.id === columns.find(c => c.group === "ad")?.id &&
               swimLessonEvents.map((e) => {
                 const startMins = timeToMinutes(e.start_time);
