@@ -210,6 +210,31 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       return;
     }
 
+    // If we're editing a lesson-booking pool_event, sync the linked occurrence so
+    // calendar/reminder emails reflect the new date+time. NEVER touch payment fields.
+    if (isEditing && (eventType === "private-lesson" || eventType === "semi-private-lesson")) {
+      const { data: occ } = await supabase
+        .from("lesson_booking_occurrences")
+        .select("id, booking_id")
+        .eq("pool_event_id", editEvent!.id)
+        .maybeSingle();
+      if (occ) {
+        await supabase.from("lesson_booking_occurrences")
+          .update({ occurrence_date: format(eventDate, "yyyy-MM-dd") })
+          .eq("id", occ.id);
+        // Sync time on the parent booking only when this is the only occurrence (single lesson)
+        const { count } = await supabase
+          .from("lesson_booking_occurrences")
+          .select("*", { count: "exact", head: true })
+          .eq("booking_id", occ.booking_id);
+        if ((count || 0) <= 1) {
+          await supabase.from("lesson_bookings")
+            .update({ start_time: startTime, end_time: endTime, pool_area: poolArea, instructor_name: instructorName.trim() || null })
+            .eq("id", occ.booking_id);
+        }
+      }
+    }
+
     toast({ title: isEditing ? "Event updated" : "Event added" });
     onOpenChange(false);
     resetForm();
