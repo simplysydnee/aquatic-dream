@@ -169,16 +169,32 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     } finally { setResending(false); }
   };
 
-  const handleMarkPaid = async (method: "cash" | "manual") => {
+  const [markDialogOpen, setMarkDialogOpen] = useState(false);
+  const [markMethod, setMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
+  const [markReference, setMarkReference] = useState("");
+
+  const handleMarkPaidConfirm = async () => {
     if (!lessonOcc) return;
+    const trimmedRef = markReference.trim();
+    if (!trimmedRef) {
+      toast.error("Reference number is required (receipt #, check #, or note)");
+      return;
+    }
     setMarking(true);
     try {
       const { error } = await supabase
         .from("lesson_booking_occurrences")
-        .update({ payment_status: "paid", paid_at: new Date().toISOString(), payment_method: method })
+        .update({
+          payment_status: markMethod === "comp" ? "comp" : "paid",
+          paid_at: new Date().toISOString(),
+          payment_method: markMethod,
+          payment_reference: trimmedRef,
+        })
         .eq("id", lessonOcc.id);
       if (error) throw error;
-      toast.success(`Marked paid (${method})`);
+      toast.success(`Marked ${markMethod === "comp" ? "comp" : "paid"} (${markMethod})`);
+      setMarkDialogOpen(false);
+      setMarkReference("");
       const { data } = await supabase.from("lesson_booking_occurrences").select("*, lesson_bookings(*)").eq("id", lessonOcc.id).maybeSingle();
       setLessonOcc(data); setLessonBooking((data as any)?.lesson_bookings || null);
     } catch (err: any) {
