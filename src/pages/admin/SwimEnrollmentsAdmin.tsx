@@ -659,7 +659,7 @@ const SwimEnrollmentsAdmin = () => {
                         </TableCell>
                         <TableCell>
                           {e.is_first_time && e.payment_status !== "not_required" ? (
-                            <Select value={e.payment_status} onValueChange={(v) => updatePaymentStatus(e, v)}>
+                            <Select value={e.payment_status} onValueChange={(v) => v === "paid" ? openMarkPaid(e, "reg", "cash") : updatePaymentStatus(e, v)}>
                               <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
                                 <SelectValue />
                               </SelectTrigger>
