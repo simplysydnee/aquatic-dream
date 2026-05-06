@@ -548,7 +548,11 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                           ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
                           : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
                       )}>
-                        {lessonOcc.payment_status === "paid" ? "Paid" : lessonOcc.payment_status === "comp" ? "Comp" : "Unpaid"}
+                        {lessonOcc.payment_status === "paid"
+                          ? `Paid${lessonOcc.payment_method ? ` (${lessonOcc.payment_method})` : ""}`
+                          : lessonOcc.payment_status === "comp" ? "Comp"
+                          : lessonOcc.payment_status === "flagged_no_pay" ? "Unpaid (flagged)"
+                          : "Unpaid"}
                       </Badge>
                     </div>
                     {lessonBooking.parent_email && (
