@@ -329,7 +329,10 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       booking_id: bookingRow.id,
       pool_event_id: ev.id,
       occurrence_date: ev.event_date,
-      payment_status: "unpaid",
+      payment_status: lb.prepaid ? "paid" : "unpaid",
+      payment_method: lb.prepaid ? lb.prepaidMethod : null,
+      payment_reference: lb.prepaid ? (lb.prepaidReference.trim() || null) : null,
+      paid_at: lb.prepaid ? new Date().toISOString() : null,
     }));
     const { data: insertedOccs, error: occErr } = await supabase
       .from("lesson_booking_occurrences")
@@ -342,8 +345,8 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       return;
     }
 
-    // 5. Send confirmation + payment link
-    if (lb.sendPaymentLink && insertedOccs.length > 0) {
+    // 5. Send confirmation + payment link (skipped entirely when prepaid)
+    if (!lb.prepaid && lb.sendPaymentLink && insertedOccs.length > 0) {
       const useSeries = lb.recurring && lb.billSeriesUpfront && insertedOccs.length > 1;
       try {
         if (useSeries) {
@@ -376,7 +379,11 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
     }
 
     toast({
-      title: lb.sendPaymentLink ? "Lesson booked & email sent" : "Lesson booked",
+      title: lb.prepaid
+        ? "Lesson booked & marked paid"
+        : lb.sendPaymentLink
+        ? "Lesson booked & email sent"
+        : "Lesson booked",
       description: `${insertedOccs.length} occurrence${insertedOccs.length > 1 ? "s" : ""} created`,
     });
     onOpenChange(false);
