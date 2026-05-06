@@ -1,49 +1,73 @@
-## Goal
+## Goals
 
-Add a "Mark paid" flow with method selection (Cash / Check / Comp / Other) to the **Swim Enrollments admin page**, mirroring what already exists on the Calendar Block detail. Make the **reference number optional** for manual methods on both surfaces. Stripe payments continue to auto-capture the `pi_...` ID via webhook — never typed by an admin.
+1. When creating a Private or Semi-Private lesson, allow admin to mark it as already paid (cash/check/comp) so no Stripe link is sent and occurrences are saved as paid.
+2. Clean up the New Event dialog — rename, reorder, and de-clutter.
 
-## Reference number rules (both surfaces)
+---
 
-- **Stripe** → reference auto-set to the Payment Intent ID by the webhook. Admin never enters it.
-- **Cash / Check / Comp / Other** → method is required, reference is **optional**. If empty, store `NULL`.
+## 1. Mark-as-paid on lesson creation
 
-## Database
+In `src/components/admin/calendar/LessonBookingFields.tsx`:
 
-The existing CHECK constraint on `lesson_booking_occurrences` requires either `pi_...` OR `payment_method + payment_reference` for `paid` rows. To allow optional references for manual payments, relax it to require only `payment_method` (reference optional):
+- Add three new optional fields to `LessonBookingFieldsData`:
+  - `prepaid: boolean` (default `false`)
+  - `prepaidMethod: "cash" | "check" | "comp" | "other" | null`
+  - `prepaidReference: string` (optional — same rule as elsewhere; required only if Stripe, which doesn't apply here)
+- Render a new section "Already paid?" with a checkbox. When checked:
+  - Show payment-method select (Cash / Check / Comp / Other)
+  - Show optional reference field (e.g. check #)
+  - Hide / disable the "Email Stripe payment link" and "Charge entire series" toggles (they're irrelevant when prepaid). Show a small note: "Stripe link skipped — lesson(s) marked paid."
 
-```sql
-ALTER TABLE lesson_booking_occurrences
-  DROP CONSTRAINT lesson_occ_paid_requires_proof;
-ALTER TABLE lesson_booking_occurrences
-  ADD CONSTRAINT lesson_occ_paid_requires_proof CHECK (
-    payment_status <> 'paid'
-    OR (stripe_session_id IS NOT NULL AND stripe_session_id LIKE 'pi_%')
-    OR payment_method IS NOT NULL
-  );
-```
+In `src/components/admin/calendar/AddPoolEventDialog.tsx` `handleLessonBookingSave`:
 
-No schema change needed for `swim_enrollments` (no equivalent constraint exists there). `payment_method` and `payment_reference` columns already exist on both tables.
+- If `lb.prepaid`:
+  - Insert `lesson_booking_occurrences` rows with `payment_status: "paid"`, `payment_method: lb.prepaidMethod`, `payment_reference: lb.prepaidReference || null`, `paid_at: now()`.
+  - Skip the `send-lesson-series-confirmation` / `send-lesson-booking-confirmation` Stripe-link calls entirely.
+  - Toast: "Lesson booked & marked paid".
+- Else: existing behavior unchanged.
 
-## Changes
+The existing `lesson_occ_paid_requires_proof` constraint already accepts `payment_method IS NOT NULL` as proof, so no migration is needed.
 
-### `src/components/admin/calendar/CalendarBlockDetail.tsx`
-- Remove the "reference required" guard in `handleMarkPaidConfirm`.
-- Update the dialog: keep the reference input but label it "Reference (optional)" — receipt #, check #, or note.
-- Allow confirm with empty reference; store `NULL` when blank.
+---
 
-### `src/pages/admin/SwimEnrollmentsAdmin.tsx`
-- Add a `MarkPaidDialog` component with: method (`cash` | `check` | `comp` | `other`) and optional reference.
-- Title contextualizes the fee: "Registration Fee — $45" or "Session Fee — $240".
-- Intercept the dropdowns:
-  - Reg Fee dropdown → selecting **Paid** opens the dialog.
-  - Session Fee dropdown → selecting **Paid** or **Comp** opens the dialog (Comp pre-selects method=`comp`).
-  - All other transitions write immediately as today.
-- On confirm, write:
-  - Reg fee: `{ payment_status: 'paid', payment_method, payment_reference: ref || null }`
-  - Session fee: `{ session_fee_status: 'paid'|'comp', session_fee_paid_at: now, payment_method, payment_reference: ref || null }`
-- Update local state and toast.
+## 2. New Event dialog UX cleanup
 
-## Out of scope
-- Bulk mark-paid.
-- Editing an existing manual payment after the fact.
-- Any change to the Stripe webhook path.
+In `src/components/admin/calendar/AddPoolEventDialog.tsx`:
+
+**Renames** (label-only — `event.value` strings stay the same to avoid data/migration impact):
+- `"Swim Lesson"` → `"Swim Group"` (it's a recurring group class, not a one-off lesson — matches existing curriculum terminology)
+- Keep `"Private"` and `"Semi-Private"` labels.
+
+**Reorder `EVENT_TYPES`** to surface what's used most:
+1. Private
+2. Semi-Private
+3. Swim Group
+4. I Can Swim
+5. Dive
+6. Rental
+7. Maintenance
+8. Other
+
+Change the default selected `eventType` from `"i-can-swim"` to `"private-lesson"` so the dialog opens on the most-used flow (and pre-fills price $65, title "Private Lesson").
+
+**Layout de-cram** (mainly the screenshot's complaint):
+- Bump dialog from `max-w-sm` to `max-w-md` so chips don't wrap onto 3 rows on desktop.
+- Group chips into a single line scrollable row OR allow 2 rows max with slightly larger touch targets (`px-3 py-1.5 text-xs`).
+- Move Date/Start/End into a tighter `grid-cols-3` with proper labels; current `grid-cols-[1fr_auto_auto]` causes uneven widths.
+- Add subtle section dividers (a thin `border-t pt-2` between: type, schedule, lesson-specific fields, instructor/notes, actions) so the form reads as logical groups instead of a wall of inputs.
+- Keep the dialog `max-h-[90vh] overflow-y-auto`.
+
+---
+
+## Technical Notes
+
+- No DB migration required — `payment_method`/`payment_reference`/`paid_at` already exist on `lesson_booking_occurrences` and the constraint already supports manual proof.
+- `event_type` enum values in `pool_events` (`swim-lesson`, `private-lesson`, `semi-private-lesson`, etc.) remain unchanged. Only the human-readable label "Swim Lesson" → "Swim Group" changes in the picker. Other places that render the event_type label (calendar block detail, lists) can stay as-is for this pass unless the user wants them renamed too — flag at end of implementation.
+- The Stripe payment-link skip path simply no-ops the `supabase.functions.invoke` calls when `prepaid=true`.
+
+---
+
+## Files to edit
+
+- `src/components/admin/calendar/LessonBookingFields.tsx` — add prepaid UI + types
+- `src/components/admin/calendar/AddPoolEventDialog.tsx` — rename/reorder chips, default type, layout polish, branch on `prepaid` in save handler

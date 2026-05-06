@@ -22,6 +22,8 @@ const DAYS_OF_WEEK = [
   { value: "sunday", label: "Sun" },
 ];
 
+export type PrepaidMethod = "cash" | "check" | "comp" | "other";
+
 export interface LessonBookingFieldsData {
   parentName: string;
   parentEmail: string;
@@ -34,6 +36,9 @@ export interface LessonBookingFieldsData {
   endDate: Date | null;
   sendPaymentLink: boolean;
   billSeriesUpfront: boolean;
+  prepaid: boolean;
+  prepaidMethod: PrepaidMethod;
+  prepaidReference: string;
 }
 
 interface ClientOption {
