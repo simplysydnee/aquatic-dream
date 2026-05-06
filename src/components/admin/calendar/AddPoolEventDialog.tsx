@@ -485,35 +485,38 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm p-4 gap-3 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md p-4 gap-3 max-h-[90vh] overflow-y-auto">
         <DialogHeader className="pb-0">
           <DialogTitle className="text-base">{isEditing ? "Edit Event" : "New Event"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3 text-sm">
-          <div className="flex flex-wrap gap-1.5">
-            {EVENT_TYPES.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => handleTypeChange(t.value)}
-                className={cn(
-                  "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
-                  eventType === t.value
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
+          <div>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5 block">Type</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {EVENT_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => handleTypeChange(t.value)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                    eventType === t.value
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {showTitle && (
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" className="h-8 text-sm" />
           )}
 
-          <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
+          <div className="border-t pt-3 grid grid-cols-3 gap-2 items-end">
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">{isLessonBooking && lessonBookingData.recurring ? "First date" : "Date"}</Label>
               <Popover>
@@ -535,11 +538,11 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
             </div>
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">Start</Label>
-              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-8 text-xs w-[100px]" />
+              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-8 text-xs w-full" />
             </div>
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">End</Label>
-              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-8 text-xs w-[100px]" />
+              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-8 text-xs w-full" />
             </div>
           </div>
 
