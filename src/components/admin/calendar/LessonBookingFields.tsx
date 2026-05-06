@@ -304,8 +304,8 @@ const LessonBookingFields = ({ lessonType, data, onChange }: Props) => {
         </div>
       )}
 
-      {/* Bill series upfront (only meaningful when recurring) */}
-      {data.recurring && (
+      {/* Bill series upfront (only meaningful when recurring AND not prepaid) */}
+      {data.recurring && !data.prepaid && (
         <div className="flex items-start gap-2 rounded-md bg-primary/5 p-2 border border-primary/20">
           <Checkbox
             id="bill-series-upfront"
@@ -322,22 +322,63 @@ const LessonBookingFields = ({ lessonType, data, onChange }: Props) => {
         </div>
       )}
 
-      {/* Send confirmation toggle */}
-      <div className="flex items-start gap-2 rounded-md bg-muted/40 p-2 border">
-        <Checkbox
-          id="send-pay-link"
-          checked={data.sendPaymentLink}
-          onCheckedChange={(c) => update({ sendPaymentLink: !!c })}
-          className="mt-0.5"
-        />
-        <Label htmlFor="send-pay-link" className="text-xs cursor-pointer leading-snug">
-          {data.recurring && data.billSeriesUpfront
-            ? "Email parent a confirmation + Stripe link for the full series"
-            : data.recurring
-            ? "Email parent a confirmation + Stripe link for the first lesson (subsequent get links 24h before each)"
-            : "Email parent a confirmation + Stripe payment link"}
-        </Label>
+      {/* Already paid? (cash/check/comp) */}
+      <div className="rounded-md border bg-muted/30 p-2 space-y-2">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="lesson-prepaid"
+            checked={data.prepaid}
+            onCheckedChange={(c) => update({ prepaid: !!c })}
+          />
+          <Label htmlFor="lesson-prepaid" className="text-xs cursor-pointer">
+            Already paid (cash, check, or comp)
+          </Label>
+        </div>
+        {data.prepaid && (
+          <div className="grid grid-cols-2 gap-2 pl-6">
+            <Select
+              value={data.prepaidMethod}
+              onValueChange={(v) => update({ prepaidMethod: v as PrepaidMethod })}
+            >
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Method" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash" className="text-xs">Cash</SelectItem>
+                <SelectItem value="check" className="text-xs">Check</SelectItem>
+                <SelectItem value="comp" className="text-xs">Comp</SelectItem>
+                <SelectItem value="other" className="text-xs">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              value={data.prepaidReference}
+              onChange={(e) => update({ prepaidReference: e.target.value })}
+              placeholder="Reference (optional)"
+              className="h-8 text-xs"
+            />
+            <p className="col-span-2 text-[10px] text-muted-foreground">
+              Stripe link skipped — lesson{data.recurring ? "s" : ""} will be marked paid.
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Send confirmation toggle (hidden when prepaid) */}
+      {!data.prepaid && (
+        <div className="flex items-start gap-2 rounded-md bg-muted/40 p-2 border">
+          <Checkbox
+            id="send-pay-link"
+            checked={data.sendPaymentLink}
+            onCheckedChange={(c) => update({ sendPaymentLink: !!c })}
+            className="mt-0.5"
+          />
+          <Label htmlFor="send-pay-link" className="text-xs cursor-pointer leading-snug">
+            {data.recurring && data.billSeriesUpfront
+              ? "Email parent a confirmation + Stripe link for the full series"
+              : data.recurring
+              ? "Email parent a confirmation + Stripe link for the first lesson (subsequent get links 24h before each)"
+              : "Email parent a confirmation + Stripe payment link"}
+          </Label>
+        </div>
+      )}
     </div>
   );
 };
