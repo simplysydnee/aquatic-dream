@@ -41,7 +41,20 @@ interface ClientOption {
   parent_email: string;
   parent_phone: string | null;
   child_name: string;
+  source: "booking" | "enrolled" | "inquiry";
 }
+
+const SOURCE_RANK: Record<ClientOption["source"], number> = {
+  booking: 0,
+  enrolled: 1,
+  inquiry: 2,
+};
+
+const SOURCE_LABEL: Record<ClientOption["source"], string> = {
+  booking: "Booking",
+  enrolled: "Enrolled",
+  inquiry: "Inquiry",
+};
 
 interface Props {
   lessonType: "private-lesson" | "semi-private-lesson";
