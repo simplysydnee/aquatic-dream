@@ -168,7 +168,12 @@ const LessonBookingFields = ({ lessonType, data, onChange }: Props) => {
                     onSelect={() => selectClient(c)}
                     className="text-xs flex flex-col items-start gap-0.5"
                   >
-                    <span className="font-medium">{c.child_name} <span className="text-muted-foreground">— {c.parent_name}</span></span>
+                    <span className="font-medium flex items-center gap-1.5">
+                      {c.child_name} <span className="text-muted-foreground">— {c.parent_name}</span>
+                      <span className="ml-auto text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        {SOURCE_LABEL[c.source]}
+                      </span>
+                    </span>
                     <span className="text-[10px] text-muted-foreground">{c.parent_email}</span>
                   </CommandItem>
                 ))}
