@@ -7,7 +7,7 @@ import type { TemplateEntry } from './registry.ts'
 const SITE_NAME = "Aquatic Dreams"
 const LOGO_URL = 'https://jilrijklnehbfuulykty.supabase.co/storage/v1/object/public/email-assets/aqd-email-logo.jpg'
 const CONTACT_EMAIL = 'info@aquaticdreamsswim.com'
-const CONTACT_PHONE = '(209) 549-7946'
+const CONTACT_PHONE = '(209) 577-3483'
 
 interface LessonRequestAcknowledgmentProps {
   parentName?: string
