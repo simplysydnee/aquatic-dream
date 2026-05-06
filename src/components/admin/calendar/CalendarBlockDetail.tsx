@@ -547,6 +547,20 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                         <span> • Link sent {format(new Date(lessonOcc.payment_link_sent_at), "MMM d, h:mma")}</span>
                       )}
                     </div>
+                    {lessonOcc.payment_status === "paid" && lessonOcc.stripe_session_id && (
+                      <a
+                        href={
+                          lessonOcc.stripe_session_id.startsWith("pi_")
+                            ? `https://dashboard.stripe.com/payments/${lessonOcc.stripe_session_id}`
+                            : `https://dashboard.stripe.com/checkout/sessions/${lessonOcc.stripe_session_id}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+                      >
+                        <CreditCard className="w-3 h-3" />View payment in Stripe
+                      </a>
+                    )}
 
                     {lessonOcc.payment_status !== "paid" && (
                       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-dashed">
