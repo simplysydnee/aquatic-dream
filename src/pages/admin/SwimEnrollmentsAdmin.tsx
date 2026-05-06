@@ -677,7 +677,7 @@ const SwimEnrollmentsAdmin = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Select value={e.session_fee_status} onValueChange={(v) => updateSessionFeeStatus(e, v)}>
+                          <Select value={e.session_fee_status} onValueChange={(v) => v === "paid" ? openMarkPaid(e, "session", "cash") : v === "comp" ? openMarkPaid(e, "session", "comp") : updateSessionFeeStatus(e, v)}>
                             <SelectTrigger className={`w-[140px] h-8 ${sessionFeeColor(e.session_fee_status)}`}>
                               <SelectValue />
                             </SelectTrigger>
