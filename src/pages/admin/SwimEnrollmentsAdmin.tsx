@@ -26,6 +26,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 interface Enrollment {
   id: string;
@@ -98,6 +99,57 @@ const SwimEnrollmentsAdmin = () => {
   const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [ageFilter, setAgeFilter] = useState<string>("all");
   const [seatsPeriodFilter, setSeatsPeriodFilter] = useState<string>("upcoming");
+
+  // Manual mark-paid dialog state
+  const [markPaidTarget, setMarkPaidTarget] = useState<
+    | { enrollment: Enrollment; fee: "reg" | "session"; defaultMethod: "cash" | "check" | "comp" | "other" }
+    | null
+  >(null);
+  const [markPaidMethod, setMarkPaidMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
+  const [markPaidReference, setMarkPaidReference] = useState("");
+  const [markPaidSaving, setMarkPaidSaving] = useState(false);
+
+  const openMarkPaid = (
+    enrollment: Enrollment,
+    fee: "reg" | "session",
+    defaultMethod: "cash" | "check" | "comp" | "other" = "cash"
+  ) => {
+    setMarkPaidTarget({ enrollment, fee, defaultMethod });
+    setMarkPaidMethod(defaultMethod);
+    setMarkPaidReference("");
+  };
+
+  const confirmMarkPaid = async () => {
+    if (!markPaidTarget) return;
+    const { enrollment, fee } = markPaidTarget;
+    const ref = markPaidReference.trim() || null;
+    setMarkPaidSaving(true);
+    try {
+      const updates: Record<string, unknown> =
+        fee === "reg"
+          ? { payment_status: "paid", payment_method: markPaidMethod, payment_reference: ref }
+          : {
+              session_fee_status: markPaidMethod === "comp" ? "comp" : "paid",
+              session_fee_paid_at: new Date().toISOString(),
+              payment_method: markPaidMethod,
+              payment_reference: ref,
+            };
+      const { error } = await supabase.from("swim_enrollments").update(updates).eq("id", enrollment.id);
+      if (error) throw error;
+      setEnrollments((prev) =>
+        prev.map((e) => (e.id === enrollment.id ? ({ ...e, ...updates } as Enrollment) : e))
+      );
+      toast({
+        title: fee === "reg" ? "Reg fee marked paid" : "Session fee recorded",
+        description: `${enrollment.child_name} · ${markPaidMethod}`,
+      });
+      setMarkPaidTarget(null);
+    } catch (err: any) {
+      toast({ title: "Failed to update", description: err?.message || "Try again", variant: "destructive" });
+    } finally {
+      setMarkPaidSaving(false);
+    }
+  };
 
   const fetchData = async () => {
     const [enrollRes, sessionRes, periodRes] = await Promise.all([
@@ -608,7 +660,7 @@ const SwimEnrollmentsAdmin = () => {
                         </TableCell>
                         <TableCell>
                           {e.is_first_time && e.payment_status !== "not_required" ? (
-                            <Select value={e.payment_status} onValueChange={(v) => updatePaymentStatus(e, v)}>
+                            <Select value={e.payment_status} onValueChange={(v) => v === "paid" ? openMarkPaid(e, "reg", "cash") : updatePaymentStatus(e, v)}>
                               <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
                                 <SelectValue />
                               </SelectTrigger>
@@ -626,7 +678,7 @@ const SwimEnrollmentsAdmin = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Select value={e.session_fee_status} onValueChange={(v) => updateSessionFeeStatus(e, v)}>
+                          <Select value={e.session_fee_status} onValueChange={(v) => v === "paid" ? openMarkPaid(e, "session", "cash") : v === "comp" ? openMarkPaid(e, "session", "comp") : updateSessionFeeStatus(e, v)}>
                             <SelectTrigger className={`w-[140px] h-8 ${sessionFeeColor(e.session_fee_status)}`}>
                               <SelectValue />
                             </SelectTrigger>
@@ -856,6 +908,57 @@ const SwimEnrollmentsAdmin = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!markPaidTarget} onOpenChange={(o) => { if (!o) setMarkPaidTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {markPaidTarget?.fee === "reg" ? "Registration Fee — $45" : "Session Fee — $240"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {markPaidTarget && (
+              <div className="text-xs text-muted-foreground">
+                {markPaidTarget.enrollment.child_name} · {markPaidTarget.enrollment.parent_name}
+              </div>
+            )}
+            <div>
+              <Label className="text-xs">Method</Label>
+              <Select value={markPaidMethod} onValueChange={(v) => setMarkPaidMethod(v as any)}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="comp">Comp (no charge)</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Reference (optional)</Label>
+              <Input
+                placeholder={
+                  markPaidMethod === "cash" ? "Receipt # or note" :
+                  markPaidMethod === "check" ? "Check #" :
+                  markPaidMethod === "comp" ? "Reason for comp" : "Reference"
+                }
+                value={markPaidReference}
+                onChange={(e) => setMarkPaidReference(e.target.value)}
+                className="h-9"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Optional. Stripe payments are recorded automatically.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button size="sm" variant="ghost" onClick={() => setMarkPaidTarget(null)} disabled={markPaidSaving}>Cancel</Button>
+            <Button size="sm" onClick={confirmMarkPaid} disabled={markPaidSaving}>
+              {markPaidSaving ? "Saving…" : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
