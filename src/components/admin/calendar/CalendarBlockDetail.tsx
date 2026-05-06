@@ -180,10 +180,6 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   const handleMarkPaidConfirm = async () => {
     if (!lessonOcc) return;
     const trimmedRef = markReference.trim();
-    if (!trimmedRef) {
-      toast.error("Reference number is required (receipt #, check #, or note)");
-      return;
-    }
     setMarking(true);
     try {
       const { error } = await supabase
@@ -192,7 +188,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
           payment_status: markMethod === "comp" ? "comp" : "paid",
           paid_at: new Date().toISOString(),
           payment_method: markMethod,
-          payment_reference: trimmedRef,
+          payment_reference: trimmedRef || null,
         })
         .eq("id", lessonOcc.id);
       if (error) throw error;
