@@ -77,22 +77,59 @@ const LessonBookingFields = ({ lessonType, data, onChange }: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonType]);
 
-  // Load existing clients (distinct families) from swim_enrollments
+  // Load existing clients from enrollments, lesson requests (interest survey), and prior bookings
   useEffect(() => {
     (async () => {
-      const { data: rows } = await supabase
-        .from("swim_enrollments")
-        .select("parent_name, parent_email, parent_phone, child_name")
-        .order("created_at", { ascending: false })
-        .limit(500);
+      const [enrollRes, requestRes, bookingRes] = await Promise.all([
+        supabase
+          .from("swim_enrollments")
+          .select("parent_name, parent_email, parent_phone, child_name, created_at")
+          .order("created_at", { ascending: false })
+          .limit(500),
+        supabase
+          .from("lesson_requests")
+          .select("parent_name, parent_email, parent_phone, child_name, created_at")
+          .order("created_at", { ascending: false })
+          .limit(500),
+        supabase
+          .from("lesson_bookings")
+          .select("parent_name, parent_email, parent_phone, child_name, created_at")
+          .order("created_at", { ascending: false })
+          .limit(500),
+      ]);
 
-      const seen = new Set<string>();
-      const unique: ClientOption[] = [];
-      (rows || []).forEach((r: any) => {
-        const key = `${(r.parent_email || "").toLowerCase()}|${(r.child_name || "").toLowerCase().trim()}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        unique.push(r);
+      const map = new Map<string, ClientOption>();
+      const ingest = (rows: any[] | null, source: ClientOption["source"]) => {
+        (rows || []).forEach((r) => {
+          const email = (r.parent_email || "").toLowerCase().trim();
+          const child = (r.child_name || "").toLowerCase().trim();
+          if (!email || !child) return;
+          const key = `${email}|${child}`;
+          const existing = map.get(key);
+          if (!existing) {
+            map.set(key, {
+              parent_name: r.parent_name || "",
+              parent_email: r.parent_email || "",
+              parent_phone: r.parent_phone || null,
+              child_name: r.child_name || "",
+              source,
+            });
+          } else {
+            // Prefer better source ranking; fill in missing parent fields
+            if (SOURCE_RANK[source] < SOURCE_RANK[existing.source]) existing.source = source;
+            if (!existing.parent_name && r.parent_name) existing.parent_name = r.parent_name;
+            if (!existing.parent_phone && r.parent_phone) existing.parent_phone = r.parent_phone;
+          }
+        });
+      };
+      ingest(bookingRes.data, "booking");
+      ingest(enrollRes.data, "enrolled");
+      ingest(requestRes.data, "inquiry");
+
+      const unique = Array.from(map.values()).sort((a, b) => {
+        const r = SOURCE_RANK[a.source] - SOURCE_RANK[b.source];
+        if (r !== 0) return r;
+        return a.child_name.localeCompare(b.child_name);
       });
       setClients(unique);
     })();
