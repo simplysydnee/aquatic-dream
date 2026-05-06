@@ -28,10 +28,10 @@ interface Props {
 }
 
 const EVENT_TYPES = [
-  { value: "i-can-swim", label: "I Can Swim" },
-  { value: "swim-lesson", label: "Swim Lesson" },
   { value: "private-lesson", label: "Private" },
   { value: "semi-private-lesson", label: "Semi-Private" },
+  { value: "swim-lesson", label: "Swim Group" },
+  { value: "i-can-swim", label: "I Can Swim" },
   { value: "dive-session", label: "Dive" },
   { value: "pool-rental", label: "Rental" },
   { value: "maintenance", label: "Maintenance" },
@@ -60,6 +60,9 @@ const defaultLessonBookingData = (lessonType: string): LessonBookingFieldsData =
   endDate: null,
   sendPaymentLink: true,
   billSeriesUpfront: true,
+  prepaid: false,
+  prepaidMethod: "cash",
+  prepaidReference: "",
 });
 
 const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEvent, prefillStartTime }: Props) => {
