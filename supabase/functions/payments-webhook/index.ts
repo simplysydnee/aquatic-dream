@@ -329,12 +329,23 @@ async function handleLessonBookingPaid(checkoutSession: any) {
     console.warn("Lesson booking callback missing occurrenceId");
     return;
   }
-  const stripeId = checkoutSession.payment_intent || checkoutSession.id;
+  // Only mark paid when Stripe says it actually was, AND we have a real PI.
+  if (checkoutSession.payment_status !== "paid" || !checkoutSession.payment_intent) {
+    console.warn("Lesson booking webhook ignored — not paid or missing PI:", {
+      occurrenceId,
+      payment_status: checkoutSession.payment_status,
+      has_pi: !!checkoutSession.payment_intent,
+    });
+    return;
+  }
+  const stripeId = checkoutSession.payment_intent;
   const { error } = await supabase
     .from("lesson_booking_occurrences")
     .update({
       payment_status: "paid",
       stripe_session_id: stripeId,
+      payment_method: "stripe",
+      payment_reference: stripeId,
       paid_at: new Date().toISOString(),
     })
     .eq("id", occurrenceId);
@@ -351,7 +362,15 @@ async function handleLessonSeriesPaid(checkoutSession: any) {
     console.warn("Lesson series callback missing bookingId");
     return;
   }
-  const stripeId = checkoutSession.payment_intent || checkoutSession.id;
+  if (checkoutSession.payment_status !== "paid" || !checkoutSession.payment_intent) {
+    console.warn("Lesson series webhook ignored — not paid or missing PI:", {
+      bookingId,
+      payment_status: checkoutSession.payment_status,
+      has_pi: !!checkoutSession.payment_intent,
+    });
+    return;
+  }
+  const stripeId = checkoutSession.payment_intent;
   // Mark all unpaid occurrences for this booking as paid
   const { data: occs, error: fetchErr } = await supabase
     .from("lesson_booking_occurrences")
@@ -371,6 +390,8 @@ async function handleLessonSeriesPaid(checkoutSession: any) {
     .update({
       payment_status: "paid",
       stripe_session_id: stripeId,
+      payment_method: "stripe",
+      payment_reference: stripeId,
       paid_at: new Date().toISOString(),
     })
     .in("id", toUpdate);
