@@ -17,6 +17,10 @@ import FrontDeskEnrollmentWaiverDialog from "./FrontDeskEnrollmentWaiverDialog";
 import EditSwimmerDialog, { type EditTarget } from "./EditSwimmerDialog";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { ClipboardSignature } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SwimBlockInfo {
   kind: "swim";
@@ -169,16 +173,32 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     } finally { setResending(false); }
   };
 
-  const handleMarkPaid = async (method: "cash" | "manual") => {
+  const [markDialogOpen, setMarkDialogOpen] = useState(false);
+  const [markMethod, setMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
+  const [markReference, setMarkReference] = useState("");
+
+  const handleMarkPaidConfirm = async () => {
     if (!lessonOcc) return;
+    const trimmedRef = markReference.trim();
+    if (!trimmedRef) {
+      toast.error("Reference number is required (receipt #, check #, or note)");
+      return;
+    }
     setMarking(true);
     try {
       const { error } = await supabase
         .from("lesson_booking_occurrences")
-        .update({ payment_status: "paid", paid_at: new Date().toISOString(), payment_method: method })
+        .update({
+          payment_status: markMethod === "comp" ? "comp" : "paid",
+          paid_at: new Date().toISOString(),
+          payment_method: markMethod,
+          payment_reference: trimmedRef,
+        })
         .eq("id", lessonOcc.id);
       if (error) throw error;
-      toast.success(`Marked paid (${method})`);
+      toast.success(`Marked ${markMethod === "comp" ? "comp" : "paid"} (${markMethod})`);
+      setMarkDialogOpen(false);
+      setMarkReference("");
       const { data } = await supabase.from("lesson_booking_occurrences").select("*, lesson_bookings(*)").eq("id", lessonOcc.id).maybeSingle();
       setLessonOcc(data); setLessonBooking((data as any)?.lesson_bookings || null);
     } catch (err: any) {
@@ -528,7 +548,11 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                           ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
                           : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
                       )}>
-                        {lessonOcc.payment_status === "paid" ? "Paid" : lessonOcc.payment_status === "comp" ? "Comp" : "Unpaid"}
+                        {lessonOcc.payment_status === "paid"
+                          ? `Paid${lessonOcc.payment_method ? ` (${lessonOcc.payment_method})` : ""}`
+                          : lessonOcc.payment_status === "comp" ? "Comp"
+                          : lessonOcc.payment_status === "flagged_no_pay" ? "Unpaid (flagged)"
+                          : "Unpaid"}
                       </Badge>
                     </div>
                     {lessonBooking.parent_email && (
@@ -570,8 +594,8 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                         <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setShowCardCheckout(true)}>
                           <CreditCard className="w-3 h-3" />Charge card
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-8 text-xs gap-1.5 col-span-2" disabled={marking} onClick={() => handleMarkPaid("cash")}>
-                          <CheckCircle2 className="w-3 h-3" />Mark paid (cash / other)
+                        <Button size="sm" variant="ghost" className="h-8 text-xs gap-1.5 col-span-2" onClick={() => { setMarkMethod("cash"); setMarkReference(""); setMarkDialogOpen(true); }}>
+                          <CheckCircle2 className="w-3 h-3" />Mark paid (cash / check / comp)
                         </Button>
                       </div>
                     )}
@@ -683,6 +707,51 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                 onRefetch?.();
               }}
             />
+
+            {/* Mark-paid (manual) dialog — requires reference for audit trail */}
+            <Dialog open={markDialogOpen} onOpenChange={setMarkDialogOpen}>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>Record manual payment</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs">Method</Label>
+                    <Select value={markMethod} onValueChange={(v) => setMarkMethod(v as any)}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="check">Check</SelectItem>
+                        <SelectItem value="comp">Comp (no charge)</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Reference (required)</Label>
+                    <Input
+                      placeholder={
+                        markMethod === "cash" ? "Receipt # or note" :
+                        markMethod === "check" ? "Check #" :
+                        markMethod === "comp" ? "Reason for comp" : "Reference"
+                      }
+                      value={markReference}
+                      onChange={(e) => setMarkReference(e.target.value)}
+                      className="h-9"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Required for audit. Stripe payments are recorded automatically and don't need this.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 justify-end pt-2">
+                    <Button size="sm" variant="ghost" onClick={() => setMarkDialogOpen(false)}>Cancel</Button>
+                    <Button size="sm" disabled={marking || !markReference.trim()} onClick={handleMarkPaidConfirm}>
+                      {marking ? "Saving…" : "Confirm"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </>
         )}
       </div>

@@ -95,10 +95,13 @@ Deno.serve(async (req) => {
 
     const paymentLink = checkoutSession.url
 
-    // Save link + sent timestamp BEFORE sending the email
+    // Save link + sent timestamp BEFORE sending the email.
+    // IMPORTANT: do NOT write the cs_ session id to stripe_session_id — that
+    // column is reserved for the verified payment intent (pi_) written by
+    // the webhook on checkout.session.completed. Keeping the cs_ id here
+    // makes unpaid links look like real payments.
     await supabase.from('lesson_booking_occurrences').update({
       stripe_checkout_url: paymentLink,
-      stripe_session_id: checkoutSession.id,
       payment_link_sent_at: new Date().toISOString(),
     }).eq('id', occ.id)
 
