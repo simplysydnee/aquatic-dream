@@ -586,8 +586,8 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                         <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setShowCardCheckout(true)}>
                           <CreditCard className="w-3 h-3" />Charge card
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-8 text-xs gap-1.5 col-span-2" disabled={marking} onClick={() => handleMarkPaid("cash")}>
-                          <CheckCircle2 className="w-3 h-3" />Mark paid (cash / other)
+                        <Button size="sm" variant="ghost" className="h-8 text-xs gap-1.5 col-span-2" onClick={() => { setMarkMethod("cash"); setMarkReference(""); setMarkDialogOpen(true); }}>
+                          <CheckCircle2 className="w-3 h-3" />Mark paid (cash / check / comp)
                         </Button>
                       </div>
                     )}
