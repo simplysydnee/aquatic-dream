@@ -908,6 +908,57 @@ const SwimEnrollmentsAdmin = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!markPaidTarget} onOpenChange={(o) => { if (!o) setMarkPaidTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {markPaidTarget?.fee === "reg" ? "Registration Fee — $45" : "Session Fee — $240"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {markPaidTarget && (
+              <div className="text-xs text-muted-foreground">
+                {markPaidTarget.enrollment.child_name} · {markPaidTarget.enrollment.parent_name}
+              </div>
+            )}
+            <div>
+              <Label className="text-xs">Method</Label>
+              <Select value={markPaidMethod} onValueChange={(v) => setMarkPaidMethod(v as any)}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="comp">Comp (no charge)</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Reference (optional)</Label>
+              <Input
+                placeholder={
+                  markPaidMethod === "cash" ? "Receipt # or note" :
+                  markPaidMethod === "check" ? "Check #" :
+                  markPaidMethod === "comp" ? "Reason for comp" : "Reference"
+                }
+                value={markPaidReference}
+                onChange={(e) => setMarkPaidReference(e.target.value)}
+                className="h-9"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Optional. Stripe payments are recorded automatically.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button size="sm" variant="ghost" onClick={() => setMarkPaidTarget(null)} disabled={markPaidSaving}>Cancel</Button>
+            <Button size="sm" onClick={confirmMarkPaid} disabled={markPaidSaving}>
+              {markPaidSaving ? "Saving…" : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
