@@ -724,7 +724,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-xs">Reference (required)</Label>
+                    <Label className="text-xs">Reference (optional)</Label>
                     <Input
                       placeholder={
                         markMethod === "cash" ? "Receipt # or note" :
@@ -736,12 +736,12 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                       className="h-9"
                     />
                     <p className="text-[10px] text-muted-foreground mt-1">
-                      Required for audit. Stripe payments are recorded automatically and don't need this.
+                      Optional. Stripe payments are recorded automatically.
                     </p>
                   </div>
                   <div className="flex gap-2 justify-end pt-2">
                     <Button size="sm" variant="ghost" onClick={() => setMarkDialogOpen(false)}>Cancel</Button>
-                    <Button size="sm" disabled={marking || !markReference.trim()} onClick={handleMarkPaidConfirm}>
+                    <Button size="sm" disabled={marking} onClick={handleMarkPaidConfirm}>
                       {marking ? "Saving…" : "Confirm"}
                     </Button>
                   </div>
