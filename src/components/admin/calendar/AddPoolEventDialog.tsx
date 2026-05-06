@@ -105,7 +105,7 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
   }, [editEvent, open, prefillStartTime]);
 
   const resetForm = () => {
-    setEventType("i-can-swim");
+    setEventType("private-lesson");
     setTitle("");
     setEventDate(defaultDate);
     setStartTime("08:00");
