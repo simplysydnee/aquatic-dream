@@ -66,7 +66,7 @@ const defaultLessonBookingData = (lessonType: string): LessonBookingFieldsData =
 });
 
 const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEvent, prefillStartTime }: Props) => {
-  const [eventType, setEventType] = useState("i-can-swim");
+  const [eventType, setEventType] = useState("private-lesson");
   const [title, setTitle] = useState("");
   const [eventDate, setEventDate] = useState<Date>(defaultDate);
   const [startTime, setStartTime] = useState("08:00");
