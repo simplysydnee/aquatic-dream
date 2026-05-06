@@ -17,6 +17,10 @@ import FrontDeskEnrollmentWaiverDialog from "./FrontDeskEnrollmentWaiverDialog";
 import EditSwimmerDialog, { type EditTarget } from "./EditSwimmerDialog";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { ClipboardSignature } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SwimBlockInfo {
   kind: "swim";
