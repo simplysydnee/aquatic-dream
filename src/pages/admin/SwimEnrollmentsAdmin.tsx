@@ -99,6 +99,57 @@ const SwimEnrollmentsAdmin = () => {
   const [ageFilter, setAgeFilter] = useState<string>("all");
   const [seatsPeriodFilter, setSeatsPeriodFilter] = useState<string>("upcoming");
 
+  // Manual mark-paid dialog state
+  const [markPaidTarget, setMarkPaidTarget] = useState<
+    | { enrollment: Enrollment; fee: "reg" | "session"; defaultMethod: "cash" | "check" | "comp" | "other" }
+    | null
+  >(null);
+  const [markPaidMethod, setMarkPaidMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
+  const [markPaidReference, setMarkPaidReference] = useState("");
+  const [markPaidSaving, setMarkPaidSaving] = useState(false);
+
+  const openMarkPaid = (
+    enrollment: Enrollment,
+    fee: "reg" | "session",
+    defaultMethod: "cash" | "check" | "comp" | "other" = "cash"
+  ) => {
+    setMarkPaidTarget({ enrollment, fee, defaultMethod });
+    setMarkPaidMethod(defaultMethod);
+    setMarkPaidReference("");
+  };
+
+  const confirmMarkPaid = async () => {
+    if (!markPaidTarget) return;
+    const { enrollment, fee } = markPaidTarget;
+    const ref = markPaidReference.trim() || null;
+    setMarkPaidSaving(true);
+    try {
+      const updates: Record<string, unknown> =
+        fee === "reg"
+          ? { payment_status: "paid", payment_method: markPaidMethod, payment_reference: ref }
+          : {
+              session_fee_status: markPaidMethod === "comp" ? "comp" : "paid",
+              session_fee_paid_at: new Date().toISOString(),
+              payment_method: markPaidMethod,
+              payment_reference: ref,
+            };
+      const { error } = await supabase.from("swim_enrollments").update(updates).eq("id", enrollment.id);
+      if (error) throw error;
+      setEnrollments((prev) =>
+        prev.map((e) => (e.id === enrollment.id ? ({ ...e, ...updates } as Enrollment) : e))
+      );
+      toast({
+        title: fee === "reg" ? "Reg fee marked paid" : "Session fee recorded",
+        description: `${enrollment.child_name} · ${markPaidMethod}`,
+      });
+      setMarkPaidTarget(null);
+    } catch (err: any) {
+      toast({ title: "Failed to update", description: err?.message || "Try again", variant: "destructive" });
+    } finally {
+      setMarkPaidSaving(false);
+    }
+  };
+
   const fetchData = async () => {
     const [enrollRes, sessionRes, periodRes] = await Promise.all([
       supabase.from("swim_enrollments").select("*").order("created_at", { ascending: false }),
