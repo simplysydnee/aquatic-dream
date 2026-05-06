@@ -699,6 +699,51 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                 onRefetch?.();
               }}
             />
+
+            {/* Mark-paid (manual) dialog — requires reference for audit trail */}
+            <Dialog open={markDialogOpen} onOpenChange={setMarkDialogOpen}>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>Record manual payment</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs">Method</Label>
+                    <Select value={markMethod} onValueChange={(v) => setMarkMethod(v as any)}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="check">Check</SelectItem>
+                        <SelectItem value="comp">Comp (no charge)</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Reference (required)</Label>
+                    <Input
+                      placeholder={
+                        markMethod === "cash" ? "Receipt # or note" :
+                        markMethod === "check" ? "Check #" :
+                        markMethod === "comp" ? "Reason for comp" : "Reference"
+                      }
+                      value={markReference}
+                      onChange={(e) => setMarkReference(e.target.value)}
+                      className="h-9"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Required for audit. Stripe payments are recorded automatically and don't need this.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 justify-end pt-2">
+                    <Button size="sm" variant="ghost" onClick={() => setMarkDialogOpen(false)}>Cancel</Button>
+                    <Button size="sm" disabled={marking || !markReference.trim()} onClick={handleMarkPaidConfirm}>
+                      {marking ? "Saving…" : "Confirm"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </>
         )}
       </div>
