@@ -15,6 +15,7 @@ import LessonOccurrenceCheckoutDialog from "./LessonOccurrenceCheckoutDialog";
 import FrontDeskWaiverDialog from "./FrontDeskWaiverDialog";
 import FrontDeskEnrollmentWaiverDialog from "./FrontDeskEnrollmentWaiverDialog";
 import EditSwimmerDialog, { type EditTarget } from "./EditSwimmerDialog";
+import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { ClipboardSignature } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
