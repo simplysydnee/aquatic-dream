@@ -138,12 +138,12 @@ export default function SwimmerDetailDrawer({
         </SheetHeader>
 
         <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="mx-6 mt-4 self-start flex-wrap h-auto">
-            <TabsTrigger value="overview">Info</TabsTrigger>
-            <TabsTrigger value="activity">Enrollments & Lessons ({totalActivity})</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="comms">Communications</TabsTrigger>
-            <TabsTrigger value="notes">Notes</TabsTrigger>
+          <TabsList className="mx-6 mt-4 grid grid-cols-5 w-auto h-auto p-1 border border-border bg-background rounded-lg gap-1">
+            <TabsTrigger value="overview" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm">Info</TabsTrigger>
+            <TabsTrigger value="activity" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm">Enrollments ({totalActivity})</TabsTrigger>
+            <TabsTrigger value="payments" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm">Payments</TabsTrigger>
+            <TabsTrigger value="comms" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm">Communications</TabsTrigger>
+            <TabsTrigger value="notes" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm">Notes</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="flex-1">
