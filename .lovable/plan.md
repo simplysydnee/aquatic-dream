@@ -1,73 +1,84 @@
-## Goal
+## The Bug
 
-One swimmer modal — the "source of truth" — opens from any admin page (Swim Enrollments, Calendar, Lesson Requests, Class Roster, Clients) by clicking the swimmer's name. Same component, same data, no duplicates.
+In the swimmer modal → **Payments tab**, the "Session fee" row shows **$45.00** for first-time swimmers. It should be **$240** (or session-specific price = `total_lessons × price_per_lesson`).
 
-## Identity & dedup
+## Root Cause
 
-- Swimmer identity = `lower(trim(child_name)) + lower(parent_email)` — already used by `useSwimmers`. The modal pulls from that hook so a child with both a class enrollment and a private booking shows as one record with both listed.
-- Display-only merge — no DB writes, no schema changes.
+`src/components/admin/swimmer/tabs/PaymentsTab.tsx` uses the wrong field for the session fee amount:
 
-## Modal structure
+```ts
+// Line 43, 167, 180
+amount={Number(e.payment_amount ?? 240)}
+```
 
-Reuse and extend the existing `SwimmerDetailDrawer` (right-side Sheet). Header: swimmer name, age, level badge, status chips, and a **pencil edit button** (admin-only) that opens the existing `EditSwimmerDialog`.
+`swim_enrollments.payment_amount` stores **what Stripe actually charged at checkout**, not the session fee. From `payments-webhook/index.ts` line 173:
 
-Tabs:
+```ts
+const paymentAmount = isReturning ? sessionPrice : regFee; // first-time = $45
+```
 
-1. **Info** — swimmer details, parent contact, lifetime stats, siblings (already exists).
-2. **Enrollments** — every `swim_enrollments` row for this swimmer, grouped Upcoming / Active / Past with session period, level, day/time, instructor. "Open" jumps to the existing enrollment detail dialog.
-3. **Lessons** — `lesson_requests` + `lesson_bookings` + `lesson_booking_occurrences` (attended / scheduled private & semi-private). Each row links to calendar or request detail.
-4. **Communications** — Read + simple draft.
-   - Timeline of all `email_send_log` rows where `recipient_email = parent_email` (template name, status, sent date, click to expand metadata).
-   - "Compose email" form (subject + plain-text body) that sends via `send-transactional-email` using a new lightweight `admin-freeform` template path. Note in UI: outbound only — inbound replies aren't tracked yet.
-5. **Payments** — Per-enrollment and per-lesson-occurrence rows with: amount, status (Reg / Session / Lesson), Stripe session id (link), paid date, method/reference. Outstanding balance summary at top. Actions per row:
-   - **Mark paid (cash / check / comp)** — updates `payment_status` or `session_fee_status` + `payment_method` + `payment_reference`.
-   - **Send Stripe payment link** — calls existing `send-session-payment-link` (enrollments) or `create-lesson-occurrence-checkout` (private lessons) and emails the parent.
-   - These actions also remain on the existing `SwimEnrollmentsAdmin` rows and Calendar lesson dialogs (no removal).
-6. **Notes** — existing `InternalCommentsPanel` keyed by `swimmer.key`.
+So:
+- **Returning swimmers**: `payment_amount = 240` → row displays correctly
+- **First-time swimmers**: `payment_amount = 45` (the reg fee) → session fee row wrongly shows $45
 
-## Wiring (click-through entry points)
+The $45 is the **registration fee**, not the session fee.
 
-Add a `useSwimmerModal()` context provider mounted once in `AdminLayout` so any list can call `openSwimmer({ child_name, parent_email })` and the same drawer renders. The provider loads the matching `Swimmer` from the `useSwimmers` cache (or fetches on demand if the cache is empty).
+## Correct Source of Truth
 
-Pages updated to make swimmer names clickable:
-- `SwimEnrollmentsAdmin` (table + per-session cards)
-- `SessionEnrollmentCards` (currently shows roster but no click)
-- `CalendarAdmin` (lesson booking + enrollment popovers)
-- `LessonRequestsAdmin`
-- `ClassRosterAdmin`
-- `ClientsAdmin` (already wired — switch to context)
+Per `swim_sessions` table defaults and the rest of the codebase:
 
-## Edit swimmer
+- `swim_sessions.session_price` = $240 (canonical session fee)
+- This already equals `total_lessons (8) × price_per_lesson ($30)` = $240
+- Edge functions (`send-session-payment-link`, `payments-webhook`, `create-checkout`) all read `session_price` correctly
 
-Pencil icon in modal header (admin only) reuses existing `EditSwimmerDialog`. Saves propagate through realtime channels already in `useSwimmers`.
+`useSwimmers` does **not** currently select `session_price`, `total_lessons`, or `price_per_lesson` (line 205 of `src/hooks/useSwimmers.ts`), so the modal has no choice but to fall back to a hardcoded 240 — and worse, it falls back to `payment_amount` first.
 
-## Data / backend
+## Fix
 
-No new tables. No schema changes. Uses existing:
-- `swim_enrollments`, `lesson_bookings`, `lesson_booking_occurrences`, `lesson_requests`
-- `email_send_log` (read), `send-transactional-email` (compose)
-- `payment_status`, `session_fee_status`, `payment_method`, `payment_reference` columns
-- `send-session-payment-link`, `create-lesson-occurrence-checkout` edge functions
+### 1. `src/hooks/useSwimmers.ts`
+Extend the embedded `swim_sessions` select to include pricing fields:
+```ts
+session:swim_sessions(id, swim_level, day_of_week, start_time, end_time, age_group,
+  session_period_id, session_price, total_lessons, price_per_lesson,
+  period:session_periods(name, start_date, end_date))
+```
+Add `session_price`, `total_lessons`, `price_per_lesson` to the `SwimmerEnrollment["session"]` type.
 
-One small addition: a generic `admin-freeform` template entry in the transactional email registry so admins can send arbitrary subject/body to a parent from the Communications tab.
+### 2. `src/components/admin/swimmer/tabs/PaymentsTab.tsx`
+Add a helper:
+```ts
+const sessionFeeFor = (e: SwimmerEnrollment) =>
+  Number(e.session?.session_price
+    ?? (e.session?.total_lessons && e.session?.price_per_lesson
+        ? e.session.total_lessons * e.session.price_per_lesson
+        : 240));
+```
 
-## Files
+Replace all three `e.payment_amount ?? 240` usages (lines 43, 167, 180) with `sessionFeeFor(e)`. Outstanding balance calc gets fixed at the same time.
 
-New:
-- `src/components/admin/swimmer/SwimmerModalProvider.tsx` (context + open/close)
-- `src/components/admin/swimmer/SwimmerLink.tsx` (button that triggers the modal)
-- `src/components/admin/swimmer/tabs/CommunicationsTab.tsx`
-- `src/components/admin/swimmer/tabs/PaymentsTab.tsx`
-- `supabase/functions/_shared/transactional-email-templates/admin-freeform.tsx`
+Also update the registration fee row to read `e.registration_fee ?? 45` instead of the hardcoded `45`.
 
-Edited:
-- `src/components/admin/clients/SwimmerDetailDrawer.tsx` — restructure tabs, add header pencil
-- `src/pages/admin/AdminLayout.tsx` — mount provider
-- `SwimEnrollmentsAdmin.tsx`, `SessionEnrollmentCards.tsx`, `CalendarAdmin.tsx`, `LessonRequestsAdmin.tsx`, `ClassRosterAdmin.tsx`, `ClientsAdmin.tsx` — replace plain names with `<SwimmerLink>`
-- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register new template
+### 3. Audit other spots (no change needed, just verifying)
 
-## Out of scope (per your answers)
+Already correct:
+- `payments-webhook/index.ts` — uses `session_price`
+- `send-session-payment-link/index.ts` — uses `session_price`
+- `cancel-enrollment-refund` — refunds the actual `session_fee_stripe_id` amount
 
-- No DB-level dedup pass.
-- No inbound/received email tracking (note shown in UI; webhook can be a follow-up).
-- No template picker in compose (subject + body only).
+Display-only hardcoded "$240" labels (acceptable, but could be parameterized later):
+- `SwimEnrollmentsAdmin.tsx` SelectItem labels ("Due Day 1 ($240)", etc.)
+- `EnrollmentDetailDialog.tsx` label "Session Fee ($240)"
+- `SwimLessons.tsx` marketing copy
+
+These are static UI labels matching the current price; not affected by the bug. Out of scope unless you also want them dynamic.
+
+## Out of Scope
+
+- Changing how Stripe charges or how the webhook stores data (it's correct).
+- Re-doing the database. `payment_amount` is correct — the modal was just reading the wrong column.
+- Making the marketing/static "$240" strings dynamic per session.
+
+## Files Changed
+
+- `src/hooks/useSwimmers.ts` — expand session select + type
+- `src/components/admin/swimmer/tabs/PaymentsTab.tsx` — use `session.session_price` for session fee row + balance

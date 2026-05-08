@@ -27,6 +27,17 @@ type MarkTarget = {
 const fmtMoney = (n: number) => `$${n.toFixed(2)}`;
 const fmt = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—");
 
+const sessionFeeFor = (e: SwimmerEnrollment): number => {
+  const sp = e.session?.session_price;
+  if (sp != null) return Number(sp);
+  const tl = e.session?.total_lessons;
+  const ppl = e.session?.price_per_lesson;
+  if (tl && ppl) return Number(tl) * Number(ppl);
+  return 240;
+};
+const regFeeFor = (e: SwimmerEnrollment): number =>
+  Number(e.registration_fee ?? 45);
+
 export default function PaymentsTab({ swimmer, onChanged }: Props) {
   const { toast } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -38,9 +49,9 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
     let due = 0;
     for (const e of swimmer.enrollments) {
       if (e.is_first_time && e.payment_status !== "paid" && e.payment_status !== "comp" && e.payment_status !== "waived") {
-        due += 45;
+        due += regFeeFor(e);
       }
-      if (e.session_fee_status === "due_day_1") due += Number(e.payment_amount ?? 240);
+      if (e.session_fee_status === "due_day_1") due += sessionFeeFor(e);
     }
     return due;
   }, [swimmer.enrollments]);
@@ -142,7 +153,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                 {e.is_first_time && (
                   <PaymentRow
                     label="Registration fee"
-                    amount={45}
+                    amount={regFeeFor(e)}
                     status={e.payment_status}
                     paidAt={null}
                     method={e.payment_method}
@@ -155,7 +166,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                         enrollment: e,
                         field: "payment_status",
                         label: "Registration fee",
-                        amount: 45,
+                        amount: regFeeFor(e),
                       })
                     }
                   />
@@ -164,7 +175,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                 {/* Session fee row */}
                 <PaymentRow
                   label="Session fee"
-                  amount={Number(e.payment_amount ?? 240)}
+                  amount={sessionFeeFor(e)}
                   status={e.session_fee_status}
                   paidAt={e.session_fee_paid_at}
                   method={e.payment_method}
@@ -177,7 +188,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                       enrollment: e,
                       field: "session_fee_status",
                       label: "Session fee",
-                      amount: Number(e.payment_amount ?? 240),
+                      amount: sessionFeeFor(e),
                     })
                   }
                   onSendStripe={() => sendStripeLink(e)}

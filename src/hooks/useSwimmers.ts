@@ -44,6 +44,7 @@ export interface SwimmerEnrollment {
   payment_reminder_sent_at: string | null;
   session_fee_stripe_id: string | null;
   session_fee_paid_at: string | null;
+  registration_fee: number | null;
   session?: {
     id: string;
     swim_level: string;
@@ -52,6 +53,9 @@ export interface SwimmerEnrollment {
     end_time: string;
     age_group: string | null;
     session_period_id: string | null;
+    session_price: number | null;
+    total_lessons: number | null;
+    price_per_lesson: number | null;
     period?: { name: string; start_date: string; end_date: string } | null;
   } | null;
 }
@@ -202,7 +206,7 @@ export function useSwimmers() {
       supabase
         .from("swim_enrollments")
         .select(
-          `*, session:swim_sessions(id, swim_level, day_of_week, start_time, end_time, age_group, session_period_id, period:session_periods(name, start_date, end_date))`,
+          `*, session:swim_sessions(id, swim_level, day_of_week, start_time, end_time, age_group, session_period_id, session_price, total_lessons, price_per_lesson, period:session_periods(name, start_date, end_date))`,
         )
         .order("created_at", { ascending: false }),
       supabase.from("lesson_bookings").select("*").order("created_at", { ascending: false }),
