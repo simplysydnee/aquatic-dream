@@ -17,6 +17,8 @@ interface ChildPayload {
   childDob: string | null;
   sessionIds: string[];
   isFirstTime: boolean;
+  /** First-timers only: when true, full session fee was charged at checkout. */
+  payAhead?: boolean;
   parentName: string;
   parentFirstName?: string;
   parentLastName?: string;
