@@ -8,6 +8,7 @@ import { ChevronDown, Users, Info } from "lucide-react";
 import { useState } from "react";
 import LevelBadge from "@/components/LevelBadge";
 import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
+import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 
 
 interface SessionInfo {
