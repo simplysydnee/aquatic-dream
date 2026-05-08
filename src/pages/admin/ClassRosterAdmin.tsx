@@ -417,7 +417,7 @@ const ClassRosterAdmin = () => {
                       const lc = LEVEL_BADGE_COLORS[e.swim_level as SwimLevel];
                       return (
                         <TableRow key={e.id}>
-                          <TableCell className="py-2 text-sm">{e.child_name}</TableCell>
+                          <TableCell className="py-2 text-sm"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /></TableCell>
                           <TableCell className="py-2 text-sm">{e.child_age}</TableCell>
                           <TableCell className="py-2">
                             {lc ? (
