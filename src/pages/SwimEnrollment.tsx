@@ -233,10 +233,13 @@ const SwimEnrollment = () => {
     const total = allChildren.reduce((sum, child) => {
       return sum + child.sessionIds.reduce((cs, sid, i) => {
         const s = sessionMap[sid];
-        const sessionPrice = s?.session_price ?? 280;
+        const sessionPrice = s?.session_price ?? 240;
         if (child.isFirstTime) {
-          // First-time: only reg fee due now (once per child, on first row)
-          return cs + (i === 0 ? PRICING.registrationFee : 0);
+          // First-time: reg fee due now (once per child, on first row).
+          // If payAhead, also include the session fee per session.
+          const reg = i === 0 ? PRICING.registrationFee : 0;
+          const sess = child.payAhead ? sessionPrice : 0;
+          return cs + reg + sess;
         }
         return cs + sessionPrice;
       }, 0);
@@ -253,6 +256,7 @@ const SwimEnrollment = () => {
         childDob: child.childDob || null,
         sessionIds: child.sessionIds,
         isFirstTime: child.isFirstTime,
+        payAhead: child.payAhead === true,
         parentName: child.enrollmentData.parentName,
         parentFirstName: child.enrollmentData.parentFirstName,
         parentLastName: child.enrollmentData.parentLastName,
