@@ -30,8 +30,8 @@ const LessonRequestAcknowledgmentEmail = ({
   const greeting = parentName ? `Hi ${parentName.split(' ')[0]},` : 'Hi there,'
   const lessonLabel = formatLessonType(lessonType)
   const intro = childName
-    ? `Thanks for requesting a ${lessonLabel} for ${childName}! We've received your request and someone from our team will reach out within 1–2 business days to get scheduling started. Lessons begin in June.`
-    : `Thanks for requesting a ${lessonLabel}! We've received your request and someone from our team will reach out within 1–2 business days to get scheduling started. Lessons begin in June.`
+    ? `Thanks for requesting a ${lessonLabel} for ${childName}! We've received your request and someone from our team will reach out to get scheduling started. Lessons begin in June.`
+    : `Thanks for requesting a ${lessonLabel}! We've received your request and someone from our team will reach out to get scheduling started. Lessons begin in June.`
 
   return (
     <Html lang="en" dir="ltr">
