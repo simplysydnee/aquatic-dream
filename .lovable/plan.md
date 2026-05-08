@@ -1,57 +1,73 @@
-# Clarify payment status in enrollments views
+## Goal
 
-## The problem
+One swimmer modal — the "source of truth" — opens from any admin page (Swim Enrollments, Calendar, Lesson Requests, Class Roster, Clients) by clicking the swimmer's name. Same component, same data, no duplicates.
 
-Each swim enrollment has **two independent payment fields**:
+## Identity & dedup
 
-| Field | What it covers | Amount |
-|---|---|---|
-| `payment_status` | Registration fee (swim bag/cap/goggles) | $45 |
-| `session_fee_status` | Session tuition (8 lessons) | $240 |
+- Swimmer identity = `lower(trim(child_name)) + lower(parent_email)` — already used by `useSwimmers`. The modal pulls from that hook so a child with both a class enrollment and a private booking shows as one record with both listed.
+- Display-only merge — no DB writes, no schema changes.
 
-Today the UI only shows the first one as a single badge labeled "paid" — so Michelle Prieto's daughter Eliza Montes shows **paid** even though her $240 session fee is still `due_day_1`. That's misleading on both:
+## Modal structure
 
-1. **By Sessions view** (`SessionEnrollmentCards.tsx`) — single badge, `payment_status` only.
-2. **Swim Enrollments table** — has separate columns, but the inline badge in the swimmers-expanded row only shows `payment_status`.
+Reuse and extend the existing `SwimmerDetailDrawer` (right-side Sheet). Header: swimmer name, age, level badge, status chips, and a **pencil edit button** (admin-only) that opens the existing `EditSwimmerDialog`.
 
-## Fix
+Tabs:
 
-### 1. By Sessions card (`src/components/admin/SessionEnrollmentCards.tsx`)
-Replace the single `payment_status` badge per swimmer with **two compact badges** stacked or side-by-side:
+1. **Info** — swimmer details, parent contact, lifetime stats, siblings (already exists).
+2. **Enrollments** — every `swim_enrollments` row for this swimmer, grouped Upcoming / Active / Past with session period, level, day/time, instructor. "Open" jumps to the existing enrollment detail dialog.
+3. **Lessons** — `lesson_requests` + `lesson_bookings` + `lesson_booking_occurrences` (attended / scheduled private & semi-private). Each row links to calendar or request detail.
+4. **Communications** — Read + simple draft.
+   - Timeline of all `email_send_log` rows where `recipient_email = parent_email` (template name, status, sent date, click to expand metadata).
+   - "Compose email" form (subject + plain-text body) that sends via `send-transactional-email` using a new lightweight `admin-freeform` template path. Note in UI: outbound only — inbound replies aren't tracked yet.
+5. **Payments** — Per-enrollment and per-lesson-occurrence rows with: amount, status (Reg / Session / Lesson), Stripe session id (link), paid date, method/reference. Outstanding balance summary at top. Actions per row:
+   - **Mark paid (cash / check / comp)** — updates `payment_status` or `session_fee_status` + `payment_method` + `payment_reference`.
+   - **Send Stripe payment link** — calls existing `send-session-payment-link` (enrollments) or `create-lesson-occurrence-checkout` (private lessons) and emails the parent.
+   - These actions also remain on the existing `SwimEnrollmentsAdmin` rows and Calendar lesson dialogs (no removal).
+6. **Notes** — existing `InternalCommentsPanel` keyed by `swimmer.key`.
 
-```
-Eliza Montes  (Michelle Prieto)   [Reg: paid] [Session: due day 1]
-```
+## Wiring (click-through entry points)
 
-Color rules:
-- `paid` → green
-- `due_day_1` → amber
-- `unpaid` → amber
-- `not_required` / `waived` → muted gray
-- `refunded` → red
-- `comp` → blue
+Add a `useSwimmerModal()` context provider mounted once in `AdminLayout` so any list can call `openSwimmer({ child_name, parent_email })` and the same drawer renders. The provider loads the matching `Swimmer` from the `useSwimmers` cache (or fetches on demand if the cache is empty).
 
-Add `session_fee_status` to the `Enrollment` interface and pass it through from `SwimEnrollmentsAdmin.tsx` (already queried — just include it in the prop).
+Pages updated to make swimmer names clickable:
+- `SwimEnrollmentsAdmin` (table + per-session cards)
+- `SessionEnrollmentCards` (currently shows roster but no click)
+- `CalendarAdmin` (lesson booking + enrollment popovers)
+- `LessonRequestsAdmin`
+- `ClassRosterAdmin`
+- `ClientsAdmin` (already wired — switch to context)
 
-Add a small **legend / tooltip** at the top of the by-sessions panel explaining: "Reg = $45 registration fee · Session = $240 tuition".
+## Edit swimmer
 
-### 2. Swim Enrollments table — expanded swimmer rows
-Wherever the inline `payment_status` badge appears alongside a swimmer (around line 805 in `SwimEnrollmentsAdmin.tsx`), render both badges with the prefix `Reg:` / `Session:` so they match the by-sessions view.
+Pencil icon in modal header (admin only) reuses existing `EditSwimmerDialog`. Saves propagate through realtime channels already in `useSwimmers`.
 
-### 3. Status label normalization
-Show friendlier labels (instead of raw enum values):
-- `due_day_1` → "Due day 1"
-- `not_required` → "N/A"
-- everything else → capitalized as-is
+## Data / backend
 
-Centralize in a tiny helper (`src/lib/paymentLabels.ts`) so both views stay in sync.
+No new tables. No schema changes. Uses existing:
+- `swim_enrollments`, `lesson_bookings`, `lesson_booking_occurrences`, `lesson_requests`
+- `email_send_log` (read), `send-transactional-email` (compose)
+- `payment_status`, `session_fee_status`, `payment_method`, `payment_reference` columns
+- `send-session-payment-link`, `create-lesson-occurrence-checkout` edge functions
 
-## Files to change
+One small addition: a generic `admin-freeform` template entry in the transactional email registry so admins can send arbitrary subject/body to a parent from the Communications tab.
 
-- `src/components/admin/SessionEnrollmentCards.tsx` — add session fee badge, update interface, add legend
-- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — pass `session_fee_status` to `SessionEnrollmentCards`; update inline badge in swimmers row to show both
-- `src/lib/paymentLabels.ts` — new helper for label + color
+## Files
 
-## Out of scope
+New:
+- `src/components/admin/swimmer/SwimmerModalProvider.tsx` (context + open/close)
+- `src/components/admin/swimmer/SwimmerLink.tsx` (button that triggers the modal)
+- `src/components/admin/swimmer/tabs/CommunicationsTab.tsx`
+- `src/components/admin/swimmer/tabs/PaymentsTab.tsx`
+- `supabase/functions/_shared/transactional-email-templates/admin-freeform.tsx`
 
-No DB changes, no logic changes — display only.
+Edited:
+- `src/components/admin/clients/SwimmerDetailDrawer.tsx` — restructure tabs, add header pencil
+- `src/pages/admin/AdminLayout.tsx` — mount provider
+- `SwimEnrollmentsAdmin.tsx`, `SessionEnrollmentCards.tsx`, `CalendarAdmin.tsx`, `LessonRequestsAdmin.tsx`, `ClassRosterAdmin.tsx`, `ClientsAdmin.tsx` — replace plain names with `<SwimmerLink>`
+- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register new template
+
+## Out of scope (per your answers)
+
+- No DB-level dedup pass.
+- No inbound/received email tracking (note shown in UI; webhook can be a follow-up).
+- No template picker in compose (subject + body only).

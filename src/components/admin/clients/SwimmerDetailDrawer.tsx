@@ -1,15 +1,20 @@
+import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, User, BookOpen, Waves, Calendar } from "lucide-react";
+import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil } from "lucide-react";
 import type { Swimmer } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "./SwimmerStatusBadges";
 import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
 import { formatPhone, phoneHref } from "@/lib/phone";
 import { LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
 import { cn } from "@/lib/utils";
+import CommunicationsTab from "@/components/admin/swimmer/tabs/CommunicationsTab";
+import PaymentsTab from "@/components/admin/swimmer/tabs/PaymentsTab";
+import EditSwimmerDialog, { type EditTarget } from "@/components/admin/calendar/EditSwimmerDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   swimmer: Swimmer | null;
@@ -41,6 +46,8 @@ export default function SwimmerDetailDrawer({
   onOpenEnrollment,
   onSelectSwimmer,
 }: Props) {
+  const { isAdmin } = useAuth();
+  const [editOpen, setEditOpen] = useState(false);
   if (!swimmer) return null;
 
   // Split entries into Enrollments vs Lessons & Requests, newest first.
@@ -78,6 +85,28 @@ export default function SwimmerDetailDrawer({
 
   const totalActivity = enrollmentEntries.length + lessonEntries.length;
 
+  const editTarget: EditTarget | null =
+    swimmer.enrollments[0]
+      ? {
+          kind: "swim_enrollment",
+          id: swimmer.enrollments[0].id,
+          child_name: swimmer.child_name,
+          child_age: swimmer.child_age,
+          parent_name: swimmer.parent_name,
+          parent_email: swimmer.parent_email,
+          parent_phone: swimmer.parent_phone,
+        }
+      : swimmer.bookings[0]
+        ? {
+            kind: "lesson_booking",
+            id: swimmer.bookings[0].id,
+            child_name: swimmer.child_name,
+            parent_name: swimmer.parent_name,
+            parent_email: swimmer.parent_email,
+            parent_phone: swimmer.parent_phone,
+          }
+        : null;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl p-0 flex flex-col">
@@ -93,14 +122,27 @@ export default function SwimmerDetailDrawer({
                 {swimmer.swim_level}
               </Badge>
             )}
+            {isAdmin && editTarget && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 ml-auto"
+                onClick={() => setEditOpen(true)}
+                title="Edit swimmer info"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </SheetTitle>
           <SwimmerStatusBadges statuses={swimmer.statuses} className="mt-2" />
         </SheetHeader>
 
         <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="mx-6 mt-4 self-start">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsList className="mx-6 mt-4 self-start flex-wrap h-auto">
+            <TabsTrigger value="overview">Info</TabsTrigger>
             <TabsTrigger value="activity">Enrollments & Lessons ({totalActivity})</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="comms">Communications</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
           </TabsList>
 
@@ -244,6 +286,14 @@ export default function SwimmerDetailDrawer({
               </section>
             </TabsContent>
 
+            <TabsContent value="payments" className="p-6 mt-0">
+              <PaymentsTab swimmer={swimmer} />
+            </TabsContent>
+
+            <TabsContent value="comms" className="p-6 mt-0">
+              <CommunicationsTab swimmer={swimmer} />
+            </TabsContent>
+
             <TabsContent value="notes" className="p-6 mt-0">
               <InternalCommentsPanel
                 targetType="swimmer"
@@ -255,6 +305,15 @@ export default function SwimmerDetailDrawer({
           </ScrollArea>
         </Tabs>
       </SheetContent>
+
+      {editTarget && (
+        <EditSwimmerDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          target={editTarget}
+          onSaved={() => setEditOpen(false)}
+        />
+      )}
     </Sheet>
   );
 }

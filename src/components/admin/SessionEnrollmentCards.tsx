@@ -8,6 +8,7 @@ import { ChevronDown, Users, Info } from "lucide-react";
 import { useState } from "react";
 import LevelBadge from "@/components/LevelBadge";
 import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
+import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 
 
 interface SessionInfo {
@@ -203,7 +204,11 @@ function SessionCard({ session, enrolled }: { session: SessionInfo; enrolled: En
               {enrolled.map((e) => (
                 <div key={e.id} className="flex items-start justify-between gap-2 text-xs py-1.5 border-b last:border-0">
                   <div className="min-w-0">
-                    <div className="font-medium truncate">{e.child_name}</div>
+                    <SwimmerLink
+                      childName={e.child_name}
+                      parentEmail={e.parent_email}
+                      className="text-xs truncate block"
+                    />
                     <div className="text-muted-foreground truncate">{e.parent_name}</div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
