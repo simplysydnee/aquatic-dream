@@ -27,6 +27,17 @@ type MarkTarget = {
 const fmtMoney = (n: number) => `$${n.toFixed(2)}`;
 const fmt = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—");
 
+const sessionFeeFor = (e: SwimmerEnrollment): number => {
+  const sp = e.session?.session_price;
+  if (sp != null) return Number(sp);
+  const tl = e.session?.total_lessons;
+  const ppl = e.session?.price_per_lesson;
+  if (tl && ppl) return Number(tl) * Number(ppl);
+  return 240;
+};
+const regFeeFor = (e: SwimmerEnrollment): number =>
+  Number(e.registration_fee ?? 45);
+
 export default function PaymentsTab({ swimmer, onChanged }: Props) {
   const { toast } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
