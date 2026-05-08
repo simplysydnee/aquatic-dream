@@ -4,9 +4,11 @@ import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
-import { ChevronDown, Users } from "lucide-react";
+import { ChevronDown, Users, Info } from "lucide-react";
 import { useState } from "react";
 import LevelBadge from "@/components/LevelBadge";
+import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SessionInfo {
   id: string;
@@ -18,6 +20,18 @@ interface SessionInfo {
   max_students: number;
   day_of_week: string;
   session_period_id: string | null;
+}
+
+interface Enrollment {
+  id: string;
+  child_name: string;
+  child_age: number;
+  parent_name: string;
+  parent_email: string;
+  payment_status: string;
+  session_fee_status?: string;
+  status: string;
+  session_id: string | null;
 }
 
 interface Enrollment {
