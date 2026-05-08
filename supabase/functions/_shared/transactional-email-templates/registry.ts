@@ -17,6 +17,7 @@ import { template as lessonRequestReply } from './lesson-request-reply.tsx'
 import { template as lessonRequestAcknowledgment } from './lesson-request-acknowledgment.tsx'
 import { template as instructorSchedule } from './instructor-schedule.tsx'
 import { template as lessonBookingConfirmation } from './lesson-booking-confirmation.tsx'
+import { template as adminFreeform } from './admin-freeform.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'session-payment-link': sessionPaymentLink,
@@ -27,4 +28,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'lesson-request-acknowledgment': lessonRequestAcknowledgment,
   'instructor-schedule': instructorSchedule,
   'lesson-booking-confirmation': lessonBookingConfirmation,
+  'admin-freeform': adminFreeform,
 }
