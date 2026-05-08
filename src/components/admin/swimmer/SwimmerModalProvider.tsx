@@ -18,14 +18,14 @@ const keyOf = (i: Identity) =>
   `${i.child_name.trim().toLowerCase()}|${i.parent_email.trim().toLowerCase()}`;
 
 export function SwimmerModalProvider({ children }: { children: ReactNode }) {
-  const { swimmers, refetch } = useSwimmers();
+  const { swimmers } = useSwimmers();
   const [selected, setSelected] = useState<Swimmer | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const [activeRequest, setActiveRequest] = useState<LessonRequest | null>(null);
   const [reqOpen, setReqOpen] = useState(false);
 
-  const [activeEnrollmentId, setActiveEnrollmentId] = useState<string | null>(null);
+  const [activeEnrollment, setActiveEnrollment] = useState<any | null>(null);
   const [enrollmentOpen, setEnrollmentOpen] = useState(false);
 
   const open = useCallback(
@@ -53,9 +53,12 @@ export function SwimmerModalProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const onOpenEnrollment = (id: string) => {
-    setActiveEnrollmentId(id);
-    setEnrollmentOpen(true);
+  const onOpenEnrollment = async (id: string) => {
+    const { data } = await supabase.from("swim_enrollments").select("*").eq("id", id).maybeSingle();
+    if (data) {
+      setActiveEnrollment(data);
+      setEnrollmentOpen(true);
+    }
   };
 
   const value = useMemo(() => ({ open, close }), [open, close]);
@@ -72,7 +75,6 @@ export function SwimmerModalProvider({ children }: { children: ReactNode }) {
         onOpenRequest={onOpenRequest}
         onOpenEnrollment={onOpenEnrollment}
         onSelectSwimmer={(s) => setSelected(s)}
-        onRefresh={refetch}
       />
 
       <LessonRequestDetailDialog
@@ -83,10 +85,10 @@ export function SwimmerModalProvider({ children }: { children: ReactNode }) {
       />
 
       <EnrollmentDetailDialog
-        enrollmentId={activeEnrollmentId}
+        enrollment={activeEnrollment}
         open={enrollmentOpen}
         onOpenChange={setEnrollmentOpen}
-        onUpdated={refetch}
+        onUpdated={(u) => setActiveEnrollment(u)}
       />
     </Ctx.Provider>
   );
