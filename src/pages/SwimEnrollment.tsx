@@ -378,13 +378,64 @@ const SwimEnrollment = () => {
               onAddAnother={handleAddAnother}
             />
           )}
-          {step === "payment" && checkoutPayload && (
-            <EnrollmentCheckout
-              payload={checkoutPayload}
-              customerEmail={confirmedChildren[0]?.enrollmentData?.parentEmail || enrollmentData?.parentEmail || ""}
-              onBack={() => setStep("legal")}
-            />
-          )}
+          {step === "payment" && checkoutInputs && (() => {
+            const inputs = checkoutInputs;
+            const hasFirstTimers = inputs.children.some(c => c.isFirstTime);
+            // Use the first first-timer's session_price (they're all $240 in practice).
+            // Counted: number of session-fee charges if pay-ahead is selected
+            // (one per first-timer × their session count).
+            const firstTimerSessionIds = inputs.children
+              .filter(c => c.isFirstTime)
+              .flatMap(c => c.sessionIds);
+            const sessionFeeCount = firstTimerSessionIds.length;
+            const sessionFeeUsd = firstTimerSessionIds.length > 0
+              ? (inputs.sessionPrices[firstTimerSessionIds[0]] ?? 240)
+              : 240;
+
+            return (
+              <EnrollmentCheckout
+                buildPayload={({ payAheadForFirstTimers }) => ({
+                  children: inputs.children.map(child => ({
+                    level: child.level,
+                    childName: child.enrollmentData.childName,
+                    childFirstName: child.enrollmentData.childFirstName,
+                    childLastName: child.enrollmentData.childLastName,
+                    childAge: child.childAge,
+                    childDob: child.childDob || null,
+                    sessionIds: child.sessionIds,
+                    isFirstTime: child.isFirstTime,
+                    payAhead: child.isFirstTime ? payAheadForFirstTimers : false,
+                    parentName: child.enrollmentData.parentName,
+                    parentFirstName: child.enrollmentData.parentFirstName,
+                    parentLastName: child.enrollmentData.parentLastName,
+                    parentEmail: child.enrollmentData.parentEmail,
+                    parentPhone: child.enrollmentData.parentPhone || null,
+                    medicalNotes: child.enrollmentData.hasMedical === "yes" ? (child.enrollmentData.medicalNotes || null) : null,
+                    notes: child.enrollmentData.notes || null,
+                    agreement: {
+                      waiverAccepted: child.legalData.waiverAccepted,
+                      photoReleaseAccepted: child.legalData.photoReleaseAccepted === "yes",
+                      privacyPolicyAccepted: child.legalData.privacyPolicyAccepted,
+                      termsAccepted: child.legalData.termsAccepted,
+                      signatureText: child.legalData.signatureText,
+                      emergencyContactName: child.legalData.emergencyContactName,
+                      emergencyContactFirstName: child.legalData.emergencyContactFirstName,
+                      emergencyContactLastName: child.legalData.emergencyContactLastName,
+                      emergencyContactPhone: child.legalData.emergencyContactPhone,
+                      emergencyContactRelationship: child.legalData.emergencyContactRelationship,
+                    },
+                  })),
+                  signerIp: inputs.signerIp,
+                  versions: { waiver: WAIVER_VERSION, tos: TOS_VERSION, privacy: PRIVACY_POLICY_VERSION },
+                })}
+                customerEmail={confirmedChildren[0]?.enrollmentData?.parentEmail || enrollmentData?.parentEmail || ""}
+                hasFirstTimers={hasFirstTimers}
+                sessionFeeUsd={sessionFeeUsd}
+                sessionFeeCount={sessionFeeCount}
+                onBack={() => setStep("legal")}
+              />
+            );
+          })()}
           {step === "done" && (
             <EnrollmentConfirmation
               children={confirmedChildren.length > 0 ? confirmedChildren.map(c => ({
