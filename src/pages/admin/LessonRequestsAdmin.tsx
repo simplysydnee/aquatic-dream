@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { CheckCircle2, MessageSquare } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
 import { useCommentCounts } from "@/hooks/useInternalComments";
+import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 
 const LessonRequestsAdmin = () => {
   const [requests, setRequests] = useState<LessonRequest[]>([]);
