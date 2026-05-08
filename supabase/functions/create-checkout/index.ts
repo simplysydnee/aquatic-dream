@@ -15,6 +15,8 @@ interface ChildPayload {
   childDob: string | null;
   sessionIds: string[];
   isFirstTime: boolean;
+  /** First-timers only: pay the full session fee at checkout instead of day 1. */
+  payAhead?: boolean;
   parentName: string;
   parentEmail: string;
   parentPhone: string | null;
@@ -37,6 +39,8 @@ interface CheckoutPayload {
   signerIp: string | null;
   versions: { waiver: string; tos: string; privacy: string };
 }
+
+const REGISTRATION_FEE_CENTS = 4500;
 
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
