@@ -30,6 +30,8 @@ interface ChildEnrollment {
   enrollmentData: EnrollmentFormData;
   legalData: LegalAgreementData;
   isFirstTime: boolean;
+  /** First-timers only: pay full session fee at checkout (default false). */
+  payAhead?: boolean;
 }
 
 const SwimEnrollment = () => {
@@ -54,8 +56,12 @@ const SwimEnrollment = () => {
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [totalDue, setTotalDue] = useState(0);
-  // Payload sent to create-checkout (no DB row exists yet)
-  const [checkoutPayload, setCheckoutPayload] = useState<unknown>(null);
+  // Inputs needed to build the create-checkout payload (no DB row yet)
+  const [checkoutInputs, setCheckoutInputs] = useState<{
+    children: ChildEnrollment[];
+    signerIp: string | null;
+    sessionPrices: Record<string, number>;
+  } | null>(null);
   // For confirmation: all children info
   const [confirmedChildren, setConfirmedChildren] = useState<ChildEnrollment[]>([]);
   const { toast } = useToast();
@@ -227,59 +233,25 @@ const SwimEnrollment = () => {
       signerIp = ipData.ip;
     } catch { /* best-effort */ }
 
-    // Calculate total for display purposes (server re-computes authoritatively)
+    // Calculate "today" total for display purposes — assumes payAhead=false
+    // (i.e. just reg fees for first-timers). The user can opt to pay ahead in
+    // the next step; that updates the Stripe-side total. The server is
+    // authoritative for the actual charge.
     const total = allChildren.reduce((sum, child) => {
       return sum + child.sessionIds.reduce((cs, sid, i) => {
         const s = sessionMap[sid];
-        const sessionPrice = s?.session_price ?? 280;
+        const sessionPrice = s?.session_price ?? 240;
         if (child.isFirstTime) {
-          // First-time: only reg fee due now (once per child, on first row)
           return cs + (i === 0 ? PRICING.registrationFee : 0);
         }
         return cs + sessionPrice;
       }, 0);
     }, 0);
 
-    // Build the full payload — NO database writes until Stripe webhook fires.
-    const payload = {
-      children: allChildren.map(child => ({
-        level: child.level,
-        childName: child.enrollmentData.childName,
-        childFirstName: child.enrollmentData.childFirstName,
-        childLastName: child.enrollmentData.childLastName,
-        childAge: child.childAge,
-        childDob: child.childDob || null,
-        sessionIds: child.sessionIds,
-        isFirstTime: child.isFirstTime,
-        parentName: child.enrollmentData.parentName,
-        parentFirstName: child.enrollmentData.parentFirstName,
-        parentLastName: child.enrollmentData.parentLastName,
-        parentEmail: child.enrollmentData.parentEmail,
-        parentPhone: child.enrollmentData.parentPhone || null,
-        medicalNotes: child.enrollmentData.hasMedical === "yes" ? (child.enrollmentData.medicalNotes || null) : null,
-        notes: child.enrollmentData.notes || null,
-        agreement: {
-          waiverAccepted: child.legalData.waiverAccepted,
-          photoReleaseAccepted: child.legalData.photoReleaseAccepted === "yes",
-          privacyPolicyAccepted: child.legalData.privacyPolicyAccepted,
-          termsAccepted: child.legalData.termsAccepted,
-          signatureText: child.legalData.signatureText,
-          emergencyContactName: child.legalData.emergencyContactName,
-          emergencyContactFirstName: child.legalData.emergencyContactFirstName,
-          emergencyContactLastName: child.legalData.emergencyContactLastName,
-          emergencyContactPhone: child.legalData.emergencyContactPhone,
-          emergencyContactRelationship: child.legalData.emergencyContactRelationship,
-        },
-      })),
-      signerIp,
-      versions: {
-        waiver: WAIVER_VERSION,
-        tos: TOS_VERSION,
-        privacy: PRIVACY_POLICY_VERSION,
-      },
-    };
+    const sessionPrices: Record<string, number> = {};
+    for (const s of sessions) sessionPrices[s.id] = Number(s.session_price ?? 240);
 
-    setCheckoutPayload(payload);
+    setCheckoutInputs({ children: allChildren, signerIp, sessionPrices });
     setTotalDue(total);
     setConfirmedChildren(allChildren);
 
@@ -406,13 +378,64 @@ const SwimEnrollment = () => {
               onAddAnother={handleAddAnother}
             />
           )}
-          {step === "payment" && checkoutPayload && (
-            <EnrollmentCheckout
-              payload={checkoutPayload}
-              customerEmail={confirmedChildren[0]?.enrollmentData?.parentEmail || enrollmentData?.parentEmail || ""}
-              onBack={() => setStep("legal")}
-            />
-          )}
+          {step === "payment" && checkoutInputs && (() => {
+            const inputs = checkoutInputs;
+            const hasFirstTimers = inputs.children.some(c => c.isFirstTime);
+            // Use the first first-timer's session_price (they're all $240 in practice).
+            // Counted: number of session-fee charges if pay-ahead is selected
+            // (one per first-timer × their session count).
+            const firstTimerSessionIds = inputs.children
+              .filter(c => c.isFirstTime)
+              .flatMap(c => c.sessionIds);
+            const sessionFeeCount = firstTimerSessionIds.length;
+            const sessionFeeUsd = firstTimerSessionIds.length > 0
+              ? (inputs.sessionPrices[firstTimerSessionIds[0]] ?? 240)
+              : 240;
+
+            return (
+              <EnrollmentCheckout
+                buildPayload={({ payAheadForFirstTimers }) => ({
+                  children: inputs.children.map(child => ({
+                    level: child.level,
+                    childName: child.enrollmentData.childName,
+                    childFirstName: child.enrollmentData.childFirstName,
+                    childLastName: child.enrollmentData.childLastName,
+                    childAge: child.childAge,
+                    childDob: child.childDob || null,
+                    sessionIds: child.sessionIds,
+                    isFirstTime: child.isFirstTime,
+                    payAhead: child.isFirstTime ? payAheadForFirstTimers : false,
+                    parentName: child.enrollmentData.parentName,
+                    parentFirstName: child.enrollmentData.parentFirstName,
+                    parentLastName: child.enrollmentData.parentLastName,
+                    parentEmail: child.enrollmentData.parentEmail,
+                    parentPhone: child.enrollmentData.parentPhone || null,
+                    medicalNotes: child.enrollmentData.hasMedical === "yes" ? (child.enrollmentData.medicalNotes || null) : null,
+                    notes: child.enrollmentData.notes || null,
+                    agreement: {
+                      waiverAccepted: child.legalData.waiverAccepted,
+                      photoReleaseAccepted: child.legalData.photoReleaseAccepted === "yes",
+                      privacyPolicyAccepted: child.legalData.privacyPolicyAccepted,
+                      termsAccepted: child.legalData.termsAccepted,
+                      signatureText: child.legalData.signatureText,
+                      emergencyContactName: child.legalData.emergencyContactName,
+                      emergencyContactFirstName: child.legalData.emergencyContactFirstName,
+                      emergencyContactLastName: child.legalData.emergencyContactLastName,
+                      emergencyContactPhone: child.legalData.emergencyContactPhone,
+                      emergencyContactRelationship: child.legalData.emergencyContactRelationship,
+                    },
+                  })),
+                  signerIp: inputs.signerIp,
+                  versions: { waiver: WAIVER_VERSION, tos: TOS_VERSION, privacy: PRIVACY_POLICY_VERSION },
+                })}
+                customerEmail={confirmedChildren[0]?.enrollmentData?.parentEmail || enrollmentData?.parentEmail || ""}
+                hasFirstTimers={hasFirstTimers}
+                sessionFeeUsd={sessionFeeUsd}
+                sessionFeeCount={sessionFeeCount}
+                onBack={() => setStep("legal")}
+              />
+            );
+          })()}
           {step === "done" && (
             <EnrollmentConfirmation
               children={confirmedChildren.length > 0 ? confirmedChildren.map(c => ({

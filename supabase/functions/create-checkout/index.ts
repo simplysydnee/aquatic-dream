@@ -15,6 +15,8 @@ interface ChildPayload {
   childDob: string | null;
   sessionIds: string[];
   isFirstTime: boolean;
+  /** First-timers only: pay the full session fee at checkout instead of day 1. */
+  payAhead?: boolean;
   parentName: string;
   parentEmail: string;
   parentPhone: string | null;
@@ -37,6 +39,8 @@ interface CheckoutPayload {
   signerIp: string | null;
   versions: { waiver: string; tos: string; privacy: string };
 }
+
+const REGISTRATION_FEE_CENTS = 4500;
 
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -125,52 +129,93 @@ serve(async (req) => {
       }
     }
 
-    // Build line items from payload truth.
+    // Build line items from DB-truth using INLINE price_data.
+    // The database (swim_sessions.session_price + 45 reg fee) is the SINGLE
+    // source of truth. We do NOT use Stripe lookup_keys, because a Stripe
+    // price object that drifts from session_price would silently overcharge.
+    //
     // RULE (per business owner): No Stripe = no enrollment row.
-    //   - First-time child: charge ONLY the $45 registration fee at checkout.
-    //                       Session fee is collected in person on day 1 of class.
-    //   - Returning child:  charge the full session fee per enrolled session row.
-    const lookupKeys: string[] = [];
+    //   - Returning child: charge the full session_price per enrolled session row.
+    //   - First-time child + payAhead=false (default): charge ONLY the $45 reg fee.
+    //                       Session fee collected in person on day 1.
+    //   - First-time child + payAhead=true: charge $45 reg fee + the session_price.
+    type LineItem = {
+      price_data: {
+        currency: string;
+        product_data: { name: string };
+        unit_amount: number;
+      };
+      quantity: number;
+    };
+    const lineItems: LineItem[] = [];
+
+    const env = (environment || "sandbox") as StripeEnv;
+    const stripe = createStripeClient(env);
+
     for (const child of typedPayload.children) {
       if (child.isFirstTime) {
-        // Reg fee only — once per first-time child, regardless of how many sessions.
-        lookupKeys.push("registration_fee");
+        lineItems.push({
+          price_data: {
+            currency: "usd",
+            product_data: { name: `Registration fee — ${child.childName}` },
+            unit_amount: REGISTRATION_FEE_CENTS,
+          },
+          quantity: 1,
+        });
+        if (child.payAhead) {
+          for (const sid of child.sessionIds) {
+            const s = sessionMap[sid];
+            const cents = Math.round(Number(s.session_price ?? 240) * 100);
+            lineItems.push({
+              price_data: {
+                currency: "usd",
+                product_data: { name: `Session fee — ${child.childName} (${s.session_start_date ?? ""})` },
+                unit_amount: cents,
+              },
+              quantity: 1,
+            });
+          }
+        }
       } else {
-        for (const _ of child.sessionIds) {
-          lookupKeys.push("swim_session_fee");
+        for (const sid of child.sessionIds) {
+          const s = sessionMap[sid];
+          const cents = Math.round(Number(s.session_price ?? 240) * 100);
+          lineItems.push({
+            price_data: {
+              currency: "usd",
+              product_data: { name: `Session fee — ${child.childName} (${s.session_start_date ?? ""})` },
+              unit_amount: cents,
+            },
+            quantity: 1,
+          });
         }
       }
     }
 
-    if (lookupKeys.length === 0) {
+    if (lineItems.length === 0) {
       return new Response(JSON.stringify({ error: "No line items to charge" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const env = (environment || "sandbox") as StripeEnv;
-    const stripe = createStripeClient(env);
-
-    const uniqueKeys = [...new Set(lookupKeys)];
-    const prices = await stripe.prices.list({ lookup_keys: uniqueKeys });
-    const priceMap: Record<string, string> = {};
-    for (const p of prices.data) {
-      if (p.lookup_key) priceMap[p.lookup_key] = p.id;
-    }
-    for (const key of uniqueKeys) {
-      if (!priceMap[key]) {
-        return new Response(JSON.stringify({ error: `Price not found: ${key}` }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    // Defensive guard: never charge a session fee unit_amount that doesn't
+    // match what's in the DB. Catches any future regression that re-introduces
+    // a price drift.
+    for (const li of lineItems) {
+      const amt = li.price_data.unit_amount;
+      const looksLikeSessionFee = li.price_data.product_data.name.startsWith("Session fee");
+      if (looksLikeSessionFee) {
+        const matches = sessions.some((s) => Math.round(Number(s.session_price ?? 240) * 100) === amt);
+        if (!matches) {
+          console.error("Session fee unit_amount does not match any DB session_price", amt);
+          return new Response(JSON.stringify({ error: "Session fee mismatch — refusing to charge" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
     }
-
-    const lineItems = lookupKeys.map((key) => ({
-      price: priceMap[key],
-      quantity: 1,
-    }));
 
     // Stage payload in pending_enrollments RIGHT BEFORE creating the Stripe session.
     // This minimizes the window during which temporary data exists.

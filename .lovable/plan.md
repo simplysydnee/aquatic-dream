@@ -1,84 +1,71 @@
-## The Bug
+## What's broken
 
-In the swimmer modal → **Payments tab**, the "Session fee" row shows **$45.00** for first-time swimmers. It should be **$240** (or session-specific price = `total_lessons × price_per_lesson`).
+Stripe's `swim_session_fee` price (lookup key used by `create-checkout`) is set to **$280** in live mode, but our app and emails treat the session fee as **$240** (`swim_sessions.session_price`).
 
-## Root Cause
+Every returning swimmer who checked out via the public flow was actually charged **$280** at Stripe while the database recorded only **$240**. Two confirmed victims so far:
 
-`src/components/admin/swimmer/tabs/PaymentsTab.tsx` uses the wrong field for the session fee amount:
+| Swimmer | Parent email | Stripe charge ID | Date | Over by |
+|---|---|---|---|---|
+| Aniya Danhoff | sarah.danhoff@yahoo.com | `pi_3TMw742HpbBBx5ls1PSIXps8` | 2026-04-16 | $40 |
+| Micah Gonzales | gabriela.gonzales4623@gmail.com | `pi_3TUYPC2HpbBBx5ls0IvX31hL` | 2026-05-07 | $40 |
 
-```ts
-// Line 43, 167, 180
-amount={Number(e.payment_amount ?? 240)}
-```
+The reconciliation alert subsystem caught Micah's overcharge (row exists in `payment_reconciliation_alerts`), but no one acted on it and the underlying price was never corrected. Aniya was charged before alerts existed.
 
-`swim_enrollments.payment_amount` stores **what Stripe actually charged at checkout**, not the session fee. From `payments-webhook/index.ts` line 173:
+## Plan
 
-```ts
-const paymentAmount = isReturning ? sessionPrice : regFee; // first-time = $45
-```
+### 1. Refund the $40 to both families (one-shot script)
 
-So:
-- **Returning swimmers**: `payment_amount = 240` → row displays correctly
-- **First-time swimmers**: `payment_amount = 45` (the reg fee) → session fee row wrongly shows $45
+Run a one-time Edge Function call against Stripe (live env) using the existing `_shared/stripe.ts` gateway client to issue two partial refunds of $40.00:
+- Refund $40 against `pi_3TMw742HpbBBx5ls1PSIXps8` (Danhoff)
+- Refund $40 against `pi_3TUYPC2HpbBBx5ls0IvX31hL` (Gonzales)
 
-The $45 is the **registration fee**, not the session fee.
+After Stripe confirms each refund, mark the matching `payment_reconciliation_alerts` row as resolved with a note, and email each parent a short apology + refund confirmation using the existing `admin-freeform` transactional template.
 
-## Correct Source of Truth
+### 2. Eliminate the price-drift class of bug for good
 
-Per `swim_sessions` table defaults and the rest of the codebase:
+Root cause: `create-checkout/index.ts` uses Stripe `lookup_keys` (`swim_session_fee`, `registration_fee`). The DB has its own truth (`swim_sessions.session_price`, `swim_enrollments.registration_fee` default 45). When the two diverge, customers get charged the Stripe number while the DB / receipts show ours.
 
-- `swim_sessions.session_price` = $240 (canonical session fee)
-- This already equals `total_lessons (8) × price_per_lesson ($30)` = $240
-- Edge functions (`send-session-payment-link`, `payments-webhook`, `create-checkout`) all read `session_price` correctly
+Switch `create-checkout` to **inline `price_data`** (the same pattern already used for donations / lesson occurrence checkout). Server reads `session.session_price` and `45` (or per-row registration_fee), and builds line items with `price_data.unit_amount = sessionPrice * 100`. No more `lookup_keys`. The DB becomes the single source of truth and Stripe can never drift.
 
-`useSwimmers` does **not** currently select `session_price`, `total_lessons`, or `price_per_lesson` (line 205 of `src/hooks/useSwimmers.ts`), so the modal has no choice but to fall back to a hardcoded 240 — and worse, it falls back to `payment_amount` first.
+Keep the existing `payments-webhook` reconciliation logic as a safety net but it should now always pass.
 
-## Fix
+### 3. First-time checkout UX: choose pay-now vs pay-day-1 for the $240
 
-### 1. `src/hooks/useSwimmers.ts`
-Extend the embedded `swim_sessions` select to include pricing fields:
-```ts
-session:swim_sessions(id, swim_level, day_of_week, start_time, end_time, age_group,
-  session_period_id, session_price, total_lessons, price_per_lesson,
-  period:session_periods(name, start_date, end_date))
-```
-Add `session_price`, `total_lessons`, `price_per_lesson` to the `SwimmerEnrollment["session"]` type.
+Current first-timer flow: only $45 reg fee at checkout, $240 always due day 1.
+New flow on the public Swim Enrollment "Review & Pay" step:
 
-### 2. `src/components/admin/swimmer/tabs/PaymentsTab.tsx`
-Add a helper:
-```ts
-const sessionFeeFor = (e: SwimmerEnrollment) =>
-  Number(e.session?.session_price
-    ?? (e.session?.total_lessons && e.session?.price_per_lesson
-        ? e.session.total_lessons * e.session.price_per_lesson
-        : 240));
-```
+- Returning swimmer → unchanged: $240 charged at checkout.
+- First-time swimmer → new toggle on the review step:
+  - **"Pay registration only ($45)"** *(default)* — current behavior. $240 due day 1.
+  - **"Pay registration + first session ($45 + $240 = $285)"** — adds the session-fee line item to the same Stripe checkout. Webhook stamps `session_fee_status='paid'` for that row, no day-1 collection needed.
 
-Replace all three `e.payment_amount ?? 240` usages (lines 43, 167, 180) with `sessionFeeFor(e)`. Outstanding balance calc gets fixed at the same time.
+Implementation:
+- Add `payAhead: boolean` per child in the `EnrollmentForm` payload.
+- `create-checkout` adds the session-fee `price_data` line when `payAhead && isFirstTime`.
+- `payments-webhook` reads `payAhead` from the staged `pending_enrollments.payload` and sets `session_fee_status='paid'` + `session_fee_stripe_id` on rows where it's true.
+- Confirmation email already has a `totalPaid` branch — extend the template-data shaping so first-timers who paid ahead see one combined "Total paid" line instead of "due day 1".
 
-Also update the registration fee row to read `e.registration_fee ?? 45` instead of the hardcoded `45`.
+### 4. Admin defensive guard
 
-### 3. Audit other spots (no change needed, just verifying)
+Add a server-side sanity check in `create-checkout` and `send-session-payment-link`: if any computed Stripe `unit_amount` differs from `session.session_price * 100`, log loudly and refuse to create the checkout. This prevents future regressions if anyone re-introduces lookup keys.
 
-Already correct:
-- `payments-webhook/index.ts` — uses `session_price`
-- `send-session-payment-link/index.ts` — uses `session_price`
-- `cancel-enrollment-refund` — refunds the actual `session_fee_stripe_id` amount
+## Out of scope
 
-Display-only hardcoded "$240" labels (acceptable, but could be parameterized later):
-- `SwimEnrollmentsAdmin.tsx` SelectItem labels ("Due Day 1 ($240)", etc.)
-- `EnrollmentDetailDialog.tsx` label "Session Fee ($240)"
-- `SwimLessons.tsx` marketing copy
+- Touching the "send $240 payment link" admin flow's UI — only its server-side amount calculation.
+- Changing prices for anyone already enrolled.
+- Refactoring the swimmer modal Payments tab (already correct after the prior fix).
 
-These are static UI labels matching the current price; not affected by the bug. Out of scope unless you also want them dynamic.
+## Files changed
 
-## Out of Scope
+- `supabase/functions/create-checkout/index.ts` — switch to inline `price_data`, support `payAhead` for first-timers, defensive amount check.
+- `supabase/functions/payments-webhook/index.ts` — when `payAhead` is true on a first-timer row, set `session_fee_status='paid'` + stamp the Stripe id; adjust `payment_amount` accounting.
+- `supabase/functions/send-session-payment-link/index.ts` — same defensive check; ensure it always uses `session.session_price` directly.
+- `src/components/swim-enrollment/EnrollmentForm.tsx` (and review step) — add per-child "Pay session fee now?" toggle for first-timers.
+- `src/components/swim-enrollment/types.ts` — add `payAhead` to payload type.
+- New one-shot Edge Function `supabase/functions/admin-issue-refund/index.ts` (admin-only) used to run the two $40 refunds; reusable later for any reconciliation alert. Deletable after run if you prefer.
 
-- Changing how Stripe charges or how the webhook stores data (it's correct).
-- Re-doing the database. `payment_amount` is correct — the modal was just reading the wrong column.
-- Making the marketing/static "$240" strings dynamic per session.
+## Verification
 
-## Files Changed
-
-- `src/hooks/useSwimmers.ts` — expand session select + type
-- `src/components/admin/swimmer/tabs/PaymentsTab.tsx` — use `session.session_price` for session fee row + balance
+- After step 1, both `payment_reconciliation_alerts` rows show `resolved_at` and the Stripe dashboard shows `amount_refunded: 40.00` on each PI.
+- After step 2, run a sandbox checkout for a returning swimmer and confirm `amount_total` on the Stripe session = $24000 cents and the new reconciliation alert table has zero new rows.
+- After step 3, run sandbox first-timer checkouts both ways: with toggle off (charged $45, row `session_fee_status='due_day_1'`) and toggle on (charged $285, row `session_fee_status='paid'`).
