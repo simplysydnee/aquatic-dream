@@ -386,9 +386,9 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <p className={cn("text-sm font-medium", isCheckedIn && "line-through text-muted-foreground")}>
+                                <SwimmerLink childName={enr.child_name} parentEmail={enr.parent_email || ""} className={cn("text-sm", isCheckedIn && "line-through text-muted-foreground")}>
                                   {enr.child_name}
-                                </p>
+                                </SwimmerLink>
                                 {enr.medical_notes && (
                                   <span title={enr.medical_notes}>
                                     <Stethoscope className="w-3 h-3 text-amber-500" />
