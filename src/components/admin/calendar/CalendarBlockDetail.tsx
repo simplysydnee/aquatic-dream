@@ -519,7 +519,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                     <div className="flex items-center justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-medium truncate">{lessonBooking.child_name || lessonBooking.parent_name}</p>
+                          <SwimmerLink childName={lessonBooking.child_name || lessonBooking.parent_name} parentEmail={lessonBooking.parent_email} className="text-sm truncate" />
                           <button
                             title="Edit swimmer info"
                             onClick={() => setEditTarget({
