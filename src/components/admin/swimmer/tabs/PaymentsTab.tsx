@@ -153,7 +153,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                 {e.is_first_time && (
                   <PaymentRow
                     label="Registration fee"
-                    amount={45}
+                    amount={regFeeFor(e)}
                     status={e.payment_status}
                     paidAt={null}
                     method={e.payment_method}
