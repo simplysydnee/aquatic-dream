@@ -56,8 +56,12 @@ const SwimEnrollment = () => {
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [totalDue, setTotalDue] = useState(0);
-  // Payload sent to create-checkout (no DB row exists yet)
-  const [checkoutPayload, setCheckoutPayload] = useState<unknown>(null);
+  // Inputs needed to build the create-checkout payload (no DB row yet)
+  const [checkoutInputs, setCheckoutInputs] = useState<{
+    children: ChildEnrollment[];
+    signerIp: string | null;
+    sessionPrices: Record<string, number>;
+  } | null>(null);
   // For confirmation: all children info
   const [confirmedChildren, setConfirmedChildren] = useState<ChildEnrollment[]>([]);
   const { toast } = useToast();
