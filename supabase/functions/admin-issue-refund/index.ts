@@ -12,7 +12,8 @@ const supabaseAdmin = createClient(
 );
 
 interface Body {
-  paymentIntentId: string;
+  paymentIntentId?: string;
+  checkoutSessionId?: string;
   amountCents: number;
   reason?: string;
   environment?: StripeEnv;
