@@ -100,7 +100,7 @@ export default function SessionEnrollmentCards({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="All Sessions" />
@@ -112,6 +112,10 @@ export default function SessionEnrollmentCards({
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Info className="w-3.5 h-3.5" />
+          <span><strong>Reg</strong> = $45 registration fee · <strong>Session</strong> = $240 tuition</span>
+        </div>
       </div>
 
       {filteredPeriods.map((period) => (
