@@ -206,7 +206,7 @@ export function useSwimmers() {
       supabase
         .from("swim_enrollments")
         .select(
-          `*, session:swim_sessions(id, swim_level, day_of_week, start_time, end_time, age_group, session_period_id, period:session_periods(name, start_date, end_date))`,
+          `*, session:swim_sessions(id, swim_level, day_of_week, start_time, end_time, age_group, session_period_id, session_price, total_lessons, price_per_lesson, period:session_periods(name, start_date, end_date))`,
         )
         .order("created_at", { ascending: false }),
       supabase.from("lesson_bookings").select("*").order("created_at", { ascending: false }),
