@@ -166,7 +166,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                         enrollment: e,
                         field: "payment_status",
                         label: "Registration fee",
-                        amount: 45,
+                        amount: regFeeFor(e),
                       })
                     }
                   />
