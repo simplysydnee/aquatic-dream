@@ -30,6 +30,8 @@ interface ChildEnrollment {
   enrollmentData: EnrollmentFormData;
   legalData: LegalAgreementData;
   isFirstTime: boolean;
+  /** First-timers only: pay full session fee at checkout (default false). */
+  payAhead?: boolean;
 }
 
 const SwimEnrollment = () => {
