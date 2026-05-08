@@ -53,7 +53,7 @@ serve(async (req) => {
       payment_intent: body.paymentIntentId,
       amount: body.amountCents,
       reason: "requested_by_customer",
-      metadata: { issued_by: userData.user.email || userData.user.id, note: body.reason || "" },
+      metadata: { issued_by: resolverEmail || resolverId || "lovable-admin", note: body.reason || "" },
     });
 
     if (body.alertId) {
@@ -61,7 +61,7 @@ serve(async (req) => {
         .from("payment_reconciliation_alerts")
         .update({
           resolved_at: new Date().toISOString(),
-          resolved_by: userData.user.id,
+          resolved_by: resolverId,
           notes: `Refunded $${(body.amountCents / 100).toFixed(2)} via ${refund.id}. ${body.reason || ""}`.trim(),
         })
         .eq("id", body.alertId);
