@@ -633,7 +633,7 @@ const SwimEnrollmentsAdmin = () => {
                     const session = e.session_id ? sessions[e.session_id] : null;
                     return (
                       <TableRow key={e.id}>
-                        <TableCell className="font-medium">{e.child_name}</TableCell>
+                        <TableCell className="font-medium"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /></TableCell>
                         <TableCell>{e.child_age}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={levelInfo?.color || ""}>
