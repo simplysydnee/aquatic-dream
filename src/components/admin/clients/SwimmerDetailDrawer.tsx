@@ -286,6 +286,14 @@ export default function SwimmerDetailDrawer({
               </section>
             </TabsContent>
 
+            <TabsContent value="payments" className="p-6 mt-0">
+              <PaymentsTab swimmer={swimmer} />
+            </TabsContent>
+
+            <TabsContent value="comms" className="p-6 mt-0">
+              <CommunicationsTab swimmer={swimmer} />
+            </TabsContent>
+
             <TabsContent value="notes" className="p-6 mt-0">
               <InternalCommentsPanel
                 targetType="swimmer"
@@ -297,6 +305,15 @@ export default function SwimmerDetailDrawer({
           </ScrollArea>
         </Tabs>
       </SheetContent>
+
+      {editTarget && (
+        <EditSwimmerDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          target={editTarget}
+          onSaved={() => setEditOpen(false)}
+        />
+      )}
     </Sheet>
   );
 }
