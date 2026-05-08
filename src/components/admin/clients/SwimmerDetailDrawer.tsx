@@ -46,6 +46,8 @@ export default function SwimmerDetailDrawer({
   onOpenEnrollment,
   onSelectSwimmer,
 }: Props) {
+  const { isAdmin } = useAuth();
+  const [editOpen, setEditOpen] = useState(false);
   if (!swimmer) return null;
 
   // Split entries into Enrollments vs Lessons & Requests, newest first.
