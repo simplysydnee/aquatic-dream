@@ -233,63 +233,25 @@ const SwimEnrollment = () => {
       signerIp = ipData.ip;
     } catch { /* best-effort */ }
 
-    // Calculate total for display purposes (server re-computes authoritatively)
+    // Calculate "today" total for display purposes — assumes payAhead=false
+    // (i.e. just reg fees for first-timers). The user can opt to pay ahead in
+    // the next step; that updates the Stripe-side total. The server is
+    // authoritative for the actual charge.
     const total = allChildren.reduce((sum, child) => {
       return sum + child.sessionIds.reduce((cs, sid, i) => {
         const s = sessionMap[sid];
         const sessionPrice = s?.session_price ?? 240;
         if (child.isFirstTime) {
-          // First-time: reg fee due now (once per child, on first row).
-          // If payAhead, also include the session fee per session.
-          const reg = i === 0 ? PRICING.registrationFee : 0;
-          const sess = child.payAhead ? sessionPrice : 0;
-          return cs + reg + sess;
+          return cs + (i === 0 ? PRICING.registrationFee : 0);
         }
         return cs + sessionPrice;
       }, 0);
     }, 0);
 
-    // Build the full payload — NO database writes until Stripe webhook fires.
-    const payload = {
-      children: allChildren.map(child => ({
-        level: child.level,
-        childName: child.enrollmentData.childName,
-        childFirstName: child.enrollmentData.childFirstName,
-        childLastName: child.enrollmentData.childLastName,
-        childAge: child.childAge,
-        childDob: child.childDob || null,
-        sessionIds: child.sessionIds,
-        isFirstTime: child.isFirstTime,
-        payAhead: child.payAhead === true,
-        parentName: child.enrollmentData.parentName,
-        parentFirstName: child.enrollmentData.parentFirstName,
-        parentLastName: child.enrollmentData.parentLastName,
-        parentEmail: child.enrollmentData.parentEmail,
-        parentPhone: child.enrollmentData.parentPhone || null,
-        medicalNotes: child.enrollmentData.hasMedical === "yes" ? (child.enrollmentData.medicalNotes || null) : null,
-        notes: child.enrollmentData.notes || null,
-        agreement: {
-          waiverAccepted: child.legalData.waiverAccepted,
-          photoReleaseAccepted: child.legalData.photoReleaseAccepted === "yes",
-          privacyPolicyAccepted: child.legalData.privacyPolicyAccepted,
-          termsAccepted: child.legalData.termsAccepted,
-          signatureText: child.legalData.signatureText,
-          emergencyContactName: child.legalData.emergencyContactName,
-          emergencyContactFirstName: child.legalData.emergencyContactFirstName,
-          emergencyContactLastName: child.legalData.emergencyContactLastName,
-          emergencyContactPhone: child.legalData.emergencyContactPhone,
-          emergencyContactRelationship: child.legalData.emergencyContactRelationship,
-        },
-      })),
-      signerIp,
-      versions: {
-        waiver: WAIVER_VERSION,
-        tos: TOS_VERSION,
-        privacy: PRIVACY_POLICY_VERSION,
-      },
-    };
+    const sessionPrices: Record<string, number> = {};
+    for (const s of sessions) sessionPrices[s.id] = Number(s.session_price ?? 240);
 
-    setCheckoutPayload(payload);
+    setCheckoutInputs({ children: allChildren, signerIp, sessionPrices });
     setTotalDue(total);
     setConfirmedChildren(allChildren);
 
