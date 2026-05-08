@@ -49,9 +49,9 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
     let due = 0;
     for (const e of swimmer.enrollments) {
       if (e.is_first_time && e.payment_status !== "paid" && e.payment_status !== "comp" && e.payment_status !== "waived") {
-        due += 45;
+        due += regFeeFor(e);
       }
-      if (e.session_fee_status === "due_day_1") due += Number(e.payment_amount ?? 240);
+      if (e.session_fee_status === "due_day_1") due += sessionFeeFor(e);
     }
     return due;
   }, [swimmer.enrollments]);
