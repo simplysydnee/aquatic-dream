@@ -85,6 +85,28 @@ export default function SwimmerDetailDrawer({
 
   const totalActivity = enrollmentEntries.length + lessonEntries.length;
 
+  const editTarget: EditTarget | null =
+    swimmer.enrollments[0]
+      ? {
+          kind: "swim_enrollment",
+          id: swimmer.enrollments[0].id,
+          child_name: swimmer.child_name,
+          child_age: swimmer.child_age,
+          parent_name: swimmer.parent_name,
+          parent_email: swimmer.parent_email,
+          parent_phone: swimmer.parent_phone,
+        }
+      : swimmer.bookings[0]
+        ? {
+            kind: "lesson_booking",
+            id: swimmer.bookings[0].id,
+            child_name: swimmer.child_name,
+            parent_name: swimmer.parent_name,
+            parent_email: swimmer.parent_email,
+            parent_phone: swimmer.parent_phone,
+          }
+        : null;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl p-0 flex flex-col">
@@ -100,14 +122,27 @@ export default function SwimmerDetailDrawer({
                 {swimmer.swim_level}
               </Badge>
             )}
+            {isAdmin && editTarget && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 ml-auto"
+                onClick={() => setEditOpen(true)}
+                title="Edit swimmer info"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </SheetTitle>
           <SwimmerStatusBadges statuses={swimmer.statuses} className="mt-2" />
         </SheetHeader>
 
         <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="mx-6 mt-4 self-start">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsList className="mx-6 mt-4 self-start flex-wrap h-auto">
+            <TabsTrigger value="overview">Info</TabsTrigger>
             <TabsTrigger value="activity">Enrollments & Lessons ({totalActivity})</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="comms">Communications</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
           </TabsList>
 
