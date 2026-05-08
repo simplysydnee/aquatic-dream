@@ -4,9 +4,11 @@ import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
-import { ChevronDown, Users } from "lucide-react";
+import { ChevronDown, Users, Info } from "lucide-react";
 import { useState } from "react";
 import LevelBadge from "@/components/LevelBadge";
+import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
+
 
 interface SessionInfo {
   id: string;
@@ -27,6 +29,7 @@ interface Enrollment {
   parent_name: string;
   parent_email: string;
   payment_status: string;
+  session_fee_status?: string;
   status: string;
   session_id: string | null;
 }
@@ -97,7 +100,7 @@ export default function SessionEnrollmentCards({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="All Sessions" />
@@ -109,6 +112,10 @@ export default function SessionEnrollmentCards({
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Info className="w-3.5 h-3.5" />
+          <span><strong>Reg</strong> = $45 registration fee · <strong>Session</strong> = $240 tuition</span>
+        </div>
       </div>
 
       {filteredPeriods.map((period) => (
@@ -194,21 +201,19 @@ function SessionCard({ session, enrolled }: { session: SessionInfo; enrolled: En
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2 space-y-1">
               {enrolled.map((e) => (
-                <div key={e.id} className="flex items-center justify-between text-xs py-1 border-b last:border-0">
-                  <div>
-                    <span className="font-medium">{e.child_name}</span>
-                    <span className="text-muted-foreground ml-1">({e.parent_name})</span>
+                <div key={e.id} className="flex items-start justify-between gap-2 text-xs py-1.5 border-b last:border-0">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{e.child_name}</div>
+                    <div className="text-muted-foreground truncate">{e.parent_name}</div>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={
-                      e.payment_status === "paid"
-                        ? "bg-green-100 text-green-700 border-green-300 text-[10px]"
-                        : "bg-yellow-100 text-yellow-700 border-yellow-300 text-[10px]"
-                    }
-                  >
-                    {e.payment_status}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <Badge variant="outline" className={`${paymentStatusBadgeClass(e.payment_status)} text-[10px]`}>
+                      Reg: {formatPaymentStatus(e.payment_status)}
+                    </Badge>
+                    <Badge variant="outline" className={`${paymentStatusBadgeClass(e.session_fee_status)} text-[10px]`}>
+                      Session: {formatPaymentStatus(e.session_fee_status)}
+                    </Badge>
+                  </div>
                 </div>
               ))}
             </CollapsibleContent>

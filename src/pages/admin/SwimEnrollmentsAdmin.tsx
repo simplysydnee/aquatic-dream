@@ -27,6 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { formatPaymentStatus } from "@/lib/paymentLabels";
 
 interface Enrollment {
   id: string;
@@ -803,12 +804,12 @@ const SwimEnrollmentsAdmin = () => {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
-                            {e.payment_status}
+                            {formatPaymentStatus(e.payment_status)}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={sessionFeeColor(e.session_fee_status)}>
-                            {e.session_fee_status}
+                            {formatPaymentStatus(e.session_fee_status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
