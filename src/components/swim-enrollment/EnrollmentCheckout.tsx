@@ -1,20 +1,43 @@
+import { useState, useMemo } from "react";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface EnrollmentCheckoutProps {
-  payload: unknown;
+  /** Builds the checkout payload. Called once per "Continue to payment" click. */
+  buildPayload: (opts: { payAheadForFirstTimers: boolean }) => unknown;
   customerEmail: string;
+  hasFirstTimers: boolean;
+  /** Per-session fee shown in the toggle copy (USD, no symbol). */
+  sessionFeeUsd: number;
+  /** Number of session-fee charges that pay-ahead would add. */
+  sessionFeeCount: number;
   onBack: () => void;
 }
 
 export default function EnrollmentCheckout({
-  payload,
+  buildPayload,
   customerEmail,
+  hasFirstTimers,
+  sessionFeeUsd,
+  sessionFeeCount,
   onBack,
 }: EnrollmentCheckoutProps) {
+  // Default = pay reg fee only (current behavior). User can opt to pay ahead.
+  const [payAhead, setPayAhead] = useState<"reg_only" | "pay_ahead">("reg_only");
+  const [confirmed, setConfirmed] = useState(false);
+
+  // The embedded checkout will mount with the payload at confirmation time.
+  // Changing the toggle after confirming requires "Change" → re-mounts with new payload.
+  const payload = useMemo(
+    () => (confirmed ? buildPayload({ payAheadForFirstTimers: payAhead === "pay_ahead" }) : null),
+    [confirmed, payAhead, buildPayload],
+  );
+
   const fetchClientSecret = async (): Promise<string> => {
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: {
@@ -30,6 +53,8 @@ export default function EnrollmentCheckout({
     return data.clientSecret;
   };
 
+  const sessionTotal = sessionFeeUsd * sessionFeeCount;
+
   return (
     <div className="max-w-2xl mx-auto px-0 sm:px-0">
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">
@@ -39,11 +64,62 @@ export default function EnrollmentCheckout({
         Please complete your payment to finalize enrollment. Your seat is reserved when payment succeeds.
       </p>
 
-      <div className="rounded-lg border border-border overflow-hidden min-w-0">
-        <EmbeddedCheckoutProvider stripe={getStripe()} options={{ fetchClientSecret }}>
-          <EmbeddedCheckout />
-        </EmbeddedCheckoutProvider>
-      </div>
+      {hasFirstTimers && !confirmed && (
+        <div className="rounded-lg border border-border p-4 mb-4 bg-muted/30">
+          <p className="font-semibold text-foreground mb-3">How would you like to pay the session fee?</p>
+          <RadioGroup value={payAhead} onValueChange={(v) => setPayAhead(v as "reg_only" | "pay_ahead")}>
+            <div className="flex items-start gap-3 mb-2">
+              <RadioGroupItem value="reg_only" id="reg_only" className="mt-1" />
+              <Label htmlFor="reg_only" className="cursor-pointer font-normal">
+                <span className="font-semibold">Pay registration only ($45 today)</span>
+                <p className="text-sm text-muted-foreground">
+                  Pay the ${sessionFeeUsd} session fee in person on the first day of class.
+                </p>
+              </Label>
+            </div>
+            <div className="flex items-start gap-3">
+              <RadioGroupItem value="pay_ahead" id="pay_ahead" className="mt-1" />
+              <Label htmlFor="pay_ahead" className="cursor-pointer font-normal">
+                <span className="font-semibold">
+                  Pay registration + session fee (${(45 + sessionTotal).toFixed(0)} today)
+                </span>
+                <p className="text-sm text-muted-foreground">
+                  Skip the day-1 payment. Everything settled now.
+                </p>
+              </Label>
+            </div>
+          </RadioGroup>
+          <Button className="mt-4 w-full" onClick={() => setConfirmed(true)}>
+            Continue to payment
+          </Button>
+        </div>
+      )}
+
+      {(!hasFirstTimers || confirmed) && (
+        <>
+          {hasFirstTimers && (
+            <div className="flex items-center justify-between mb-3 text-sm">
+              <span className="text-muted-foreground">
+                {payAhead === "pay_ahead"
+                  ? `Paying $${(45 + sessionTotal).toFixed(0)} now (registration + session fee).`
+                  : `Paying $45 now (registration only). Session fee due day 1.`}
+              </span>
+              <Button type="button" variant="link" size="sm" onClick={() => setConfirmed(false)}>
+                Change
+              </Button>
+            </div>
+          )}
+          <div className="rounded-lg border border-border overflow-hidden min-w-0">
+            <EmbeddedCheckoutProvider
+              key={payAhead}
+              stripe={getStripe()}
+              options={{ fetchClientSecret }}
+            >
+              <EmbeddedCheckout />
+            </EmbeddedCheckoutProvider>
+          </div>
+        </>
+      )}
 
       <div className="mt-4">
         <Button type="button" variant="ghost" onClick={onBack}>
