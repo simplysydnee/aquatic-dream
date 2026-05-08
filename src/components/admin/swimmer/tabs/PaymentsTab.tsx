@@ -188,7 +188,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                       enrollment: e,
                       field: "session_fee_status",
                       label: "Session fee",
-                      amount: Number(e.payment_amount ?? 240),
+                      amount: sessionFeeFor(e),
                     })
                   }
                   onSendStripe={() => sendStripeLink(e)}
