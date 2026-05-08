@@ -803,12 +803,12 @@ const SwimEnrollmentsAdmin = () => {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
-                            {e.payment_status}
+                            {formatPaymentStatus(e.payment_status)}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={sessionFeeColor(e.session_fee_status)}>
-                            {e.session_fee_status}
+                            {formatPaymentStatus(e.session_fee_status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
