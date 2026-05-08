@@ -43,15 +43,23 @@ serve(async (req) => {
     }
 
     const body = (await req.json()) as Body;
-    if (!body.paymentIntentId || !body.amountCents || body.amountCents <= 0) {
-      return json({ error: "paymentIntentId and amountCents required" }, 400);
+    if ((!body.paymentIntentId && !body.checkoutSessionId) || !body.amountCents || body.amountCents <= 0) {
+      return json({ error: "paymentIntentId or checkoutSessionId required, and amountCents > 0" }, 400);
     }
 
     const env: StripeEnv = body.environment === "sandbox" ? "sandbox" : "live";
     const stripe = createStripeClient(env);
 
+    let paymentIntentId = body.paymentIntentId || "";
+    if (!paymentIntentId && body.checkoutSessionId) {
+      const cs = await stripe.checkout.sessions.retrieve(body.checkoutSessionId);
+      if (typeof cs.payment_intent === "string") paymentIntentId = cs.payment_intent;
+      else if (cs.payment_intent && typeof cs.payment_intent === "object") paymentIntentId = (cs.payment_intent as any).id;
+    }
+    if (!paymentIntentId) return json({ error: "Could not resolve payment_intent" }, 400);
+
     const refund = await stripe.refunds.create({
-      payment_intent: body.paymentIntentId,
+      payment_intent: paymentIntentId,
       amount: body.amountCents,
       reason: "requested_by_customer",
       metadata: { issued_by: resolverEmail || resolverId || "lovable-admin", note: body.reason || "" },
