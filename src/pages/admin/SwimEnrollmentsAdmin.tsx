@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatPaymentStatus } from "@/lib/paymentLabels";
+import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 
 interface Enrollment {
   id: string;
@@ -632,7 +633,7 @@ const SwimEnrollmentsAdmin = () => {
                     const session = e.session_id ? sessions[e.session_id] : null;
                     return (
                       <TableRow key={e.id}>
-                        <TableCell className="font-medium">{e.child_name}</TableCell>
+                        <TableCell className="font-medium"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /></TableCell>
                         <TableCell>{e.child_age}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={levelInfo?.color || ""}>
@@ -777,7 +778,7 @@ const SwimEnrollmentsAdmin = () => {
                     const session = e.session_id ? sessions[e.session_id] : null;
                     return (
                       <TableRow key={e.id} className="opacity-80">
-                        <TableCell className="font-medium">{e.child_name}</TableCell>
+                        <TableCell className="font-medium"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /></TableCell>
                         <TableCell>{e.child_age}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={levelInfo?.color || ""}>{groupName}</Badge>

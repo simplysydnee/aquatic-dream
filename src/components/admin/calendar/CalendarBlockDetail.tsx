@@ -15,6 +15,7 @@ import LessonOccurrenceCheckoutDialog from "./LessonOccurrenceCheckoutDialog";
 import FrontDeskWaiverDialog from "./FrontDeskWaiverDialog";
 import FrontDeskEnrollmentWaiverDialog from "./FrontDeskEnrollmentWaiverDialog";
 import EditSwimmerDialog, { type EditTarget } from "./EditSwimmerDialog";
+import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { ClipboardSignature } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -385,9 +386,9 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <p className={cn("text-sm font-medium", isCheckedIn && "line-through text-muted-foreground")}>
+                                <SwimmerLink childName={enr.child_name} parentEmail={enr.parent_email || ""} className={cn("text-sm", isCheckedIn && "line-through text-muted-foreground")}>
                                   {enr.child_name}
-                                </p>
+                                </SwimmerLink>
                                 {enr.medical_notes && (
                                   <span title={enr.medical_notes}>
                                     <Stethoscope className="w-3 h-3 text-amber-500" />
@@ -518,7 +519,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                     <div className="flex items-center justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-medium truncate">{lessonBooking.child_name || lessonBooking.parent_name}</p>
+                          <SwimmerLink childName={lessonBooking.child_name || lessonBooking.parent_name} parentEmail={lessonBooking.parent_email} className="text-sm truncate" />
                           <button
                             title="Edit swimmer info"
                             onClick={() => setEditTarget({

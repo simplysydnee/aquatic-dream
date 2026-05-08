@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { CheckCircle2, MessageSquare } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
 import { useCommentCounts } from "@/hooks/useInternalComments";
+import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 
 const LessonRequestsAdmin = () => {
   const [requests, setRequests] = useState<LessonRequest[]>([]);
@@ -88,7 +89,7 @@ const LessonRequestsAdmin = () => {
                 >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-1.5">
-                      {r.child_name}
+                      <SwimmerLink childName={r.child_name} parentEmail={r.parent_email} />
                       {commentCounts[r.id] > 0 && (
                         <Badge variant="secondary" className="gap-1 text-[10px] h-5">
                           <MessageSquare className="h-3 w-3" />

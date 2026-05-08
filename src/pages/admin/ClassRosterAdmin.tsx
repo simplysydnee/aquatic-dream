@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
 import { Users, Plus, ArrowRightLeft, Loader2, Calendar, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 
 interface Session {
   id: string;
@@ -416,7 +417,7 @@ const ClassRosterAdmin = () => {
                       const lc = LEVEL_BADGE_COLORS[e.swim_level as SwimLevel];
                       return (
                         <TableRow key={e.id}>
-                          <TableCell className="py-2 text-sm">{e.child_name}</TableCell>
+                          <TableCell className="py-2 text-sm"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /></TableCell>
                           <TableCell className="py-2 text-sm">{e.child_age}</TableCell>
                           <TableCell className="py-2">
                             {lc ? (
