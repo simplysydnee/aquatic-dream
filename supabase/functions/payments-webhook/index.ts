@@ -170,13 +170,24 @@ async function handleCheckoutCompleted(session: any) {
       // payment_status tracks the REGISTRATION FEE only.
       // session_fee_status tracks the $240 session fee SEPARATELY.
       //   - Returning: Stripe collected $240 at checkout → session_fee_status='paid'
-      //   - First-time: only $45 reg fee charged → session_fee_status='due_day_1' (collected day 1)
+      //   - First-time, payAhead=true: Stripe also collected the session fee → 'paid'
+      //   - First-time, default: only $45 reg fee charged → 'due_day_1'
       const isReturning = !child.isFirstTime;
-      const paymentAmount = isReturning ? sessionPrice : regFee;
+      const sessionFeePaidAtCheckout = isReturning || (child.isFirstTime && child.payAhead === true);
+
+      // payment_amount = what Stripe charged for THIS row.
+      //   returning: sessionPrice
+      //   first-time payAhead: regFee (on row 0) + sessionPrice
+      //   first-time default: regFee (on row 0) only
+      const paymentAmount =
+        (isReturning ? sessionPrice : 0) +
+        (chargeRegFee ? regFee : 0) +
+        (child.isFirstTime && child.payAhead ? sessionPrice : 0);
+
       // Reg fee is one-time per family. First-timer's first row pays it; additional
       // rows (same checkout, same family) get 'not_required' — same as returning swimmers.
       const rowPaymentStatus = isReturning ? "not_required" : (chargeRegFee ? "paid" : "not_required");
-      const sessionFeeStatus = isReturning ? "paid" : "due_day_1";
+      const sessionFeeStatus = sessionFeePaidAtCheckout ? "paid" : "due_day_1";
 
       return {
         swim_level: child.level,
@@ -204,8 +215,8 @@ async function handleCheckoutCompleted(session: any) {
         payment_method: "stripe",
         payment_reference: sessionId,
         session_fee_status: sessionFeeStatus,
-        session_fee_stripe_id: isReturning ? sessionId : null,
-        session_fee_paid_at: isReturning ? new Date().toISOString() : null,
+        session_fee_stripe_id: sessionFeePaidAtCheckout ? sessionId : null,
+        session_fee_paid_at: sessionFeePaidAtCheckout ? new Date().toISOString() : null,
       };
     });
   });
