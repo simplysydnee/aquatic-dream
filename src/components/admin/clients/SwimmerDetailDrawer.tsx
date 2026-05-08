@@ -1,15 +1,20 @@
+import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, User, BookOpen, Waves, Calendar } from "lucide-react";
+import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil } from "lucide-react";
 import type { Swimmer } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "./SwimmerStatusBadges";
 import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
 import { formatPhone, phoneHref } from "@/lib/phone";
 import { LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
 import { cn } from "@/lib/utils";
+import CommunicationsTab from "@/components/admin/swimmer/tabs/CommunicationsTab";
+import PaymentsTab from "@/components/admin/swimmer/tabs/PaymentsTab";
+import EditSwimmerDialog, { type EditTarget } from "@/components/admin/calendar/EditSwimmerDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   swimmer: Swimmer | null;
