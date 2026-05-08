@@ -84,6 +84,9 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   const [resendingWaiver, setResendingWaiver] = useState(false);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [enrWaiverTarget, setEnrWaiverTarget] = useState<{ id: string; parent_name: string; parent_email: string; child_name: string } | null>(null);
+  const [markDialogOpen, setMarkDialogOpen] = useState(false);
+  const [markMethod, setMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
+  const [markReference, setMarkReference] = useState("");
 
   const refetchLesson = async () => {
     if (!eventId) return;
@@ -174,9 +177,6 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     } finally { setResending(false); }
   };
 
-  const [markDialogOpen, setMarkDialogOpen] = useState(false);
-  const [markMethod, setMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
-  const [markReference, setMarkReference] = useState("");
 
   const handleMarkPaidConfirm = async () => {
     if (!lessonOcc) return;
