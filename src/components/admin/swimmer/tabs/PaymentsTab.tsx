@@ -175,7 +175,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                 {/* Session fee row */}
                 <PaymentRow
                   label="Session fee"
-                  amount={Number(e.payment_amount ?? 240)}
+                  amount={sessionFeeFor(e)}
                   status={e.session_fee_status}
                   paidAt={e.session_fee_paid_at}
                   method={e.payment_method}
