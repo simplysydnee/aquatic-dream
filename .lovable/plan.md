@@ -1,73 +1,57 @@
-## Goals
+# Clarify payment status in enrollments views
 
-1. When creating a Private or Semi-Private lesson, allow admin to mark it as already paid (cash/check/comp) so no Stripe link is sent and occurrences are saved as paid.
-2. Clean up the New Event dialog — rename, reorder, and de-clutter.
+## The problem
 
----
+Each swim enrollment has **two independent payment fields**:
 
-## 1. Mark-as-paid on lesson creation
+| Field | What it covers | Amount |
+|---|---|---|
+| `payment_status` | Registration fee (swim bag/cap/goggles) | $45 |
+| `session_fee_status` | Session tuition (8 lessons) | $240 |
 
-In `src/components/admin/calendar/LessonBookingFields.tsx`:
+Today the UI only shows the first one as a single badge labeled "paid" — so Michelle Prieto's daughter Eliza Montes shows **paid** even though her $240 session fee is still `due_day_1`. That's misleading on both:
 
-- Add three new optional fields to `LessonBookingFieldsData`:
-  - `prepaid: boolean` (default `false`)
-  - `prepaidMethod: "cash" | "check" | "comp" | "other" | null`
-  - `prepaidReference: string` (optional — same rule as elsewhere; required only if Stripe, which doesn't apply here)
-- Render a new section "Already paid?" with a checkbox. When checked:
-  - Show payment-method select (Cash / Check / Comp / Other)
-  - Show optional reference field (e.g. check #)
-  - Hide / disable the "Email Stripe payment link" and "Charge entire series" toggles (they're irrelevant when prepaid). Show a small note: "Stripe link skipped — lesson(s) marked paid."
+1. **By Sessions view** (`SessionEnrollmentCards.tsx`) — single badge, `payment_status` only.
+2. **Swim Enrollments table** — has separate columns, but the inline badge in the swimmers-expanded row only shows `payment_status`.
 
-In `src/components/admin/calendar/AddPoolEventDialog.tsx` `handleLessonBookingSave`:
+## Fix
 
-- If `lb.prepaid`:
-  - Insert `lesson_booking_occurrences` rows with `payment_status: "paid"`, `payment_method: lb.prepaidMethod`, `payment_reference: lb.prepaidReference || null`, `paid_at: now()`.
-  - Skip the `send-lesson-series-confirmation` / `send-lesson-booking-confirmation` Stripe-link calls entirely.
-  - Toast: "Lesson booked & marked paid".
-- Else: existing behavior unchanged.
+### 1. By Sessions card (`src/components/admin/SessionEnrollmentCards.tsx`)
+Replace the single `payment_status` badge per swimmer with **two compact badges** stacked or side-by-side:
 
-The existing `lesson_occ_paid_requires_proof` constraint already accepts `payment_method IS NOT NULL` as proof, so no migration is needed.
+```
+Eliza Montes  (Michelle Prieto)   [Reg: paid] [Session: due day 1]
+```
 
----
+Color rules:
+- `paid` → green
+- `due_day_1` → amber
+- `unpaid` → amber
+- `not_required` / `waived` → muted gray
+- `refunded` → red
+- `comp` → blue
 
-## 2. New Event dialog UX cleanup
+Add `session_fee_status` to the `Enrollment` interface and pass it through from `SwimEnrollmentsAdmin.tsx` (already queried — just include it in the prop).
 
-In `src/components/admin/calendar/AddPoolEventDialog.tsx`:
+Add a small **legend / tooltip** at the top of the by-sessions panel explaining: "Reg = $45 registration fee · Session = $240 tuition".
 
-**Renames** (label-only — `event.value` strings stay the same to avoid data/migration impact):
-- `"Swim Lesson"` → `"Swim Group"` (it's a recurring group class, not a one-off lesson — matches existing curriculum terminology)
-- Keep `"Private"` and `"Semi-Private"` labels.
+### 2. Swim Enrollments table — expanded swimmer rows
+Wherever the inline `payment_status` badge appears alongside a swimmer (around line 805 in `SwimEnrollmentsAdmin.tsx`), render both badges with the prefix `Reg:` / `Session:` so they match the by-sessions view.
 
-**Reorder `EVENT_TYPES`** to surface what's used most:
-1. Private
-2. Semi-Private
-3. Swim Group
-4. I Can Swim
-5. Dive
-6. Rental
-7. Maintenance
-8. Other
+### 3. Status label normalization
+Show friendlier labels (instead of raw enum values):
+- `due_day_1` → "Due day 1"
+- `not_required` → "N/A"
+- everything else → capitalized as-is
 
-Change the default selected `eventType` from `"i-can-swim"` to `"private-lesson"` so the dialog opens on the most-used flow (and pre-fills price $65, title "Private Lesson").
+Centralize in a tiny helper (`src/lib/paymentLabels.ts`) so both views stay in sync.
 
-**Layout de-cram** (mainly the screenshot's complaint):
-- Bump dialog from `max-w-sm` to `max-w-md` so chips don't wrap onto 3 rows on desktop.
-- Group chips into a single line scrollable row OR allow 2 rows max with slightly larger touch targets (`px-3 py-1.5 text-xs`).
-- Move Date/Start/End into a tighter `grid-cols-3` with proper labels; current `grid-cols-[1fr_auto_auto]` causes uneven widths.
-- Add subtle section dividers (a thin `border-t pt-2` between: type, schedule, lesson-specific fields, instructor/notes, actions) so the form reads as logical groups instead of a wall of inputs.
-- Keep the dialog `max-h-[90vh] overflow-y-auto`.
+## Files to change
 
----
+- `src/components/admin/SessionEnrollmentCards.tsx` — add session fee badge, update interface, add legend
+- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — pass `session_fee_status` to `SessionEnrollmentCards`; update inline badge in swimmers row to show both
+- `src/lib/paymentLabels.ts` — new helper for label + color
 
-## Technical Notes
+## Out of scope
 
-- No DB migration required — `payment_method`/`payment_reference`/`paid_at` already exist on `lesson_booking_occurrences` and the constraint already supports manual proof.
-- `event_type` enum values in `pool_events` (`swim-lesson`, `private-lesson`, `semi-private-lesson`, etc.) remain unchanged. Only the human-readable label "Swim Lesson" → "Swim Group" changes in the picker. Other places that render the event_type label (calendar block detail, lists) can stay as-is for this pass unless the user wants them renamed too — flag at end of implementation.
-- The Stripe payment-link skip path simply no-ops the `supabase.functions.invoke` calls when `prepaid=true`.
-
----
-
-## Files to edit
-
-- `src/components/admin/calendar/LessonBookingFields.tsx` — add prepaid UI + types
-- `src/components/admin/calendar/AddPoolEventDialog.tsx` — rename/reorder chips, default type, layout polish, branch on `prepaid` in save handler
+No DB changes, no logic changes — display only.
