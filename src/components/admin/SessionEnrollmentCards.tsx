@@ -34,17 +34,6 @@ interface Enrollment {
   session_id: string | null;
 }
 
-interface Enrollment {
-  id: string;
-  child_name: string;
-  child_age: number;
-  parent_name: string;
-  parent_email: string;
-  payment_status: string;
-  status: string;
-  session_id: string | null;
-}
-
 interface SessionPeriod {
   id: string;
   name: string;
