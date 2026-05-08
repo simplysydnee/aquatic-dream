@@ -177,9 +177,6 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     } finally { setResending(false); }
   };
 
-  const [markDialogOpen, setMarkDialogOpen] = useState(false);
-  const [markMethod, setMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
-  const [markReference, setMarkReference] = useState("");
 
   const handleMarkPaidConfirm = async () => {
     if (!lessonOcc) return;
