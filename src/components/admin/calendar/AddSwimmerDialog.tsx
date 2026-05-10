@@ -54,6 +54,36 @@ const AddSwimmerDialog = ({
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"paid" | "unpaid">("paid");
 
+  // Account credit lookup
+  const [availableCredits, setAvailableCredits] = useState<{ id: string; amount_cents: number }[]>([]);
+  const [applyCredit, setApplyCredit] = useState(false);
+
+  useEffect(() => {
+    const email = parentEmail.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      setAvailableCredits([]);
+      setApplyCredit(false);
+      return;
+    }
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from("client_credits")
+        .select("id, amount_cents")
+        .ilike("parent_email", email)
+        .is("used_at", null)
+        .order("created_at", { ascending: true });
+      setAvailableCredits((data as any) ?? []);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [parentEmail]);
+
+  const creditTotalCents = availableCredits.reduce((s, c) => s + c.amount_cents, 0);
+  const amountNum = paymentAmount ? parseFloat(paymentAmount) : 0;
+  const creditAppliedCents = applyCredit
+    ? Math.min(creditTotalCents, Math.round(amountNum * 100))
+    : 0;
+  const netDueCents = Math.max(0, Math.round(amountNum * 100) - creditAppliedCents);
+
   const reset = () => {
     setChildName("");
     setChildAge("");
