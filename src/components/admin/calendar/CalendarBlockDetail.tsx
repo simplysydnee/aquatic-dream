@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2 } from "lucide-react";
+import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2, Ban } from "lucide-react";
+import CancelLessonDialog from "./CancelLessonDialog";
+import type { CancelTarget } from "@/lib/lessonCancel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -87,6 +89,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   const [markDialogOpen, setMarkDialogOpen] = useState(false);
   const [markMethod, setMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
   const [markReference, setMarkReference] = useState("");
+  const [cancelTargets, setCancelTargets] = useState<CancelTarget[] | null>(null);
 
   const refetchLesson = async () => {
     if (!eventId) return;
@@ -203,16 +206,40 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     } finally { setMarking(false); }
   };
 
-  const isSwim = block.kind === "swim";
-  const isICS = block.kind === "ics";
-
-  const title = isSwim
-    ? LEVEL_DISPLAY[block.session.swim_level as SwimLevel]?.name || block.session.swim_level
-    : isICS
-    ? block.session.client_name || block.session.session_type || "I Can Swim"
-    : block.event.title;
+  const isSwim = block?.kind === "swim";
+  const isICS = block?.kind === "ics";
 
   const fmtTime = (t: string) => format(new Date(`2000-01-01T${t}`), "h:mm a");
+
+  const buildSwimTarget = (sessionDateId: string) => {
+    if (!block || block.kind !== "swim") return;
+    const swimmers = block.enrollments.map((e) => {
+      const paid = e.payment_status === "paid" ? Number((block.session as any).session_price ?? 240) : 0;
+      return {
+        parentName: e.parent_name,
+        parentEmail: e.parent_email,
+        childName: e.child_name,
+        paidAmount: paid,
+      };
+    });
+    setCancelTargets([
+      {
+        kind: "session_date",
+        id: sessionDateId,
+        title: block.session.session_name || block.session.swim_level,
+        date: block.dateStr,
+        timeLabel: `${fmtTime(block.session.start_time)} – ${fmtTime(block.session.end_time)}`,
+        swimmers,
+      },
+    ]);
+  };
+
+
+  const title = isSwim
+    ? LEVEL_DISPLAY[(block as SwimBlockInfo).session.swim_level as SwimLevel]?.name || (block as SwimBlockInfo).session.swim_level
+    : isICS
+    ? (block as ICSBlockInfo).session.client_name || (block as ICSBlockInfo).session.session_type || "I Can Swim"
+    : (block as EventBlockInfo).event.title;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
@@ -634,13 +661,75 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
             )}
 
 
-            <div className="sticky bottom-0 bg-card border-t p-4 flex gap-2">
-              <Button size="sm" variant="outline" onClick={onEdit} className="flex-1 gap-1.5">
+            <div className="sticky bottom-0 bg-card border-t p-4 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={onEdit} className="flex-1 gap-1.5 min-w-[110px]">
                 <Pencil className="w-3.5 h-3.5" /> Edit
               </Button>
               {isSwim && (
-                <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => setShowAddSwimmer(true)}>
+                <Button size="sm" variant="outline" className="flex-1 gap-1.5 min-w-[110px]" onClick={() => setShowAddSwimmer(true)}>
                   <UserPlus className="w-3.5 h-3.5" /> Add Swimmer
+                </Button>
+              )}
+              {(isSwim || isLessonEventType) && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="flex-1 gap-1.5 min-w-[110px] text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    if (isSwim) {
+                      // Find or synthesize the session_lesson_dates row id for this date
+                      // We don't have it in props — do a quick lookup
+                      (async () => {
+                        const { data } = await supabase
+                          .from("session_lesson_dates")
+                          .select("id")
+                          .eq("session_id", block.session.id)
+                          .eq("lesson_date", block.dateStr)
+                          .maybeSingle();
+                        if (!data) {
+                          // create one so we can flag it cancelled
+                          const { data: created } = await supabase
+                            .from("session_lesson_dates")
+                            .insert({
+                              session_id: block.session.id,
+                              lesson_date: block.dateStr,
+                              is_cancelled: false,
+                            })
+                            .select("id")
+                            .maybeSingle();
+                          if (!created) return;
+                          buildSwimTarget(created.id);
+                        } else {
+                          buildSwimTarget(data.id);
+                        }
+                      })();
+                    } else if (isLessonEventType && lessonOcc && lessonBooking) {
+                      const price = Number(lessonBooking.price_per_session) || 0;
+                      const paid =
+                        lessonOcc.payment_status === "paid" || lessonOcc.payment_status === "comp"
+                          ? price
+                          : 0;
+                      setCancelTargets([
+                        {
+                          kind: "lesson_occurrence",
+                          id: lessonOcc.id,
+                          title: lessonBooking.lesson_type === "private" ? "Private lesson" : "Semi-private lesson",
+                          date: lessonOcc.occurrence_date,
+                          timeLabel: `${fmtTime(lessonBooking.start_time)} – ${fmtTime(lessonBooking.end_time)}`,
+                          swimmers: [
+                            {
+                              parentName: lessonBooking.parent_name,
+                              parentEmail: lessonBooking.parent_email,
+                              childName: lessonBooking.child_name || lessonBooking.parent_name,
+                              paidAmount: paid,
+                            },
+                          ],
+                        },
+                      ]);
+                    }
+                  }}
+                >
+                  <Ban className="w-3.5 h-3.5" /> Cancel
                 </Button>
               )}
             </div>
@@ -749,6 +838,13 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                 </div>
               </DialogContent>
             </Dialog>
+
+            <CancelLessonDialog
+              open={!!cancelTargets}
+              onOpenChange={(o) => { if (!o) setCancelTargets(null); }}
+              targets={cancelTargets || []}
+              onDone={() => { setCancelTargets(null); onClose(); onRefetch?.(); }}
+            />
           </>
         )}
       </div>
