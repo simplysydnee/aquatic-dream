@@ -217,7 +217,7 @@ export default function SwimmerDetailDrawer({
               )}
             </TabsContent>
 
-            <TabsContent value="activity" className="p-6 mt-0 space-y-6">
+            <TabsContent value="activity" className="p-4 sm:p-6 mt-0 space-y-4 sm:space-y-6">
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <Waves className="h-4 w-4 text-primary" />
@@ -288,15 +288,15 @@ export default function SwimmerDetailDrawer({
               </section>
             </TabsContent>
 
-            <TabsContent value="payments" className="p-6 mt-0">
+            <TabsContent value="payments" className="p-4 sm:p-6 mt-0">
               <PaymentsTab swimmer={swimmer} />
             </TabsContent>
 
-            <TabsContent value="comms" className="p-6 mt-0">
+            <TabsContent value="comms" className="p-4 sm:p-6 mt-0">
               <CommunicationsTab swimmer={swimmer} />
             </TabsContent>
 
-            <TabsContent value="notes" className="p-6 mt-0">
+            <TabsContent value="notes" className="p-4 sm:p-6 mt-0">
               <InternalCommentsPanel
                 targetType="swimmer"
                 targetKey={swimmer.key}
