@@ -1,14 +1,19 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
-import { ChevronDown, Users, Info } from "lucide-react";
+import { ChevronDown, Users, Info, MoreVertical, Lock, LockOpen, Trash2 } from "lucide-react";
 import { useState } from "react";
 import LevelBadge from "@/components/LevelBadge";
 import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
 import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 
 interface SessionInfo {
@@ -21,6 +26,7 @@ interface SessionInfo {
   max_students: number;
   day_of_week: string;
   session_period_id: string | null;
+  registration_status?: string;
 }
 
 interface Enrollment {
@@ -62,10 +68,12 @@ export default function SessionEnrollmentCards({
   sessions,
   enrollments,
   sessionPeriods,
+  onChanged,
 }: {
   sessions: Record<string, SessionInfo>;
   enrollments: Enrollment[];
   sessionPeriods: SessionPeriod[];
+  onChanged?: () => void;
 }) {
   const getDefaultPeriod = () => {
     if (sessionPeriods.length === 0) return "all";
@@ -130,6 +138,7 @@ export default function SessionEnrollmentCards({
                   key={session.id}
                   session={session}
                   enrolled={enrollmentsBySession[session.id] || []}
+                  onChanged={onChanged}
                 />
               ))}
           </div>
@@ -144,6 +153,7 @@ export default function SessionEnrollmentCards({
                 key={session.id}
                 session={session}
                 enrolled={enrollmentsBySession[session.id] || []}
+                onChanged={onChanged}
               />
             ))}
           </div>
@@ -153,8 +163,10 @@ export default function SessionEnrollmentCards({
   );
 }
 
-function SessionCard({ session, enrolled }: { session: SessionInfo; enrolled: Enrollment[] }) {
+function SessionCard({ session, enrolled, onChanged }: { session: SessionInfo; enrolled: Enrollment[]; onChanged?: () => void }) {
   const [open, setOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
   const levelInfo = LEVEL_DISPLAY[session.swim_level as SwimLevel];
   const ageGroup = session.age_group === "preschool-3-5" ? "preschool-3-5" as const : "school-age-6-12" as const;
   const groupName = levelInfo ? getGroupName(session.swim_level as SwimLevel, ageGroup) : session.swim_level;
@@ -162,9 +174,40 @@ function SessionCard({ session, enrolled }: { session: SessionInfo; enrolled: En
   const max = session.max_students;
   const pct = max > 0 ? Math.min((count / max) * 100, 100) : 0;
   const isFull = count >= max;
+  const isClosed = session.registration_status === "closed";
+  const hasEnrollments = count > 0;
+
+  const toggleStatus = async () => {
+    setBusy(true);
+    const next = isClosed ? "open" : "closed";
+    const { error } = await supabase.from("swim_sessions")
+      .update({ registration_status: next })
+      .eq("id", session.id);
+    setBusy(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: `Class ${next === "closed" ? "closed to new sign-ups" : "reopened"}` });
+    onChanged?.();
+  };
+
+  const deleteClass = async () => {
+    setBusy(true);
+    await supabase.from("session_lesson_dates").delete().eq("session_id", session.id);
+    const { error } = await supabase.from("swim_sessions").delete().eq("id", session.id);
+    setBusy(false);
+    setConfirmDelete(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Class deleted" });
+    onChanged?.();
+  };
 
   return (
-    <Card className={isFull ? "border-red-300" : ""}>
+    <Card className={`${isFull ? "border-red-300" : ""} ${isClosed ? "opacity-70" : ""}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
@@ -173,9 +216,38 @@ function SessionCard({ session, enrolled }: { session: SessionInfo; enrolled: En
               {session.session_name || groupName}
             </CardTitle>
           </div>
-          <Badge variant="outline" className={levelInfo?.color || ""}>
-            {groupName}
-          </Badge>
+          <div className="flex items-center gap-1 shrink-0">
+            {isClosed && <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-700">Closed</Badge>}
+            <Badge variant="outline" className={levelInfo?.color || ""}>
+              {groupName}
+            </Badge>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" disabled={busy}>
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={toggleStatus}>
+                  {isClosed ? <><LockOpen className="w-4 h-4 mr-2" />Reopen registration</> : <><Lock className="w-4 h-4 mr-2" />Close registration</>}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={hasEnrollments}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete class
+                </DropdownMenuItem>
+                {hasEnrollments && (
+                  <div className="px-2 py-1 text-[10px] text-muted-foreground max-w-[220px]">
+                    Cancel or move {count} enrolled swimmer{count !== 1 ? "s" : ""} before deleting.
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <div className="text-xs text-muted-foreground space-y-0.5">
           <div>{formatDayOfWeek(session.day_of_week)} · {formatTime(session.start_time)}{session.end_time ? ` – ${formatTime(session.end_time)}` : ""}</div>
@@ -225,6 +297,22 @@ function SessionCard({ session, enrolled }: { session: SessionInfo; enrolled: En
           </Collapsible>
         )}
       </CardContent>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this class?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes <strong>{session.session_name || groupName}</strong> ({formatDayOfWeek(session.day_of_week)} {formatTime(session.start_time)}) and its scheduled lesson dates. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteClass} disabled={busy} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

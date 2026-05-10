@@ -156,7 +156,7 @@ const SwimEnrollmentsAdmin = () => {
   const fetchData = async () => {
     const [enrollRes, sessionRes, periodRes] = await Promise.all([
       supabase.from("swim_enrollments").select("*").order("created_at", { ascending: false }),
-      supabase.from("swim_sessions").select("id, start_time, end_time, session_name, age_group, swim_level, max_students, day_of_week, session_period_id"),
+      supabase.from("swim_sessions").select("id, start_time, end_time, session_name, age_group, swim_level, max_students, day_of_week, session_period_id, registration_status"),
       supabase.from("session_periods").select("id, name, start_date").order("start_date", { ascending: true }),
     ]);
 
@@ -746,6 +746,7 @@ const SwimEnrollmentsAdmin = () => {
             sessions={sessions}
             enrollments={nonCancelled}
             sessionPeriods={sessionPeriods}
+            onChanged={fetchData}
           />
         </TabsContent>
 
