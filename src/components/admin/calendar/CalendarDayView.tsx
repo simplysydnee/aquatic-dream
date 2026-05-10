@@ -566,7 +566,7 @@ const CalendarDayView = ({
           <div
             key={col.id}
             className="flex-1 relative border-l"
-            style={{ height: `${TOTAL_HEIGHT}px`, minWidth: "120px" }}
+            style={{ height: `${TOTAL_HEIGHT}px`, minWidth: isMobile ? "140px" : "120px" }}
             onMouseMove={(e) => {
               if (col.group !== "ics") {
                 const rect = e.currentTarget.getBoundingClientRect();
