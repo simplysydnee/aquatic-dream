@@ -336,8 +336,7 @@ const InstructorDayModal = ({ open, onOpenChange, instructorName, initialDate, o
         open={reassignOpen}
         onOpenChange={setReassignOpen}
         sessionDateIds={reassignSessionDateIds}
-        poolEventIds={reassignPoolEventIds}
-        notifyMeta={reassignNotifyMeta}
+        poolEventIds={[]}
         onDone={() => {
           load();
           onChanged?.();
