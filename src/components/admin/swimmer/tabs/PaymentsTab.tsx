@@ -11,6 +11,7 @@ import { CheckCircle2, ExternalLink, Send, DollarSign } from "lucide-react";
 import type { Swimmer, SwimmerEnrollment } from "@/hooks/useSwimmers";
 import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
 import { getStripeEnvironment } from "@/lib/stripe";
+import CreditsSection from "./CreditsSection";
 
 interface Props {
   swimmer: Swimmer;
