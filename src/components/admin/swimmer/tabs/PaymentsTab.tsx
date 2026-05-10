@@ -132,6 +132,8 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
         <DollarSign className="h-8 w-8 text-muted-foreground/40" />
       </div>
 
+      {swimmer.parent_email && <CreditsSection parentEmail={swimmer.parent_email} />}
+
       <div className="space-y-3">
         {swimmer.enrollments
           .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
