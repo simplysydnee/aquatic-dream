@@ -307,6 +307,145 @@ const CalendarDayView = ({
   const adCount = columns.filter((c) => c.group === "ad").length;
   const diveCount = columns.filter((c) => c.group === "dive").length;
 
+  // ── Mobile agenda items (flat, time-sorted) ──
+  type AgendaItem = {
+    key: string;
+    startMins: number;
+    endMins: number;
+    startLabel: string;
+    endLabel: string;
+    colorKey: string;
+    levelKey?: string; // for swim level color override
+    title: string;
+    subtitle?: string;
+    extra?: string;
+    dimmed: boolean;
+    onClick: () => void;
+    locked?: boolean;
+  };
+
+  const agendaItems = useMemo<AgendaItem[]>(() => {
+    if (!isMobile) return [];
+    const items: AgendaItem[] = [];
+
+    if (showICS) {
+      todayICS.forEach((s) => {
+        const isClosed = s.status?.toLowerCase() === "closed";
+        const colorKey = isClosed ? "i-can-swim-closed" : "i-can-swim";
+        const title = isClosed
+          ? (s.instructor_name || "Instructor")
+          : (s.client_name || s.session_type || "I Can Swim");
+        items.push({
+          key: `ics-${s.id}`,
+          startMins: timeToMinutes(s.start_time),
+          endMins: timeToMinutes(s.end_time),
+          startLabel: fmtTime(s.start_time),
+          endLabel: fmtTime(s.end_time),
+          colorKey,
+          title,
+          subtitle: s.instructor_name ? `Coach ${s.instructor_name}` : "I Can Swim 209",
+          extra: isClosed ? "Closed" : `${s.confirmed_bookings}/${s.max_capacity} booked`,
+          dimmed: false,
+          locked: true,
+          onClick: () => setDetailBlock({ kind: "ics", session: s }),
+        });
+      });
+    }
+
+    if (showAD) {
+      todaySessions.forEach((s) => {
+        const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
+        const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
+        items.push({
+          key: `ad-${s.id}`,
+          startMins: timeToMinutes(s.start_time),
+          endMins: timeToMinutes(s.end_time),
+          startLabel: fmtTime(s.start_time),
+          endLabel: fmtTime(s.end_time),
+          colorKey: "swim",
+          levelKey: s.swim_level,
+          title: levelInfo?.name || s.swim_level,
+          subtitle: s.session_name || (s.instructors?.name ? `Coach ${s.instructors.name}` : undefined),
+          extra: `${sessionEnrollments.length}/${s.max_students} swimmers`,
+          dimmed: false,
+          onClick: () =>
+            setDetailBlock({
+              kind: "swim",
+              session: s,
+              enrollments: sessionEnrollments,
+              attendance: attendance.filter((a) => a.session_id === s.id),
+              agreements,
+              dateStr,
+            }),
+        });
+      });
+
+      adEvents.forEach((e) => {
+        items.push({
+          key: `event-${e.id}`,
+          startMins: timeToMinutes(e.start_time),
+          endMins: timeToMinutes(e.end_time),
+          startLabel: fmtTime(e.start_time),
+          endLabel: fmtTime(e.end_time),
+          colorKey: e.event_type,
+          title: e.title,
+          subtitle: e.instructor_name || e.pool_area,
+          dimmed: !activeFilters.has(e.event_type as ActivityType),
+          onClick: () => setDetailBlock({ kind: "event", event: e }),
+        });
+      });
+
+      swimLessonEvents.forEach((e) => {
+        items.push({
+          key: `swl-${e.id}`,
+          startMins: timeToMinutes(e.start_time),
+          endMins: timeToMinutes(e.end_time),
+          startLabel: fmtTime(e.start_time),
+          endLabel: fmtTime(e.end_time),
+          colorKey: "swim-lesson",
+          title: e.title,
+          subtitle: e.instructor_name || e.notes || undefined,
+          dimmed: !activeFilters.has("swim"),
+          onClick: () => setDetailBlock({ kind: "event", event: e }),
+        });
+      });
+    }
+
+    if (showDive) {
+      diveRentalEvents.forEach((e) => {
+        items.push({
+          key: `dr-${e.id}`,
+          startMins: timeToMinutes(e.start_time),
+          endMins: timeToMinutes(e.end_time),
+          startLabel: fmtTime(e.start_time),
+          endLabel: fmtTime(e.end_time),
+          colorKey: e.event_type,
+          title: e.title,
+          subtitle: e.instructor_name || e.pool_area,
+          dimmed: !activeFilters.has(e.event_type as ActivityType),
+          onClick: () => setDetailBlock({ kind: "event", event: e }),
+        });
+      });
+    }
+
+    return items.sort((a, b) => a.startMins - b.startMins);
+  }, [
+    isMobile, showICS, showAD, showDive, todayICS, todaySessions, enrollments,
+    attendance, agreements, dateStr, adEvents, swimLessonEvents, diveRentalEvents,
+    activeFilters,
+  ]);
+
+  // Group agenda items by hour bucket (skip empty hours)
+  const agendaByHour = useMemo(() => {
+    const map = new Map<number, AgendaItem[]>();
+    agendaItems.forEach((it) => {
+      const h = Math.floor(it.startMins / 60);
+      if (!map.has(h)) map.set(h, []);
+      map.get(h)!.push(it);
+    });
+    return [...map.entries()].sort((a, b) => a[0] - b[0]);
+  }, [agendaItems]);
+
   // ── Delete handler ──
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -414,7 +553,8 @@ const CalendarDayView = ({
   return (
     <TooltipProvider delayDuration={150}>
     <div className="border rounded-lg bg-card overflow-hidden">
-      {/* ── Group headers ── */}
+      {/* ── Group headers (desktop only) ── */}
+      {!isMobile && (
       <div className="flex border-b">
         {/* Time gutter */}
         <div className="w-16 shrink-0" />
@@ -476,6 +616,7 @@ const CalendarDayView = ({
           </div>
         )}
       </div>
+      )}
 
       {/* ── Instructors today (clickable to open day-modal) ── */}
       {(() => {
@@ -502,6 +643,74 @@ const CalendarDayView = ({
         );
       })()}
 
+      {isMobile ? (
+        /* ── Mobile: stacked agenda by hour ── */
+        <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 240px)" }}>
+          {agendaByHour.length === 0 ? (
+            <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+              Nothing scheduled
+            </div>
+          ) : (
+            <div className="divide-y">
+              {agendaByHour.map(([hour, items]) => {
+                const hourLabel = hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`;
+                const isCurrentHour = format(date, "yyyy-MM-dd") === format(now, "yyyy-MM-dd") &&
+                  new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })).getHours() === hour;
+                return (
+                  <div key={hour} className="bg-background">
+                    <div className={cn(
+                      "sticky top-0 z-10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide bg-muted/80 backdrop-blur border-b",
+                      isCurrentHour ? "text-primary" : "text-muted-foreground"
+                    )}>
+                      {hourLabel}{isCurrentHour && <span className="ml-2 inline-block w-1.5 h-1.5 rounded-full bg-red-500 align-middle" />}
+                    </div>
+                    <div className="p-2 space-y-1.5">
+                      {items.map((it) => {
+                        const lvlColor = it.levelKey ? LEVEL_COLORS[it.levelKey] : null;
+                        const colors = lvlColor || BLOCK_COLORS[it.colorKey] || BLOCK_COLORS.other;
+                        return (
+                          <button
+                            key={it.key}
+                            onClick={it.onClick}
+                            className={cn(
+                              "w-full text-left rounded-md border-l-4 px-3 py-2 transition-opacity active:opacity-70",
+                              it.dimmed && "opacity-40"
+                            )}
+                            style={{
+                              backgroundColor: colors.bg,
+                              borderLeftColor: colors.border,
+                              color: colors.text,
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 text-[11px] font-semibold opacity-80">
+                                  <span>{it.startLabel} – {it.endLabel}</span>
+                                  {it.locked && <Lock className="w-3 h-3 opacity-60" />}
+                                </div>
+                                <p className="text-sm font-semibold leading-tight mt-0.5 truncate">{it.title}</p>
+                                {it.subtitle && (
+                                  <p className="text-xs opacity-75 leading-tight mt-0.5 truncate">{it.subtitle}</p>
+                                )}
+                              </div>
+                              {it.extra && (
+                                <span className="text-[11px] font-medium opacity-70 shrink-0 whitespace-nowrap">
+                                  {it.extra}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
       {/* ── Column name headers (color-coded for AD) ── */}
       <div className="flex border-b">
         <div className="w-16 shrink-0" />
@@ -864,6 +1073,8 @@ const CalendarDayView = ({
         ))}
       </div>
       </div>
+        </>
+      )}
 
       {/* ── Block detail panel ── */}
       <CalendarBlockDetail
