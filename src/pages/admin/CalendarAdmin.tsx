@@ -74,8 +74,8 @@ const CalendarAdmin = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-display font-bold text-foreground">Pool Calendar</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">Pool Calendar</h2>
+          <p className="hidden sm:block text-sm text-muted-foreground">
             Manage lessons and pool schedule
           </p>
         </div>
