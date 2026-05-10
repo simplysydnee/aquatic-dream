@@ -207,14 +207,8 @@ const InstructorDayModal = ({ open, onOpenChange, instructorName, initialDate, o
     .filter((r) => r.kind === "session_date")
     .map((r) => r.sessionDateId!)
     .filter(Boolean);
-  const reassignPoolEventIds: string[] = [];
-  const reassignNotifyMeta: Record<string, any> = {};
-  for (const r of selectedRows) {
-    if (r.kind === "session_date" && r.sessionDateId) {
-    } else if (r.notify) {
-      reassignNotifyMeta[r.id.replace("lo-", "")] = r.notify;
-    }
-  }
+  const hasUnreassignable = selectedRows.some((r) => r.kind !== "session_date");
+  const canReassign = selectedRows.length > 0 && !hasUnreassignable;
 
   return (
     <>
