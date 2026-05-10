@@ -814,6 +814,7 @@ const CalendarDayView = ({
                   const endMins = timeToMinutes(s.end_time);
                   const isClosed = s.status?.toLowerCase() === "closed";
                   const colorKey = isClosed ? "i-can-swim-closed" : "i-can-swim";
+                  const bookedCount = Math.max(s.confirmed_bookings ?? 0, s.client_name ? 1 : 0);
                   const label = isClosed
                     ? (s.instructor_name || "Instructor")
                     : (s.client_name || s.session_type || "I Can Swim");
@@ -837,7 +838,7 @@ const CalendarDayView = ({
                       {s.instructor_name && <p>Instructor: {s.instructor_name}</p>}
                       {s.session_type && <p>Type: {s.session_type}</p>}
                       <p>Status: {s.status}</p>
-                      <p>{s.confirmed_bookings}/{s.max_capacity} booked</p>
+                      <p>{bookedCount}/{s.max_capacity} booked</p>
                     </div>
                   );
                 })}
