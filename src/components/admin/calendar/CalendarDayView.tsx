@@ -645,7 +645,7 @@ const CalendarDayView = ({
 
       {isMobile ? (
         /* ── Mobile: stacked agenda by hour ── */
-        <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 240px)" }}>
+        <div ref={scrollRef} className="overflow-y-auto overflow-x-hidden max-w-full" style={{ maxHeight: "calc(100vh - 240px)" }}>
           {agendaByHour.length === 0 ? (
             <div className="px-4 py-12 text-center text-sm text-muted-foreground">
               Nothing scheduled
@@ -673,7 +673,7 @@ const CalendarDayView = ({
                             key={it.key}
                             onClick={it.onClick}
                             className={cn(
-                              "w-full text-left rounded-md border-l-4 px-3 py-2 transition-opacity active:opacity-70",
+                              "w-full max-w-full text-left rounded-md border-l-4 px-3 py-2 transition-opacity active:opacity-70 overflow-hidden",
                               it.dimmed && "opacity-40"
                             )}
                             style={{
@@ -682,21 +682,19 @@ const CalendarDayView = ({
                               color: colors.text,
                             }}
                           >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 text-[11px] font-semibold opacity-80">
-                                  <span>{it.startLabel} – {it.endLabel}</span>
-                                  {it.locked && <Lock className="w-3 h-3 opacity-60" />}
-                                </div>
-                                <p className="text-sm font-semibold leading-tight mt-0.5 truncate">{it.title}</p>
-                                {it.subtitle && (
-                                  <p className="text-xs opacity-75 leading-tight mt-0.5 truncate">{it.subtitle}</p>
+                            <div className="min-w-0 w-full">
+                              <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[11px] font-semibold opacity-80">
+                                <span>{it.startLabel} – {it.endLabel}</span>
+                                {it.locked && <Lock className="w-3 h-3 opacity-60" />}
+                                {it.extra && (
+                                  <span className="ml-auto text-[11px] font-medium opacity-70 break-words">
+                                    {it.extra}
+                                  </span>
                                 )}
                               </div>
-                              {it.extra && (
-                                <span className="text-[11px] font-medium opacity-70 shrink-0 whitespace-nowrap">
-                                  {it.extra}
-                                </span>
+                              <p className="text-sm font-semibold leading-tight mt-0.5 break-words">{it.title}</p>
+                              {it.subtitle && (
+                                <p className="text-xs opacity-75 leading-tight mt-0.5 break-words">{it.subtitle}</p>
                               )}
                             </div>
                           </button>
