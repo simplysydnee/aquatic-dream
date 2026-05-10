@@ -98,7 +98,28 @@ const AddSwimmerDialog = ({
     setTab("enroll");
   };
 
+  const consumeCredits = async (enrollmentId: string) => {
+    if (creditAppliedCents <= 0) return;
+    let remaining = creditAppliedCents;
+    for (const c of availableCredits) {
+      if (remaining <= 0) break;
+      // Simple model: mark each credit fully used in order until remaining is satisfied.
+      await supabase
+        .from("client_credits")
+        .update({
+          used_at: new Date().toISOString(),
+          used_against: enrollmentId,
+        })
+        .eq("id", c.id);
+      remaining -= c.amount_cents;
+    }
+  };
+
   const callAdminCreate = async (isWalkIn: boolean) => {
+    const netAmount = applyCredit ? netDueCents / 100 : (paymentAmount ? parseFloat(paymentAmount) : null);
+    const noteParts: string[] = [];
+    if (isWalkIn) noteParts.push(`Walk-in on ${dateStr}`);
+    if (creditAppliedCents > 0) noteParts.push(`Applied $${(creditAppliedCents / 100).toFixed(2)} account credit`);
     const { data, error } = await supabase.functions.invoke("admin-create-enrollment", {
       body: {
         childName,
@@ -111,15 +132,18 @@ const AddSwimmerDialog = ({
         isFirstTime,
         paymentMethod,
         paymentReference: paymentReference.trim() || `${paymentMethod} ${dateStr}`,
-        paymentStatus,
-        paymentAmount: paymentAmount ? parseFloat(paymentAmount) : null,
-        notes: isWalkIn ? `Walk-in on ${dateStr}` : null,
+        paymentStatus: applyCredit && netDueCents === 0 ? "paid" : paymentStatus,
+        paymentAmount: netAmount,
+        notes: noteParts.join(" · ") || null,
         isWalkIn,
         walkInDate: isWalkIn ? dateStr : undefined,
       },
     });
     if (error || !data?.success) {
       throw new Error(error?.message || data?.error || "Failed to create enrollment");
+    }
+    if (data?.enrollmentId) {
+      await consumeCredits(data.enrollmentId);
     }
   };
 
