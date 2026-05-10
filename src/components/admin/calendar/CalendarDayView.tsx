@@ -332,6 +332,7 @@ const CalendarDayView = ({
       todayICS.forEach((s) => {
         const isClosed = s.status?.toLowerCase() === "closed";
         const colorKey = isClosed ? "i-can-swim-closed" : "i-can-swim";
+        const bookedCount = Math.max(s.confirmed_bookings ?? 0, s.client_name ? 1 : 0);
         const title = isClosed
           ? (s.instructor_name || "Instructor")
           : (s.client_name || s.session_type || "I Can Swim");
@@ -344,7 +345,7 @@ const CalendarDayView = ({
           colorKey,
           title,
           subtitle: s.instructor_name ? `Coach ${s.instructor_name}` : "I Can Swim 209",
-          extra: isClosed ? "Closed" : `${s.confirmed_bookings}/${s.max_capacity} booked`,
+          extra: isClosed ? "Closed" : `${bookedCount}/${s.max_capacity} booked`,
           dimmed: false,
           locked: true,
           onClick: () => setDetailBlock({ kind: "ics", session: s }),
@@ -664,7 +665,7 @@ const CalendarDayView = ({
                     )}>
                       {hourLabel}{isCurrentHour && <span className="ml-2 inline-block w-1.5 h-1.5 rounded-full bg-red-500 align-middle" />}
                     </div>
-                    <div className="p-2 space-y-1.5">
+          <div className="p-2 space-y-1.5 min-w-0">
                       {items.map((it) => {
                         const lvlColor = it.levelKey ? LEVEL_COLORS[it.levelKey] : null;
                         const colors = lvlColor || BLOCK_COLORS[it.colorKey] || BLOCK_COLORS.other;
@@ -684,14 +685,14 @@ const CalendarDayView = ({
                           >
                             <div className="min-w-0 w-full">
                               <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[11px] font-semibold opacity-80">
-                                <span>{it.startLabel} – {it.endLabel}</span>
+                            <span className="min-w-0 break-words">{it.startLabel} – {it.endLabel}</span>
                                 {it.locked && <Lock className="w-3 h-3 opacity-60" />}
-                                {it.extra && (
-                                  <span className="ml-auto text-[11px] font-medium opacity-70 break-words">
-                                    {it.extra}
-                                  </span>
-                                )}
                               </div>
+                          {it.extra && (
+                            <p className="mt-0.5 text-[11px] font-medium opacity-70 break-words">
+                              {it.extra}
+                            </p>
+                          )}
                               <p className="text-sm font-semibold leading-tight mt-0.5 break-words">{it.title}</p>
                               {it.subtitle && (
                                 <p className="text-xs opacity-75 leading-tight mt-0.5 break-words">{it.subtitle}</p>
@@ -813,6 +814,7 @@ const CalendarDayView = ({
                   const endMins = timeToMinutes(s.end_time);
                   const isClosed = s.status?.toLowerCase() === "closed";
                   const colorKey = isClosed ? "i-can-swim-closed" : "i-can-swim";
+                  const bookedCount = Math.max(s.confirmed_bookings ?? 0, s.client_name ? 1 : 0);
                   const label = isClosed
                     ? (s.instructor_name || "Instructor")
                     : (s.client_name || s.session_type || "I Can Swim");
@@ -836,7 +838,7 @@ const CalendarDayView = ({
                       {s.instructor_name && <p>Instructor: {s.instructor_name}</p>}
                       {s.session_type && <p>Type: {s.session_type}</p>}
                       <p>Status: {s.status}</p>
-                      <p>{s.confirmed_bookings}/{s.max_capacity} booked</p>
+                      <p>{bookedCount}/{s.max_capacity} booked</p>
                     </div>
                   );
                 })}
