@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil } from "lucide-react";
+import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil, Info, DollarSign, MessageSquare, StickyNote } from "lucide-react";
 import type { Swimmer } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "./SwimmerStatusBadges";
 import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
@@ -138,12 +138,28 @@ export default function SwimmerDetailDrawer({
         </SheetHeader>
 
         <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="mx-3 sm:mx-6 mt-3 sm:mt-4 flex sm:grid sm:grid-cols-5 w-auto h-auto p-1 border border-border bg-background rounded-lg gap-1 overflow-x-auto whitespace-nowrap [&>*]:shrink-0">
-            <TabsTrigger value="overview" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm text-xs sm:text-sm px-2.5 sm:px-3">Info</TabsTrigger>
-            <TabsTrigger value="activity" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm text-xs sm:text-sm px-2.5 sm:px-3"><span className="sm:hidden">Activity ({totalActivity})</span><span className="hidden sm:inline">Enrollments ({totalActivity})</span></TabsTrigger>
-            <TabsTrigger value="payments" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm text-xs sm:text-sm px-2.5 sm:px-3"><span className="sm:hidden">$</span><span className="hidden sm:inline">Payments</span></TabsTrigger>
-            <TabsTrigger value="comms" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm text-xs sm:text-sm px-2.5 sm:px-3"><span className="sm:hidden">Comms</span><span className="hidden sm:inline">Communications</span></TabsTrigger>
-            <TabsTrigger value="notes" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm text-xs sm:text-sm px-2.5 sm:px-3">Notes</TabsTrigger>
+          <TabsList className="mx-3 sm:mx-6 mt-3 sm:mt-4 flex w-auto h-auto p-1 border border-border bg-muted/40 rounded-lg gap-1 overflow-x-auto whitespace-nowrap [&>*]:shrink-0 justify-start sm:justify-between">
+            {[
+              { value: "overview", icon: Info, label: "Info" },
+              { value: "activity", icon: Waves, label: "Activity", count: totalActivity },
+              { value: "payments", icon: DollarSign, label: "Payments" },
+              { value: "comms", icon: MessageSquare, label: "Messages" },
+              { value: "notes", icon: StickyNote, label: "Notes" },
+            ].map(({ value, icon: Icon, label, count }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:border-border data-[state=active]:shadow-sm text-xs sm:text-sm px-3 sm:px-4 py-2"
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{label}</span>
+                {count != null && count > 0 && (
+                  <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground data-[state=active]:bg-primary/10">
+                    {count}
+                  </span>
+                )}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <ScrollArea className="flex-1">
