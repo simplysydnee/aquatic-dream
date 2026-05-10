@@ -153,6 +153,7 @@ export default function SessionEnrollmentCards({
                 key={session.id}
                 session={session}
                 enrolled={enrollmentsBySession[session.id] || []}
+                onChanged={onChanged}
               />
             ))}
           </div>
