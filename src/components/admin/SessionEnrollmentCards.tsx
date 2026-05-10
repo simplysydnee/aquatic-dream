@@ -68,10 +68,12 @@ export default function SessionEnrollmentCards({
   sessions,
   enrollments,
   sessionPeriods,
+  onChanged,
 }: {
   sessions: Record<string, SessionInfo>;
   enrollments: Enrollment[];
   sessionPeriods: SessionPeriod[];
+  onChanged?: () => void;
 }) {
   const getDefaultPeriod = () => {
     if (sessionPeriods.length === 0) return "all";
