@@ -258,6 +258,32 @@ const AddSwimmerDialog = ({
                 </Label>
               </div>
 
+              {creditTotalCents > 0 && (
+                <div className="rounded border border-primary/30 bg-primary/5 p-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-primary" />
+                      <span className="font-medium">Account credit available</span>
+                    </div>
+                    <span className="font-bold text-primary">${(creditTotalCents / 100).toFixed(2)}</span>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={applyCredit}
+                      onChange={(e) => setApplyCredit(e.target.checked)}
+                      className="h-3.5 w-3.5"
+                    />
+                    Apply ${(Math.min(creditTotalCents, Math.round(amountNum * 100)) / 100).toFixed(2)} credit toward this enrollment
+                  </label>
+                  {applyCredit && (
+                    <p className="text-xs text-muted-foreground">
+                      Net due: <span className="font-medium text-foreground">${(netDueCents / 100).toFixed(2)}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Payment audit block — required for traceability */}
               <div className="space-y-3 p-3 rounded border border-border bg-muted/20">
                 <p className="text-xs font-semibold text-foreground">Payment Record (required)</p>
