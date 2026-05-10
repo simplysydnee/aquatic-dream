@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, CalendarCheck } from "lucide-react";
+import { UserPlus, CalendarCheck, Wallet } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -54,6 +54,36 @@ const AddSwimmerDialog = ({
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"paid" | "unpaid">("paid");
 
+  // Account credit lookup
+  const [availableCredits, setAvailableCredits] = useState<{ id: string; amount_cents: number }[]>([]);
+  const [applyCredit, setApplyCredit] = useState(false);
+
+  useEffect(() => {
+    const email = parentEmail.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      setAvailableCredits([]);
+      setApplyCredit(false);
+      return;
+    }
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from("client_credits")
+        .select("id, amount_cents")
+        .ilike("parent_email", email)
+        .is("used_at", null)
+        .order("created_at", { ascending: true });
+      setAvailableCredits((data as any) ?? []);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [parentEmail]);
+
+  const creditTotalCents = availableCredits.reduce((s, c) => s + c.amount_cents, 0);
+  const amountNum = paymentAmount ? parseFloat(paymentAmount) : 0;
+  const creditAppliedCents = applyCredit
+    ? Math.min(creditTotalCents, Math.round(amountNum * 100))
+    : 0;
+  const netDueCents = Math.max(0, Math.round(amountNum * 100) - creditAppliedCents);
+
   const reset = () => {
     setChildName("");
     setChildAge("");
@@ -68,7 +98,40 @@ const AddSwimmerDialog = ({
     setTab("enroll");
   };
 
+  const consumeCredits = async (enrollmentId: string) => {
+    if (creditAppliedCents <= 0) return;
+    let remaining = creditAppliedCents;
+    for (const c of availableCredits) {
+      if (remaining <= 0) break;
+      if (c.amount_cents <= remaining) {
+        await supabase
+          .from("client_credits")
+          .update({ used_at: new Date().toISOString(), used_against: enrollmentId })
+          .eq("id", c.id);
+        remaining -= c.amount_cents;
+      } else {
+        // Partial: split into used + leftover
+        await supabase
+          .from("client_credits")
+          .update({ amount_cents: remaining, used_at: new Date().toISOString(), used_against: enrollmentId })
+          .eq("id", c.id);
+        await supabase.from("client_credits").insert({
+          parent_email: parentEmail.trim().toLowerCase(),
+          amount_cents: c.amount_cents - remaining,
+          source: "credit_split",
+          source_ref: enrollmentId,
+          note: "Leftover after partial application",
+        });
+        remaining = 0;
+      }
+    }
+  };
+
   const callAdminCreate = async (isWalkIn: boolean) => {
+    const netAmount = applyCredit ? netDueCents / 100 : (paymentAmount ? parseFloat(paymentAmount) : null);
+    const noteParts: string[] = [];
+    if (isWalkIn) noteParts.push(`Walk-in on ${dateStr}`);
+    if (creditAppliedCents > 0) noteParts.push(`Applied $${(creditAppliedCents / 100).toFixed(2)} account credit`);
     const { data, error } = await supabase.functions.invoke("admin-create-enrollment", {
       body: {
         childName,
@@ -81,15 +144,18 @@ const AddSwimmerDialog = ({
         isFirstTime,
         paymentMethod,
         paymentReference: paymentReference.trim() || `${paymentMethod} ${dateStr}`,
-        paymentStatus,
-        paymentAmount: paymentAmount ? parseFloat(paymentAmount) : null,
-        notes: isWalkIn ? `Walk-in on ${dateStr}` : null,
+        paymentStatus: applyCredit && netDueCents === 0 ? "paid" : paymentStatus,
+        paymentAmount: netAmount,
+        notes: noteParts.join(" · ") || null,
         isWalkIn,
         walkInDate: isWalkIn ? dateStr : undefined,
       },
     });
     if (error || !data?.success) {
       throw new Error(error?.message || data?.error || "Failed to create enrollment");
+    }
+    if (data?.enrollmentId) {
+      await consumeCredits(data.enrollmentId);
     }
   };
 
@@ -191,6 +257,32 @@ const AddSwimmerDialog = ({
                   First-time swimmer (adds $45 reg fee)
                 </Label>
               </div>
+
+              {creditTotalCents > 0 && (
+                <div className="rounded border border-primary/30 bg-primary/5 p-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-primary" />
+                      <span className="font-medium">Account credit available</span>
+                    </div>
+                    <span className="font-bold text-primary">${(creditTotalCents / 100).toFixed(2)}</span>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={applyCredit}
+                      onChange={(e) => setApplyCredit(e.target.checked)}
+                      className="h-3.5 w-3.5"
+                    />
+                    Apply ${(Math.min(creditTotalCents, Math.round(amountNum * 100)) / 100).toFixed(2)} credit toward this enrollment
+                  </label>
+                  {applyCredit && (
+                    <p className="text-xs text-muted-foreground">
+                      Net due: <span className="font-medium text-foreground">${(netDueCents / 100).toFixed(2)}</span>
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Payment audit block — required for traceability */}
               <div className="space-y-3 p-3 rounded border border-border bg-muted/20">

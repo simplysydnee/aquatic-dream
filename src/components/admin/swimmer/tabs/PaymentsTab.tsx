@@ -11,6 +11,7 @@ import { CheckCircle2, ExternalLink, Send, DollarSign } from "lucide-react";
 import type { Swimmer, SwimmerEnrollment } from "@/hooks/useSwimmers";
 import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
 import { getStripeEnvironment } from "@/lib/stripe";
+import CreditsSection from "./CreditsSection";
 
 interface Props {
   swimmer: Swimmer;
@@ -130,6 +131,8 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
         </div>
         <DollarSign className="h-8 w-8 text-muted-foreground/40" />
       </div>
+
+      {swimmer.parent_email && <CreditsSection parentEmail={swimmer.parent_email} />}
 
       <div className="space-y-3">
         {swimmer.enrollments
