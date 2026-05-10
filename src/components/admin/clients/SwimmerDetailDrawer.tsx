@@ -147,46 +147,48 @@ export default function SwimmerDetailDrawer({
           </TabsList>
 
           <ScrollArea className="flex-1">
-            <TabsContent value="overview" className="p-6 space-y-6 mt-0">
-              <section>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Swimmer</h3>
-                <div className="space-y-1 text-sm">
-                  <div><span className="text-muted-foreground">Name:</span> {swimmer.child_name}</div>
-                  <div><span className="text-muted-foreground">Age:</span> {swimmer.child_age ?? "—"}</div>
-                  <div><span className="text-muted-foreground">DOB:</span> {fmtDate(swimmer.child_dob)}</div>
-                  <div><span className="text-muted-foreground">Level:</span> {swimmer.swim_level || "—"}</div>
-                </div>
-              </section>
+            <TabsContent value="overview" className="p-4 sm:p-6 space-y-4 sm:space-y-6 mt-0">
+              <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 sm:gap-0 sm:space-y-6">
+                <section>
+                  <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Swimmer</h3>
+                  <div className="space-y-1 text-sm">
+                    <div><span className="text-muted-foreground">Name:</span> {swimmer.child_name}</div>
+                    <div><span className="text-muted-foreground">Age:</span> {swimmer.child_age ?? "—"}</div>
+                    <div><span className="text-muted-foreground">DOB:</span> {fmtDate(swimmer.child_dob)}</div>
+                    <div><span className="text-muted-foreground">Level:</span> {swimmer.swim_level || "—"}</div>
+                  </div>
+                </section>
 
-              <section>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Parent</h3>
-                <div className="space-y-1 text-sm">
-                  <div className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground" />{swimmer.parent_name}</div>
-                  <a href={`mailto:${swimmer.parent_email}`} className="flex items-center gap-2 text-primary hover:underline">
-                    <Mail className="h-3.5 w-3.5" />{swimmer.parent_email}
-                  </a>
-                  {swimmer.parent_phone && (
-                    <a href={phoneHref(swimmer.parent_phone)} className="flex items-center gap-2 text-primary hover:underline">
-                      <Phone className="h-3.5 w-3.5" />{formatPhone(swimmer.parent_phone)}
+                <section>
+                  <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Parent</h3>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground shrink-0" /><span className="truncate">{swimmer.parent_name}</span></div>
+                    <a href={`mailto:${swimmer.parent_email}`} className="flex items-center gap-2 text-primary hover:underline">
+                      <Mail className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{swimmer.parent_email}</span>
                     </a>
-                  )}
-                </div>
-              </section>
+                    {swimmer.parent_phone && (
+                      <a href={phoneHref(swimmer.parent_phone)} className="flex items-center gap-2 text-primary hover:underline">
+                        <Phone className="h-3.5 w-3.5 shrink-0" />{formatPhone(swimmer.parent_phone)}
+                      </a>
+                    )}
+                  </div>
+                </section>
+              </div>
 
               <section>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Lifetime</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-md border p-3 text-center">
-                    <div className="text-2xl font-bold text-foreground">{swimmer.requests.length}</div>
-                    <div className="text-xs text-muted-foreground">Requests</div>
+                <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Lifetime</h3>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="rounded-md border p-2 sm:p-3 text-center">
+                    <div className="text-xl sm:text-2xl font-bold text-foreground">{swimmer.requests.length}</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">Requests</div>
                   </div>
-                  <div className="rounded-md border p-3 text-center">
-                    <div className="text-2xl font-bold text-foreground">{swimmer.enrollments.length}</div>
-                    <div className="text-xs text-muted-foreground">Enrollments</div>
+                  <div className="rounded-md border p-2 sm:p-3 text-center">
+                    <div className="text-xl sm:text-2xl font-bold text-foreground">{swimmer.enrollments.length}</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">Enrollments</div>
                   </div>
-                  <div className="rounded-md border p-3 text-center">
-                    <div className="text-2xl font-bold text-foreground">{swimmer.bookings.length}</div>
-                    <div className="text-xs text-muted-foreground">Bookings</div>
+                  <div className="rounded-md border p-2 sm:p-3 text-center">
+                    <div className="text-xl sm:text-2xl font-bold text-foreground">{swimmer.bookings.length}</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">Bookings</div>
                   </div>
                 </div>
               </section>
