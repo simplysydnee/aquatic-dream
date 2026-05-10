@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2 } from "lucide-react";
+import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2, Ban } from "lucide-react";
+import CancelLessonDialog from "./CancelLessonDialog";
+import type { CancelTarget } from "@/lib/lessonCancel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -87,6 +89,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   const [markDialogOpen, setMarkDialogOpen] = useState(false);
   const [markMethod, setMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
   const [markReference, setMarkReference] = useState("");
+  const [cancelTargets, setCancelTargets] = useState<CancelTarget[] | null>(null);
 
   const refetchLesson = async () => {
     if (!eventId) return;
