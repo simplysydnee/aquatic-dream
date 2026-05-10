@@ -35,8 +35,8 @@ const CalendarFilterBar = ({ activeFilters, onToggle, onShowAll }: Props) => {
   const activeLabels = FILTER_CHIPS.filter((c) => activeFilters.has(c.type)).map((c) => c.label);
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2 overflow-x-auto sm:flex-wrap whitespace-nowrap pb-1 -mx-1 px-1 [&>*]:shrink-0">
+    <div className="space-y-1 max-w-full overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2 pb-1 min-w-0">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mr-1">
           Filter:
         </span>
@@ -47,7 +47,7 @@ const CalendarFilterBar = ({ activeFilters, onToggle, onShowAll }: Props) => {
               key={chip.type}
               onClick={() => onToggle(chip.type)}
               className={cn(
-                "px-2.5 py-1 rounded-full text-xs font-medium transition-all border",
+                "px-2.5 py-1 rounded-full text-xs font-medium transition-all border break-words text-left",
                 isActive ? "shadow-sm" : "opacity-40 grayscale"
               )}
               style={{
