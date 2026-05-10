@@ -637,13 +637,75 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
             )}
 
 
-            <div className="sticky bottom-0 bg-card border-t p-4 flex gap-2">
-              <Button size="sm" variant="outline" onClick={onEdit} className="flex-1 gap-1.5">
+            <div className="sticky bottom-0 bg-card border-t p-4 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={onEdit} className="flex-1 gap-1.5 min-w-[110px]">
                 <Pencil className="w-3.5 h-3.5" /> Edit
               </Button>
               {isSwim && (
-                <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => setShowAddSwimmer(true)}>
+                <Button size="sm" variant="outline" className="flex-1 gap-1.5 min-w-[110px]" onClick={() => setShowAddSwimmer(true)}>
                   <UserPlus className="w-3.5 h-3.5" /> Add Swimmer
+                </Button>
+              )}
+              {(isSwim || isLessonEventType) && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="flex-1 gap-1.5 min-w-[110px] text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    if (isSwim) {
+                      // Find or synthesize the session_lesson_dates row id for this date
+                      // We don't have it in props — do a quick lookup
+                      (async () => {
+                        const { data } = await supabase
+                          .from("session_lesson_dates")
+                          .select("id")
+                          .eq("session_id", block.session.id)
+                          .eq("lesson_date", block.dateStr)
+                          .maybeSingle();
+                        if (!data) {
+                          // create one so we can flag it cancelled
+                          const { data: created } = await supabase
+                            .from("session_lesson_dates")
+                            .insert({
+                              session_id: block.session.id,
+                              lesson_date: block.dateStr,
+                              is_cancelled: false,
+                            })
+                            .select("id")
+                            .maybeSingle();
+                          if (!created) return;
+                          buildSwimTarget(created.id);
+                        } else {
+                          buildSwimTarget(data.id);
+                        }
+                      })();
+                    } else if (isLessonEventType && lessonOcc && lessonBooking) {
+                      const price = Number(lessonBooking.price_per_session) || 0;
+                      const paid =
+                        lessonOcc.payment_status === "paid" || lessonOcc.payment_status === "comp"
+                          ? price
+                          : 0;
+                      setCancelTargets([
+                        {
+                          kind: "lesson_occurrence",
+                          id: lessonOcc.id,
+                          title: lessonBooking.lesson_type === "private" ? "Private lesson" : "Semi-private lesson",
+                          date: lessonOcc.occurrence_date,
+                          timeLabel: `${fmtTime(lessonBooking.start_time)} – ${fmtTime(lessonBooking.end_time)}`,
+                          swimmers: [
+                            {
+                              parentName: lessonBooking.parent_name,
+                              parentEmail: lessonBooking.parent_email,
+                              childName: lessonBooking.child_name || lessonBooking.parent_name,
+                              paidAmount: paid,
+                            },
+                          ],
+                        },
+                      ]);
+                    }
+                  }}
+                >
+                  <Ban className="w-3.5 h-3.5" /> Cancel
                 </Button>
               )}
             </div>
