@@ -474,6 +474,31 @@ const CalendarDayView = ({
         )}
       </div>
 
+      {/* ── Instructors today (clickable to open day-modal) ── */}
+      {(() => {
+        const names = new Set<string>();
+        todaySessions.forEach((s) => s.instructors?.name && names.add(s.instructors.name));
+        adEvents.forEach((e) => e.instructor_name && names.add(e.instructor_name));
+        swimLessonEvents.forEach((e) => e.instructor_name && names.add(e.instructor_name));
+        const list = [...names].sort();
+        if (list.length === 0) return null;
+        return (
+          <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b bg-muted/20">
+            <span className="text-[11px] font-medium text-muted-foreground mr-1">Instructors today:</span>
+            {list.map((n) => (
+              <button
+                key={n}
+                onClick={() => setOpenInstructor(n)}
+                className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs hover:bg-accent hover:border-primary/50 transition-colors"
+              >
+                <UserCircle2 className="w-3 h-3" />
+                {n}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* ── Column name headers (color-coded for AD) ── */}
       <div className="flex border-b">
         <div className="w-16 shrink-0" />
