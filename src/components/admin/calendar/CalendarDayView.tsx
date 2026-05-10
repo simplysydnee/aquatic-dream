@@ -27,6 +27,8 @@ import CalendarBlockDetail from "./CalendarBlockDetail";
 import type { BlockInfo } from "./CalendarBlockDetail";
 import type { ActivityType } from "./CalendarFilterBar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import InstructorDayModal from "./InstructorDayModal";
+import { UserCircle2 } from "lucide-react";
 
 /* ── ICS session from Airtable edge function ── */
 export interface ICSSession {
