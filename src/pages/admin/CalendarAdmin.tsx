@@ -79,15 +79,15 @@ const CalendarAdmin = () => {
             Manage lessons and pool schedule
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={icsSource === "supabase" ? "default" : "secondary"} className="text-[10px]">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant={icsSource === "supabase" ? "default" : "secondary"} className="hidden sm:inline-flex text-[10px]">
             ICS: {icsSource === "supabase" ? "New DB" : "Airtable"}
           </Badge>
           <Button
             variant="outline"
             size="sm"
             onClick={toggleIcsSource}
-            className="text-xs gap-1.5"
+            className="hidden sm:inline-flex text-xs gap-1.5"
           >
             <ArrowRightLeft className="w-3.5 h-3.5" />
             Switch to {icsSource === "airtable" ? "New DB" : "Airtable"}
@@ -101,8 +101,8 @@ const CalendarAdmin = () => {
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 text-xs">
+      {/* Legend (desktop) */}
+      <div className="hidden sm:flex flex-wrap gap-3 text-xs">
         {[
           { label: "I Can Swim", border: "#2a5e84", bg: "#d4f0f8" },
           { label: "Swim Sessions", border: "#1a3a8a", bg: "#d0ddf7" },
