@@ -104,24 +104,27 @@ const AddSwimmerDialog = ({
     let remaining = creditAppliedCents;
     for (const c of availableCredits) {
       if (remaining <= 0) break;
+      // Guarded update prevents double-spend if another flow consumed it first.
+      const { data: claimed, error } = await supabase
+        .from("client_credits")
+        .update({ used_at: new Date().toISOString(), used_against: enrollmentId })
+        .eq("id", c.id)
+        .is("used_at", null)
+        .is("voided_at", null)
+        .select("id")
+        .maybeSingle();
+      if (error || !claimed) continue;
       if (c.amount_cents <= remaining) {
-        await supabase
-          .from("client_credits")
-          .update({ used_at: new Date().toISOString(), used_against: enrollmentId })
-          .eq("id", c.id);
         remaining -= c.amount_cents;
       } else {
-        // Partial: split into used + leftover
-        await supabase
-          .from("client_credits")
-          .update({ amount_cents: remaining, used_at: new Date().toISOString(), used_against: enrollmentId })
-          .eq("id", c.id);
+        // Partial: keep original row at full amount (audit trail), insert leftover row.
+        const leftover = c.amount_cents - remaining;
         await supabase.from("client_credits").insert({
           parent_email: parentEmail.trim().toLowerCase(),
-          amount_cents: c.amount_cents - remaining,
+          amount_cents: leftover,
           source: "credit_split",
-          source_ref: enrollmentId,
-          note: "Leftover after partial application",
+          source_ref: c.id,
+          note: `Leftover after partial application against enrollment ${enrollmentId}`,
         });
         remaining = 0;
       }
