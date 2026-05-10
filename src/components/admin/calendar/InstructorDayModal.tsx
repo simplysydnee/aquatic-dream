@@ -132,13 +132,23 @@ const InstructorDayModal = ({ open, onOpenChange, instructorName, initialDate, o
     // Private/semi-private lesson occurrences
     const { data: occs } = await supabase
       .from("lesson_booking_occurrences")
-      .select("id, occurrence_date, status, payment_status, booking_id, lesson_bookings!inner(id, lesson_type, instructor_name, parent_name, parent_email, child_name, start_time, end_time, price_per_session)")
+      .select("id, occurrence_date, status, payment_status, booking_id")
       .eq("occurrence_date", dateStr);
 
+    const bookingIds = [...new Set((occs || []).map((o) => o.booking_id))];
+    let bookingsById: Record<string, any> = {};
+    if (bookingIds.length) {
+      const { data: bks } = await supabase
+        .from("lesson_bookings")
+        .select("id, lesson_type, instructor_name, parent_name, parent_email, child_name, start_time, end_time, price_per_session")
+        .in("id", bookingIds);
+      bookingsById = Object.fromEntries((bks || []).map((b) => [b.id, b]));
+    }
+
     const privRows: Row[] = (occs || [])
-      .filter((o: any) => o.lesson_bookings?.instructor_name === instructorName)
-      .map((o: any) => {
-        const b = o.lesson_bookings;
+      .map((o) => ({ o, b: bookingsById[o.booking_id] }))
+      .filter(({ b }) => b && b.instructor_name === instructorName)
+      .map(({ o, b }) => {
         const timeLabel = `${fmtT(b.start_time)} – ${fmtT(b.end_time)}`;
         const paid = o.payment_status === "paid" ? Number(b.price_per_session || 0) : 0;
         const swimmer = {
