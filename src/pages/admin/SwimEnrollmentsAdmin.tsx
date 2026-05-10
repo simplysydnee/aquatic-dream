@@ -746,6 +746,7 @@ const SwimEnrollmentsAdmin = () => {
             sessions={sessions}
             enrollments={nonCancelled}
             sessionPeriods={sessionPeriods}
+            onChanged={fetchData}
           />
         </TabsContent>
 
