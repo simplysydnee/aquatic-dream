@@ -86,7 +86,9 @@ const JobApplicationForm = ({ jobPostingId, jobTitle, onClose }: Props) => {
           ? `Yes — ${form.experience_description}`
           : "No";
 
+      const applicationId = crypto.randomUUID();
       const { error } = await supabase.from("job_applications").insert({
+        id: applicationId,
         job_posting_id: jobPostingId,
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
@@ -100,6 +102,37 @@ const JobApplicationForm = ({ jobPostingId, jobTitle, onClose }: Props) => {
         resume_url: filePath,
       });
       if (error) throw error;
+
+      // Internal staff alerts — fire-and-forget, one invoke per recipient
+      const applicantName = `${form.first_name.trim()} ${form.last_name.trim()}`.trim();
+      const alertData = {
+        applicantName,
+        applicantEmail: form.email.trim(),
+        applicantPhone: form.phone.trim(),
+        jobTitle,
+        availability: form.availability.join(", ") || "—",
+        certifications: form.certifications.join(", ") || "—",
+        swimmingAbility: form.swimming_ability || "—",
+        experience: experienceText,
+        availableStartDate: form.available_start_date || "—",
+        submittedAt: new Date().toLocaleString(),
+      };
+      const STAFF_ALERTS: Array<{ email: string; tag: string }> = [
+        { email: "generalmail@aquaticdreams.com", tag: "general" },
+        { email: "sutton@aquaticdreams.com", tag: "sutton" },
+      ];
+      STAFF_ALERTS.forEach(({ email, tag }) => {
+        supabase.functions
+          .invoke("send-transactional-email", {
+            body: {
+              templateName: "internal-job-application-alert",
+              recipientEmail: email,
+              idempotencyKey: `job-app-internal-${tag}-${applicationId}`,
+              templateData: alertData,
+            },
+          })
+          .catch((e) => console.error(`Failed to send staff alert to ${email}`, e));
+      });
 
       setSubmitted(true);
       toast({ title: "Application submitted!", description: "We'll be in touch soon." });

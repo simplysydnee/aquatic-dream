@@ -1,62 +1,38 @@
-# Account Credits — hardening + manual management
+## Internal staff alerts for new lesson requests & job applications
 
-Scope kept narrow per your answers: credits remain redeemable **only** in the admin AddSwimmer dialog. We'll fix the bugs there, then add owner controls to issue/void credits from the swimmer drawer.
+Send a notification email to **generalmail@aquaticdreams.com** and **sutton@aquaticdreams.com** every time a parent submits a lesson request or an applicant submits a job application. Each email contains a brief summary plus a button that deep-links into the corresponding admin page.
 
-## 1. Fix the partial-consume bug in `AddSwimmerDialog.tsx`
+### New email templates (React Email, in `supabase/functions/_shared/transactional-email-templates/`)
 
-Today, when a credit is partially used, the original row's `amount_cents` is overwritten with the consumed amount — that rewrites history. Change `consumeCredits()` so a partial spend:
-- Marks the **original row** fully used (`used_at`, `used_against`) without touching `amount_cents` (preserve the audit trail).
-- Inserts a new row with `source = "credit_split"` for the unused remainder, referencing the original credit id in `source_ref`.
+1. **`internal-lesson-request-alert.tsx`**
+   - Subject: `New lesson request — {childName} (age {childAge})`
+   - Body: child name + age, parent name/email/phone, lesson type (Private / Semi-Private), preferred times, truncated notes (first ~300 chars), submitted timestamp.
+   - CTA button "Open in Admin" → `https://aquaticdreamsswim.com/admin/lesson-requests` (uses production custom domain).
 
-Add a guarded update (`.is("used_at", null)`) on every consume so two simultaneous admin enrollments can't double-spend the same row. If the update affects 0 rows, refetch credits and abort with a toast: "Credit was already used — please retry."
+2. **`internal-job-application-alert.tsx`**
+   - Subject: `New job application — {applicantName} for {jobTitle}`
+   - Body: applicant name, email, phone, position applied for, short snippet of cover letter / availability if present, submitted timestamp.
+   - CTA button "Open in Admin" → `https://aquaticdreamsswim.com/admin/applications`.
 
-## 2. Tighten the redemption UX in AddSwimmer
+Both registered in `registry.ts`. Brand-styled (Teal `#2a5e84` heading + Coral `#F58B76` button) consistent with existing transactional emails. White body background.
 
-- Show "Applying $X.XX of $Y.YY available" inline so the staffer sees what will be consumed before clicking Enroll.
-- Disable the Apply checkbox if `paymentAmount` is empty/0.
-- If `applyCredit && netDue === 0`, hide the Reference field's required marker (already partially handled — verify and clean up).
-- After successful consume, refresh CreditsSection if the swimmer drawer is open.
+### Trigger wiring (client-side, fire-and-forget after row insert)
 
-## 3. Manual credit management in the swimmer drawer
+- **`src/components/swim-enrollment/LessonRequestForm.tsx`**: after the existing parent acknowledgment invoke, add two more `supabase.functions.invoke("send-transactional-email", …)` calls — one per recipient — using `templateName: "internal-lesson-request-alert"` and idempotency keys `lesson-req-internal-general-${id}` and `lesson-req-internal-sutton-${id}`.
 
-Upgrade `CreditsSection.tsx` from read-only to manage:
+- **`src/components/careers/JobApplicationForm.tsx`**: after the insert, add the same pair of invocations with `templateName: "internal-job-application-alert"` and idempotency keys `job-app-internal-general-${id}` / `job-app-internal-sutton-${id}`.
 
-**Issue credit** button (admins only):
-- Modal with: amount ($), reason dropdown (`goodwill`, `manual_adjustment`, `transfer_in`, `other`), free-text note (required).
-- Inserts row with `source = "manual_issue"`, `created_by = auth.uid()`, parent_email lowercased.
+Recipients are hardcoded constants (`STAFF_ALERT_EMAILS = ["generalmail@aquaticdreams.com", "sutton@aquaticdreams.com"]`) at the top of each form. One invoke per recipient (the send function is one-recipient-per-call by design). Failures are logged to console only — they never block the user-facing success state.
 
-**Void** action on each unused row:
-- Confirms, then sets `used_at = now()`, `used_against = "voided"`, appends void reason to `note`.
-- Only available when `used_at IS NULL`.
-- Records `created_by` of the void in note (`Voided by <email> — <reason>`).
+### Out of scope
+- No new DB tables, no settings UI to edit recipients (hardcoded per request).
+- No SMS, no Slack, no in-app notifications.
+- No changes to existing parent acknowledgment emails or admin badge counts.
+- Contact form / other inbound channels — only lesson requests and job applications as requested.
 
-**Visual polish**:
-- Group ledger into "Available" and "History" sections.
-- Show running balance.
+### Deployment
+- Deploy `send-transactional-email` after registry update so the two new templates are recognized.
 
-## 4. Database — minor schema touch
-
-One migration:
-- Add `voided_at timestamptz` and `voided_by uuid` columns to `client_credits` (cleaner than overloading `used_at` for voids).
-- Add `voided_reason text`.
-- Update `unusedTotal` queries everywhere to filter `used_at IS NULL AND voided_at IS NULL`.
-- Backfill: nothing to backfill.
-
-## 5. Out of scope (per your decisions)
-
-- Public enrollment checkout, `create-lesson-occurrence-checkout`, and `send-session-payment-link` will **not** learn about credits. If a parent wants to use a credit, staff must run AddSwimmer manually.
-- No credit expiration logic.
-- No customer-facing credit display.
-
-## Technical details
-
-**Files touched**
-- `supabase/migrations/<new>.sql` — add `voided_at`, `voided_by`, `voided_reason` to `client_credits`.
-- `src/components/admin/calendar/AddSwimmerDialog.tsx` — fix `consumeCredits`, add guarded update, UX polish.
-- `src/components/admin/swimmer/tabs/CreditsSection.tsx` — split into ledger view + actions; integrate new dialogs.
-- `src/components/admin/swimmer/tabs/IssueCreditDialog.tsx` (new) — issue form.
-- `src/components/admin/swimmer/tabs/VoidCreditDialog.tsx` (new) — confirm + reason.
-
-**RLS** — existing "Admins manage client credits" policy already covers insert/update; no new policies needed.
-
-**No edge function changes.** All credit operations stay client-side under admin RLS.
+### Files touched
+- **New**: `supabase/functions/_shared/transactional-email-templates/internal-lesson-request-alert.tsx`, `internal-job-application-alert.tsx`
+- **Edited**: `supabase/functions/_shared/transactional-email-templates/registry.ts`, `src/components/swim-enrollment/LessonRequestForm.tsx`, `src/components/careers/JobApplicationForm.tsx`
