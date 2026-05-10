@@ -206,16 +206,41 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     } finally { setMarking(false); }
   };
 
-  const isSwim = block.kind === "swim";
-  const isICS = block.kind === "ics";
-
-  const title = isSwim
-    ? LEVEL_DISPLAY[block.session.swim_level as SwimLevel]?.name || block.session.swim_level
-    : isICS
-    ? block.session.client_name || block.session.session_type || "I Can Swim"
-    : block.event.title;
+  const isSwim = block?.kind === "swim";
+  const isICS = block?.kind === "ics";
 
   const fmtTime = (t: string) => format(new Date(`2000-01-01T${t}`), "h:mm a");
+
+  const buildSwimTarget = (sessionDateId: string) => {
+    if (!block || block.kind !== "swim") return;
+    const swimmers = block.enrollments.map((e) => {
+      const paid = e.payment_status === "paid" ? Number((block.session as any).session_price ?? 240) : 0;
+      return {
+        parentName: e.parent_name,
+        parentEmail: e.parent_email,
+        childName: e.child_name,
+        paidAmount: paid,
+      };
+    });
+    setCancelTargets([
+      {
+        kind: "session_date",
+        id: sessionDateId,
+        title: block.session.session_name || block.session.swim_level,
+        date: block.dateStr,
+        timeLabel: `${fmtTime(block.session.start_time)} – ${fmtTime(block.session.end_time)}`,
+        swimmers,
+      },
+    ]);
+  };
+
+  if (!block) return null;
+
+  const title = isSwim
+    ? LEVEL_DISPLAY[(block as SwimBlockInfo).session.swim_level as SwimLevel]?.name || (block as SwimBlockInfo).session.swim_level
+    : isICS
+    ? (block as ICSBlockInfo).session.client_name || (block as ICSBlockInfo).session.session_type || "I Can Swim"
+    : (block as EventBlockInfo).event.title;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
