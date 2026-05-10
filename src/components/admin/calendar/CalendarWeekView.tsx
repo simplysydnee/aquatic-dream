@@ -39,7 +39,7 @@ const eventTypeColor: Record<string, string> = {
 
 const CalendarWeekView = ({ weekDates, currentDate, swimSessions, enrollments, poolEvents, onSelectDate }: Props) => {
   return (
-    <div className="grid grid-cols-7 gap-1">
+    <div className="grid grid-cols-1 gap-1 sm:grid-cols-7 max-w-full overflow-hidden">
       {weekDates.map((date) => {
         const dayName = format(date, "EEEE");
         const dateStr = format(date, "yyyy-MM-dd");
@@ -51,7 +51,7 @@ const CalendarWeekView = ({ weekDates, currentDate, swimSessions, enrollments, p
           <Card
             key={dateStr}
             className={cn(
-              "p-2 min-h-[140px] cursor-pointer hover:shadow-md transition-shadow",
+              "p-2 min-h-[96px] sm:min-h-[140px] cursor-pointer hover:shadow-md transition-shadow min-w-0 overflow-hidden",
               isToday(date) && "ring-2 ring-primary"
             )}
             onClick={() => onSelectDate(date)}
@@ -78,7 +78,7 @@ const CalendarWeekView = ({ weekDates, currentDate, swimSessions, enrollments, p
             <div className="space-y-1">
               {/* Swim sessions summary */}
               {daySessions.length > 0 && (
-                <div className="flex items-center gap-1 text-xs bg-blue-50 rounded px-1.5 py-0.5 border border-blue-200">
+                <div className="flex items-center gap-1 text-xs bg-blue-50 rounded px-1.5 py-0.5 border border-blue-200 min-w-0">
                   <Waves className="w-3 h-3 text-blue-500" />
                   <span className="text-blue-700 truncate">
                     {daySessions.length} lesson{daySessions.length !== 1 ? "s" : ""}
@@ -93,7 +93,7 @@ const CalendarWeekView = ({ weekDates, currentDate, swimSessions, enrollments, p
                 return (
                   <div
                     key={event.id}
-                    className={`flex items-center gap-1 text-xs rounded px-1.5 py-0.5 border ${color} truncate`}
+                    className={`flex items-center gap-1 text-xs rounded px-1.5 py-0.5 border ${color} min-w-0 overflow-hidden`}
                   >
                     <Icon className="w-3 h-3 shrink-0" />
                     <span className="truncate">{event.title}</span>
