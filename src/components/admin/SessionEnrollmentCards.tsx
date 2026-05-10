@@ -297,6 +297,22 @@ function SessionCard({ session, enrolled, onChanged }: { session: SessionInfo; e
           </Collapsible>
         )}
       </CardContent>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this class?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes <strong>{session.session_name || groupName}</strong> ({formatDayOfWeek(session.day_of_week)} {formatTime(session.start_time)}) and its scheduled lesson dates. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteClass} disabled={busy} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
