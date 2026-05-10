@@ -142,6 +142,9 @@ export type Database = {
           source_ref: string | null
           used_against: string | null
           used_at: string | null
+          voided_at: string | null
+          voided_by: string | null
+          voided_reason: string | null
         }
         Insert: {
           amount_cents: number
@@ -154,6 +157,9 @@ export type Database = {
           source_ref?: string | null
           used_against?: string | null
           used_at?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          voided_reason?: string | null
         }
         Update: {
           amount_cents?: number
@@ -166,6 +172,9 @@ export type Database = {
           source_ref?: string | null
           used_against?: string | null
           used_at?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          voided_reason?: string | null
         }
         Relationships: []
       }
