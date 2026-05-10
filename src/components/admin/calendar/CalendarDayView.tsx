@@ -90,13 +90,9 @@ function timeToMinutes(t: string): number {
   return h * 60 + m;
 }
 
-function minutesToTop(mins: number): number {
-  return ((mins - START_HOUR * 60) / 60) * HOUR_HEIGHT;
-}
+// minutesToTop / durationHeight are defined inside the component so they can use
+// the active HOUR_HEIGHT (mobile vs desktop).
 
-function durationHeight(startMins: number, endMins: number): number {
-  return Math.max(((endMins - startMins) / 60) * HOUR_HEIGHT, 24);
-}
 
 function fmtTime(t: string): string {
   if (t.includes("T")) {
