@@ -553,7 +553,8 @@ const CalendarDayView = ({
   return (
     <TooltipProvider delayDuration={150}>
     <div className="border rounded-lg bg-card overflow-hidden">
-      {/* ── Group headers ── */}
+      {/* ── Group headers (desktop only) ── */}
+      {!isMobile && (
       <div className="flex border-b">
         {/* Time gutter */}
         <div className="w-16 shrink-0" />
