@@ -49,10 +49,10 @@ export interface ICSSession {
 }
 
 /* ── Layout constants ── */
-const HOUR_HEIGHT = 80; // px per hour
+const HOUR_HEIGHT_DESKTOP = 80; // px per hour (desktop)
+const HOUR_HEIGHT_MOBILE = 48;  // px per hour (mobile, ~40% less scroll)
 const START_HOUR = 7;
 const END_HOUR = 20;
-const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
 
 /* ── Color configs ── */
