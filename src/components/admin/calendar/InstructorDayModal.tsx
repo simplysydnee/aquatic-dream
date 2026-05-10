@@ -256,7 +256,8 @@ const InstructorDayModal = ({ open, onOpenChange, instructorName, initialDate, o
               <Button
                 size="sm"
                 variant="outline"
-                disabled={selected.size === 0}
+                disabled={!canReassign}
+                title={hasUnreassignable ? "Private/semi-private reassignment isn't supported here yet — pick group classes only" : undefined}
                 onClick={() => setReassignOpen(true)}
               >
                 Reassign
