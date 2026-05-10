@@ -838,6 +838,13 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                 </div>
               </DialogContent>
             </Dialog>
+
+            <CancelLessonDialog
+              open={!!cancelTargets}
+              onOpenChange={(o) => { if (!o) setCancelTargets(null); }}
+              targets={cancelTargets || []}
+              onDone={() => { setCancelTargets(null); onClose(); onRefetch?.(); }}
+            />
           </>
         )}
       </div>
