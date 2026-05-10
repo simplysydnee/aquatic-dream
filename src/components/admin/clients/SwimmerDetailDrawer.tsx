@@ -110,8 +110,8 @@ export default function SwimmerDetailDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl p-0 flex flex-col">
-        <SheetHeader className="p-6 border-b">
-          <SheetTitle className="text-xl flex items-center gap-2 flex-wrap">
+        <SheetHeader className="p-4 sm:p-6 border-b">
+          <SheetTitle className="text-base sm:text-xl flex items-center gap-2 flex-wrap">
             <User className="h-5 w-5 text-primary" />
             {swimmer.child_name}
             {swimmer.child_age != null && (
