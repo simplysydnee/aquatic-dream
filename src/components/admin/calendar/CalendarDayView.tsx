@@ -889,6 +889,17 @@ const CalendarDayView = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Instructor day modal ── */}
+      {openInstructor && (
+        <InstructorDayModal
+          open={!!openInstructor}
+          onOpenChange={(o) => !o && setOpenInstructor(null)}
+          instructorName={openInstructor}
+          initialDate={date}
+          onChanged={onAttendanceChange}
+        />
+      )}
     </div>
     </TooltipProvider>
   );
