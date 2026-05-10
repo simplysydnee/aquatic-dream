@@ -616,6 +616,7 @@ const CalendarDayView = ({
           </div>
         )}
       </div>
+      )}
 
       {/* ── Instructors today (clickable to open day-modal) ── */}
       {(() => {
