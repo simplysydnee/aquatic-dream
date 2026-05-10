@@ -307,6 +307,145 @@ const CalendarDayView = ({
   const adCount = columns.filter((c) => c.group === "ad").length;
   const diveCount = columns.filter((c) => c.group === "dive").length;
 
+  // ── Mobile agenda items (flat, time-sorted) ──
+  type AgendaItem = {
+    key: string;
+    startMins: number;
+    endMins: number;
+    startLabel: string;
+    endLabel: string;
+    colorKey: string;
+    levelKey?: string; // for swim level color override
+    title: string;
+    subtitle?: string;
+    extra?: string;
+    dimmed: boolean;
+    onClick: () => void;
+    locked?: boolean;
+  };
+
+  const agendaItems = useMemo<AgendaItem[]>(() => {
+    if (!isMobile) return [];
+    const items: AgendaItem[] = [];
+
+    if (showICS) {
+      todayICS.forEach((s) => {
+        const isClosed = s.status?.toLowerCase() === "closed";
+        const colorKey = isClosed ? "i-can-swim-closed" : "i-can-swim";
+        const title = isClosed
+          ? (s.instructor_name || "Instructor")
+          : (s.client_name || s.session_type || "I Can Swim");
+        items.push({
+          key: `ics-${s.id}`,
+          startMins: timeToMinutes(s.start_time),
+          endMins: timeToMinutes(s.end_time),
+          startLabel: fmtTime(s.start_time),
+          endLabel: fmtTime(s.end_time),
+          colorKey,
+          title,
+          subtitle: s.instructor_name ? `Coach ${s.instructor_name}` : "I Can Swim 209",
+          extra: isClosed ? "Closed" : `${s.confirmed_bookings}/${s.max_capacity} booked`,
+          dimmed: false,
+          locked: true,
+          onClick: () => setDetailBlock({ kind: "ics", session: s }),
+        });
+      });
+    }
+
+    if (showAD) {
+      todaySessions.forEach((s) => {
+        const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
+        const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
+        items.push({
+          key: `ad-${s.id}`,
+          startMins: timeToMinutes(s.start_time),
+          endMins: timeToMinutes(s.end_time),
+          startLabel: fmtTime(s.start_time),
+          endLabel: fmtTime(s.end_time),
+          colorKey: "swim",
+          levelKey: s.swim_level,
+          title: levelInfo?.name || s.swim_level,
+          subtitle: s.session_name || (s.instructors?.name ? `Coach ${s.instructors.name}` : undefined),
+          extra: `${sessionEnrollments.length}/${s.max_students} swimmers`,
+          dimmed: false,
+          onClick: () =>
+            setDetailBlock({
+              kind: "swim",
+              session: s,
+              enrollments: sessionEnrollments,
+              attendance: attendance.filter((a) => a.session_id === s.id),
+              agreements,
+              dateStr,
+            }),
+        });
+      });
+
+      adEvents.forEach((e) => {
+        items.push({
+          key: `event-${e.id}`,
+          startMins: timeToMinutes(e.start_time),
+          endMins: timeToMinutes(e.end_time),
+          startLabel: fmtTime(e.start_time),
+          endLabel: fmtTime(e.end_time),
+          colorKey: e.event_type,
+          title: e.title,
+          subtitle: e.instructor_name || e.pool_area,
+          dimmed: !activeFilters.has(e.event_type as ActivityType),
+          onClick: () => setDetailBlock({ kind: "event", event: e }),
+        });
+      });
+
+      swimLessonEvents.forEach((e) => {
+        items.push({
+          key: `swl-${e.id}`,
+          startMins: timeToMinutes(e.start_time),
+          endMins: timeToMinutes(e.end_time),
+          startLabel: fmtTime(e.start_time),
+          endLabel: fmtTime(e.end_time),
+          colorKey: "swim-lesson",
+          title: e.title,
+          subtitle: e.instructor_name || e.notes || undefined,
+          dimmed: !activeFilters.has("swim"),
+          onClick: () => setDetailBlock({ kind: "event", event: e }),
+        });
+      });
+    }
+
+    if (showDive) {
+      diveRentalEvents.forEach((e) => {
+        items.push({
+          key: `dr-${e.id}`,
+          startMins: timeToMinutes(e.start_time),
+          endMins: timeToMinutes(e.end_time),
+          startLabel: fmtTime(e.start_time),
+          endLabel: fmtTime(e.end_time),
+          colorKey: e.event_type,
+          title: e.title,
+          subtitle: e.instructor_name || e.pool_area,
+          dimmed: !activeFilters.has(e.event_type as ActivityType),
+          onClick: () => setDetailBlock({ kind: "event", event: e }),
+        });
+      });
+    }
+
+    return items.sort((a, b) => a.startMins - b.startMins);
+  }, [
+    isMobile, showICS, showAD, showDive, todayICS, todaySessions, enrollments,
+    attendance, agreements, dateStr, adEvents, swimLessonEvents, diveRentalEvents,
+    activeFilters,
+  ]);
+
+  // Group agenda items by hour bucket (skip empty hours)
+  const agendaByHour = useMemo(() => {
+    const map = new Map<number, AgendaItem[]>();
+    agendaItems.forEach((it) => {
+      const h = Math.floor(it.startMins / 60);
+      if (!map.has(h)) map.set(h, []);
+      map.get(h)!.push(it);
+    });
+    return [...map.entries()].sort((a, b) => a[0] - b[0]);
+  }, [agendaItems]);
+
   // ── Delete handler ──
   const handleDelete = async () => {
     if (!deleteId) return;
