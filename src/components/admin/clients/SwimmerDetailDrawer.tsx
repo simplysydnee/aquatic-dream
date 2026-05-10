@@ -110,8 +110,8 @@ export default function SwimmerDetailDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl p-0 flex flex-col">
-        <SheetHeader className="p-6 border-b">
-          <SheetTitle className="text-xl flex items-center gap-2 flex-wrap">
+        <SheetHeader className="p-4 sm:p-6 border-b">
+          <SheetTitle className="text-base sm:text-xl flex items-center gap-2 flex-wrap">
             <User className="h-5 w-5 text-primary" />
             {swimmer.child_name}
             {swimmer.child_age != null && (
@@ -138,55 +138,57 @@ export default function SwimmerDetailDrawer({
         </SheetHeader>
 
         <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="mx-6 mt-4 grid grid-cols-5 w-auto h-auto p-1 border border-border bg-background rounded-lg gap-1">
-            <TabsTrigger value="overview" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm">Info</TabsTrigger>
-            <TabsTrigger value="activity" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm">Enrollments ({totalActivity})</TabsTrigger>
-            <TabsTrigger value="payments" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm">Payments</TabsTrigger>
-            <TabsTrigger value="comms" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm">Communications</TabsTrigger>
-            <TabsTrigger value="notes" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm">Notes</TabsTrigger>
+          <TabsList className="mx-3 sm:mx-6 mt-3 sm:mt-4 flex sm:grid sm:grid-cols-5 w-auto h-auto p-1 border border-border bg-background rounded-lg gap-1 overflow-x-auto whitespace-nowrap [&>*]:shrink-0">
+            <TabsTrigger value="overview" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm text-xs sm:text-sm px-2.5 sm:px-3">Info</TabsTrigger>
+            <TabsTrigger value="activity" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm text-xs sm:text-sm px-2.5 sm:px-3"><span className="sm:hidden">Activity ({totalActivity})</span><span className="hidden sm:inline">Enrollments ({totalActivity})</span></TabsTrigger>
+            <TabsTrigger value="payments" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm text-xs sm:text-sm px-2.5 sm:px-3"><span className="sm:hidden">$</span><span className="hidden sm:inline">Payments</span></TabsTrigger>
+            <TabsTrigger value="comms" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm text-xs sm:text-sm px-2.5 sm:px-3"><span className="sm:hidden">Comms</span><span className="hidden sm:inline">Communications</span></TabsTrigger>
+            <TabsTrigger value="notes" className="border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary data-[state=active]:shadow-sm text-xs sm:text-sm px-2.5 sm:px-3">Notes</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="flex-1">
-            <TabsContent value="overview" className="p-6 space-y-6 mt-0">
-              <section>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Swimmer</h3>
-                <div className="space-y-1 text-sm">
-                  <div><span className="text-muted-foreground">Name:</span> {swimmer.child_name}</div>
-                  <div><span className="text-muted-foreground">Age:</span> {swimmer.child_age ?? "—"}</div>
-                  <div><span className="text-muted-foreground">DOB:</span> {fmtDate(swimmer.child_dob)}</div>
-                  <div><span className="text-muted-foreground">Level:</span> {swimmer.swim_level || "—"}</div>
-                </div>
-              </section>
+            <TabsContent value="overview" className="p-4 sm:p-6 space-y-4 sm:space-y-6 mt-0">
+              <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 sm:gap-0 sm:space-y-6">
+                <section>
+                  <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Swimmer</h3>
+                  <div className="space-y-1 text-sm">
+                    <div><span className="text-muted-foreground">Name:</span> {swimmer.child_name}</div>
+                    <div><span className="text-muted-foreground">Age:</span> {swimmer.child_age ?? "—"}</div>
+                    <div><span className="text-muted-foreground">DOB:</span> {fmtDate(swimmer.child_dob)}</div>
+                    <div><span className="text-muted-foreground">Level:</span> {swimmer.swim_level || "—"}</div>
+                  </div>
+                </section>
 
-              <section>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Parent</h3>
-                <div className="space-y-1 text-sm">
-                  <div className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground" />{swimmer.parent_name}</div>
-                  <a href={`mailto:${swimmer.parent_email}`} className="flex items-center gap-2 text-primary hover:underline">
-                    <Mail className="h-3.5 w-3.5" />{swimmer.parent_email}
-                  </a>
-                  {swimmer.parent_phone && (
-                    <a href={phoneHref(swimmer.parent_phone)} className="flex items-center gap-2 text-primary hover:underline">
-                      <Phone className="h-3.5 w-3.5" />{formatPhone(swimmer.parent_phone)}
+                <section>
+                  <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Parent</h3>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground shrink-0" /><span className="truncate">{swimmer.parent_name}</span></div>
+                    <a href={`mailto:${swimmer.parent_email}`} className="flex items-center gap-2 text-primary hover:underline">
+                      <Mail className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{swimmer.parent_email}</span>
                     </a>
-                  )}
-                </div>
-              </section>
+                    {swimmer.parent_phone && (
+                      <a href={phoneHref(swimmer.parent_phone)} className="flex items-center gap-2 text-primary hover:underline">
+                        <Phone className="h-3.5 w-3.5 shrink-0" />{formatPhone(swimmer.parent_phone)}
+                      </a>
+                    )}
+                  </div>
+                </section>
+              </div>
 
               <section>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Lifetime</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-md border p-3 text-center">
-                    <div className="text-2xl font-bold text-foreground">{swimmer.requests.length}</div>
-                    <div className="text-xs text-muted-foreground">Requests</div>
+                <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Lifetime</h3>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="rounded-md border p-2 sm:p-3 text-center">
+                    <div className="text-xl sm:text-2xl font-bold text-foreground">{swimmer.requests.length}</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">Requests</div>
                   </div>
-                  <div className="rounded-md border p-3 text-center">
-                    <div className="text-2xl font-bold text-foreground">{swimmer.enrollments.length}</div>
-                    <div className="text-xs text-muted-foreground">Enrollments</div>
+                  <div className="rounded-md border p-2 sm:p-3 text-center">
+                    <div className="text-xl sm:text-2xl font-bold text-foreground">{swimmer.enrollments.length}</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">Enrollments</div>
                   </div>
-                  <div className="rounded-md border p-3 text-center">
-                    <div className="text-2xl font-bold text-foreground">{swimmer.bookings.length}</div>
-                    <div className="text-xs text-muted-foreground">Bookings</div>
+                  <div className="rounded-md border p-2 sm:p-3 text-center">
+                    <div className="text-xl sm:text-2xl font-bold text-foreground">{swimmer.bookings.length}</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">Bookings</div>
                   </div>
                 </div>
               </section>
@@ -215,7 +217,7 @@ export default function SwimmerDetailDrawer({
               )}
             </TabsContent>
 
-            <TabsContent value="activity" className="p-6 mt-0 space-y-6">
+            <TabsContent value="activity" className="p-4 sm:p-6 mt-0 space-y-4 sm:space-y-6">
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <Waves className="h-4 w-4 text-primary" />
@@ -286,15 +288,15 @@ export default function SwimmerDetailDrawer({
               </section>
             </TabsContent>
 
-            <TabsContent value="payments" className="p-6 mt-0">
+            <TabsContent value="payments" className="p-4 sm:p-6 mt-0">
               <PaymentsTab swimmer={swimmer} />
             </TabsContent>
 
-            <TabsContent value="comms" className="p-6 mt-0">
+            <TabsContent value="comms" className="p-4 sm:p-6 mt-0">
               <CommunicationsTab swimmer={swimmer} />
             </TabsContent>
 
-            <TabsContent value="notes" className="p-6 mt-0">
+            <TabsContent value="notes" className="p-4 sm:p-6 mt-0">
               <InternalCommentsPanel
                 targetType="swimmer"
                 targetKey={swimmer.key}

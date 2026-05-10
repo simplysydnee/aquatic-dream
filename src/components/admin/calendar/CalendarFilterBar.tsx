@@ -36,7 +36,7 @@ const CalendarFilterBar = ({ activeFilters, onToggle, onShowAll }: Props) => {
 
   return (
     <div className="space-y-1">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 overflow-x-auto sm:flex-wrap whitespace-nowrap pb-1 -mx-1 px-1 [&>*]:shrink-0">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mr-1">
           Filter:
         </span>

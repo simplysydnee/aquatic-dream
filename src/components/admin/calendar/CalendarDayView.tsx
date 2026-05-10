@@ -29,6 +29,7 @@ import type { ActivityType } from "./CalendarFilterBar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import InstructorDayModal from "./InstructorDayModal";
 import { UserCircle2 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /* ── ICS session from Airtable edge function ── */
 export interface ICSSession {
@@ -48,10 +49,10 @@ export interface ICSSession {
 }
 
 /* ── Layout constants ── */
-const HOUR_HEIGHT = 80; // px per hour
+const HOUR_HEIGHT_DESKTOP = 80; // px per hour (desktop)
+const HOUR_HEIGHT_MOBILE = 48;  // px per hour (mobile, ~40% less scroll)
 const START_HOUR = 7;
 const END_HOUR = 20;
-const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
 
 /* ── Color configs ── */
@@ -89,13 +90,9 @@ function timeToMinutes(t: string): number {
   return h * 60 + m;
 }
 
-function minutesToTop(mins: number): number {
-  return ((mins - START_HOUR * 60) / 60) * HOUR_HEIGHT;
-}
+// minutesToTop / durationHeight are defined inside the component so they can use
+// the active HOUR_HEIGHT (mobile vs desktop).
 
-function durationHeight(startMins: number, endMins: number): number {
-  return Math.max(((endMins - startMins) / 60) * HOUR_HEIGHT, 24);
-}
 
 function fmtTime(t: string): string {
   if (t.includes("T")) {
@@ -158,6 +155,12 @@ const CalendarDayView = ({
   const [now, setNow] = useState(new Date());
   const [openInstructor, setOpenInstructor] = useState<string | null>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const HOUR_HEIGHT = isMobile ? HOUR_HEIGHT_MOBILE : HOUR_HEIGHT_DESKTOP;
+  const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
+  const minutesToTop = (mins: number) => ((mins - START_HOUR * 60) / 60) * HOUR_HEIGHT;
+  const durationHeight = (startMins: number, endMins: number) =>
+    Math.max(((endMins - startMins) / 60) * HOUR_HEIGHT, isMobile ? 20 : 24);
 
   // Update current time every 60 seconds
   useEffect(() => {
@@ -521,7 +524,7 @@ const CalendarDayView = ({
       </div>
 
       {/* ── Time grid (scrollable) ── */}
-      <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 320px)" }}>
+      <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: isMobile ? "calc(100vh - 240px)" : "calc(100vh - 320px)" }}>
       <div className="flex overflow-x-auto relative">
         {/* ── Current time indicator ── */}
         {(() => {
@@ -563,7 +566,7 @@ const CalendarDayView = ({
           <div
             key={col.id}
             className="flex-1 relative border-l"
-            style={{ height: `${TOTAL_HEIGHT}px`, minWidth: "120px" }}
+            style={{ height: `${TOTAL_HEIGHT}px`, minWidth: isMobile ? "140px" : "120px" }}
             onMouseMove={(e) => {
               if (col.group !== "ics") {
                 const rect = e.currentTarget.getBoundingClientRect();
