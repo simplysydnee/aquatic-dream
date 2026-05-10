@@ -130,6 +130,45 @@ export type Database = {
           },
         ]
       }
+      client_credits: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          parent_email: string
+          source: string
+          source_ref: string | null
+          used_against: string | null
+          used_at: string | null
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          parent_email: string
+          source: string
+          source_ref?: string | null
+          used_against?: string | null
+          used_at?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          parent_email?: string
+          source?: string
+          source_ref?: string | null
+          used_against?: string | null
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       contact_submissions: {
         Row: {
           created_at: string
@@ -605,6 +644,9 @@ export type Database = {
       lesson_booking_occurrences: {
         Row: {
           booking_id: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           id: string
           occurrence_date: string
@@ -615,12 +657,16 @@ export type Database = {
           payment_status: string
           pool_event_id: string | null
           reminder_attempted_at: string | null
+          status: string
           stripe_checkout_url: string | null
           stripe_session_id: string | null
           updated_at: string
         }
         Insert: {
           booking_id: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           id?: string
           occurrence_date: string
@@ -631,12 +677,16 @@ export type Database = {
           payment_status?: string
           pool_event_id?: string | null
           reminder_attempted_at?: string | null
+          status?: string
           stripe_checkout_url?: string | null
           stripe_session_id?: string | null
           updated_at?: string
         }
         Update: {
           booking_id?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           id?: string
           occurrence_date?: string
@@ -647,6 +697,7 @@ export type Database = {
           payment_status?: string
           pool_event_id?: string | null
           reminder_attempted_at?: string | null
+          status?: string
           stripe_checkout_url?: string | null
           stripe_session_id?: string | null
           updated_at?: string
@@ -992,24 +1043,33 @@ export type Database = {
       session_lesson_dates: {
         Row: {
           cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           id: string
+          instructor_override_id: string | null
           is_cancelled: boolean
           lesson_date: string
           session_id: string
         }
         Insert: {
           cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           id?: string
+          instructor_override_id?: string | null
           is_cancelled?: boolean
           lesson_date: string
           session_id: string
         }
         Update: {
           cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           id?: string
+          instructor_override_id?: string | null
           is_cancelled?: boolean
           lesson_date?: string
           session_id?: string
