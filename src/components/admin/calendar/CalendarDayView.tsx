@@ -155,6 +155,12 @@ const CalendarDayView = ({
   const [now, setNow] = useState(new Date());
   const [openInstructor, setOpenInstructor] = useState<string | null>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const HOUR_HEIGHT = isMobile ? HOUR_HEIGHT_MOBILE : HOUR_HEIGHT_DESKTOP;
+  const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
+  const minutesToTop = (mins: number) => ((mins - START_HOUR * 60) / 60) * HOUR_HEIGHT;
+  const durationHeight = (startMins: number, endMins: number) =>
+    Math.max(((endMins - startMins) / 60) * HOUR_HEIGHT, isMobile ? 20 : 24);
 
   // Update current time every 60 seconds
   useEffect(() => {
