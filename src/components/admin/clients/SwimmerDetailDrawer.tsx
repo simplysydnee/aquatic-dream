@@ -137,8 +137,8 @@ export default function SwimmerDetailDrawer({
           <SwimmerStatusBadges statuses={swimmer.statuses} className="mt-2" />
         </SheetHeader>
 
-        <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="mx-3 sm:mx-6 mt-3 sm:mt-4 flex w-auto h-auto p-1 border border-border bg-muted/40 rounded-lg gap-1 overflow-x-auto whitespace-nowrap [&>*]:shrink-0 justify-start sm:justify-between">
+        <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <TabsList className="mx-3 sm:mx-6 mt-3 sm:mt-4 grid grid-cols-3 sm:grid-cols-5 w-auto h-auto p-1 border border-border bg-muted/40 rounded-lg gap-1 overflow-hidden">
             {[
               { value: "overview", icon: Info, label: "Info" },
               { value: "activity", icon: Waves, label: "Activity", count: totalActivity },
@@ -149,12 +149,12 @@ export default function SwimmerDetailDrawer({
               <TabsTrigger
                 key={value}
                 value={value}
-                className="flex-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:border-border data-[state=active]:shadow-sm text-xs sm:text-sm px-3 sm:px-4 py-2"
+                className="min-w-0 inline-flex items-center justify-center gap-1 border border-transparent rounded-md text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:border-border data-[state=active]:shadow-sm text-[11px] sm:text-sm px-1.5 sm:px-3 py-2"
               >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{label}</span>
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 truncate">{label}</span>
                 {count != null && count > 0 && (
-                  <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground data-[state=active]:bg-primary/10">
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground data-[state=active]:bg-primary/10 shrink-0">
                     {count}
                   </span>
                 )}
