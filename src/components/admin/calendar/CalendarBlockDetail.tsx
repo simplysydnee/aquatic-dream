@@ -234,7 +234,6 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
     ]);
   };
 
-  if (!block) return null;
 
   const title = isSwim
     ? LEVEL_DISPLAY[(block as SwimBlockInfo).session.swim_level as SwimLevel]?.name || (block as SwimBlockInfo).session.swim_level
