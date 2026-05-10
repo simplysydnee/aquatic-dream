@@ -156,6 +156,7 @@ const CalendarDayView = ({
   const [detailBlock, setDetailBlock] = useState<BlockInfo | null>(null);
   const [hoverSlot, setHoverSlot] = useState<{ colId: string; y: number } | null>(null);
   const [now, setNow] = useState(new Date());
+  const [openInstructor, setOpenInstructor] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Update current time every 60 seconds
