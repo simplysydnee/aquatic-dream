@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, CalendarCheck } from "lucide-react";
+import { UserPlus, CalendarCheck, Wallet } from "lucide-react";
 
 interface Props {
   open: boolean;
