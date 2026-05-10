@@ -71,6 +71,7 @@ const AddSwimmerDialog = ({
         .select("id, amount_cents")
         .ilike("parent_email", email)
         .is("used_at", null)
+        .is("voided_at", null)
         .order("created_at", { ascending: true });
       setAvailableCredits((data as any) ?? []);
     }, 350);
