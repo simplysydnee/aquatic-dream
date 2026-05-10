@@ -33,4 +33,6 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'lesson-booking-confirmation': lessonBookingConfirmation,
   'admin-freeform': adminFreeform,
   'lesson-cancellation': lessonCancellation,
+  'internal-lesson-request-alert': internalLessonRequestAlert,
+  'internal-job-application-alert': internalJobApplicationAlert,
 }
