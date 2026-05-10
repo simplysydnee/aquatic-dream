@@ -117,6 +117,35 @@ const LessonRequestForm = () => {
         },
       })
       .catch((e) => console.error("Failed to send acknowledgment email", e));
+
+    // Internal staff alerts — one invoke per recipient, fire-and-forget
+    const STAFF_ALERTS: Array<{ email: string; tag: string }> = [
+      { email: "generalmail@aquaticdreams.com", tag: "general" },
+      { email: "sutton@aquaticdreams.com", tag: "sutton" },
+    ];
+    const alertData = {
+      parentName,
+      parentEmail: parsed.data.parentEmail,
+      parentPhone: parsed.data.parentPhone || "",
+      childName,
+      childAge,
+      lessonType: parsed.data.lessonType,
+      preferredTimes: parsed.data.preferredTimes || "",
+      notes: parsed.data.notes || "",
+      submittedAt: new Date().toLocaleString(),
+    };
+    STAFF_ALERTS.forEach(({ email, tag }) => {
+      supabase.functions
+        .invoke("send-transactional-email", {
+          body: {
+            templateName: "internal-lesson-request-alert",
+            recipientEmail: email,
+            idempotencyKey: `lesson-req-internal-${tag}-${id}`,
+            templateData: alertData,
+          },
+        })
+        .catch((e) => console.error(`Failed to send staff alert to ${email}`, e));
+    });
     setSubmitted(true);
   };
 
