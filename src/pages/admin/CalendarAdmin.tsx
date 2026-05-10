@@ -70,7 +70,7 @@ const CalendarAdmin = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-full overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
@@ -79,7 +79,7 @@ const CalendarAdmin = () => {
             Manage lessons and pool schedule
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap max-w-full">
           <Badge variant={icsSource === "supabase" ? "default" : "secondary"} className="hidden sm:inline-flex text-[10px]">
             ICS: {icsSource === "supabase" ? "New DB" : "Airtable"}
           </Badge>
@@ -130,18 +130,20 @@ const CalendarAdmin = () => {
       />
 
       {/* Navigation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 sm:flex sm:gap-2 min-w-0 w-full sm:w-auto">
           <Button variant="ghost" size="icon" onClick={() => navigateDate(-1)}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <Popover open={miniCalOpen} onOpenChange={setMiniCalOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="min-w-[180px]">
-                <CalIcon className="w-4 h-4 mr-2" />
-                {view === "day"
-                  ? format(currentDate, "EEEE, MMMM d, yyyy")
-                  : `${format(weekDates[0], "MMM d")} – ${format(weekDates[6], "MMM d, yyyy")}`}
+              <Button variant="outline" size="sm" className="w-full min-w-0 justify-start px-2 sm:min-w-[180px] sm:w-auto sm:px-3">
+                <CalIcon className="w-4 h-4 mr-1.5 shrink-0 sm:mr-2" />
+                <span className="min-w-0 truncate">
+                  {view === "day"
+                    ? format(currentDate, "EEE, MMM d, yyyy")
+                    : `${format(weekDates[0], "MMM d")} – ${format(weekDates[6], "MMM d, yyyy")}`}
+                </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -168,8 +170,8 @@ const CalendarAdmin = () => {
           </Button>
         </div>
 
-        <Tabs value={view} onValueChange={(v) => setView(v as "day" | "week")}>
-          <TabsList>
+        <Tabs value={view} onValueChange={(v) => setView(v as "day" | "week")} className="w-full sm:w-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:flex sm:w-auto">
             <TabsTrigger value="day">Day</TabsTrigger>
             <TabsTrigger value="week">Week</TabsTrigger>
           </TabsList>
@@ -178,13 +180,13 @@ const CalendarAdmin = () => {
 
       {/* Week day tabs (quick day selector) */}
       {view === "day" && (
-        <div className="flex gap-1 overflow-x-auto pb-1">
+        <div className="grid grid-cols-7 gap-1 min-w-0">
           {weekDates.map((d) => (
             <button
               key={d.toISOString()}
               onClick={() => setCurrentDate(d)}
               className={cn(
-                "flex flex-col items-center px-3 py-1.5 rounded-lg text-xs transition-colors shrink-0",
+                "flex min-w-0 flex-col items-center px-1 py-1.5 rounded-lg text-xs transition-colors",
                 format(d, "yyyy-MM-dd") === format(currentDate, "yyyy-MM-dd")
                   ? "bg-primary text-primary-foreground"
                   : isToday(d)
