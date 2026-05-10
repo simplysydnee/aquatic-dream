@@ -103,15 +103,27 @@ const AddSwimmerDialog = ({
     let remaining = creditAppliedCents;
     for (const c of availableCredits) {
       if (remaining <= 0) break;
-      // Simple model: mark each credit fully used in order until remaining is satisfied.
-      await supabase
-        .from("client_credits")
-        .update({
-          used_at: new Date().toISOString(),
-          used_against: enrollmentId,
-        })
-        .eq("id", c.id);
-      remaining -= c.amount_cents;
+      if (c.amount_cents <= remaining) {
+        await supabase
+          .from("client_credits")
+          .update({ used_at: new Date().toISOString(), used_against: enrollmentId })
+          .eq("id", c.id);
+        remaining -= c.amount_cents;
+      } else {
+        // Partial: split into used + leftover
+        await supabase
+          .from("client_credits")
+          .update({ amount_cents: remaining, used_at: new Date().toISOString(), used_against: enrollmentId })
+          .eq("id", c.id);
+        await supabase.from("client_credits").insert({
+          parent_email: parentEmail.trim().toLowerCase(),
+          amount_cents: c.amount_cents - remaining,
+          source: "credit_split",
+          source_ref: enrollmentId,
+          note: "Leftover after partial application",
+        });
+        remaining = 0;
+      }
     }
   };
 
