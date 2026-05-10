@@ -26,6 +26,7 @@ interface SessionInfo {
   max_students: number;
   day_of_week: string;
   session_period_id: string | null;
+  registration_status?: string;
 }
 
 interface Enrollment {
