@@ -524,7 +524,7 @@ const CalendarDayView = ({
       </div>
 
       {/* ── Time grid (scrollable) ── */}
-      <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 320px)" }}>
+      <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: isMobile ? "calc(100vh - 240px)" : "calc(100vh - 320px)" }}>
       <div className="flex overflow-x-auto relative">
         {/* ── Current time indicator ── */}
         {(() => {
