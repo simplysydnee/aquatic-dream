@@ -54,6 +54,8 @@ export function paymentStatusBadgeClass(status: string | null | undefined): stri
     case "due_day_1":
     case "unpaid":
       return "bg-amber-100 text-amber-700 border-amber-300";
+    case "flagged_no_pay":
+      return "bg-red-100 text-red-700 border-red-300";
     case "refunded":
       return "bg-red-100 text-red-700 border-red-300";
     case "comp":
