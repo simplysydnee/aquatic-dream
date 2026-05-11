@@ -1,59 +1,42 @@
-## Goal
-Eliminate page-level horizontal scrolling across the admin mobile experience, especially Calendar, Class Roster, Swim Enrollments, Clients/Swimmers, and other admin data pages, while preserving desktop functionality.
+# Fix: closed/deleted classes still showing as open
 
-## What I found
-- Many admin pages still render desktop tables on mobile. The shared table wrapper scrolls internally, but repeated wide columns, fixed `w-[...]` controls, badges, and long emails/names create spillover and poor mobile UX.
-- Swim Enrollments is the biggest offender: metric cards, tab list, filter row, and 10+ column tables are not mobile-first.
-- Class Roster uses cards, but each roster card contains a table and header controls that can overflow on phones.
-- Clients/Swimmers is closer, but long emails/status badges and the drawer tabs/content can still force width pressure.
-- Calendar day view has a stacked mobile agenda, but some text and action/header groups still need stricter max-width/min-width handling.
-- Several secondary admin pages use similar table patterns: Lesson Requests, Contacts, Instructors, Job Applications/Postings, Email Log, Time Off, Timesheets, and Schedule.
+## Root cause
 
-## Implementation plan
-1. **Add reusable mobile-safe admin primitives**
-   - Create small shared components/classes for:
-     - responsive admin page headers
-     - mobile filter stacks
-     - mobile record cards
-     - desktop-only tables with mobile card alternatives
-   - Keep desktop table layouts intact for tablet/desktop.
+The public **Swim Lessons** schedule (`src/pages/SwimLessons.tsx` → `ScheduleSection`) queries `swim_sessions` filtered only on `is_active = true`. It does **not** filter on `registration_status`, so any class an admin "Closes" in Sessions Admin (which sets `registration_status = 'closed'`) still renders as a colored, available slot with "spots left".
 
-2. **Fix Swim Enrollments mobile layout**
-   - Make summary cards one-column or compact two-column on narrow phones without text spill.
-   - Convert the tab list to a full-width responsive grid instead of a horizontal tab strip.
-   - Stack filters vertically on mobile with full-width inputs/selects.
-   - Replace the All Enrollments and Cancelled tables on mobile with compact enrollment cards showing child, parent, session, payment statuses, date, and actions.
-   - Keep the current tables for desktop.
+Verified for contrast:
+- `src/components/swim-enrollment/SessionPicker.tsx` (the actual enrollment step) already filters `is_active = true` AND `registration_status = 'open'`, so the enrollment form is mostly correct — but it doesn't hide periods whose `end_date` is in the past.
+- `SessionsAdmin` toggle writes `registration_status` open/closed and never deletes `swim_sessions` rows; "delete" only removes empty `session_periods`. So closed classes remain in the DB and leak through any query that doesn't filter status.
 
-3. **Fix Class Roster mobile layout**
-   - Make filter selects full-width/stacked on mobile.
-   - Rework each session card header so title, badges, instructor selector, and capacity wrap cleanly.
-   - Replace the roster table inside each card with stacked swimmer rows on mobile.
-   - Keep table layout on desktop.
+Also: a session whose `session_period_id` points to an inactive or already-ended period can still appear if the query joins on `is_active` only.
 
-4. **Fix Clients/Swimmers mobile layout**
-   - Ensure search/filter controls never exceed the viewport.
-   - Clamp/wrap long emails, parent names, badges, and last-activity metadata.
-   - Make swimmer detail drawer tabs and content use strict `min-w-0`, wrapping, and mobile-safe widths.
+## Fix
 
-5. **Fix Calendar remaining mobile overflow**
-   - Tighten the mobile agenda cards so long swimmer names, coach names, and time labels wrap inside cards.
-   - Constrain instructor chips/filter chips and date controls to the viewport.
-   - Preserve the stacked time-based mobile calendar and all click/detail actions.
+### 1. `src/pages/SwimLessons.tsx` — ScheduleSection
+- Add `.eq("registration_status", "open")` to the `swim_sessions` query.
+- Filter `session_periods` to only those with `end_date >= today` (hide finished sessions on the marketing page).
+- After loading, drop any time-slot row where every class is full/closed so the row collapses cleanly.
+- If a period ends up with zero visible classes after filtering, skip rendering that period card.
 
-6. **Sweep secondary admin pages**
-   - For pages with tables (Lesson Requests, Contacts, Instructors, Job Applications/Postings, Email Log, etc.), add mobile card views or responsive wrappers where needed.
-   - For pages with tabs (Time Off, Reports, Job Applications), convert tab lists to mobile grid/wrap layouts.
-   - For scheduling pages that must remain wide, contain the horizontal scroll inside the schedule card only and prevent the whole page from scrolling sideways.
+### 2. `src/components/swim-enrollment/SessionPicker.tsx`
+- Add an `end_date >= today` filter on `session_periods` so the enrollment picker can't offer a past session.
+- Keep existing `is_active` + `registration_status = 'open'` filters.
 
-7. **Verify on phone viewport**
-   - Test the main mobile routes at 390px width:
-     - `/admin`
-     - `/admin/enrollments`
-     - `/admin/roster`
-     - `/admin/clients`
-     - `/admin/lesson-requests`
-     - `/admin/contacts`
-     - `/admin/instructors`
-     - `/admin/schedule`
-   - Confirm `documentElement.scrollWidth <= window.innerWidth` for normal pages, and for intentionally wide schedule grids confirm only the inner grid scrolls.
+### 3. `src/hooks/useAvailableSlots.ts` (private-lesson booking)
+- No change to swim-class logic; this hook is for private-lesson instructor availability and is unrelated. Leave as-is.
+
+### 4. Admin clarity (small UX, no behavior change to data)
+- In `SessionsAdmin`, when a class is `closed`, keep showing it in the admin list (already does) but no DB change needed. Confirms admins can still re-open.
+
+## Verification
+
+After changes, on a 390px viewport:
+1. In Sessions Admin, close a class slot → reload `/swim-lessons` and confirm it no longer appears.
+2. Start the enrollment flow for that level/age → confirm the closed slot is not offered.
+3. Set a `session_period` `end_date` to yesterday → confirm it disappears from both `/swim-lessons` and the enrollment SessionPicker.
+4. Re-open the class → confirm it reappears in both places.
+
+## Files to edit
+
+- `src/pages/SwimLessons.tsx`
+- `src/components/swim-enrollment/SessionPicker.tsx`
