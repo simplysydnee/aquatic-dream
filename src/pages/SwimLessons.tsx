@@ -268,6 +268,8 @@ function ScheduleSection() {
     const preschoolTimes = groupByTime(preschool);
     const schoolAgeTimes = groupByTime(schoolAge);
 
+    if (preschoolTimes.length === 0 && schoolAgeTimes.length === 0) return null;
+
     return (
       <Card key={period.id} className="p-6">
         <div className="flex items-center gap-2 mb-1">
