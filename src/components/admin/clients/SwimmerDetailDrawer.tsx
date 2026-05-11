@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil, Info, DollarSign, MessageSquare, StickyNote } from "lucide-react";
+import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil, Info, DollarSign, MessageSquare, StickyNote, ShieldCheck } from "lucide-react";
 import type { Swimmer } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "./SwimmerStatusBadges";
 import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
@@ -13,6 +13,7 @@ import { LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment
 import { cn } from "@/lib/utils";
 import CommunicationsTab from "@/components/admin/swimmer/tabs/CommunicationsTab";
 import PaymentsTab from "@/components/admin/swimmer/tabs/PaymentsTab";
+import ComplianceTab from "@/components/admin/swimmer/tabs/ComplianceTab";
 import EditSwimmerDialog, { type EditTarget } from "@/components/admin/calendar/EditSwimmerDialog";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -138,10 +139,11 @@ export default function SwimmerDetailDrawer({
         </SheetHeader>
 
         <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <TabsList className="mx-3 sm:mx-6 mt-3 sm:mt-4 grid grid-cols-3 sm:grid-cols-5 w-auto h-auto p-1 border border-border bg-muted/40 rounded-lg gap-1 overflow-hidden">
+          <TabsList className="mx-3 sm:mx-6 mt-3 sm:mt-4 grid grid-cols-3 sm:grid-cols-6 w-auto h-auto p-1 border border-border bg-muted/40 rounded-lg gap-1 overflow-hidden">
             {[
               { value: "overview", icon: Info, label: "Info" },
               { value: "activity", icon: Waves, label: "Activity", count: totalActivity },
+              { value: "compliance", icon: ShieldCheck, label: "Waivers" },
               { value: "payments", icon: DollarSign, label: "Payments" },
               { value: "comms", icon: MessageSquare, label: "Messages" },
               { value: "notes", icon: StickyNote, label: "Notes" },
@@ -302,6 +304,10 @@ export default function SwimmerDetailDrawer({
                   </div>
                 )}
               </section>
+            </TabsContent>
+
+            <TabsContent value="compliance" className="p-4 sm:p-6 mt-0">
+              <ComplianceTab swimmer={swimmer} />
             </TabsContent>
 
             <TabsContent value="payments" className="p-4 sm:p-6 mt-0">
