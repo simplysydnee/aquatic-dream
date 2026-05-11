@@ -798,7 +798,42 @@ const SwimEnrollmentsAdmin = () => {
           <div className="text-sm text-muted-foreground">
             Cancelled enrollments are hidden from the main views. Use the status dropdown to restore one if needed.
           </div>
-          <Card>
+
+          {/* Mobile cancelled cards */}
+          <div className="grid grid-cols-1 gap-2 md:hidden">
+            {cancelledList.map((e) => {
+              const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
+              const ageGroup = getAgeGroup(e.child_age);
+              const groupName = levelInfo ? getGroupName(e.swim_level as SwimLevel, ageGroup) : e.swim_level;
+              return (
+                <Card key={e.id} className="p-3 opacity-90">
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-sm break-words"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /></span>
+                        <Badge variant="outline" className={`text-[10px] ${levelInfo?.color || ""}`}>{groupName}</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground break-words">{e.parent_name}</div>
+                      <div className="text-xs text-muted-foreground break-all">{e.parent_email}</div>
+                    </div>
+                    <Button size="icon" variant="ghost" className="shrink-0 -mr-1" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className={`text-[10px] ${enrollmentStateColor(e.status)}`}>{e.status}</Badge>
+                    <Badge variant="outline" className={`text-[10px] ${paymentStatusColor(e.payment_status)}`}>Reg: {formatPaymentStatus(e.payment_status)}</Badge>
+                    <Badge variant="outline" className={`text-[10px] ${sessionFeeColor(e.session_fee_status)}`}>Session: {formatPaymentStatus(e.session_fee_status)}</Badge>
+                  </div>
+                </Card>
+              );
+            })}
+            {cancelledList.length === 0 && (
+              <p className="text-center py-8 text-sm text-muted-foreground">No cancelled enrollments</p>
+            )}
+          </div>
+
+          <Card className="hidden md:block">
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
