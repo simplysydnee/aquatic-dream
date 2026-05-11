@@ -229,9 +229,9 @@ const ClassRosterAdmin = () => {
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <h2 className="text-2xl font-display font-bold text-foreground">Class Roster</h2>
+    <div className="space-y-6 max-w-full overflow-x-hidden">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">Class Roster</h2>
         <Dialog open={manualOpen} onOpenChange={setManualOpen}>
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Manual Enroll</Button>
@@ -276,16 +276,16 @@ const ClassRosterAdmin = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="grid grid-cols-2 sm:flex sm:items-center sm:flex-wrap gap-2 sm:gap-3">
         <Select value={filterPeriod} onValueChange={setFilterPeriod}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Period" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[140px]"><SelectValue placeholder="Period" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Periods</SelectItem>
             {periods.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterAgeGroup} onValueChange={setFilterAgeGroup}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Age Group" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Age Group" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Ages</SelectItem>
             <SelectItem value="preschool-3-5">Preschool</SelectItem>
@@ -293,7 +293,7 @@ const ClassRosterAdmin = () => {
           </SelectContent>
         </Select>
         <Select value={filterLevel} onValueChange={setFilterLevel}>
-          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Level" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder="Level" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Levels</SelectItem>
             {(["white","red","yellow","blue","green"] as SwimLevel[]).map(l => (
@@ -302,7 +302,7 @@ const ClassRosterAdmin = () => {
           </SelectContent>
         </Select>
         <Select value={filterInstructor} onValueChange={setFilterInstructor}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Instructor" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Instructor" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Instructors</SelectItem>
             <SelectItem value="unassigned">Unassigned</SelectItem>
@@ -310,7 +310,7 @@ const ClassRosterAdmin = () => {
           </SelectContent>
         </Select>
         <Select value={filterTime} onValueChange={setFilterTime}>
-          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Time" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[130px] col-span-2 sm:col-span-1"><SelectValue placeholder="Time" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Times</SelectItem>
             {uniqueTimes.map(t => <SelectItem key={t} value={t}>{formatTime(t)}</SelectItem>)}
@@ -401,48 +401,78 @@ const ClassRosterAdmin = () => {
             </CardHeader>
             <CardContent className="pt-0">
               {slotEnrollments.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="h-8 text-xs">Child</TableHead>
-                      <TableHead className="h-8 text-xs">Age</TableHead>
-                      <TableHead className="h-8 text-xs">Level</TableHead>
-                      <TableHead className="h-8 text-xs">Parent</TableHead>
-                      <TableHead className="h-8 text-xs">Status</TableHead>
-                      <TableHead className="h-8 text-xs w-[40px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  {/* Mobile list */}
+                  <div className="md:hidden space-y-1.5">
                     {slotEnrollments.map(e => {
                       const lc = LEVEL_BADGE_COLORS[e.swim_level as SwimLevel];
                       return (
-                        <TableRow key={e.id}>
-                          <TableCell className="py-2 text-sm"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /></TableCell>
-                          <TableCell className="py-2 text-sm">{e.child_age}</TableCell>
-                          <TableCell className="py-2">
-                            {lc ? (
-                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ring-1 ${lc.bg} ${lc.text} ${lc.ring}`}>
-                                {LEVEL_DISPLAY[e.swim_level as SwimLevel]?.name}
-                              </span>
-                            ) : (
-                              <span className="text-xs">{e.swim_level}</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="py-2 text-sm">{e.parent_name}</TableCell>
-                          <TableCell className="py-2">
-                            <Badge variant="outline" className="text-xs capitalize">{e.status}</Badge>
-                          </TableCell>
-                          <TableCell className="py-2">
-                            <Button size="icon" variant="ghost" className="h-7 w-7"
-                              onClick={() => { setMovingEnrollment(e); setMoveOpen(true); }}>
-                              <ArrowRightLeft className="w-3.5 h-3.5" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+                        <div key={e.id} className="flex items-start justify-between gap-2 rounded border p-2 min-w-0">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium break-words"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /> <span className="text-xs text-muted-foreground font-normal">({e.child_age})</span></div>
+                            <div className="text-xs text-muted-foreground break-words">{e.parent_name}</div>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {lc && (
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ring-1 ${lc.bg} ${lc.text} ${lc.ring}`}>
+                                  {LEVEL_DISPLAY[e.swim_level as SwimLevel]?.name}
+                                </span>
+                              )}
+                              <Badge variant="outline" className="text-[10px] capitalize">{e.status}</Badge>
+                            </div>
+                          </div>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => { setMovingEnrollment(e); setMoveOpen(true); }}>
+                            <ArrowRightLeft className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       );
                     })}
-                  </TableBody>
-                </Table>
+                  </div>
+                  {/* Desktop table */}
+                  <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="h-8 text-xs">Child</TableHead>
+                        <TableHead className="h-8 text-xs">Age</TableHead>
+                        <TableHead className="h-8 text-xs">Level</TableHead>
+                        <TableHead className="h-8 text-xs">Parent</TableHead>
+                        <TableHead className="h-8 text-xs">Status</TableHead>
+                        <TableHead className="h-8 text-xs w-[40px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {slotEnrollments.map(e => {
+                        const lc = LEVEL_BADGE_COLORS[e.swim_level as SwimLevel];
+                        return (
+                          <TableRow key={e.id}>
+                            <TableCell className="py-2 text-sm"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /></TableCell>
+                            <TableCell className="py-2 text-sm">{e.child_age}</TableCell>
+                            <TableCell className="py-2">
+                              {lc ? (
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ring-1 ${lc.bg} ${lc.text} ${lc.ring}`}>
+                                  {LEVEL_DISPLAY[e.swim_level as SwimLevel]?.name}
+                                </span>
+                              ) : (
+                                <span className="text-xs">{e.swim_level}</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-2 text-sm">{e.parent_name}</TableCell>
+                            <TableCell className="py-2">
+                              <Badge variant="outline" className="text-xs capitalize">{e.status}</Badge>
+                            </TableCell>
+                            <TableCell className="py-2">
+                              <Button size="icon" variant="ghost" className="h-7 w-7"
+                                onClick={() => { setMovingEnrollment(e); setMoveOpen(true); }}>
+                                <ArrowRightLeft className="w-3.5 h-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  </div>
+                </>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-3">No enrollments yet</p>
               )}
