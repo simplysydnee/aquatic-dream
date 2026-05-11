@@ -426,10 +426,10 @@ const SwimEnrollmentsAdmin = () => {
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-display font-bold text-foreground">Swim Enrollments</h2>
-        <Badge variant="outline" className="text-sm">{enrollments.length} total</Badge>
+    <div className="space-y-6 max-w-full overflow-x-hidden">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">Swim Enrollments</h2>
+        <Badge variant="outline" className="text-xs sm:text-sm shrink-0">{enrollments.length} total</Badge>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
