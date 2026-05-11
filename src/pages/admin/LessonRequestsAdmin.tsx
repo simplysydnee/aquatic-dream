@@ -43,29 +43,67 @@ const LessonRequestsAdmin = () => {
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-display font-bold text-foreground">Lesson Requests</h2>
-        <Badge variant="outline" className="text-sm">{requests.length} total</Badge>
+    <div className="space-y-6 max-w-full overflow-x-hidden">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">Lesson Requests</h2>
+        <Badge variant="outline" className="text-xs sm:text-sm shrink-0">{requests.length} total</Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {["new", "contacted", "scheduled"].map((status) => {
           const count = requests.filter((r) => r.status === status).length;
           return (
             <Card key={status}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium capitalize text-muted-foreground">{status}</CardTitle>
+              <CardHeader className="pb-2 p-3 sm:p-4">
+                <CardTitle className="text-xs sm:text-sm font-medium capitalize text-muted-foreground">{status}</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-foreground">{count}</p>
+              <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+                <p className="text-2xl sm:text-3xl font-bold text-foreground">{count}</p>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      <Card>
+      {/* Mobile cards */}
+      <div className="grid grid-cols-1 gap-2 md:hidden">
+        {requests.map((r) => (
+          <Card key={r.id} className="p-3 cursor-pointer" onClick={() => openRequest(r)}>
+            <div className="flex items-start justify-between gap-2 min-w-0">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-semibold text-sm break-words"><SwimmerLink childName={r.child_name} parentEmail={r.parent_email} /></span>
+                  <span className="text-xs text-muted-foreground">({r.child_age})</span>
+                  {commentCounts[r.id] > 0 && (
+                    <Badge variant="secondary" className="gap-1 text-[10px] h-5">
+                      <MessageSquare className="h-3 w-3" />{commentCounts[r.id]}
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground break-words">{r.parent_name}</div>
+                <div className="text-xs text-muted-foreground break-all">{r.parent_email}</div>
+                {r.parent_phone && <div className="text-xs text-muted-foreground">{formatPhone(r.parent_phone)}</div>}
+                {r.preferred_times && <div className="text-xs mt-1 break-words">⏰ {r.preferred_times}</div>}
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <Badge variant="outline" className={`text-[10px] ${r.lesson_type === "private" ? "bg-purple-50 text-purple-700 border-purple-300" : "bg-blue-50 text-blue-700 border-blue-300"}`}>
+                {r.lesson_type === "private" ? "Private" : "Semi-Private"}
+              </Badge>
+              <Badge variant={r.status === "new" ? "destructive" : "secondary"} className="capitalize text-[10px]">{r.status}</Badge>
+              {r.last_replied_at && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-green-700">
+                  <CheckCircle2 className="h-3 w-3" /> {new Date(r.last_replied_at).toLocaleDateString()}
+                </span>
+              )}
+              <span className="ml-auto text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span>
+            </div>
+          </Card>
+        ))}
+        {requests.length === 0 && <p className="text-center py-8 text-sm text-muted-foreground">No lesson requests yet</p>}
+      </div>
+
+      <Card className="hidden md:block">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

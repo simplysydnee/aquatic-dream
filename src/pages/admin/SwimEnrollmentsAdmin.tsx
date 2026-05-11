@@ -426,10 +426,10 @@ const SwimEnrollmentsAdmin = () => {
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-display font-bold text-foreground">Swim Enrollments</h2>
-        <Badge variant="outline" className="text-sm">{enrollments.length} total</Badge>
+    <div className="space-y-6 max-w-full overflow-x-hidden">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">Swim Enrollments</h2>
+        <Badge variant="outline" className="text-xs sm:text-sm shrink-0">{enrollments.length} total</Badge>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -542,25 +542,25 @@ const SwimEnrollmentsAdmin = () => {
       </div>
 
       <Tabs defaultValue="all">
-        <TabsList>
-          <TabsTrigger value="all">All Enrollments</TabsTrigger>
-          <TabsTrigger value="by-session">By Session</TabsTrigger>
-          <TabsTrigger value="cancelled">
-            Cancelled{cancelledCount > 0 && <span className="ml-1.5 text-xs opacity-70">({cancelledCount})</span>}
+        <TabsList className="grid w-full grid-cols-3 sm:inline-flex sm:w-auto h-auto">
+          <TabsTrigger value="all" className="text-xs sm:text-sm whitespace-normal">All</TabsTrigger>
+          <TabsTrigger value="by-session" className="text-xs sm:text-sm whitespace-normal">By Session</TabsTrigger>
+          <TabsTrigger value="cancelled" className="text-xs sm:text-sm whitespace-normal">
+            Cancelled{cancelledCount > 0 && <span className="ml-1 opacity-70">({cancelledCount})</span>}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {/* Filters */}
-          <div className="flex gap-3 items-center flex-wrap">
+          {/* Filters: stack full-width on mobile */}
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-3">
             <Input
               placeholder="Search by name or email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="max-w-xs"
+              className="w-full sm:max-w-xs"
             />
             <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Payment" />
               </SelectTrigger>
               <SelectContent>
@@ -571,7 +571,7 @@ const SwimEnrollmentsAdmin = () => {
               </SelectContent>
             </Select>
             <Select value={periodFilter} onValueChange={setPeriodFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="All Sessions" />
               </SelectTrigger>
               <SelectContent>
@@ -582,7 +582,7 @@ const SwimEnrollmentsAdmin = () => {
               </SelectContent>
             </Select>
             <Select value={ageFilter} onValueChange={setAgeFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="All Ages" />
               </SelectTrigger>
               <SelectContent>
@@ -592,7 +592,7 @@ const SwimEnrollmentsAdmin = () => {
               </SelectContent>
             </Select>
             <Select value={sessionFilter} onValueChange={setSessionFilter}>
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger className="w-full sm:w-[220px]">
                 <SelectValue placeholder="All Classes" />
               </SelectTrigger>
               <SelectContent>
@@ -607,7 +607,51 @@ const SwimEnrollmentsAdmin = () => {
             </Select>
           </div>
 
-          <Card>
+          {/* Mobile card list */}
+          <div className="grid grid-cols-1 gap-2 md:hidden">
+            {filtered.map((e) => {
+              const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
+              const ageGroup = getAgeGroup(e.child_age);
+              const groupName = levelInfo ? getGroupName(e.swim_level as SwimLevel, ageGroup) : e.swim_level;
+              const session = e.session_id ? sessions[e.session_id] : null;
+              return (
+                <Card key={e.id} className="p-3">
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-sm break-words"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /></span>
+                        <span className="text-xs text-muted-foreground">({e.child_age})</span>
+                        <Badge variant="outline" className={`text-[10px] ${levelInfo?.color || ""}`}>{groupName}</Badge>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground break-words">{e.parent_name}</div>
+                      <div className="text-xs text-muted-foreground break-all">{e.parent_email}</div>
+                      <div className="mt-1 text-xs break-words">
+                        {session ? `${session.session_name || ""} · ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
+                      </div>
+                    </div>
+                    <Button size="icon" variant="ghost" className="shrink-0 -mr-1" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className={`text-[10px] ${enrollmentStateColor(e.status)}`}>{e.status}</Badge>
+                    <Badge variant="outline" className={`text-[10px] ${paymentStatusColor(e.payment_status)}`}>Reg: {formatPaymentStatus(e.payment_status)}</Badge>
+                    <Badge variant="outline" className={`text-[10px] ${sessionFeeColor(e.session_fee_status)}`}>Session: {formatPaymentStatus(e.session_fee_status)}</Badge>
+                    {e.session_fee_status === "due_day_1" && (
+                      <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1" onClick={() => sendPaymentLink(e)}>
+                        <Send className="w-3 h-3" /> Send link
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+            {filtered.length === 0 && (
+              <p className="text-center py-8 text-sm text-muted-foreground">No enrollments found</p>
+            )}
+          </div>
+
+          <Card className="hidden md:block">
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
@@ -754,7 +798,42 @@ const SwimEnrollmentsAdmin = () => {
           <div className="text-sm text-muted-foreground">
             Cancelled enrollments are hidden from the main views. Use the status dropdown to restore one if needed.
           </div>
-          <Card>
+
+          {/* Mobile cancelled cards */}
+          <div className="grid grid-cols-1 gap-2 md:hidden">
+            {cancelledList.map((e) => {
+              const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
+              const ageGroup = getAgeGroup(e.child_age);
+              const groupName = levelInfo ? getGroupName(e.swim_level as SwimLevel, ageGroup) : e.swim_level;
+              return (
+                <Card key={e.id} className="p-3 opacity-90">
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-sm break-words"><SwimmerLink childName={e.child_name} parentEmail={e.parent_email} /></span>
+                        <Badge variant="outline" className={`text-[10px] ${levelInfo?.color || ""}`}>{groupName}</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground break-words">{e.parent_name}</div>
+                      <div className="text-xs text-muted-foreground break-all">{e.parent_email}</div>
+                    </div>
+                    <Button size="icon" variant="ghost" className="shrink-0 -mr-1" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className={`text-[10px] ${enrollmentStateColor(e.status)}`}>{e.status}</Badge>
+                    <Badge variant="outline" className={`text-[10px] ${paymentStatusColor(e.payment_status)}`}>Reg: {formatPaymentStatus(e.payment_status)}</Badge>
+                    <Badge variant="outline" className={`text-[10px] ${sessionFeeColor(e.session_fee_status)}`}>Session: {formatPaymentStatus(e.session_fee_status)}</Badge>
+                  </div>
+                </Card>
+              );
+            })}
+            {cancelledList.length === 0 && (
+              <p className="text-center py-8 text-sm text-muted-foreground">No cancelled enrollments</p>
+            )}
+          </div>
+
+          <Card className="hidden md:block">
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
