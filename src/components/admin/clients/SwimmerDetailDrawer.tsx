@@ -305,31 +305,103 @@ export default function SwimmerDetailDrawer({
               <section>
                 <div className="flex items-center gap-2 mb-3">
                   <BookOpen className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold text-sm">Lessons & Requests ({lessonEntries.length})</h3>
+                  <h3 className="font-semibold text-sm">
+                    Lessons & Requests ({requestEntries.length + occurrences.length})
+                  </h3>
                 </div>
-                {lessonEntries.length === 0 ? (
+
+                {requestEntries.length === 0 && swimmer.bookings.length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">No lesson requests or private bookings.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {lessonEntries.map((item) => {
-                      const Icon = item.kind === "request" ? BookOpen : Calendar;
-                      return (
-                        <div key={item.id} className="rounded-md border p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="text-xs text-muted-foreground">{fmtDateTime(item.date)}</div>
-                              <div className="font-medium text-sm flex items-center gap-1.5">
-                                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                                {item.title}
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-0.5">{item.sub}</div>
+                  <div className="space-y-3">
+                    {requestEntries.map((item) => (
+                      <div key={item.id} className="rounded-md border p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-xs text-muted-foreground">{fmtDateTime(item.date)}</div>
+                            <div className="font-medium text-sm flex items-center gap-1.5">
+                              <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                              {item.title}
                             </div>
-                            {item.onClick && (
-                              <Button variant="link" size="sm" className="h-auto p-0 text-xs shrink-0" onClick={item.onClick}>
-                                Open →
-                              </Button>
-                            )}
+                            <div className="text-xs text-muted-foreground mt-0.5">{item.sub}</div>
                           </div>
+                          <Button variant="link" size="sm" className="h-auto p-0 text-xs shrink-0" onClick={item.onClick}>
+                            Open →
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {swimmer.bookings.map((b) => {
+                      const occs = occurrences
+                        .filter((o) => o.booking_id === b.id)
+                        .sort((a, b2) => (a.occurrence_date < b2.occurrence_date ? -1 : 1));
+                      return (
+                        <div key={`bk-${b.id}`} className="rounded-md border">
+                          <div className="p-3 border-b bg-muted/30">
+                            <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
+                              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                              {b.lesson_type === "private" ? "Private" : "Semi-private"} lesson series
+                              {b.recurring && (
+                                <Badge variant="outline" className="text-[10px]">Recurring</Badge>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {fmtTime(b.start_time)}–{fmtTime(b.end_time)}
+                              {b.instructor_name ? ` · ${b.instructor_name}` : ""}
+                              {` · $${Number(b.price_per_session ?? 0).toFixed(2)}/lesson`}
+                            </div>
+                          </div>
+                          {occs.length === 0 ? (
+                            <div className="p-3 text-xs text-muted-foreground italic">
+                              No scheduled lessons yet.
+                            </div>
+                          ) : (
+                            <ul className="divide-y">
+                              {occs.map((o) => {
+                                const cancelled = o.status === "cancelled" || !!o.cancelled_at;
+                                const tip = paymentStatusTooltip(o.payment_status);
+                                return (
+                                  <li key={o.id} className="p-3 flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-medium truncate">{fmtOccDate(o.occurrence_date)}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {fmtTime(b.start_time)}–{fmtTime(b.end_time)}
+                                        {b.instructor_name ? ` · ${b.instructor_name}` : ""}
+                                      </div>
+                                    </div>
+                                    {cancelled ? (
+                                      <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
+                                        Cancelled
+                                      </Badge>
+                                    ) : tip ? (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Badge
+                                              variant="outline"
+                                              className={cn(
+                                                "cursor-help inline-flex items-center gap-1",
+                                                paymentStatusBadgeClass(o.payment_status),
+                                              )}
+                                            >
+                                              {formatPaymentStatus(o.payment_status)}
+                                              <HelpCircle className="h-3 w-3 opacity-70" />
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent className="max-w-xs">{tip}</TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    ) : (
+                                      <Badge variant="outline" className={paymentStatusBadgeClass(o.payment_status)}>
+                                        {formatPaymentStatus(o.payment_status)}
+                                      </Badge>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
                         </div>
                       );
                     })}
