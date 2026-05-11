@@ -122,12 +122,12 @@ const InstructorsAdmin = () => {
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-display font-bold text-foreground">Instructors</h2>
+    <div className="space-y-6 max-w-full overflow-x-hidden">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">Instructors</h2>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Add Instructor</Button>
+            <Button size="sm"><Plus className="w-4 h-4 mr-1" /> Add</Button>
           </DialogTrigger>
           <DialogContent className="max-w-sm">
             <DialogHeader><DialogTitle>{editingId ? "Edit Instructor" : "Add Instructor"}</DialogTitle></DialogHeader>
@@ -142,7 +142,42 @@ const InstructorsAdmin = () => {
         </Dialog>
       </div>
 
-      <Card>
+      {/* Mobile cards */}
+      <div className="grid grid-cols-1 gap-2 md:hidden">
+        {instructors.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">No instructors added yet.</p>
+        ) : instructors.map(inst => (
+          <Card key={inst.id} className={`p-3 ${!inst.is_active ? "opacity-60" : ""}`}>
+            <div className="flex items-start justify-between gap-2 min-w-0">
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-sm break-words">{inst.name}</div>
+                {inst.email && <div className="text-xs text-muted-foreground break-all">{inst.email}</div>}
+                {inst.phone && <div className="text-xs text-muted-foreground">{inst.phone}</div>}
+                <div className="mt-1 flex flex-wrap gap-1.5 items-center">
+                  <Badge variant={inst.is_active ? "default" : "secondary"} className="text-[10px]">{inst.is_active ? "Active" : "Inactive"}</Badge>
+                  {inst.user_id ? <Badge variant="outline" className="text-[10px]">Linked</Badge> : <span className="text-[10px] text-muted-foreground">No login</span>}
+                  {inst.hourly_wage != null && <span className="text-[10px] text-muted-foreground">${Number(inst.hourly_wage).toFixed(2)}/hr</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(inst)}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => toggleActive(inst)}>
+                  {inst.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                </Button>
+                {!inst.user_id && (
+                  <Button size="icon" variant="ghost" className="h-7 w-7" disabled={inviting === inst.id || !inst.email} onClick={() => inviteLogin(inst)}>
+                    {inviting === inst.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="hidden md:block">
         <CardHeader><CardTitle className="text-base">All Instructors</CardTitle></CardHeader>
         <CardContent>
           {instructors.length === 0 ? (
