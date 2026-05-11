@@ -68,8 +68,9 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
     async function fetchSessions() {
       setLoading(true);
       try {
+        const today = new Date().toISOString().slice(0, 10);
         const [periodsRes, sessionsRes] = await Promise.all([
-          supabase.from("session_periods").select("*").eq("is_active", true).order("start_date"),
+          supabase.from("session_periods").select("*").eq("is_active", true).gte("end_date", today).order("start_date"),
           supabase.from("swim_sessions").select("*")
             .eq("age_group", ageGroup)
             .eq("swim_level", level)
