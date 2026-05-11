@@ -329,6 +329,42 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Private / semi-private lessons ({occurrences.length})
           </h4>
+
+          {/* Combined payment link banner: shown per booking with 2+ unpaid lessons */}
+          {Array.from(unpaidByBooking.entries())
+            .filter(([, list]) => list.length >= 2)
+            .map(([bookingId, list]) => {
+              const lb = list[0].lesson_bookings;
+              const total = list.reduce(
+                (sum, o) => sum + Number(o.lesson_bookings?.price_per_session ?? 0),
+                0,
+              );
+              const busy = busyId === `series-${bookingId}`;
+              return (
+                <div
+                  key={`series-${bookingId}`}
+                  className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex flex-wrap items-center justify-between gap-2"
+                >
+                  <div className="text-xs">
+                    <div className="font-medium text-sm text-foreground">
+                      {list.length} unpaid lessons · {fmtMoney(total)} total
+                    </div>
+                    <div className="text-muted-foreground">
+                      Send one Stripe checkout link covering the entire remaining series.
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => sendSeriesLink(bookingId, lb?.parent_email || swimmer.parent_email)}
+                    disabled={busy}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <Send className="h-3 w-3" /> Email combined link ({fmtMoney(total)})
+                  </Button>
+                </div>
+              );
+            })}
+
           {occurrences.map((o) => {
             const lb = o.lesson_bookings;
             const price = Number(lb?.price_per_session ?? 0);
