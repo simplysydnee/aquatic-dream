@@ -1,21 +1,34 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil, Info, DollarSign, MessageSquare, StickyNote, ShieldCheck } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil, Info, DollarSign, MessageSquare, StickyNote, ShieldCheck, HelpCircle } from "lucide-react";
 import type { Swimmer } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "./SwimmerStatusBadges";
 import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
 import { formatPhone, phoneHref } from "@/lib/phone";
 import { LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
 import { cn } from "@/lib/utils";
+import { formatPaymentStatus, paymentStatusBadgeClass, paymentStatusTooltip } from "@/lib/paymentLabels";
 import CommunicationsTab from "@/components/admin/swimmer/tabs/CommunicationsTab";
 import PaymentsTab from "@/components/admin/swimmer/tabs/PaymentsTab";
 import ComplianceTab from "@/components/admin/swimmer/tabs/ComplianceTab";
 import EditSwimmerDialog, { type EditTarget } from "@/components/admin/calendar/EditSwimmerDialog";
 import { useAuth } from "@/hooks/useAuth";
+
+type Occurrence = {
+  id: string;
+  booking_id: string;
+  occurrence_date: string;
+  payment_status: string;
+  status: string;
+  cancelled_at: string | null;
+};
 
 interface Props {
   swimmer: Swimmer | null;
