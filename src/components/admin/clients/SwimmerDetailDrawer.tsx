@@ -62,6 +62,31 @@ export default function SwimmerDetailDrawer({
 }: Props) {
   const { isAdmin } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
+  const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
+
+  const bookingIds = swimmer ? swimmer.bookings.map((b) => b.id) : [];
+  const bookingIdsKey = bookingIds.join(",");
+
+  useEffect(() => {
+    if (!swimmer || bookingIds.length === 0) {
+      setOccurrences([]);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("lesson_booking_occurrences")
+      .select("id, booking_id, occurrence_date, payment_status, status, cancelled_at")
+      .in("booking_id", bookingIds)
+      .order("occurrence_date", { ascending: true })
+      .then(({ data }) => {
+        if (!cancelled && data) setOccurrences(data as Occurrence[]);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [swimmer?.key, bookingIdsKey]);
+
   if (!swimmer) return null;
 
   // Split entries into Enrollments vs Lessons & Requests, newest first.
@@ -78,24 +103,20 @@ export default function SwimmerDetailDrawer({
       onClick: () => onOpenEnrollment(e.id),
     }));
 
-  const lessonEntries = [
-    ...swimmer.requests.map((r) => ({
-      id: `req-${r.id}`,
-      date: r.created_at,
-      kind: "request" as const,
-      title: `Lesson Request · ${r.lesson_type}`,
-      sub: `Status: ${r.status}${r.preferred_times ? ` · Prefers: ${r.preferred_times}` : ""}`,
-      onClick: () => onOpenRequest(r.id),
-    })),
-    ...swimmer.bookings.map((b) => ({
-      id: `bk-${b.id}`,
-      date: b.created_at,
-      kind: "booking" as const,
-      title: `Booking · ${b.lesson_type}`,
-      sub: `${b.series_start} → ${b.series_end || "ongoing"} · ${b.start_time}-${b.end_time}`,
-      onClick: undefined,
-    })),
-  ].sort((a, b) => (a.date < b.date ? 1 : -1));
+  const requestEntries = swimmer.requests.map((r) => ({
+    id: `req-${r.id}`,
+    date: r.created_at,
+    title: `Lesson Request · ${r.lesson_type}`,
+    sub: `Status: ${r.status}${r.preferred_times ? ` · Prefers: ${r.preferred_times}` : ""}`,
+    onClick: () => onOpenRequest(r.id),
+  })).sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  const fmtTime = (t: string) => format(new Date(`2000-01-01T${t}`), "h:mm a");
+  const fmtOccDate = (d: string) => format(new Date(d + "T00:00:00"), "EEE, MMM d, yyyy");
+
+  const totalActivity =
+    enrollmentEntries.length + requestEntries.length + (occurrences.length || swimmer.bookings.length);
+
 
   const totalActivity = enrollmentEntries.length + lessonEntries.length;
 
