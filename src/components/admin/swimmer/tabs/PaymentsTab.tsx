@@ -202,6 +202,40 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
     }
   };
 
+  const sendSeriesLink = async (bookingId: string, parentEmail: string) => {
+    setBusyId(`series-${bookingId}`);
+    try {
+      const { error } = await supabase.functions.invoke("send-lesson-series-confirmation", {
+        body: { bookingId, environment: getStripeEnvironment(), siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast({ title: "Combined payment link emailed", description: `One link for all unpaid lessons sent to ${parentEmail}` });
+      await loadOccurrences();
+    } catch (err: any) {
+      toast({ title: "Send failed", description: err?.message, variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Group unpaid, non-cancelled occurrences by booking so we can offer a
+  // single combined Stripe link covering the entire remaining series.
+  const unpaidByBooking = useMemo(() => {
+    const map = new Map<string, LessonOccurrence[]>();
+    for (const o of occurrences) {
+      const open =
+        !o.cancelled_at &&
+        o.payment_status !== "paid" &&
+        o.payment_status !== "comp" &&
+        o.payment_status !== "refunded";
+      if (!open) continue;
+      const arr = map.get(o.booking_id) || [];
+      arr.push(o);
+      map.set(o.booking_id, arr);
+    }
+    return map;
+  }, [occurrences]);
+
   if (swimmer.enrollments.length === 0 && swimmer.bookings.length === 0) {
     return (
       <p className="text-xs text-muted-foreground italic py-6 text-center">
