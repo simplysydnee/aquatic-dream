@@ -117,9 +117,6 @@ export default function SwimmerDetailDrawer({
   const totalActivity =
     enrollmentEntries.length + requestEntries.length + (occurrences.length || swimmer.bookings.length);
 
-
-  const totalActivity = enrollmentEntries.length + lessonEntries.length;
-
   const editTarget: EditTarget | null =
     swimmer.enrollments[0]
       ? {
