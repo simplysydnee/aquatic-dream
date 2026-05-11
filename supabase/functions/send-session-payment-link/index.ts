@@ -84,6 +84,9 @@ Deno.serve(async (req) => {
     const checkoutSession = await stripe.checkout.sessions.create({
       line_items: [{ price: stripePrice.id, quantity: 1 }],
       mode: 'payment',
+      // Stripe default expiry is 24h; extend to the 30-day max so emailed
+      // links don't go stale before the parent gets to them.
+      expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
       success_url: `${returnBase}/swim-enrollment?step=done`,
       cancel_url: `${returnBase}/swim-enrollment`,
       customer_email: enrollment.parent_email,
