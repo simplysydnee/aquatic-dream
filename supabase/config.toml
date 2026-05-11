@@ -37,3 +37,5 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.admin-issue-refund]
     verify_jwt = false
+  [functions.admin-mark-waiver-complete]
+    verify_jwt = false
