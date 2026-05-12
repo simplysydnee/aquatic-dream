@@ -56,9 +56,8 @@ Deno.serve(async (req) => {
       }],
       mode: 'payment',
       ui_mode: 'embedded',
-      // Stripe default expiry is 24h; extend to 30-day max for parity with
-      // emailed links — admins may open this dialog days after creation.
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+      // Stripe enforces a max of 24h on expires_at; use 23h to stay safely under the limit.
+      expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
       return_url: (returnUrl || 'https://aquaticdreamsswim.com/admin') + '?lesson_paid=1&session_id={CHECKOUT_SESSION_ID}',
       customer_email: booking.parent_email || undefined,
       metadata: {

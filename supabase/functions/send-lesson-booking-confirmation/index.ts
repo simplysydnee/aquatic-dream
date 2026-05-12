@@ -83,9 +83,8 @@ Deno.serve(async (req) => {
         quantity: 1,
       }],
       mode: 'payment',
-      // Stripe default expiry is 24h; extend to the 30-day max so emailed
-      // links don't go stale before the parent gets to them.
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+      // Stripe enforces a max of 24h on expires_at; use 23h to stay safely under the limit.
+      expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
       success_url: `${returnBase}/?lesson_paid=1`,
       cancel_url: `${returnBase}/`,
       customer_email: booking.parent_email,
