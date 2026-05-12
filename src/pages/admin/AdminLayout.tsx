@@ -23,8 +23,14 @@ const AdminLayout = () => {
               <Outlet />
             </main>
           </div>
+          </div>
         </div>
       </SwimmerModalProvider>
+    </SidebarProvider>
+  );
+};
+
+export default AdminLayout;
     </SidebarProvider>
   );
 };
