@@ -75,12 +75,17 @@ export function SwimmerModalProvider({ children }: { children: ReactNode }) {
             key: k,
             child_name: source.child_name || name,
             child_age: source.child_age ?? null,
+            child_dob: source.child_dob ?? null,
             parent_name: source.parent_name || "",
             parent_email: source.parent_email || email,
             parent_phone: source.parent_phone || null,
+            swim_level: null,
+            requests: [],
             enrollments: [],
-            lesson_bookings: [],
-            lesson_requests: [],
+            bookings: [],
+            statuses: [{ key: "unknown", label: "Profile loading…", tone: "info" }],
+            last_activity: new Date().toISOString(),
+            primary_status: { key: "unknown", label: "Profile loading…", tone: "info" },
           } as unknown as Swimmer;
           setSelected(stub);
           setDrawerOpen(true);
