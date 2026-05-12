@@ -14,12 +14,19 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 
 const GATEWAY_STRIPE_BASE = 'https://connector-gateway.lovable.dev/stripe';
 
+// Cache Stripe clients per env across warm invocations to skip the
+// repeated client construction (TLS + http client setup) on every request.
+const stripeClientCache: Partial<Record<StripeEnv, Stripe>> = {};
+
 export function createStripeClient(env: StripeEnv): Stripe {
+  const cached = stripeClientCache[env];
+  if (cached) return cached;
+
   const connectionApiKey = getConnectionApiKey(env);
   const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
 
-  return new Stripe(connectionApiKey, {
+  const client = new Stripe(connectionApiKey, {
     httpClient: Stripe.createFetchHttpClient((url: string | URL, init?: RequestInit) => {
       const gatewayUrl = url.toString().replace('https://api.stripe.com', GATEWAY_STRIPE_BASE);
       return fetch(gatewayUrl, {
@@ -32,6 +39,8 @@ export function createStripeClient(env: StripeEnv): Stripe {
       });
     }),
   });
+  stripeClientCache[env] = client;
+  return client;
 }
 
 export async function verifyWebhook(req: Request, env: StripeEnv): Promise<{ type: string; data: { object: any } }> {
