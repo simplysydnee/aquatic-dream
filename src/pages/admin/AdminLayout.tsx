@@ -31,8 +31,3 @@ const AdminLayout = () => {
 };
 
 export default AdminLayout;
-    </SidebarProvider>
-  );
-};
-
-export default AdminLayout;
