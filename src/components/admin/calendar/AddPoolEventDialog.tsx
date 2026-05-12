@@ -118,6 +118,24 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
     setLessonBookingData(defaultLessonBookingData("private-lesson"));
   };
 
+  // Auto-generate title from swimmer/client name for lesson types
+  useEffect(() => {
+    if (isEditing) return;
+    if (eventType === "private-lesson" || eventType === "semi-private-lesson") {
+      const base = eventType === "private-lesson" ? "Private Lesson" : "Semi-Private Lesson";
+      const child = lessonBookingData.childName.trim();
+      setTitle(child ? `${base} - ${child}` : base);
+    }
+  }, [lessonBookingData.childName, eventType, isEditing]);
+
+  useEffect(() => {
+    if (isEditing) return;
+    if (eventType === "dive-session") {
+      const client = clientName.trim();
+      setTitle(client ? `Dive Training - ${client}` : "Dive Training");
+    }
+  }, [clientName, eventType, isEditing]);
+
   const handleTypeChange = (type: string) => {
     setEventType(type);
     if (type === "i-can-swim") {
