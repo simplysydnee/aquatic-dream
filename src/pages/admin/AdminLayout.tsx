@@ -2,12 +2,15 @@ import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { SwimmerModalProvider } from "@/components/admin/swimmer/SwimmerModalProvider";
+import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 
 const AdminLayout = () => {
   return (
     <SidebarProvider>
       <SwimmerModalProvider>
-        <div className="min-h-screen flex w-full overflow-x-hidden">
+        <div className="min-h-screen flex w-full overflow-x-hidden flex-col">
+          <PaymentTestModeBanner />
+          <div className="flex flex-1 w-full overflow-x-hidden">
           <AdminSidebar />
           <div className="flex-1 min-w-0 flex flex-col">
             <header className="h-14 flex items-center border-b px-4 bg-card">
