@@ -95,7 +95,9 @@ Deno.serve(async (req) => {
 
     const paymentLink = checkoutSession.url
 
-    // Send email via transactional email system
+    // Send email via transactional email system in the background so the
+    // caller (admin UI) gets a fast response. Failures are logged in
+    // email_send_log so admins can still see real failures.
     const session = enrollment.swim_sessions
     const sessionInfo = session
       ? `${session.session_name || session.swim_level} — ${session.day_of_week} ${session.start_time}`
@@ -104,29 +106,44 @@ Deno.serve(async (req) => {
       ? new Date(session.session_start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : undefined
 
-    await supabase.functions.invoke('send-transactional-email', {
-      body: {
-        templateName: 'session-payment-link',
-        recipientEmail: enrollment.parent_email,
-        idempotencyKey: `session-payment-${enrollmentId}-${Date.now()}`,
-        templateData: {
-          parentName: enrollment.parent_name,
-          childName: enrollment.child_name,
-          sessionInfo,
-          amountDue: `$${chargeAmount}`,
-          paymentLink,
-          dueDate,
-        },
-      },
-    })
-
-    // Update reminder timestamp
+    // Update reminder timestamp before returning so admin UI reflects state.
     await supabase
       .from('swim_enrollments')
       .update({ payment_reminder_sent_at: new Date().toISOString() })
       .eq('id', enrollmentId)
 
-    return new Response(JSON.stringify({ success: true, paymentLink }), {
+    const sendEmail = async () => {
+      try {
+        const { error: invokeErr } = await supabase.functions.invoke('send-transactional-email', {
+          body: {
+            templateName: 'session-payment-link',
+            recipientEmail: enrollment.parent_email,
+            idempotencyKey: `session-payment-${enrollmentId}-${Date.now()}`,
+            templateData: {
+              parentName: enrollment.parent_name,
+              childName: enrollment.child_name,
+              sessionInfo,
+              amountDue: `$${chargeAmount}`,
+              paymentLink,
+              dueDate,
+            },
+          },
+        })
+        if (invokeErr) throw invokeErr
+      } catch (err) {
+        console.error('session-payment-link background email failed:', err)
+      }
+    }
+
+    // @ts-ignore — EdgeRuntime is provided by the Supabase Edge runtime
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(sendEmail())
+    } else {
+      sendEmail()
+    }
+
+    return new Response(JSON.stringify({ success: true, paymentLink, emailQueued: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
