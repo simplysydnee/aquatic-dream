@@ -660,6 +660,8 @@ export type Database = {
           id: string
           occurrence_date: string
           paid_at: string | null
+          payment_link_email_error: string | null
+          payment_link_email_status: string | null
           payment_link_sent_at: string | null
           payment_method: string | null
           payment_reference: string | null
@@ -680,6 +682,8 @@ export type Database = {
           id?: string
           occurrence_date: string
           paid_at?: string | null
+          payment_link_email_error?: string | null
+          payment_link_email_status?: string | null
           payment_link_sent_at?: string | null
           payment_method?: string | null
           payment_reference?: string | null
@@ -700,6 +704,8 @@ export type Database = {
           id?: string
           occurrence_date?: string
           paid_at?: string | null
+          payment_link_email_error?: string | null
+          payment_link_email_status?: string | null
           payment_link_sent_at?: string | null
           payment_method?: string | null
           payment_reference?: string | null

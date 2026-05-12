@@ -363,50 +363,49 @@ const AddPoolEventDialog = ({ open, onOpenChange, defaultDate, onSaved, editEven
       return;
     }
 
-    // 5. Send confirmation + payment link (skipped entirely when prepaid)
+    // 5. Send confirmation + payment link (skipped entirely when prepaid).
+    // We DO NOT await this — the booking is durable in the DB above and the
+    // edge function backgrounds the actual email send. Awaiting forces the
+    // admin to wait 3-8s for cold-start email delivery before the dialog
+    // closes; instead we close immediately and surface a follow-up toast
+    // if the link/email fails.
+    let kickoffEmail: Promise<void> | null = null;
     if (!lb.prepaid && lb.sendPaymentLink && insertedOccs.length > 0) {
       const useSeries = lb.recurring && lb.billSeriesUpfront && insertedOccs.length > 1;
-      try {
-        if (useSeries) {
-          const { error: sendErr } = await supabase.functions.invoke("send-lesson-series-confirmation", {
-            body: {
-              bookingId: bookingRow.id,
-              environment: getStripeEnvironment(),
-              siteUrl: window.location.origin,
-            },
-          });
-          if (sendErr) throw sendErr;
-        } else {
-          const firstOcc = insertedOccs[0];
-          const { error: sendErr } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
-            body: {
-              occurrenceId: firstOcc.id,
-              environment: getStripeEnvironment(),
-              siteUrl: window.location.origin,
-            },
-          });
-          if (sendErr) throw sendErr;
-        }
-      } catch (e: any) {
-        toast({
-          title: "Booking saved, but confirmation email failed",
-          description: e?.message || "You can resend from the calendar block.",
-          variant: "destructive",
-        });
-      }
+      const fnName = useSeries ? "send-lesson-series-confirmation" : "send-lesson-booking-confirmation";
+      const body = useSeries
+        ? { bookingId: bookingRow.id, environment: getStripeEnvironment(), siteUrl: window.location.origin }
+        : { occurrenceId: insertedOccs[0].id, environment: getStripeEnvironment(), siteUrl: window.location.origin };
+
+      kickoffEmail = (async () => {
+        const { error: sendErr } = await supabase.functions.invoke(fnName, { body });
+        if (sendErr) throw sendErr;
+      })();
     }
 
     toast({
       title: lb.prepaid
         ? "Lesson booked & marked paid"
         : lb.sendPaymentLink
-        ? "Lesson booked & email sent"
+        ? "Lesson booked — sending confirmation…"
         : "Lesson booked",
       description: `${insertedOccs.length} occurrence${insertedOccs.length > 1 ? "s" : ""} created`,
     });
     onOpenChange(false);
     resetForm();
     onSaved();
+
+    // Surface real failures after the dialog has already closed so admin
+    // never sees a false success.
+    if (kickoffEmail) {
+      kickoffEmail.catch((e: any) => {
+        toast({
+          title: "Confirmation email failed",
+          description: e?.message || "You can resend from the calendar block.",
+          variant: "destructive",
+        });
+      });
+    }
   };
 
   const handleSwimLessonSave = async (effectiveTitle: string) => {

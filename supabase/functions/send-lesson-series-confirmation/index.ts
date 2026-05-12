@@ -85,11 +85,14 @@ Deno.serve(async (req) => {
     const paymentLink = checkoutSession.url
 
     // Stamp every unpaid occurrence with the same series checkout
+    const occIds = occs.map((o: any) => o.id)
     await supabase.from('lesson_booking_occurrences').update({
       stripe_checkout_url: paymentLink,
       stripe_session_id: checkoutSession.id,
       payment_link_sent_at: new Date().toISOString(),
-    }).in('id', occs.map((o: any) => o.id))
+      payment_link_email_status: 'queued',
+      payment_link_email_error: null,
+    }).in('id', occIds)
 
     const waiverLink = booking.waiver_token && !booking.waiver_signed_at
       ? `${returnBase}/lesson-waiver/${booking.waiver_token}`
@@ -113,32 +116,53 @@ Deno.serve(async (req) => {
       time: lessonTimeLabel,
     }))
 
-    await supabase.functions.invoke('send-transactional-email', {
-      body: {
-        templateName: 'lesson-booking-confirmation',
-        recipientEmail: booking.parent_email,
-        idempotencyKey: `lesson-series-${booking.id}-${booking.waiver_signed_at ? 'signed' : 'unsigned'}`,
-        templateData: {
-          parentName: booking.parent_name,
-          childName: booking.child_name,
-          lessonTypeLabel,
-          instructorName: booking.instructor_name,
-          paymentLink,
-          waiverLink,
-          waiverSigned: !!booking.waiver_signed_at,
-          icsLink: icsUrl,
-          googleCalendarLink: googleUrl,
-          // Series-specific
-          seriesMode: true,
-          totalAmountDue: `$${total.toFixed(2)}`,
-          totalOccurrences: occs.length,
-          scheduleList,
-          lessonTime: lessonTimeLabel,
-        },
-      },
-    })
+    const sendEmail = async () => {
+      try {
+        const { error: invokeErr } = await supabase.functions.invoke('send-transactional-email', {
+          body: {
+            templateName: 'lesson-booking-confirmation',
+            recipientEmail: booking.parent_email,
+            idempotencyKey: `lesson-series-${booking.id}-${booking.waiver_signed_at ? 'signed' : 'unsigned'}`,
+            templateData: {
+              parentName: booking.parent_name,
+              childName: booking.child_name,
+              lessonTypeLabel,
+              instructorName: booking.instructor_name,
+              paymentLink,
+              waiverLink,
+              waiverSigned: !!booking.waiver_signed_at,
+              icsLink: icsUrl,
+              googleCalendarLink: googleUrl,
+              seriesMode: true,
+              totalAmountDue: `$${total.toFixed(2)}`,
+              totalOccurrences: occs.length,
+              scheduleList,
+              lessonTime: lessonTimeLabel,
+            },
+          },
+        })
+        if (invokeErr) throw invokeErr
+        await supabase.from('lesson_booking_occurrences')
+          .update({ payment_link_email_status: 'sent', payment_link_email_error: null })
+          .in('id', occIds)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('background series email send failed for booking', booking.id, msg)
+        await supabase.from('lesson_booking_occurrences')
+          .update({ payment_link_email_status: 'failed', payment_link_email_error: msg })
+          .in('id', occIds)
+      }
+    }
 
-    return json({ success: true, paymentLink, count: occs.length })
+    // @ts-ignore — EdgeRuntime is provided by the Supabase Edge runtime
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(sendEmail())
+    } else {
+      sendEmail()
+    }
+
+    return json({ success: true, paymentLink, count: occs.length, emailQueued: true })
   } catch (e) {
     console.error('send-lesson-series-confirmation error:', e)
     return json({ error: e instanceof Error ? e.message : String(e) }, 500)

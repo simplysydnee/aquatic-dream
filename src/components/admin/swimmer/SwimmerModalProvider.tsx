@@ -4,6 +4,7 @@ import SwimmerDetailDrawer from "@/components/admin/clients/SwimmerDetailDrawer"
 import LessonRequestDetailDialog, { type LessonRequest } from "@/components/admin/LessonRequestDetailDialog";
 import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 type Identity = { child_name: string; parent_email: string };
 
@@ -29,11 +30,74 @@ export function SwimmerModalProvider({ children }: { children: ReactNode }) {
   const [enrollmentOpen, setEnrollmentOpen] = useState(false);
 
   const open = useCallback(
-    (id: Identity) => {
+    async (id: Identity) => {
       const k = keyOf(id);
       const found = swimmers.find((s) => s.key === k) || null;
-      setSelected(found);
-      setDrawerOpen(true);
+      if (found) {
+        setSelected(found);
+        setDrawerOpen(true);
+        return;
+      }
+
+      // Fallback: swimmers list may not have loaded yet (slow network on
+      // tablets) or this swimmer comes from a lesson_booking that hasn't
+      // been merged into the swimmers view. Try a direct lookup so the
+      // tap doesn't appear to do nothing.
+      const email = id.parent_email.trim();
+      const name = id.child_name.trim();
+
+      try {
+        const [enrRes, bookRes] = await Promise.all([
+          email
+            ? supabase
+                .from("swim_enrollments")
+                .select("*")
+                .ilike("parent_email", email)
+                .ilike("child_name", name)
+                .limit(1)
+                .maybeSingle()
+            : Promise.resolve({ data: null } as any),
+          email
+            ? supabase
+                .from("lesson_bookings")
+                .select("*")
+                .ilike("parent_email", email)
+                .limit(1)
+                .maybeSingle()
+            : Promise.resolve({ data: null } as any),
+        ]);
+
+        const enr = (enrRes as any)?.data;
+        const book = (bookRes as any)?.data;
+        const source = enr || book;
+        if (source) {
+          const stub: Swimmer = {
+            key: k,
+            child_name: source.child_name || name,
+            child_age: source.child_age ?? null,
+            child_dob: source.child_dob ?? null,
+            parent_name: source.parent_name || "",
+            parent_email: source.parent_email || email,
+            parent_phone: source.parent_phone || null,
+            swim_level: null,
+            requests: [],
+            enrollments: [],
+            bookings: [],
+            statuses: [{ key: "unknown", label: "Profile loading…", tone: "info" }],
+            last_activity: new Date().toISOString(),
+            primary_status: { key: "unknown", label: "Profile loading…", tone: "info" },
+          } as unknown as Swimmer;
+          setSelected(stub);
+          setDrawerOpen(true);
+          return;
+        }
+      } catch (e) {
+        console.error("SwimmerModalProvider fallback lookup failed:", e);
+      }
+
+      toast.error("Swimmer record not found", {
+        description: "We couldn't find a profile for this person yet.",
+      });
     },
     [swimmers],
   );
