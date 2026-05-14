@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import SEO from "@/components/SEO";
 import StarfishCurriculumBadge from "@/components/StarfishCurriculumBadge";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
