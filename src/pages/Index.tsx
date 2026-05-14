@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import SEO from "@/components/SEO";
 import StarfishCurriculumBadge from "@/components/StarfishCurriculumBadge";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -230,6 +231,11 @@ const ICanSwimCallout = () => (
 const Index = () => {
   return (
     <main>
+      <SEO
+        title="Aquatic Dreams Swim — Modesto Swim Lessons Ages 3–12"
+        description="Modesto's swim lesson destination. 5-level Starfish Aquatics curriculum for ages 3–12 with max 3 students per instructor. Group, semi-private & private lessons."
+        path="/"
+      />
       <HeroSection />
       <StatsSection />
       <SwimProgramPanel />

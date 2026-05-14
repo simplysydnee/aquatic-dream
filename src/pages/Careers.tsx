@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import SEO from "@/components/SEO";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Clock, DollarSign, Briefcase, Heart, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,11 @@ const Careers = () => {
 
   return (
     <div className="min-h-screen">
+      <SEO
+        title="Careers at Aquatic Dreams Swim — Modesto Swim Instructor Jobs"
+        description="Join the Aquatic Dreams team in Modesto. Open swim instructor and aquatic staff positions — apply online to teach with a 5-level curriculum and small class sizes."
+        path="/careers"
+      />
       {/* Hero */}
       <section className="bg-secondary text-secondary-foreground py-20">
         <div className="container text-center">

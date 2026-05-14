@@ -1,0 +1,12 @@
+# Aquatic Dreams Swim
+
+> Modesto, CA swim lesson destination for ages 3–12. 5-level Starfish Aquatics curriculum with a maximum of 3 students per instructor. Group, semi-private, and private lessons.
+
+Located at 1212 Kansas Ave, Modesto, CA 95351. Phone (209) 577-3483. Email info@aquaticdreamsswim.com.
+
+## Pages
+
+- [Home](/): Overview of the swim program, levels, pricing, and family testimonials.
+- [Swim Lessons](/swim-lessons): All 5 color-coded levels (White, Red, Yellow, Blue, Green), pricing, and weekly schedule.
+- [Enroll](/swim-enrollment): Step-by-step swim lesson enrollment with assessment, session pick, waivers, and checkout.
+- [Careers](/careers): Open positions and job application form for swim instructors and staff.
