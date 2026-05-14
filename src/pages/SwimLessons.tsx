@@ -356,6 +356,11 @@ function TimeSlotRow({ time, slots, getCount }: { time: string; slots: SwimSessi
 const SwimLessons = () => {
   return (
     <main>
+      <SEO
+        title="Swim Lesson Levels & Pricing — Aquatic Dreams Swim Modesto"
+        description="Explore our 5 color-coded swim levels for ages 3–12 with pricing, weekly schedule, and the Starfish Aquatics curriculum. Max 3 students per instructor."
+        path="/swim-lessons"
+      />
       {/* Hero */}
       <section className="bg-gradient-to-br from-primary/10 to-background py-20">
         <div className="container">

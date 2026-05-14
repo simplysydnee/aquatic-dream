@@ -297,6 +297,11 @@ const SwimEnrollment = () => {
 
   return (
     <main className="min-h-screen bg-background">
+      <SEO
+        title="Enroll in Swim Lessons — Aquatic Dreams Swim Modesto"
+        description="Enroll your swimmer at Aquatic Dreams in Modesto. Quick assessment, session pick, secure online checkout for group, semi-private, and private lessons."
+        path="/swim-enrollment"
+      />
       <PaymentTestModeBanner />
       <section className="bg-gradient-to-br from-primary/10 to-background py-12">
         <div className="container">
