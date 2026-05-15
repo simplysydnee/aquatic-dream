@@ -59,6 +59,19 @@ const AddSwimmerDialog = ({
   const [availableCredits, setAvailableCredits] = useState<{ id: string; amount_cents: number }[]>([]);
   const [applyCredit, setApplyCredit] = useState(false);
 
+  // Stripe charge override (used by stripe_phone & stripe_link). Blank = auto.
+  const [chargeOverride, setChargeOverride] = useState("");
+
+  // After admin clicks "Enroll & Charge Card", we create the row then mount
+  // the Embedded Stripe checkout inline in this same dialog.
+  const [phoneCheckout, setPhoneCheckout] = useState<{ enrollmentId: string; amountCents: number } | null>(null);
+
+  const autoChargeCents = isFirstTime ? 4500 : 24000;
+  const overrideNum = parseFloat(chargeOverride);
+  const effectiveChargeCents = chargeOverride && !isNaN(overrideNum) && overrideNum > 0
+    ? Math.round(overrideNum * 100)
+    : autoChargeCents;
+
   useEffect(() => {
     const email = parentEmail.trim().toLowerCase();
     if (!email || !email.includes("@")) {
