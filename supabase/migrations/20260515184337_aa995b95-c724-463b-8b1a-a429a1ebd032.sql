@@ -1,0 +1,1 @@
+ALTER TABLE public.swim_enrollments ADD COLUMN IF NOT EXISTS reg_fee_link_sent_at TIMESTAMPTZ;

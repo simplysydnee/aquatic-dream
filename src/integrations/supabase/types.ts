@@ -1319,6 +1319,7 @@ export type Database = {
           payment_reference: string | null
           payment_reminder_sent_at: string | null
           payment_status: string
+          reg_fee_link_sent_at: string | null
           registration_fee: number | null
           session_fee_paid_at: string | null
           session_fee_refund_amount: number | null
@@ -1356,6 +1357,7 @@ export type Database = {
           payment_reference?: string | null
           payment_reminder_sent_at?: string | null
           payment_status?: string
+          reg_fee_link_sent_at?: string | null
           registration_fee?: number | null
           session_fee_paid_at?: string | null
           session_fee_refund_amount?: number | null
@@ -1393,6 +1395,7 @@ export type Database = {
           payment_reference?: string | null
           payment_reminder_sent_at?: string | null
           payment_status?: string
+          reg_fee_link_sent_at?: string | null
           registration_fee?: number | null
           session_fee_paid_at?: string | null
           session_fee_refund_amount?: number | null
