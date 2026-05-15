@@ -110,6 +110,8 @@ const AddSwimmerDialog = ({
     setPaymentReference("");
     setPaymentAmount("");
     setPaymentStatus("paid");
+    setChargeOverride("");
+    setPhoneCheckout(null);
     setTab("enroll");
   };
 
