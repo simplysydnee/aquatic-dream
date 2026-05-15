@@ -186,6 +186,22 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
     }
   };
 
+  const sendRegFeeLink = async (e: SwimmerEnrollment) => {
+    setBusyId(e.id);
+    try {
+      const { error } = await supabase.functions.invoke("send-registration-fee-payment-link", {
+        body: { enrollmentId: e.id, environment: getStripeEnvironment(), siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast({ title: "Registration fee link emailed", description: `Sent to ${e.parent_email}` });
+      onChanged?.();
+    } catch (err: any) {
+      toast({ title: "Send failed", description: err?.message, variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const sendLessonLink = async (occurrenceId: string, parentEmail: string) => {
     setBusyId(occurrenceId);
     try {
@@ -294,6 +310,13 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                           amount: regFeeFor(e),
                         })
                       }
+                      onSendStripe={
+                        e.payment_status !== "paid" && e.payment_status !== "comp" && e.payment_status !== "waived"
+                          ? () => sendRegFeeLink(e)
+                          : undefined
+                      }
+                      linkSentAt={e.reg_fee_link_sent_at}
+                      sendLabel={e.reg_fee_link_sent_at ? "Resend reg fee link" : "Email reg fee link"}
                     />
                   )}
 
@@ -534,8 +557,10 @@ function PaymentRow(props: {
   busy: boolean;
   onMark: () => void;
   onSendStripe?: () => void;
+  linkSentAt?: string | null;
+  sendLabel?: string;
 }) {
-  const { label, amount, status, paidAt, method, reference, stripeId, busy, onMark, onSendStripe } = props;
+  const { label, amount, status, paidAt, method, reference, stripeId, busy, onMark, onSendStripe, linkSentAt, sendLabel } = props;
   const isPaid = status === "paid" || status === "comp";
   return (
     <div className="rounded-md border bg-muted/20 p-2.5 text-xs space-y-1.5">
@@ -564,6 +589,11 @@ function PaymentRow(props: {
           )}
         </div>
       )}
+      {!isPaid && linkSentAt && (
+        <div className="text-muted-foreground italic">
+          Payment link sent {fmt(linkSentAt)} · waiting for parent to pay
+        </div>
+      )}
       {!isPaid && (
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           <Button size="sm" variant="outline" onClick={onMark} disabled={busy} className="h-7 text-xs gap-1">
@@ -571,7 +601,7 @@ function PaymentRow(props: {
           </Button>
           {onSendStripe && (
             <Button size="sm" variant="outline" onClick={onSendStripe} disabled={busy} className="h-7 text-xs gap-1">
-              <Send className="h-3 w-3" /> Email Stripe link
+              <Send className="h-3 w-3" /> {sendLabel || "Email Stripe link"}
             </Button>
           )}
         </div>
