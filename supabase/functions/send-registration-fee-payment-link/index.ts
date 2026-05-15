@@ -21,10 +21,13 @@ Deno.serve(async (req) => {
   )
 
   try {
-    const { enrollmentId, environment, siteUrl } = await req.json()
+    const { enrollmentId, environment, siteUrl, amountOverrideCents } = await req.json()
     if (!enrollmentId) {
       return json({ error: 'enrollmentId is required' }, 400)
     }
+    const chargeCents = (typeof amountOverrideCents === 'number' && amountOverrideCents >= 50)
+      ? Math.round(amountOverrideCents)
+      : REGISTRATION_FEE_CENTS
 
     const { data: enrollment, error: enrollErr } = await supabase
       .from('swim_enrollments')
