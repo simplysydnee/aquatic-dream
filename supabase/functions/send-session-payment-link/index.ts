@@ -16,12 +16,15 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
   try {
-    const { enrollmentId, environment, siteUrl } = await req.json()
+    const { enrollmentId, environment, siteUrl, amountOverrideCents } = await req.json()
     if (!enrollmentId) {
       return new Response(JSON.stringify({ error: 'enrollmentId is required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+    const overrideCents = (typeof amountOverrideCents === 'number' && amountOverrideCents >= 50)
+      ? Math.round(amountOverrideCents)
+      : null
 
     // Fetch enrollment + session details
     const { data: enrollment, error: enrollErr } = await supabase
