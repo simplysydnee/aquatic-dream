@@ -12,7 +12,7 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-const VALID_METHODS = ["stripe", "stripe_link", "cash", "check", "comp", "walk_in"] as const;
+const VALID_METHODS = ["stripe", "stripe_link", "stripe_phone", "cash", "check", "comp", "walk_in"] as const;
 type PaymentMethod = typeof VALID_METHODS[number];
 
 interface AdminEnrollmentInput {
