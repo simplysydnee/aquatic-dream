@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, CalendarCheck, Wallet } from "lucide-react";
+import { UserPlus, CalendarCheck, Wallet, CreditCard, Mail } from "lucide-react";
+import PhoneCheckoutPanel from "./PhoneCheckoutPanel";
 
 interface Props {
   open: boolean;
@@ -25,7 +26,7 @@ interface Props {
   onSaved: () => void;
 }
 
-type PaymentMethod = "cash" | "check" | "comp" | "stripe" | "stripe_link";
+type PaymentMethod = "cash" | "check" | "comp" | "stripe" | "stripe_link" | "stripe_phone";
 
 const AddSwimmerDialog = ({
   open,
