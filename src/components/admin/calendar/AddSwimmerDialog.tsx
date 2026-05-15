@@ -25,7 +25,7 @@ interface Props {
   onSaved: () => void;
 }
 
-type PaymentMethod = "cash" | "check" | "comp" | "stripe";
+type PaymentMethod = "cash" | "check" | "comp" | "stripe" | "stripe_link";
 
 const AddSwimmerDialog = ({
   open,
@@ -147,8 +147,14 @@ const AddSwimmerDialog = ({
         parentPhone: parentPhone || null,
         isFirstTime,
         paymentMethod,
-        paymentReference: paymentReference.trim() || `${paymentMethod} ${dateStr}`,
-        paymentStatus: applyCredit && netDueCents === 0 ? "paid" : paymentStatus,
+        paymentReference:
+          paymentMethod === "stripe_link"
+            ? (paymentReference.trim() || "pending_stripe_link")
+            : (paymentReference.trim() || `${paymentMethod} ${dateStr}`),
+        paymentStatus:
+          paymentMethod === "stripe_link"
+            ? "unpaid"
+            : (applyCredit && netDueCents === 0 ? "paid" : paymentStatus),
         paymentAmount: netAmount,
         notes: noteParts.join(" · ") || null,
         isWalkIn,
@@ -168,8 +174,17 @@ const AddSwimmerDialog = ({
       toast({ title: "Missing fields", description: "Fill in child name, age, parent name, and email.", variant: "destructive" });
       return;
     }
-    if (paymentStatus === "paid" && !paymentReference.trim() && paymentMethod !== "comp") {
+    if (
+      paymentMethod !== "stripe_link" &&
+      paymentStatus === "paid" &&
+      !paymentReference.trim() &&
+      paymentMethod !== "comp"
+    ) {
       toast({ title: "Payment reference required", description: "Enter a receipt #, check #, or note for the audit log.", variant: "destructive" });
+      return;
+    }
+    if (paymentMethod === "stripe_link" && !isFirstTime) {
+      toast({ title: "Stripe link only sends the registration fee", description: "Mark this as a first-time swimmer, or use a different payment method.", variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -300,6 +315,7 @@ const AddSwimmerDialog = ({
                         <SelectItem value="cash">Cash</SelectItem>
                         <SelectItem value="check">Check</SelectItem>
                         <SelectItem value="stripe">Stripe (manual)</SelectItem>
+                        <SelectItem value="stripe_link">Stripe — send link to parent</SelectItem>
                         <SelectItem value="comp">Comp / Free</SelectItem>
                       </SelectContent>
                     </Select>
