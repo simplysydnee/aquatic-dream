@@ -127,19 +127,24 @@ serve(async (req) => {
       return json({ error: enrollErr?.message || "Insert failed" }, 500);
     }
 
-    // If the admin selected "Stripe — send payment link to parent" AND this row
-    // still owes the registration fee, fire-and-forget the link email.
-    if (
-      body.paymentMethod === "stripe_link" &&
-      regFee > 0 &&
-      body.paymentStatus !== "paid"
-    ) {
+    // If the admin selected "Stripe — send payment link to parent", auto-fire the
+    // appropriate link function: reg fee for first-time, session fee for returning.
+    // For "stripe_phone" we don't invoke anything here — the client opens the
+    // Embedded Checkout immediately after this returns.
+    if (body.paymentMethod === "stripe_link" && body.paymentStatus !== "paid") {
+      const linkFn = isFirstTime && regFee > 0
+        ? "send-registration-fee-payment-link"
+        : "send-session-payment-link";
       try {
-        await supabaseAdmin.functions.invoke("send-registration-fee-payment-link", {
-          body: { enrollmentId: enrollment.id, environment: "sandbox" },
+        await supabaseAdmin.functions.invoke(linkFn, {
+          body: {
+            enrollmentId: enrollment.id,
+            environment: "sandbox",
+            amountOverrideCents: (body as any).linkAmountOverrideCents ?? null,
+          },
         });
       } catch (linkErr) {
-        console.error("Failed to auto-send reg fee link:", linkErr);
+        console.error(`Failed to auto-send ${linkFn}:`, linkErr);
         // Non-fatal — admin can resend from PaymentsTab.
       }
     }
