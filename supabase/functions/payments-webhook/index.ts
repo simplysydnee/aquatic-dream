@@ -65,6 +65,8 @@ serve(async (req) => {
           await handleRegistrationFeePaid(obj);
         } else if (obj?.metadata?.type === "session_fee" && obj?.metadata?.enrollmentId) {
           await handleSessionFeePaid(obj);
+        } else if (obj?.metadata?.type === "admin_phone_checkout" && obj?.metadata?.enrollmentId) {
+          await handleAdminPhoneCheckoutPaid(obj);
         } else if (obj?.metadata?.type === "lesson_booking_occurrence" && obj?.metadata?.occurrenceId) {
           await handleLessonBookingPaid(obj);
         } else if (obj?.metadata?.type === "lesson_booking_series" && obj?.metadata?.bookingId) {
