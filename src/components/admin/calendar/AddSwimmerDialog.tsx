@@ -360,6 +360,12 @@ const AddSwimmerDialog = ({
                     />
                   </div>
                 </div>
+                {paymentMethod === "stripe_link" && (
+                  <p className="text-xs text-muted-foreground italic">
+                    A $45 registration fee Stripe checkout link will be emailed to the parent. The
+                    enrollment stays unpaid until they complete payment.
+                  </p>
+                )}
               </div>
 
               <Button onClick={handleEnroll} disabled={saving} className="w-full">
