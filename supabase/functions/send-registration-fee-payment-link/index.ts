@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
           price_data: {
             currency: 'usd',
             product_data: { name: 'Aquatic Dreams Registration Fee (one-time)' },
-            unit_amount: REGISTRATION_FEE_CENTS,
+            unit_amount: chargeCents,
           },
           quantity: 1,
         },
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
               parentName: enrollment.parent_name,
               childName: enrollment.child_name,
               sessionInfo,
-              amountDue: '$45',
+              amountDue: `$${(chargeCents / 100).toFixed(2)}`,
               paymentLink,
             },
           },
