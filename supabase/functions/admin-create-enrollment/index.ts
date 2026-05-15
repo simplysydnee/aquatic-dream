@@ -12,7 +12,7 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-const VALID_METHODS = ["stripe", "cash", "check", "comp", "walk_in"] as const;
+const VALID_METHODS = ["stripe", "stripe_link", "cash", "check", "comp", "walk_in"] as const;
 type PaymentMethod = typeof VALID_METHODS[number];
 
 interface AdminEnrollmentInput {
@@ -69,6 +69,35 @@ serve(async (req) => {
       return json({ error: "paymentReference is required (Stripe charge id, receipt #, or note)" }, 400);
     }
 
+    // Dedup guard: registration fee is once-per-family/child, not per session.
+    // If this child (matched by lower(email) + lower(trim(name))) already has any
+    // enrollment row with registration_fee > 0, suppress the fee on this new row.
+    let regFee = body.isFirstTime ? 45 : 0;
+    let isFirstTime = body.isFirstTime;
+    let suppressionNote: string | null = null;
+
+    if (body.isFirstTime) {
+      const emailKey = body.parentEmail.trim().toLowerCase();
+      const nameKey = body.childName.trim().toLowerCase();
+      const { data: priorRows } = await supabaseAdmin
+        .from("swim_enrollments")
+        .select("id, registration_fee, child_name, parent_email")
+        .ilike("parent_email", emailKey)
+        .gt("registration_fee", 0);
+      const match = (priorRows || []).find(
+        (r) => (r.child_name || "").trim().toLowerCase() === nameKey,
+      );
+      if (match) {
+        regFee = 0;
+        isFirstTime = false;
+        suppressionNote = `Reg fee suppressed — already charged on enrollment ${match.id}`;
+      }
+    }
+
+    const combinedNotes = [body.notes?.trim() || null, suppressionNote]
+      .filter(Boolean)
+      .join(" · ") || null;
+
     const insertRow = {
       child_name: body.childName.trim(),
       child_age: body.childAge,
@@ -77,15 +106,15 @@ serve(async (req) => {
       parent_name: body.parentName.trim(),
       parent_email: body.parentEmail.trim(),
       parent_phone: body.parentPhone?.trim() || null,
-      is_first_time: body.isFirstTime,
-      registration_fee: body.isFirstTime ? 45 : 0,
+      is_first_time: isFirstTime,
+      registration_fee: regFee,
       payment_status: body.paymentStatus,
       payment_amount: body.paymentAmount,
       payment_method: body.paymentMethod,
       payment_reference: body.paymentReference.trim(),
       status: "confirmed",
       lesson_type: "group",
-      notes: body.notes?.trim() || null,
+      notes: combinedNotes,
     };
 
     const { data: enrollment, error: enrollErr } = await supabaseAdmin
@@ -96,6 +125,23 @@ serve(async (req) => {
 
     if (enrollErr || !enrollment) {
       return json({ error: enrollErr?.message || "Insert failed" }, 500);
+    }
+
+    // If the admin selected "Stripe — send payment link to parent" AND this row
+    // still owes the registration fee, fire-and-forget the link email.
+    if (
+      body.paymentMethod === "stripe_link" &&
+      regFee > 0 &&
+      body.paymentStatus !== "paid"
+    ) {
+      try {
+        await supabaseAdmin.functions.invoke("send-registration-fee-payment-link", {
+          body: { enrollmentId: enrollment.id, environment: "sandbox" },
+        });
+      } catch (linkErr) {
+        console.error("Failed to auto-send reg fee link:", linkErr);
+        // Non-fatal — admin can resend from PaymentsTab.
+      }
     }
 
     // Optionally check the swimmer in for today's attendance

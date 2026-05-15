@@ -61,7 +61,9 @@ serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const obj = event.data.object;
-        if (obj?.metadata?.type === "session_fee" && obj?.metadata?.enrollmentId) {
+        if (obj?.metadata?.type === "registration_fee" && obj?.metadata?.enrollmentId) {
+          await handleRegistrationFeePaid(obj);
+        } else if (obj?.metadata?.type === "session_fee" && obj?.metadata?.enrollmentId) {
           await handleSessionFeePaid(obj);
         } else if (obj?.metadata?.type === "lesson_booking_occurrence" && obj?.metadata?.occurrenceId) {
           await handleLessonBookingPaid(obj);
@@ -311,6 +313,38 @@ async function handleCheckoutCompleted(session: any) {
   // 8. Send confirmation emails (one per enrollment row)
   for (const e of insertedEnrollments) {
     await sendEnrollmentConfirmation(e.id);
+  }
+}
+
+async function handleRegistrationFeePaid(checkoutSession: any) {
+  const enrollmentId = checkoutSession.metadata?.enrollmentId;
+  if (!enrollmentId) {
+    console.warn("Registration fee callback missing enrollmentId");
+    return;
+  }
+  // Only mark paid when Stripe says it actually was, AND we have a real PI.
+  if (checkoutSession.payment_status !== "paid" || !checkoutSession.payment_intent) {
+    console.warn("Reg fee webhook ignored — not paid or missing PI:", {
+      enrollmentId,
+      payment_status: checkoutSession.payment_status,
+      has_pi: !!checkoutSession.payment_intent,
+    });
+    return;
+  }
+  const stripeId = checkoutSession.payment_intent;
+  const { error } = await supabase
+    .from("swim_enrollments")
+    .update({
+      payment_status: "paid",
+      payment_method: "stripe",
+      payment_reference: stripeId,
+      stripe_payment_id: stripeId,
+    })
+    .eq("id", enrollmentId);
+  if (error) {
+    console.error("Failed to mark registration fee paid:", enrollmentId, error);
+  } else {
+    console.log("Registration fee marked paid for enrollment:", enrollmentId);
   }
 }
 

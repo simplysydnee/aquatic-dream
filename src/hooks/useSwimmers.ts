@@ -42,6 +42,7 @@ export interface SwimmerEnrollment {
   payment_method: string | null;
   payment_reference: string | null;
   payment_reminder_sent_at: string | null;
+  reg_fee_link_sent_at: string | null;
   session_fee_stripe_id: string | null;
   session_fee_paid_at: string | null;
   registration_fee: number | null;
