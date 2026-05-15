@@ -62,30 +62,43 @@ Deno.serve(async (req) => {
     const env = (environment || 'sandbox') as StripeEnv
     const stripe = createStripeClient(env)
 
-    const prices = await stripe.prices.list({ lookup_keys: ['swim_session_fee'] })
-    if (!prices.data.length) {
-      return new Response(JSON.stringify({ error: 'Session fee price not configured in Stripe' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    let lineItem: any
+    let chargeAmount: number
 
-    // Authoritative amount = what Stripe will actually charge.
-    // Derive amountDue from the resolved Stripe price (not the DB session_price)
-    // so the email can never advertise a different number than what gets billed.
-    const stripePrice = prices.data[0]
-    const stripeAmountDollars = (stripePrice.unit_amount ?? 0) / 100
-    if (stripeAmountDollars > 0 && Math.abs(stripeAmountDollars - sessionFee) > 0.01) {
-      console.warn(
-        `Price drift detected for enrollment ${enrollmentId}: ` +
-        `swim_sessions.session_price=$${sessionFee} vs Stripe swim_session_fee=$${stripeAmountDollars}. ` +
-        `Charging Stripe amount ($${stripeAmountDollars}); update the DB or rotate the Stripe price to resolve.`
-      )
+    if (overrideCents !== null) {
+      // Admin-specified custom amount — use inline price_data, skip lookup_key.
+      chargeAmount = overrideCents / 100
+      lineItem = {
+        price_data: {
+          currency: 'usd',
+          product_data: { name: 'Aquatic Dreams — Custom Charge' },
+          unit_amount: overrideCents,
+        },
+        quantity: 1,
+      }
+    } else {
+      const prices = await stripe.prices.list({ lookup_keys: ['swim_session_fee'] })
+      if (!prices.data.length) {
+        return new Response(JSON.stringify({ error: 'Session fee price not configured in Stripe' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const stripePrice = prices.data[0]
+      const stripeAmountDollars = (stripePrice.unit_amount ?? 0) / 100
+      if (stripeAmountDollars > 0 && Math.abs(stripeAmountDollars - sessionFee) > 0.01) {
+        console.warn(
+          `Price drift detected for enrollment ${enrollmentId}: ` +
+          `swim_sessions.session_price=$${sessionFee} vs Stripe swim_session_fee=$${stripeAmountDollars}. ` +
+          `Charging Stripe amount ($${stripeAmountDollars}); update the DB or rotate the Stripe price to resolve.`
+        )
+      }
+      chargeAmount = stripeAmountDollars > 0 ? stripeAmountDollars : sessionFee
+      lineItem = { price: stripePrice.id, quantity: 1 }
     }
-    const chargeAmount = stripeAmountDollars > 0 ? stripeAmountDollars : sessionFee
 
     const returnBase = siteUrl || 'https://aquatic-dream-quest.lovable.app'
     const checkoutSession = await stripe.checkout.sessions.create({
-      line_items: [{ price: stripePrice.id, quantity: 1 }],
+      line_items: [lineItem],
       mode: 'payment',
       // Stripe default expiry is 24h; extend to the 30-day max so emailed
       // links don't go stale before the parent gets to them.
