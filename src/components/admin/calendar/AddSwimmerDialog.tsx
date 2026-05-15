@@ -340,15 +340,20 @@ const AddSwimmerDialog = ({
                       <SelectContent>
                         <SelectItem value="cash">Cash</SelectItem>
                         <SelectItem value="check">Check</SelectItem>
-                        <SelectItem value="stripe">Stripe (manual)</SelectItem>
-                        <SelectItem value="stripe_link">Stripe — send link to parent</SelectItem>
+                        <SelectItem value="stripe">Stripe (manual receipt #)</SelectItem>
+                        <SelectItem value="stripe_phone">Stripe — take card over phone (charge now)</SelectItem>
+                        <SelectItem value="stripe_link">Stripe — email payment link to parent</SelectItem>
                         <SelectItem value="comp">Comp / Free</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label htmlFor="pay-status" className="text-xs">Status *</Label>
-                    <Select value={paymentStatus} onValueChange={(v) => setPaymentStatus(v as "paid" | "unpaid")}>
+                    <Select
+                      value={paymentStatus}
+                      onValueChange={(v) => setPaymentStatus(v as "paid" | "unpaid")}
+                      disabled={paymentMethod === "stripe_phone" || paymentMethod === "stripe_link"}
+                    >
                       <SelectTrigger id="pay-status"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="paid">Paid</SelectItem>
@@ -357,45 +362,76 @@ const AddSwimmerDialog = ({
                     </Select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="pay-amount" className="text-xs">Amount ($)</Label>
-                    <Input
-                      id="pay-amount"
-                      type="number"
-                      step="0.01"
-                      value={paymentAmount}
-                      onChange={(e) => setPaymentAmount(e.target.value)}
-                      placeholder="240"
-                    />
+
+                {(paymentMethod === "stripe_phone" || paymentMethod === "stripe_link") ? (
+                  <div className="space-y-2 rounded border border-primary/30 bg-primary/5 p-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-foreground">
+                        {isFirstTime ? "Charge: Registration fee" : "Charge: Session fee"}
+                      </span>
+                      <span className="font-bold text-primary">
+                        ${(autoChargeCents / 100).toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      <Label htmlFor="charge-override" className="text-xs">
+                        Override amount ($) — optional
+                      </Label>
+                      <Input
+                        id="charge-override"
+                        type="number"
+                        step="0.01"
+                        min="0.50"
+                        value={chargeOverride}
+                        onChange={(e) => setChargeOverride(e.target.value)}
+                        placeholder={`Auto: ${(autoChargeCents / 100).toFixed(2)}`}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground italic">
+                      {paymentMethod === "stripe_phone"
+                        ? `After clicking below, the Stripe checkout opens here so you can type the parent's card. Enrollment is created first, then marked paid automatically when Stripe confirms the charge ($${(effectiveChargeCents / 100).toFixed(2)}).`
+                        : `A Stripe checkout link for $${(effectiveChargeCents / 100).toFixed(2)} will be emailed to the parent. The enrollment stays unpaid until they complete payment.`}
+                    </p>
                   </div>
-                  <div>
-                    <Label htmlFor="pay-ref" className="text-xs">
-                      Reference {paymentStatus === "paid" && paymentMethod !== "comp" ? "*" : ""}
-                    </Label>
-                    <Input
-                      id="pay-ref"
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                      placeholder={
-                        paymentMethod === "stripe" ? "ch_xxx" :
-                        paymentMethod === "check" ? "Check #1234" :
-                        paymentMethod === "comp" ? "Reason" :
-                        "Receipt #"
-                      }
-                    />
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="pay-amount" className="text-xs">Amount ($)</Label>
+                      <Input
+                        id="pay-amount"
+                        type="number"
+                        step="0.01"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                        placeholder="240"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="pay-ref" className="text-xs">
+                        Reference {paymentStatus === "paid" && paymentMethod !== "comp" ? "*" : ""}
+                      </Label>
+                      <Input
+                        id="pay-ref"
+                        value={paymentReference}
+                        onChange={(e) => setPaymentReference(e.target.value)}
+                        placeholder={
+                          paymentMethod === "stripe" ? "ch_xxx" :
+                          paymentMethod === "check" ? "Check #1234" :
+                          paymentMethod === "comp" ? "Reason" :
+                          "Receipt #"
+                        }
+                      />
+                    </div>
                   </div>
-                </div>
-                {paymentMethod === "stripe_link" && (
-                  <p className="text-xs text-muted-foreground italic">
-                    A $45 registration fee Stripe checkout link will be emailed to the parent. The
-                    enrollment stays unpaid until they complete payment.
-                  </p>
                 )}
               </div>
 
-              <Button onClick={handleEnroll} disabled={saving} className="w-full">
-                {saving ? "Enrolling..." : "Enroll Swimmer"}
+              <Button onClick={handleEnroll} disabled={saving} className="w-full gap-2">
+                {saving ? "Enrolling..." : (
+                  paymentMethod === "stripe_phone" ? <><CreditCard className="h-4 w-4" /> Enroll &amp; Charge Card</> :
+                  paymentMethod === "stripe_link" ? <><Mail className="h-4 w-4" /> Enroll &amp; Email Link</> :
+                  "Enroll Swimmer"
+                )}
               </Button>
             </TabsContent>
 
