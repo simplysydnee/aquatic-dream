@@ -23,6 +23,8 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.admin-create-enrollment]
     verify_jwt = true
+  [functions.create-admin-phone-checkout]
+    verify_jwt = true
   [functions.send-lesson-booking-confirmation]
     verify_jwt = false
   [functions.send-lesson-series-confirmation]

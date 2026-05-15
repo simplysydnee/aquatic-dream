@@ -65,6 +65,8 @@ serve(async (req) => {
           await handleRegistrationFeePaid(obj);
         } else if (obj?.metadata?.type === "session_fee" && obj?.metadata?.enrollmentId) {
           await handleSessionFeePaid(obj);
+        } else if (obj?.metadata?.type === "admin_phone_checkout" && obj?.metadata?.enrollmentId) {
+          await handleAdminPhoneCheckoutPaid(obj);
         } else if (obj?.metadata?.type === "lesson_booking_occurrence" && obj?.metadata?.occurrenceId) {
           await handleLessonBookingPaid(obj);
         } else if (obj?.metadata?.type === "lesson_booking_series" && obj?.metadata?.bookingId) {
@@ -370,6 +372,45 @@ async function handleSessionFeePaid(checkoutSession: any) {
   }
 }
 
+
+async function handleAdminPhoneCheckoutPaid(checkoutSession: any) {
+  const enrollmentId = checkoutSession.metadata?.enrollmentId;
+  if (!enrollmentId) {
+    console.warn("Admin phone checkout callback missing enrollmentId");
+    return;
+  }
+  if (checkoutSession.payment_status !== "paid" || !checkoutSession.payment_intent) {
+    console.warn("Admin phone checkout webhook ignored — not paid or missing PI:", {
+      enrollmentId,
+      payment_status: checkoutSession.payment_status,
+      has_pi: !!checkoutSession.payment_intent,
+    });
+    return;
+  }
+  const stripeId = checkoutSession.payment_intent;
+  const amountTotal = Number(checkoutSession.amount_total || 0);
+  const coversSessionFee = amountTotal >= 24000;
+  const update: Record<string, unknown> = {
+    payment_status: "paid",
+    payment_method: "stripe",
+    payment_reference: stripeId,
+    stripe_payment_id: stripeId,
+  };
+  if (coversSessionFee) {
+    update.session_fee_status = "paid";
+    update.session_fee_stripe_id = stripeId;
+    update.session_fee_paid_at = new Date().toISOString();
+  }
+  const { error } = await supabase
+    .from("swim_enrollments")
+    .update(update)
+    .eq("id", enrollmentId);
+  if (error) {
+    console.error("Failed to mark admin phone checkout paid:", enrollmentId, error);
+  } else {
+    console.log("Admin phone checkout marked paid for enrollment:", enrollmentId, "amount:", amountTotal);
+  }
+}
 async function handleLessonBookingPaid(checkoutSession: any) {
   const occurrenceId = checkoutSession.metadata?.occurrenceId;
   if (!occurrenceId) {

@@ -21,10 +21,13 @@ Deno.serve(async (req) => {
   )
 
   try {
-    const { enrollmentId, environment, siteUrl } = await req.json()
+    const { enrollmentId, environment, siteUrl, amountOverrideCents } = await req.json()
     if (!enrollmentId) {
       return json({ error: 'enrollmentId is required' }, 400)
     }
+    const chargeCents = (typeof amountOverrideCents === 'number' && amountOverrideCents >= 50)
+      ? Math.round(amountOverrideCents)
+      : REGISTRATION_FEE_CENTS
 
     const { data: enrollment, error: enrollErr } = await supabase
       .from('swim_enrollments')
@@ -58,7 +61,7 @@ Deno.serve(async (req) => {
           price_data: {
             currency: 'usd',
             product_data: { name: 'Aquatic Dreams Registration Fee (one-time)' },
-            unit_amount: REGISTRATION_FEE_CENTS,
+            unit_amount: chargeCents,
           },
           quantity: 1,
         },
@@ -96,7 +99,7 @@ Deno.serve(async (req) => {
               parentName: enrollment.parent_name,
               childName: enrollment.child_name,
               sessionInfo,
-              amountDue: '$45',
+              amountDue: `$${(chargeCents / 100).toFixed(2)}`,
               paymentLink,
             },
           },
