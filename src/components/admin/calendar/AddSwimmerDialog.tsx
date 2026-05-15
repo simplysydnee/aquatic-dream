@@ -147,11 +147,16 @@ const AddSwimmerDialog = ({
     }
   };
 
-  const callAdminCreate = async (isWalkIn: boolean) => {
+  const callAdminCreate = async (isWalkIn: boolean): Promise<string | null> => {
     const netAmount = applyCredit ? netDueCents / 100 : (paymentAmount ? parseFloat(paymentAmount) : null);
     const noteParts: string[] = [];
     if (isWalkIn) noteParts.push(`Walk-in on ${dateStr}`);
     if (creditAppliedCents > 0) noteParts.push(`Applied $${(creditAppliedCents / 100).toFixed(2)} account credit`);
+    const isStripeAsync = paymentMethod === "stripe_link" || paymentMethod === "stripe_phone";
+    const refFallback =
+      paymentMethod === "stripe_link" ? "pending_stripe_link" :
+      paymentMethod === "stripe_phone" ? "pending_phone_checkout" :
+      `${paymentMethod} ${dateStr}`;
     const { data, error } = await supabase.functions.invoke("admin-create-enrollment", {
       body: {
         childName,
@@ -163,18 +168,18 @@ const AddSwimmerDialog = ({
         parentPhone: parentPhone || null,
         isFirstTime,
         paymentMethod,
-        paymentReference:
-          paymentMethod === "stripe_link"
-            ? (paymentReference.trim() || "pending_stripe_link")
-            : (paymentReference.trim() || `${paymentMethod} ${dateStr}`),
-        paymentStatus:
-          paymentMethod === "stripe_link"
-            ? "unpaid"
-            : (applyCredit && netDueCents === 0 ? "paid" : paymentStatus),
+        paymentReference: paymentReference.trim() || refFallback,
+        paymentStatus: isStripeAsync
+          ? "unpaid"
+          : (applyCredit && netDueCents === 0 ? "paid" : paymentStatus),
         paymentAmount: netAmount,
         notes: noteParts.join(" · ") || null,
         isWalkIn,
         walkInDate: isWalkIn ? dateStr : undefined,
+        linkAmountOverrideCents:
+          paymentMethod === "stripe_link" && chargeOverride
+            ? effectiveChargeCents
+            : null,
       },
     });
     if (error || !data?.success) {
@@ -183,6 +188,7 @@ const AddSwimmerDialog = ({
     if (data?.enrollmentId) {
       await consumeCredits(data.enrollmentId);
     }
+    return data?.enrollmentId ?? null;
   };
 
   const handleEnroll = async () => {
@@ -190,8 +196,9 @@ const AddSwimmerDialog = ({
       toast({ title: "Missing fields", description: "Fill in child name, age, parent name, and email.", variant: "destructive" });
       return;
     }
+    const isStripeAsync = paymentMethod === "stripe_link" || paymentMethod === "stripe_phone";
     if (
-      paymentMethod !== "stripe_link" &&
+      !isStripeAsync &&
       paymentStatus === "paid" &&
       !paymentReference.trim() &&
       paymentMethod !== "comp"
@@ -199,17 +206,20 @@ const AddSwimmerDialog = ({
       toast({ title: "Payment reference required", description: "Enter a receipt #, check #, or note for the audit log.", variant: "destructive" });
       return;
     }
-    if (paymentMethod === "stripe_link" && !isFirstTime) {
-      toast({ title: "Stripe link only sends the registration fee", description: "Mark this as a first-time swimmer, or use a different payment method.", variant: "destructive" });
-      return;
-    }
     setSaving(true);
     try {
-      await callAdminCreate(false);
-      toast({ title: "Swimmer enrolled", description: `${childName} added to ${sessionName}` });
-      reset();
-      onOpenChange(false);
-      onSaved();
+      const enrollmentId = await callAdminCreate(false);
+      if (paymentMethod === "stripe_phone" && enrollmentId) {
+        // Don't close the dialog — swap to embedded Stripe checkout in place.
+        setPhoneCheckout({ enrollmentId, amountCents: effectiveChargeCents });
+        toast({ title: "Enrollment created", description: "Enter the parent's card to charge now." });
+        onSaved();
+      } else {
+        toast({ title: "Swimmer enrolled", description: `${childName} added to ${sessionName}` });
+        reset();
+        onOpenChange(false);
+        onSaved();
+      }
     } catch (e) {
       toast({ title: "Failed to enroll", description: (e as Error).message, variant: "destructive" });
     } finally {
