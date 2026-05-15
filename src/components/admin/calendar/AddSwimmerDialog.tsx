@@ -250,10 +250,30 @@ const AddSwimmerDialog = ({
     <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
-          <DialogTitle>Add Swimmer</DialogTitle>
-          <DialogDescription>{sessionName} — {swimLevel}</DialogDescription>
+          <DialogTitle>{phoneCheckout ? "Charge card over phone" : "Add Swimmer"}</DialogTitle>
+          <DialogDescription>
+            {phoneCheckout
+              ? `Enter the parent's card to charge $${(phoneCheckout.amountCents / 100).toFixed(2)}. The enrollment is already created and will be marked paid automatically.`
+              : `${sessionName} — ${swimLevel}`}
+          </DialogDescription>
         </DialogHeader>
 
+        {phoneCheckout ? (
+          <div className="space-y-3">
+            <PhoneCheckoutPanel
+              enrollmentId={phoneCheckout.enrollmentId}
+              amountCents={phoneCheckout.amountCents}
+              label={`Aquatic Dreams — ${childName} (${sessionName})`}
+            />
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => { reset(); onOpenChange(false); onSaved(); }}
+            >
+              Done
+            </Button>
+          </div>
+        ) : (
         <Tabs value={tab} onValueChange={(v) => setTab(v as "enroll" | "walkin")}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="enroll" className="gap-1.5">
