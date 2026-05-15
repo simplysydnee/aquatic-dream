@@ -509,6 +509,7 @@ const AddSwimmerDialog = ({
             </TabsContent>
           </div>
         </Tabs>
+        )}
       </DialogContent>
     </Dialog>
   );
