@@ -105,7 +105,7 @@ const ClassRosterAdmin = () => {
   const [manualOpen, setManualOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [movingEnrollment, setMovingEnrollment] = useState<Enrollment | null>(null);
-  const [newSessionId, setNewSessionId] = useState("");
+  
   const [manualForm, setManualForm] = useState({
     child_name: "", child_age: "", parent_name: "", parent_email: "",
     parent_phone: "", swim_level: "white", session_id: "", notes: "",
