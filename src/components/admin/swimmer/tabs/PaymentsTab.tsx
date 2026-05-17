@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, ExternalLink, Send, DollarSign, CreditCard, Ban } from "lucide-react";
+import { CheckCircle2, ExternalLink, Send, DollarSign, CreditCard, Ban, FileCheck2, Clock3, Copy } from "lucide-react";
 import type { Swimmer, SwimmerEnrollment } from "@/hooks/useSwimmers";
 import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
 import { getStripeEnvironment } from "@/lib/stripe";
@@ -292,32 +292,41 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                   </div>
 
                   {e.is_first_time && (
-                    <PaymentRow
-                      label="Registration fee"
-                      amount={regFeeFor(e)}
-                      status={e.payment_status}
-                      paidAt={null}
-                      method={e.payment_method}
-                      reference={e.payment_reference}
-                      stripeId={e.stripe_payment_id}
-                      busy={busyId === e.id}
-                      onMark={() =>
-                        openMark({
-                          kind: "enrollment",
-                          enrollment: e,
-                          field: "payment_status",
-                          label: "Registration fee",
-                          amount: regFeeFor(e),
-                        })
-                      }
-                      onSendStripe={
-                        e.payment_status !== "paid" && e.payment_status !== "comp" && e.payment_status !== "waived"
-                          ? () => sendRegFeeLink(e)
-                          : undefined
-                      }
-                      linkSentAt={e.reg_fee_link_sent_at}
-                      sendLabel={e.reg_fee_link_sent_at ? "Resend reg fee link" : "Email reg fee link"}
-                    />
+                    <>
+                      <PaymentRow
+                        label="Registration fee"
+                        amount={regFeeFor(e)}
+                        status={e.payment_status}
+                        paidAt={null}
+                        method={e.payment_method}
+                        reference={e.payment_reference}
+                        stripeId={e.stripe_payment_id}
+                        busy={busyId === e.id}
+                        onMark={() =>
+                          openMark({
+                            kind: "enrollment",
+                            enrollment: e,
+                            field: "payment_status",
+                            label: "Registration fee",
+                            amount: regFeeFor(e),
+                          })
+                        }
+                        onSendStripe={
+                          e.payment_status !== "paid" && e.payment_status !== "comp" && e.payment_status !== "waived"
+                            ? () => sendRegFeeLink(e)
+                            : undefined
+                        }
+                        linkSentAt={e.reg_fee_link_sent_at}
+                        sendLabel={e.reg_fee_link_sent_at ? "Resend reg fee + waiver email" : "Email reg fee + waiver"}
+                      />
+                      <WaiverRow
+                        signedAt={e.waiver_signed_at}
+                        waiverToken={e.waiver_token}
+                        onCopied={() =>
+                          toast({ title: "Waiver link copied", description: "Paste it anywhere — text, email, etc." })
+                        }
+                      />
+                    </>
                   )}
 
                   <PaymentRow
