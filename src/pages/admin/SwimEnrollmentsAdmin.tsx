@@ -772,6 +772,9 @@ const SwimEnrollmentsAdmin = () => {
                                 <Send className="w-4 h-4 text-primary" />
                               </Button>
                             )}
+                            <Button size="icon" variant="ghost" title="Move to another class" onClick={() => { setMoveTarget(e); setMoveOpen(true); }}>
+                              <ArrowRightLeft className="w-4 h-4" />
+                            </Button>
                             <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
                               <Eye className="w-4 h-4" />
                             </Button>
