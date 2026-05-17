@@ -96,6 +96,8 @@ const SwimEnrollmentsAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<Enrollment | null>(null);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [sessionFilter, setSessionFilter] = useState<string>("all");
