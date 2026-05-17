@@ -938,6 +938,16 @@ const SwimEnrollmentsAdmin = () => {
         }}
       />
 
+      <MoveSwimmerDialog
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        enrollment={moveTarget}
+        sessions={Object.values(sessions)}
+        periods={sessionPeriods}
+        allEnrollments={enrollments}
+        onMoved={fetchData}
+      />
+
       <AlertDialog open={!!cancelTarget} onOpenChange={(o) => { if (!o) setCancelTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
