@@ -67,8 +67,8 @@ Deno.serve(async (req) => {
         },
       ],
       mode: 'payment',
-      // Extend to Stripe's 30-day max so emailed links don't expire too quickly.
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+      // Stripe enforces a max of 24h on expires_at; use 23h to stay safely under the limit.
+      expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
       success_url: `${returnBase}/swim-enrollment?step=done`,
       cancel_url: `${returnBase}/swim-enrollment`,
       customer_email: enrollment.parent_email,
