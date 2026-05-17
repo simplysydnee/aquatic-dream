@@ -162,11 +162,36 @@ export default function MoveSwimmerDialog({
       if (error) throw error;
       if (!data) throw new Error("No row updated — check permissions.");
 
+      // Fire-and-await: resend confirmation email with new class details + calendar invite.
+      let emailNote = "";
+      try {
+        const { error: invokeErr } = await supabase.functions.invoke(
+          "resend-enrollment-confirmation",
+          {
+            body: {
+              enrollmentId: enrollment.id,
+              reason: "moved",
+              previousSessionLabel: currentLabel,
+              previousLevel: enrollment.swim_level,
+            },
+          },
+        );
+        if (invokeErr) {
+          emailNote = " (confirmation email failed to send)";
+          console.error("Resend confirmation failed:", invokeErr);
+        } else {
+          emailNote = " Updated confirmation sent to parent.";
+        }
+      } catch (e) {
+        emailNote = " (confirmation email failed to send)";
+        console.error(e);
+      }
+
       toast({
         title: "Moved",
         description: `${enrollment.child_name} moved to ${
           targetSession ? labelFor(targetSession) : "new class"
-        }.`,
+        }.${emailNote}`,
       });
       onOpenChange(false);
       onMoved?.();
