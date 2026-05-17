@@ -632,9 +632,14 @@ const SwimEnrollmentsAdmin = () => {
                         {session ? `${session.session_name || ""} · ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                       </div>
                     </div>
-                    <Button size="icon" variant="ghost" className="shrink-0 -mr-1" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
-                      <Eye className="w-4 h-4" />
-                    </Button>
+                    <div className="flex shrink-0 -mr-1">
+                      <Button size="icon" variant="ghost" title="Move to another class" onClick={() => { setMoveTarget(e); setMoveOpen(true); }}>
+                        <ArrowRightLeft className="w-4 h-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <Badge variant="outline" className={`text-[10px] ${enrollmentStateColor(e.status)}`}>{e.status}</Badge>
