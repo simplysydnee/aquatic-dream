@@ -1,59 +1,43 @@
 ## Goal
+For first-time enrollments, the registration fee email must include a waiver signing link alongside the $45 payment button. One email, two CTAs.
 
-Admins can reliably move a swimmer from one class to another from both **Class Roster** and **Swim Enrollments**, including changing the swimmer's level when the new class is at a different level.
+## Database
+- Add to `swim_enrollments`: `waiver_token text unique`, `waiver_signed_at timestamptz`.
+- Trigger: auto-generate `waiver_token` on insert when `is_first_time = true` and token is null.
+- Backfill tokens for existing first-time enrollments missing one.
+- RPC `get_swim_enrollment_by_waiver_token(_token)` (SECURITY DEFINER) returning parent/child/session info needed by the public waiver page.
+- RPC `mark_swim_enrollment_waiver_signed(_token)` (SECURITY DEFINER) that stamps `waiver_signed_at` and returns the enrollment id.
 
-## What's wrong today
+## Public waiver page
+- New route `/enrollment-waiver/:token` → `src/pages/EnrollmentWaiver.tsx`, modeled on existing `LessonWaiver.tsx`.
+- Reuses `LegalAgreements` component, writes a row to `enrollment_agreements` keyed by `enrollment_id`.
+- On submit calls `mark_swim_enrollment_waiver_signed`, then shows a confirmation screen with a "Pay $45 registration fee" CTA if `payment_status !== 'paid'` (link to the existing Stripe checkout URL when present).
+- If already signed, render a friendly "Waiver already on file" state.
 
-- **Class Roster** has a move dialog, but:
-  - It only updates `session_id`. The swimmer's `swim_level` stays the same, so moving (e.g.) a "white" swimmer into a "yellow" class leaves them visually mismatched and they can appear to "snap back" under their old level grouping in some filter views — looks like the move didn't happen.
-  - No capacity check — silently lets you put a 4th swimmer in a 3-seat class.
-  - The "new session" dropdown lists every session with no filtering / search, easy to pick the wrong one.
-  - The update call has no `.select()` and no surfaced error detail beyond `error.message`, so a silent RLS or constraint failure would be near-invisible.
-- **Swim Enrollments** has no move action at all.
+## Email
+- `supabase/functions/_shared/transactional-email-templates/registration-fee-payment-link.tsx`:
+  - Add an optional `waiverLink` + `waiverSigned` prop.
+  - When `waiverLink` is present and not signed, render a prominent "Step 1: Sign your waiver" block above the existing "Step 2: Pay $45 registration fee" button. Copy explains both steps must be completed.
+  - When already signed, show a small "✅ Waiver signed" confirmation and only the payment CTA.
+- `supabase/functions/send-registration-fee-payment-link/index.ts`:
+  - Load `waiver_token` + `waiver_signed_at` from the enrollment.
+  - Build `${APP_URL}/enrollment-waiver/${waiver_token}` and pass to template as `waiverLink`.
+  - Pass `waiverSigned` boolean.
 
-## Shared "Move Swimmer" dialog (new component)
-
-Create `src/components/admin/MoveSwimmerDialog.tsx` used by both pages.
-
-Inputs: `enrollment`, `sessions[]`, `periods[]`, `enrollmentsBySession` (for live counts), `onMoved()`.
-
-UI:
-1. Header: "Move {child_name} (currently {currentClassLabel})"
-2. **Target class** — searchable Select grouped by session period, each row shows: period · day · time · level · `count/max`, and a "FULL" pill when at capacity. Excludes the current `session_id`.
-3. **Level** — Select prefilled with the swimmer's current `swim_level`. When the admin picks a target class whose level differs, show an inline note: "This class is {targetLevel}. Update {child}'s level too?" with a one-click "Match class level" button that sets the Level select to the target's level. Admin can still pick any of the 5 levels independently.
-4. Capacity warning banner if target is full: "This class is at 3/3. Moving will put it at 4/3." Confirm button changes to "Move anyway".
-5. Optional "Notes" textarea appended to the enrollment's `notes` ("Moved from X to Y on {date} by admin" — append, not overwrite).
-6. Confirm button performs:
-   ```
-   UPDATE swim_enrollments
-      SET session_id = :newSessionId,
-          swim_level = :chosenLevel,
-          notes      = :mergedNotes,
-          updated_at = now()
-    WHERE id = :enrollmentId
-   ```
-   uses `.select().single()` so a 0-row result throws a clear error toast. On success → toast "Moved {name} to {newClassLabel}" → `onMoved()` refetch.
-
-No payment / Stripe changes. Status, fees, agreements, and history stay intact.
-
-## Class Roster wiring
-
-Replace the existing inline move dialog in `src/pages/admin/ClassRosterAdmin.tsx` with `<MoveSwimmerDialog />`. Pass live `enrollments` so capacity counts are accurate. Remove the local `moveOpen`/`newSessionId` state and `handleMoveSwimmer`.
-
-## Swim Enrollments wiring
-
-In `src/pages/admin/SwimEnrollmentsAdmin.tsx`, add an `ArrowRightLeft` icon button on each enrollment row (all three tabs that render rows — same lookup pattern as the existing edit/cancel actions) that opens the shared `<MoveSwimmerDialog />`. Wire `onMoved` to the existing refetch.
+## Admin UI
+- In `PaymentsTab` (and `SwimmerDetailDrawer` where reg fee status shows), add a "Waiver: ✅ signed / ⏳ pending" badge next to the reg fee status.
+- Add a "Copy waiver link" button next to the existing "Copy reg fee link" button for first-time enrollments.
 
 ## Out of scope
+- No change to returning enrollments (they don't get a reg fee email).
+- No change to the public 5-step self-serve flow (already collects waivers inline).
+- No separate "waiver only" email — single combined email per the chosen approach.
 
-- No DB migration (RLS already allows authenticated updates; no schema change needed).
-- No edge-function changes.
-- Refunds, payment status, instructor reassignment, and class-date changes are untouched.
-- Public enrollment flow untouched.
-
-## Risk check
-
-- Additive UI only on Swim Enrollments.
-- Class Roster swap replaces a broken dialog with a working one with the same DB write surface (`UPDATE swim_enrollments` by id). Adds `swim_level` + `notes` to the updated columns — both are existing nullable/defaulted columns the admin already edits elsewhere (e.g. EditSwimmerDialog).
-- `.select().single()` makes silent failures loud — no behavior change on success.
-- Capacity override is admin-confirmed, matching the "Warn but allow" choice. The 3-seat rule has never been DB-enforced, so no constraint will reject the write.
+## Files
+- Migration (new)
+- `src/pages/EnrollmentWaiver.tsx` (new)
+- `src/App.tsx` (add route)
+- `supabase/functions/_shared/transactional-email-templates/registration-fee-payment-link.tsx`
+- `supabase/functions/send-registration-fee-payment-link/index.ts`
+- `src/components/admin/PaymentsTab.tsx` (waiver badge + copy link)
+- `src/components/admin/SwimmerDetailDrawer.tsx` (waiver badge, if reg fee shown there)
