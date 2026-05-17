@@ -13,6 +13,7 @@ import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/
 import { Users, Plus, ArrowRightLeft, Loader2, Calendar, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
+import MoveSwimmerDialog from "@/components/admin/MoveSwimmerDialog";
 
 interface Session {
   id: string;
