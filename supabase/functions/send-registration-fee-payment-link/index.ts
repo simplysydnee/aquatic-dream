@@ -88,6 +88,11 @@ Deno.serve(async (req) => {
       .update({ reg_fee_link_sent_at: new Date().toISOString() })
       .eq('id', enrollmentId)
 
+    const waiverLink = enrollment.waiver_token
+      ? `${returnBase}/enrollment-waiver/${enrollment.waiver_token}`
+      : undefined
+    const waiverSigned = !!enrollment.waiver_signed_at
+
     const sendEmail = async () => {
       try {
         const { error: invokeErr } = await supabase.functions.invoke('send-transactional-email', {
@@ -101,6 +106,8 @@ Deno.serve(async (req) => {
               sessionInfo,
               amountDue: `$${(chargeCents / 100).toFixed(2)}`,
               paymentLink,
+              waiverLink,
+              waiverSigned,
             },
           },
         })
