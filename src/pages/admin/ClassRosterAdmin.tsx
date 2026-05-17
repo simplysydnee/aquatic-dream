@@ -127,6 +127,26 @@ const ClassRosterAdmin = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Realtime: refetch on any swim_enrollments change so moves made elsewhere appear instantly.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel("class-roster-enrollments")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "swim_enrollments" },
+        () => {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => fetchData(), 300);
+        },
+      )
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const uniqueTimes = [...new Set(sessions.map(s => s.start_time))].sort();
 
   // Apply filters
