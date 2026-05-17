@@ -31,6 +31,8 @@ interface EnrollmentConfirmationProps {
   // Add to calendar
   icsLink?: string
   googleCalendarLink?: string
+  // Optional banner shown when this is a re-send after a class/level/time change
+  changeNotice?: string
   // Legacy compat
   sessionInfo?: string
 }
