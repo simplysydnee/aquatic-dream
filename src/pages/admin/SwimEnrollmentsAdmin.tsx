@@ -11,7 +11,8 @@ import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/comp
 import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
 import SessionEnrollmentCards from "@/components/admin/SessionEnrollmentCards";
 import { Progress } from "@/components/ui/progress";
-import { Eye, CheckCircle, Send } from "lucide-react";
+import { Eye, CheckCircle, Send, ArrowRightLeft } from "lucide-react";
+import MoveSwimmerDialog from "@/components/admin/MoveSwimmerDialog";
 import { toast } from "@/hooks/use-toast";
 import {
   AlertDialog,
