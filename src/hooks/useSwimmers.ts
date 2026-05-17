@@ -46,6 +46,8 @@ export interface SwimmerEnrollment {
   session_fee_stripe_id: string | null;
   session_fee_paid_at: string | null;
   registration_fee: number | null;
+  waiver_token: string | null;
+  waiver_signed_at: string | null;
   session?: {
     id: string;
     swim_level: string;

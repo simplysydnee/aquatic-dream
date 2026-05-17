@@ -1333,6 +1333,8 @@ export type Database = {
           stripe_payment_id: string | null
           swim_level: string
           updated_at: string
+          waiver_signed_at: string | null
+          waiver_token: string | null
         }
         Insert: {
           child_age: number
@@ -1371,6 +1373,8 @@ export type Database = {
           stripe_payment_id?: string | null
           swim_level: string
           updated_at?: string
+          waiver_signed_at?: string | null
+          waiver_token?: string | null
         }
         Update: {
           child_age?: number
@@ -1409,6 +1413,8 @@ export type Database = {
           stripe_payment_id?: string | null
           swim_level?: string
           updated_at?: string
+          waiver_signed_at?: string | null
+          waiver_token?: string | null
         }
         Relationships: [
           {
@@ -1803,6 +1809,23 @@ export type Database = {
           waiver_signed_at: string
         }[]
       }
+      get_swim_enrollment_by_waiver_token: {
+        Args: { _token: string }
+        Returns: {
+          child_name: string
+          id: string
+          is_first_time: boolean
+          parent_email: string
+          parent_name: string
+          payment_status: string
+          session_day: string
+          session_name: string
+          session_start_date: string
+          session_start_time: string
+          swim_level: string
+          waiver_signed_at: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1811,6 +1834,10 @@ export type Database = {
         Returns: boolean
       }
       mark_lesson_waiver_signed: { Args: { _token: string }; Returns: string }
+      mark_swim_enrollment_waiver_signed: {
+        Args: { _token: string }
+        Returns: string
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string

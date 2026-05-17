@@ -9,6 +9,7 @@ import Careers from "./pages/Careers";
 import SwimLessons from "./pages/SwimLessons";
 import SwimEnrollment from "./pages/SwimEnrollment";
 import LessonWaiver from "./pages/LessonWaiver";
+import EnrollmentWaiver from "./pages/EnrollmentWaiver";
 import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
 import ProtectedRoute from "./components/admin/ProtectedRoute";
@@ -98,6 +99,7 @@ const App = () => (
 
             {/* Standalone full-screen flows (no public layout chrome) */}
             <Route path="/lesson-waiver/:token" element={<LessonWaiver />} />
+            <Route path="/enrollment-waiver/:token" element={<EnrollmentWaiver />} />
 
             {/* Public routes */}
             <Route element={<PublicLayout />}>

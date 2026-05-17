@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, ExternalLink, Send, DollarSign, CreditCard, Ban } from "lucide-react";
+import { CheckCircle2, ExternalLink, Send, DollarSign, CreditCard, Ban, FileCheck2, Clock3, Copy } from "lucide-react";
 import type { Swimmer, SwimmerEnrollment } from "@/hooks/useSwimmers";
 import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
 import { getStripeEnvironment } from "@/lib/stripe";
@@ -292,32 +292,41 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                   </div>
 
                   {e.is_first_time && (
-                    <PaymentRow
-                      label="Registration fee"
-                      amount={regFeeFor(e)}
-                      status={e.payment_status}
-                      paidAt={null}
-                      method={e.payment_method}
-                      reference={e.payment_reference}
-                      stripeId={e.stripe_payment_id}
-                      busy={busyId === e.id}
-                      onMark={() =>
-                        openMark({
-                          kind: "enrollment",
-                          enrollment: e,
-                          field: "payment_status",
-                          label: "Registration fee",
-                          amount: regFeeFor(e),
-                        })
-                      }
-                      onSendStripe={
-                        e.payment_status !== "paid" && e.payment_status !== "comp" && e.payment_status !== "waived"
-                          ? () => sendRegFeeLink(e)
-                          : undefined
-                      }
-                      linkSentAt={e.reg_fee_link_sent_at}
-                      sendLabel={e.reg_fee_link_sent_at ? "Resend reg fee link" : "Email reg fee link"}
-                    />
+                    <>
+                      <PaymentRow
+                        label="Registration fee"
+                        amount={regFeeFor(e)}
+                        status={e.payment_status}
+                        paidAt={null}
+                        method={e.payment_method}
+                        reference={e.payment_reference}
+                        stripeId={e.stripe_payment_id}
+                        busy={busyId === e.id}
+                        onMark={() =>
+                          openMark({
+                            kind: "enrollment",
+                            enrollment: e,
+                            field: "payment_status",
+                            label: "Registration fee",
+                            amount: regFeeFor(e),
+                          })
+                        }
+                        onSendStripe={
+                          e.payment_status !== "paid" && e.payment_status !== "comp" && e.payment_status !== "waived"
+                            ? () => sendRegFeeLink(e)
+                            : undefined
+                        }
+                        linkSentAt={e.reg_fee_link_sent_at}
+                        sendLabel={e.reg_fee_link_sent_at ? "Resend reg fee + waiver email" : "Email reg fee + waiver"}
+                      />
+                      <WaiverRow
+                        signedAt={e.waiver_signed_at}
+                        waiverToken={e.waiver_token}
+                        onCopied={() =>
+                          toast({ title: "Waiver link copied", description: "Paste it anywhere — text, email, etc." })
+                        }
+                      />
+                    </>
                   )}
 
                   <PaymentRow
@@ -604,6 +613,73 @@ function PaymentRow(props: {
               <Send className="h-3 w-3" /> {sendLabel || "Email Stripe link"}
             </Button>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WaiverRow({
+  signedAt,
+  waiverToken,
+  onCopied,
+}: {
+  signedAt: string | null;
+  waiverToken: string | null;
+  onCopied: () => void;
+}) {
+  const signed = !!signedAt;
+  const link = waiverToken ? `${window.location.origin}/enrollment-waiver/${waiverToken}` : null;
+  return (
+    <div className="rounded-md border bg-muted/20 p-2.5 text-xs space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <FileCheck2 className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="font-medium">Liability waiver</span>
+        </div>
+        <Badge
+          variant="outline"
+          className={
+            signed
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : "bg-amber-50 text-amber-700 border-amber-200"
+          }
+        >
+          {signed ? (
+            <>
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Signed
+            </>
+          ) : (
+            <>
+              <Clock3 className="h-3 w-3 mr-1" /> Pending
+            </>
+          )}
+        </Badge>
+      </div>
+      {signed && signedAt && (
+        <div className="text-muted-foreground">Signed {new Date(signedAt).toLocaleDateString()}</div>
+      )}
+      {!signed && link && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              await navigator.clipboard.writeText(link);
+              onCopied();
+            }}
+            className="h-7 text-xs gap-1"
+          >
+            <Copy className="h-3 w-3" /> Copy waiver link
+          </Button>
+          <a
+            href={link}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary hover:underline inline-flex items-center gap-0.5"
+          >
+            Open <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
       )}
     </div>
