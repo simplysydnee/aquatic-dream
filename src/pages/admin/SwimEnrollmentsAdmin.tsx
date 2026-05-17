@@ -175,6 +175,26 @@ const SwimEnrollmentsAdmin = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Realtime: refetch on any swim_enrollments change so moves made elsewhere appear instantly.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel("swim-enrollments-admin")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "swim_enrollments" },
+        () => {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => fetchData(), 300);
+        },
+      )
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // Cancellation flow state
   const [cancelTarget, setCancelTarget] = useState<Enrollment | null>(null);
   const [cancelRefund, setCancelRefund] = useState(true);

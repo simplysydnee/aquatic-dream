@@ -31,6 +31,8 @@ interface EnrollmentConfirmationProps {
   // Add to calendar
   icsLink?: string
   googleCalendarLink?: string
+  // Optional banner shown when this is a re-send after a class/level/time change
+  changeNotice?: string
   // Legacy compat
   sessionInfo?: string
 }
@@ -62,6 +64,7 @@ const EnrollmentConfirmationEmail = ({
   paymentReference,
   icsLink,
   googleCalendarLink,
+  changeNotice,
   sessionInfo,
 }: EnrollmentConfirmationProps) => {
   const timeRange = startTime
@@ -88,6 +91,14 @@ const EnrollmentConfirmationEmail = ({
           <Text style={text}>
             {parentName ? `Hi ${parentName},` : 'Hello,'}
           </Text>
+
+          {changeNotice && (
+            <Section style={{ backgroundColor: '#FEF3C7', borderLeft: '4px solid #F58B76', padding: '12px 16px', borderRadius: '6px', margin: '0 0 16px' }}>
+              <Text style={{ fontSize: '14px', color: '#1a3a8a', margin: 0, fontWeight: 600 }}>
+                {changeNotice}
+              </Text>
+            </Section>
+          )}
 
           <Text style={text}>
             Great news! <strong>{childName || 'Your swimmer'}</strong> has been successfully enrolled

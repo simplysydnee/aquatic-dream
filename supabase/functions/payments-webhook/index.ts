@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { type StripeEnv, verifyWebhook } from "../_shared/stripe.ts";
-import { buildSessionCalendarLinks } from "../_shared/calendar-links.ts";
+import { sendEnrollmentConfirmation as sendConfirmationHelper } from "../_shared/send-enrollment-confirmation.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -492,164 +492,13 @@ async function handleLessonSeriesPaid(checkoutSession: any) {
 
 async function sendEnrollmentConfirmation(enrollmentId: string) {
   try {
-    const { data: enrollment, error: enrollErr } = await supabase
-      .from("swim_enrollments")
-      .select("*, swim_sessions(id, session_period_id, day_of_week, start_time, end_time, swim_level, session_price, session_start_date, session_end_date)")
-      .eq("id", enrollmentId)
-      .maybeSingle();
-
-    if (enrollErr || !enrollment) {
-      console.error("Failed to fetch enrollment for confirmation email:", enrollErr);
-      return;
+    const res = await sendConfirmationHelper(supabase, enrollmentId);
+    if (!res.ok) {
+      console.error("Failed to send confirmation email:", res.error);
+    } else {
+      console.log("Enrollment confirmation email sent for:", enrollmentId);
     }
-
-    const sessionId = enrollment.session_id;
-    if (!sessionId) return;
-
-    const { data: lessonDates } = await supabase
-      .from("session_lesson_dates")
-      .select("lesson_date")
-      .eq("session_id", sessionId)
-      .eq("is_cancelled", false)
-      .order("lesson_date");
-
-    const formattedDates = (lessonDates || []).map((d) => {
-      const date = new Date(d.lesson_date + "T00:00:00");
-      return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-    });
-
-    let periodName = "Session";
-    const session = enrollment.swim_sessions;
-    if (session?.session_period_id) {
-      const { data: period } = await supabase
-        .from("session_periods")
-        .select("name")
-        .eq("id", session.session_period_id)
-        .maybeSingle();
-      if (period) periodName = period.name;
-    }
-
-    const formatTime = (t: string | null | undefined) =>
-      t
-        ? new Date(`2000-01-01T${t}`).toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-          })
-        : undefined;
-
-    const formatLongDate = (d: string | null | undefined) =>
-      d
-        ? new Date(d + "T00:00:00").toLocaleDateString("en-US", {
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })
-        : undefined;
-
-    const startTime = formatTime(session?.start_time);
-    const endTime = formatTime(session?.end_time);
-    const sessionStartDate = formatLongDate(session?.session_start_date);
-    const sessionEndDate = formatLongDate(session?.session_end_date);
-
-    const sessionInfo = session
-      ? `${periodName} — ${session.day_of_week}${startTime ? ` ${startTime}` : ""}`
-      : undefined;
-
-    const levelLabel = getLevelLabel(enrollment.swim_level, enrollment.child_age);
-    const groupName = getGroupName(enrollment.swim_level, enrollment.child_age);
-
-    const sessionPrice = session?.session_price ?? 240;
-    const isFirstTime = enrollment.is_first_time;
-    // Use the EXACT amount Stripe charged on this enrollment row (validated
-    // against session.amount_total in handleCheckoutCompleted).
-    const paidOnThisRow = Number(enrollment.payment_amount ?? 0);
-
-    const firstClassDate =
-      lessonDates && lessonDates.length > 0
-        ? formatLongDate(lessonDates[0].lesson_date)
-        : sessionStartDate;
-
-    // Build "Add to Calendar" links if we have lesson dates + session times.
-    let icsLink: string | undefined;
-    let googleCalendarLink: string | undefined;
-    if (
-      lessonDates && lessonDates.length > 0 &&
-      session?.start_time && session?.end_time
-    ) {
-      const titleParts = [
-        enrollment.child_name ? `${enrollment.child_name}'s Swim Lesson` : 'Swim Lesson',
-        groupName ? `— ${groupName}` : '',
-        levelLabel ? `(${levelLabel})` : '',
-        '— Aquatic Dreams',
-      ].filter(Boolean);
-      const links = buildSessionCalendarLinks({
-        uid: `enroll-${enrollmentId}`,
-        title: titleParts.join(' '),
-        dates: lessonDates.map((d) => d.lesson_date),
-        start: session.start_time,
-        end: session.end_time,
-        location: '1212 Kansas Ave, Modesto, CA 95351',
-        description: 'Aquatic Dreams swim lesson. Questions: info@aquaticdreamsswim.com / (209) 577-3483',
-      });
-      icsLink = links.icsUrl;
-      googleCalendarLink = links.googleUrl;
-    }
-
-    await supabase.functions.invoke("send-transactional-email", {
-      body: {
-        templateName: "enrollment-confirmation",
-        recipientEmail: enrollment.parent_email,
-        idempotencyKey: `enrollment-confirm-${enrollmentId}`,
-        templateData: {
-          parentName: enrollment.parent_name,
-          childName: enrollment.child_name,
-          levelLabel,
-          groupName,
-          dayOfWeek: session?.day_of_week,
-          startTime,
-          endTime,
-          sessionStartDate,
-          sessionEndDate,
-          sessionPeriodName: periodName,
-          sessionInfo,
-          lessonDates: formattedDates,
-          isFirstTime,
-          registrationFeePaid: isFirstTime ? `$${paidOnThisRow || 45}` : undefined,
-          sessionFeeDue: isFirstTime ? `$${sessionPrice}` : undefined,
-          dueDate: firstClassDate,
-          totalPaid: !isFirstTime ? `$${paidOnThisRow || sessionPrice}` : undefined,
-          paymentReference: enrollment.stripe_payment_id || undefined,
-          icsLink,
-          googleCalendarLink,
-        },
-      },
-    });
-
-    console.log("Enrollment confirmation email sent for:", enrollmentId);
   } catch (err) {
     console.error("Failed to send confirmation email:", err);
   }
-}
-
-function getLevelLabel(level: string, age: number): string {
-  const ageGroup = age <= 5 ? "preschool" : "school-age";
-  if (ageGroup === "preschool") {
-    if (level === "white") return "Preschool 1";
-    if (level === "red") return "Preschool 2";
-  }
-  if (level === "yellow") return "School Age 1";
-  if (level === "blue") return "School Age 2";
-  return "School Age 3";
-}
-
-function getGroupName(level: string, age: number): string {
-  const ageGroup = age <= 5 ? "preschool" : "school-age";
-  if (ageGroup === "preschool") {
-    if (level === "white") return "Little Fins (White)";
-    if (level === "red") return "Reef Explorers (Red)";
-  }
-  if (level === "yellow") return "Sea Scouts (Yellow)";
-  if (level === "blue") return "Deep Sea Divers (Blue)";
-  return "Ocean Masters (Green)";
 }
