@@ -211,21 +211,6 @@ const ClassRosterAdmin = () => {
     }
   };
 
-  const handleMoveSwimmer = async () => {
-    if (!movingEnrollment || !newSessionId) return;
-    const { error } = await supabase.from("swim_enrollments")
-      .update({ session_id: newSessionId })
-      .eq("id", movingEnrollment.id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Moved", description: `${movingEnrollment.child_name} moved to new session.` });
-      setMoveOpen(false);
-      setMovingEnrollment(null);
-      setNewSessionId("");
-      fetchData();
-    }
-  };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
