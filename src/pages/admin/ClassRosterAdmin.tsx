@@ -488,27 +488,15 @@ const ClassRosterAdmin = () => {
         </Card>
       )}
 
-      <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Move {movingEnrollment?.child_name}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Label>New Session</Label>
-            <Select value={newSessionId} onValueChange={setNewSessionId}>
-              <SelectTrigger><SelectValue placeholder="Select new session" /></SelectTrigger>
-              <SelectContent>
-                {sessions.filter(s => s.id !== movingEnrollment?.session_id).map(s => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {getPeriodName(s.session_period_id)} · {s.session_name} · {formatTime(s.start_time)} · {LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleMoveSwimmer} className="w-full" disabled={!newSessionId}>
-              Move Swimmer
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <MoveSwimmerDialog
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        enrollment={movingEnrollment}
+        sessions={sessions}
+        periods={periods}
+        allEnrollments={enrollments}
+        onMoved={fetchData}
+      />
     </div>
   );
 };
