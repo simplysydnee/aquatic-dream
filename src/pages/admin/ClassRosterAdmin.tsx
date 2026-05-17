@@ -13,6 +13,7 @@ import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/
 import { Users, Plus, ArrowRightLeft, Loader2, Calendar, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
+import MoveSwimmerDialog from "@/components/admin/MoveSwimmerDialog";
 
 interface Session {
   id: string;
@@ -104,7 +105,7 @@ const ClassRosterAdmin = () => {
   const [manualOpen, setManualOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [movingEnrollment, setMovingEnrollment] = useState<Enrollment | null>(null);
-  const [newSessionId, setNewSessionId] = useState("");
+  
   const [manualForm, setManualForm] = useState({
     child_name: "", child_age: "", parent_name: "", parent_email: "",
     parent_phone: "", swim_level: "white", session_id: "", notes: "",
@@ -210,21 +211,6 @@ const ClassRosterAdmin = () => {
     }
   };
 
-  const handleMoveSwimmer = async () => {
-    if (!movingEnrollment || !newSessionId) return;
-    const { error } = await supabase.from("swim_enrollments")
-      .update({ session_id: newSessionId })
-      .eq("id", movingEnrollment.id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Moved", description: `${movingEnrollment.child_name} moved to new session.` });
-      setMoveOpen(false);
-      setMovingEnrollment(null);
-      setNewSessionId("");
-      fetchData();
-    }
-  };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
@@ -487,27 +473,15 @@ const ClassRosterAdmin = () => {
         </Card>
       )}
 
-      <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Move {movingEnrollment?.child_name}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Label>New Session</Label>
-            <Select value={newSessionId} onValueChange={setNewSessionId}>
-              <SelectTrigger><SelectValue placeholder="Select new session" /></SelectTrigger>
-              <SelectContent>
-                {sessions.filter(s => s.id !== movingEnrollment?.session_id).map(s => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {getPeriodName(s.session_period_id)} · {s.session_name} · {formatTime(s.start_time)} · {LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleMoveSwimmer} className="w-full" disabled={!newSessionId}>
-              Move Swimmer
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <MoveSwimmerDialog
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        enrollment={movingEnrollment}
+        sessions={sessions}
+        periods={periods}
+        allEnrollments={enrollments}
+        onMoved={fetchData}
+      />
     </div>
   );
 };

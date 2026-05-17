@@ -11,7 +11,8 @@ import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/comp
 import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
 import SessionEnrollmentCards from "@/components/admin/SessionEnrollmentCards";
 import { Progress } from "@/components/ui/progress";
-import { Eye, CheckCircle, Send } from "lucide-react";
+import { Eye, CheckCircle, Send, ArrowRightLeft } from "lucide-react";
+import MoveSwimmerDialog from "@/components/admin/MoveSwimmerDialog";
 import { toast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -95,6 +96,8 @@ const SwimEnrollmentsAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<Enrollment | null>(null);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [sessionFilter, setSessionFilter] = useState<string>("all");
@@ -629,9 +632,14 @@ const SwimEnrollmentsAdmin = () => {
                         {session ? `${session.session_name || ""} · ${formatDayOfWeek(session.day_of_week)} ${formatTime12h(session.start_time)}` : "—"}
                       </div>
                     </div>
-                    <Button size="icon" variant="ghost" className="shrink-0 -mr-1" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
-                      <Eye className="w-4 h-4" />
-                    </Button>
+                    <div className="flex shrink-0 -mr-1">
+                      <Button size="icon" variant="ghost" title="Move to another class" onClick={() => { setMoveTarget(e); setMoveOpen(true); }}>
+                        <ArrowRightLeft className="w-4 h-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <Badge variant="outline" className={`text-[10px] ${enrollmentStateColor(e.status)}`}>{e.status}</Badge>
@@ -764,6 +772,9 @@ const SwimEnrollmentsAdmin = () => {
                                 <Send className="w-4 h-4 text-primary" />
                               </Button>
                             )}
+                            <Button size="icon" variant="ghost" title="Move to another class" onClick={() => { setMoveTarget(e); setMoveOpen(true); }}>
+                              <ArrowRightLeft className="w-4 h-4" />
+                            </Button>
                             <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
                               <Eye className="w-4 h-4" />
                             </Button>
@@ -925,6 +936,16 @@ const SwimEnrollmentsAdmin = () => {
         onUpdated={(updated) => {
           setEnrollments((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
         }}
+      />
+
+      <MoveSwimmerDialog
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        enrollment={moveTarget}
+        sessions={Object.values(sessions)}
+        periods={sessionPeriods}
+        allEnrollments={enrollments}
+        onMoved={fetchData}
       />
 
       <AlertDialog open={!!cancelTarget} onOpenChange={(o) => { if (!o) setCancelTarget(null); }}>

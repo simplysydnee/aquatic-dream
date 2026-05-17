@@ -1,72 +1,59 @@
 ## Goal
 
-Add two payment options to the admin "Add Swimmer → Enroll in Session" flow:
+Admins can reliably move a swimmer from one class to another from both **Class Roster** and **Swim Enrollments**, including changing the swimmer's level when the new class is at a different level.
 
-1. **Take card over phone** — admin opens an embedded Stripe checkout inline in the dialog, types the parent's card while on the call, charges immediately.
-2. **Email payment link** — generalize the existing reg-fee-only link so it auto-sends the right amount: $45 reg fee for first-time swimmers, $240 session fee for returning swimmers.
+## What's wrong today
 
-Both options auto-pick the amount but admin can override with a custom $ value.
+- **Class Roster** has a move dialog, but:
+  - It only updates `session_id`. The swimmer's `swim_level` stays the same, so moving (e.g.) a "white" swimmer into a "yellow" class leaves them visually mismatched and they can appear to "snap back" under their old level grouping in some filter views — looks like the move didn't happen.
+  - No capacity check — silently lets you put a 4th swimmer in a 3-seat class.
+  - The "new session" dropdown lists every session with no filtering / search, easy to pick the wrong one.
+  - The update call has no `.select()` and no surfaced error detail beyond `error.message`, so a silent RLS or constraint failure would be near-invisible.
+- **Swim Enrollments** has no move action at all.
 
-No changes to walk-in flow, public enrollment, or existing cash/check/comp/stripe-manual paths.
+## Shared "Move Swimmer" dialog (new component)
 
-## UX in `AddSwimmerDialog`
+Create `src/components/admin/MoveSwimmerDialog.tsx` used by both pages.
 
-Payment Method dropdown becomes:
-- Cash
-- Check
-- Stripe (manual entry of existing receipt #) — unchanged
-- **Stripe — take card over phone (charge now)** — new
-- **Stripe — email payment link to parent** — renamed from "send link to parent"
-- Comp / Free
+Inputs: `enrollment`, `sessions[]`, `periods[]`, `enrollmentsBySession` (for live counts), `onMoved()`.
 
-When either Stripe option is selected, show a small "Charge" block:
-- Auto-detected amount label: "Reg fee $45" (first-time) or "Session fee $240" (returning)
-- Optional **Override amount** field (defaults blank = use auto)
+UI:
+1. Header: "Move {child_name} (currently {currentClassLabel})"
+2. **Target class** — searchable Select grouped by session period, each row shows: period · day · time · level · `count/max`, and a "FULL" pill when at capacity. Excludes the current `session_id`.
+3. **Level** — Select prefilled with the swimmer's current `swim_level`. When the admin picks a target class whose level differs, show an inline note: "This class is {targetLevel}. Update {child}'s level too?" with a one-click "Match class level" button that sets the Level select to the target's level. Admin can still pick any of the 5 levels independently.
+4. Capacity warning banner if target is full: "This class is at 3/3. Moving will put it at 4/3." Confirm button changes to "Move anyway".
+5. Optional "Notes" textarea appended to the enrollment's `notes` ("Moved from X to Y on {date} by admin" — append, not overwrite).
+6. Confirm button performs:
+   ```
+   UPDATE swim_enrollments
+      SET session_id = :newSessionId,
+          swim_level = :chosenLevel,
+          notes      = :mergedNotes,
+          updated_at = now()
+    WHERE id = :enrollmentId
+   ```
+   uses `.select().single()` so a 0-row result throws a clear error toast. On success → toast "Moved {name} to {newClassLabel}" → `onMoved()` refetch.
 
-### Take card over phone flow
+No payment / Stripe changes. Status, fees, agreements, and history stay intact.
 
-1. Admin fills swimmer/parent fields, picks "take card over phone", clicks **Enroll & Charge Card**.
-2. Dialog calls `admin-create-enrollment` with `paymentMethod='stripe_phone'`, `paymentStatus='unpaid'`, `paymentReference='pending_phone_checkout'`. Row is created.
-3. Dialog calls new `create-admin-phone-checkout` edge function → returns `clientSecret`.
-4. Dialog swaps the form for `<EmbeddedCheckoutProvider>` + `<EmbeddedCheckout>` mounted inline (same dialog body). Admin reads card #, exp, CVC from parent and enters them.
-5. On `return_url`, the `payments-webhook` `checkout.session.completed` handler reads `metadata.type='admin_phone_checkout'` + `metadata.enrollmentId` and flips `payment_status='paid'`, stores `payment_intent`. Same pattern as existing reg-fee-link branch.
-6. Dialog polls enrollment row for `payment_status='paid'` (or shows success on Stripe's return), then closes.
+## Class Roster wiring
 
-### Email payment link flow (extended)
+Replace the existing inline move dialog in `src/pages/admin/ClassRosterAdmin.tsx` with `<MoveSwimmerDialog />`. Pass live `enrollments` so capacity counts are accurate. Remove the local `moveOpen`/`newSessionId` state and `handleMoveSwimmer`.
 
-1. Admin picks "email payment link", clicks **Enroll & Email Link**.
-2. `admin-create-enrollment` creates row as today (`payment_method='stripe_link'`, `payment_status='unpaid'`).
-3. Dispatch logic in `admin-create-enrollment`:
-   - If `isFirstTime` → invoke existing `send-registration-fee-payment-link` ($45).
-   - Else → invoke existing `send-session-payment-link` ($240).
-   - If admin entered override amount → pass it through; both edge functions accept an optional `amountOverride` (new param) that uses inline `price_data` instead of the lookup_key price.
-4. Webhook flips `payment_status='paid'` on parent completion (already wired for both metadata types; verify session-fee branch also stamps `enrollmentId`).
+## Swim Enrollments wiring
 
-## Files
-
-**New**
-- `supabase/functions/create-admin-phone-checkout/index.ts` — accepts `{ enrollmentId, amountCents, parentEmail, environment, returnUrl }`, creates Stripe Customer with `metadata.parentEmail`, creates Checkout Session `ui_mode='embedded_page'`, `metadata={ type:'admin_phone_checkout', enrollmentId }`. Returns `{ clientSecret }`. Uses shared `createStripeClient`. Add `[functions.create-admin-phone-checkout] verify_jwt = false` to `supabase/config.toml`.
-- `src/components/admin/calendar/PhoneCheckoutPanel.tsx` — wraps `EmbeddedCheckoutProvider`/`EmbeddedCheckout`, takes `clientSecret`, fires `onComplete` callback.
-
-**Modified**
-- `src/components/admin/calendar/AddSwimmerDialog.tsx` — add `stripe_phone` to `PaymentMethod`, add charge-amount block with override, swap form ↔ phone checkout panel inline, add `Enroll & Charge Card` / `Enroll & Email Link` buttons. Validation: stripe_phone requires email.
-- `supabase/functions/admin-create-enrollment/index.ts` — accept `paymentMethod='stripe_phone'` (no auto-invoke; client invokes phone-checkout function after row insert and reads back enrollmentId). For `stripe_link`, branch by `is_first_time` to call session-fee vs reg-fee link function. Pass through optional `linkAmountOverrideCents`.
-- `supabase/functions/send-session-payment-link/index.ts` — accept optional `amountOverrideCents`; when present, build session with inline `price_data` instead of looking up `swim_session_fee` price. Stamp `metadata.enrollmentId`.
-- `supabase/functions/send-registration-fee-payment-link/index.ts` — accept optional `amountOverrideCents` (same pattern).
-- `supabase/functions/payments-webhook/index.ts` — add `case 'admin_phone_checkout'` in the `checkout.session.completed` handler, mirroring the existing `registration_fee` branch (update enrollment row by `metadata.enrollmentId` → `payment_status='paid'`, `payment_reference=payment_intent_id`, `stripe_payment_id=payment_intent_id`).
-
-**No schema changes.** `payment_method` is free-text; existing columns cover the audit fields.
+In `src/pages/admin/SwimEnrollmentsAdmin.tsx`, add an `ArrowRightLeft` icon button on each enrollment row (all three tabs that render rows — same lookup pattern as the existing edit/cancel actions) that opens the shared `<MoveSwimmerDialog />`. Wire `onMoved` to the existing refetch.
 
 ## Out of scope
 
-- Public enrollment flow (untouched).
-- Walk-in tab (still cash/check/comp only).
-- Existing manual Stripe receipt entry option (unchanged).
-- Refunds for phone-checkout sessions (use existing `admin-issue-refund` flow — works because `stripe_payment_id` is stored).
+- No DB migration (RLS already allows authenticated updates; no schema change needed).
+- No edge-function changes.
+- Refunds, payment status, instructor reassignment, and class-date changes are untouched.
+- Public enrollment flow untouched.
 
-## Risk / breaking-change check
+## Risk check
 
-- `admin-create-enrollment`: only adds new branches; default behavior for cash/check/comp/stripe/stripe_link unchanged.
-- `payments-webhook`: only adds a new `metadata.type` case; existing `registration_fee` and other branches untouched.
-- `send-*-payment-link` functions: `amountOverrideCents` is optional; current callers (no override) keep using lookup_key prices.
-- Reg-fee dedup guard in `admin-create-enrollment` continues to apply — phone checkout for a child whose family already paid the reg fee will charge $0 reg fee + session fee.
+- Additive UI only on Swim Enrollments.
+- Class Roster swap replaces a broken dialog with a working one with the same DB write surface (`UPDATE swim_enrollments` by id). Adds `swim_level` + `notes` to the updated columns — both are existing nullable/defaulted columns the admin already edits elsewhere (e.g. EditSwimmerDialog).
+- `.select().single()` makes silent failures loud — no behavior change on success.
+- Capacity override is admin-confirmed, matching the "Warn but allow" choice. The 3-seat rule has never been DB-enforced, so no constraint will reject the write.
