@@ -370,6 +370,8 @@ export default function ClientsAdmin() {
         onOpenRequest={openRequest}
         onOpenEnrollment={openEnrollment}
         onSelectSwimmer={openSwimmer}
+        onChanged={refetch}
+
       />
 
       <LessonRequestDetailDialog
