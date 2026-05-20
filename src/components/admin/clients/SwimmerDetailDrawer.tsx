@@ -38,7 +38,9 @@ interface Props {
   onOpenRequest: (id: string) => void;
   onOpenEnrollment: (id: string) => void;
   onSelectSwimmer: (s: Swimmer) => void;
+  onChanged?: () => void;
 }
+
 
 const fmtDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—");
 const fmtDateTime = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
@@ -59,6 +61,8 @@ export default function SwimmerDetailDrawer({
   onOpenRequest,
   onOpenEnrollment,
   onSelectSwimmer,
+  onChanged,
+
 }: Props) {
   const { isAdmin } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
@@ -439,9 +443,13 @@ export default function SwimmerDetailDrawer({
           open={editOpen}
           onOpenChange={setEditOpen}
           target={editTarget}
-          onSaved={() => setEditOpen(false)}
+          onSaved={() => {
+            setEditOpen(false);
+            onChanged?.();
+          }}
         />
       )}
+
     </Sheet>
   );
 }

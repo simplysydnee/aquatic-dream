@@ -120,7 +120,7 @@ const matchFilter = (s: Swimmer, f: Filter) => {
 };
 
 export default function ClientsAdmin() {
-  const { swimmers, loading } = useSwimmers();
+  const { swimmers, loading, refetch } = useSwimmers();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<Swimmer | null>(null);
@@ -173,7 +173,16 @@ export default function ClientsAdmin() {
   const visibleKeys = useMemo(() => visible.map((v) => v.key), [visible]);
   const commentCounts = useCommentCounts("swimmer", visibleKeys);
 
+  // Keep the open drawer's swimmer object in sync with the live list so
+  // edits show up immediately (the drawer holds a snapshot, not a live ref).
+  useEffect(() => {
+    if (!selected) return;
+    const fresh = swimmers.find((s) => s.key === selected.key);
+    if (fresh && fresh !== selected) setSelected(fresh);
+  }, [swimmers, selected]);
+
   const siblingsOf = (s: Swimmer) =>
+
     swimmers.filter((x) => x.parent_email.toLowerCase() === s.parent_email.toLowerCase() && x.key !== s.key);
 
   const openSwimmer = (s: Swimmer) => {
@@ -361,6 +370,8 @@ export default function ClientsAdmin() {
         onOpenRequest={openRequest}
         onOpenEnrollment={openEnrollment}
         onSelectSwimmer={openSwimmer}
+        onChanged={refetch}
+
       />
 
       <LessonRequestDetailDialog
