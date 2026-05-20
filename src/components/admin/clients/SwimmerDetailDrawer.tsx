@@ -61,6 +61,8 @@ export default function SwimmerDetailDrawer({
   onOpenRequest,
   onOpenEnrollment,
   onSelectSwimmer,
+  onChanged,
+
 }: Props) {
   const { isAdmin } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
