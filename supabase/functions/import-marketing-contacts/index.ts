@@ -81,10 +81,6 @@ Deno.serve(async (req) => {
     for (const r of unique) {
       const ex = existing.get(r.email);
       if (ex) {
-        const merged = Array.from(new Set([...(ex.tags || []), ...tags]));
-    for (const r of unique) {
-      const ex = existing.get(r.email);
-      if (ex) {
         const currentTags = ex.tags || [];
         const missingTags = tags.filter((t) => !currentTags.includes(t));
         const needsName = !ex.first_name && r.first_name;
