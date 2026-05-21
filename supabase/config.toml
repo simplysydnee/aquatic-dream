@@ -52,3 +52,5 @@ project_id = "jilrijklnehbfuulykty"
   [functions.schedule-marketing-campaigns]
     verify_jwt = false
 
+  [functions.import-marketing-contacts]
+    verify_jwt = false
