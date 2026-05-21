@@ -61,9 +61,8 @@ const App = () => (
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/checkin" element={<KioskCheckIn />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
-            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/unsubscribe-marketing" element={<UnsubscribeMarketing />} />
-
+            <Route
               path="/admin"
               element={
                 <ProtectedRoute>
@@ -71,6 +70,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
+
               <Route index element={<CalendarAdmin />} />
               <Route path="roster" element={<ClassRosterAdmin />} />
               <Route path="clients" element={<ClientsAdmin />} />
@@ -84,8 +84,9 @@ const App = () => (
               <Route path="reports" element={<ReportsAdmin />} />
               <Route path="announcements" element={<AnnouncementsAdmin />} />
               <Route path="emails" element={<EmailLogAdmin />} />
-              <Route path="emails" element={<EmailLogAdmin />} />
               <Route path="marketing" element={<MarketingAdmin />} />
+              <Route path="sessions" element={<SessionsAdmin />} />
+
 
               <Route path="careers" element={<JobPostingsAdmin />} />
               <Route path="applications" element={<JobApplicationsAdmin />} />
