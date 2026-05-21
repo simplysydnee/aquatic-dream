@@ -2,24 +2,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-import-token",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
-
-async function isAdmin(req: Request): Promise<boolean> {
-  const auth = req.headers.get("Authorization");
-  if (!auth) return false;
-  const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: auth } },
-  });
-  const { data: { user } } = await userClient.auth.getUser();
-  if (!user) return false;
-  const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
-  return !!data;
-}
 
 function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
@@ -44,13 +32,10 @@ function parseCSV(text: string): string[][] {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    // Allow admin OR a one-time shared token
     const token = req.headers.get("x-import-token");
-    const allowed = token === "scuba-import-2026" || (await isAdmin(req));
-    if (!allowed) {
+    if (token !== "scuba-import-2026") {
       return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
     }
-
     const body = await req.json().catch(() => ({}));
     const bucket = body.bucket || "email-assets";
     const path = body.path || "imports/scuba_contacts.csv";
@@ -65,45 +50,80 @@ Deno.serve(async (req) => {
     const idx = (k: string) => header.indexOf(k);
     const iE = idx("email"), iF = idx("first_name"), iL = idx("last_name"), iP = idx("phone");
 
-    let inserted = 0, updated = 0, skipped = 0, failed = 0;
-    const BATCH = 200;
-    for (let b = 0; b < rows.length; b += BATCH) {
-      const slice = rows.slice(b, b + BATCH).map((r) => ({
-        email: (r[iE] || "").trim().toLowerCase(),
-        first_name: (r[iF] || "").trim() || null,
-        last_name: (r[iL] || "").trim() || null,
-        phone: (r[iP] || "").trim() || null,
-        source,
-        tags,
-      })).filter((x) => x.email && x.email.includes("@"));
+    const parsed = rows.map((r) => ({
+      email: (r[iE] || "").trim().toLowerCase(),
+      first_name: (r[iF] || "").trim() || null,
+      last_name: (r[iL] || "").trim() || null,
+      phone: (r[iP] || "").trim() || null,
+    })).filter((x) => x.email && x.email.includes("@"));
 
-      // upsert one by one to merge tags correctly
-      for (const c of slice) {
-        const { data: existing } = await supabase
-          .from("marketing_contacts")
-          .select("id, tags, first_name, last_name, phone")
-          .eq("email", c.email)
-          .maybeSingle();
-        if (existing) {
-          const mergedTags = Array.from(new Set([...(existing.tags || []), ...tags]));
-          const { error } = await supabase.from("marketing_contacts").update({
-            tags: mergedTags,
-            first_name: existing.first_name || c.first_name,
-            last_name: existing.last_name || c.last_name,
-            phone: existing.phone || c.phone,
+    // Dedupe by email
+    const map = new Map<string, typeof parsed[number]>();
+    for (const r of parsed) if (!map.has(r.email)) map.set(r.email, r);
+    const unique = [...map.values()];
+
+    // Load all existing contacts (paged)
+    const existing = new Map<string, { id: string; tags: string[]; first_name: string|null; last_name: string|null; phone: string|null }>();
+    let from = 0; const PAGE = 1000;
+    while (true) {
+      const { data, error } = await supabase
+        .from("marketing_contacts")
+        .select("id, email, tags, first_name, last_name, phone")
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      for (const r of (data || [])) existing.set((r.email as string).toLowerCase(), r as any);
+      if (!data || data.length < PAGE) break;
+      from += PAGE;
+    }
+
+    const toInsert: any[] = [];
+    const toUpdate: { id: string; patch: any }[] = [];
+    for (const r of unique) {
+      const ex = existing.get(r.email);
+      if (ex) {
+        const merged = Array.from(new Set([...(ex.tags || []), ...tags]));
+        toUpdate.push({
+          id: ex.id,
+          patch: {
+            tags: merged,
+            first_name: ex.first_name || r.first_name,
+            last_name: ex.last_name || r.last_name,
+            phone: ex.phone || r.phone,
             updated_at: new Date().toISOString(),
-          }).eq("id", existing.id);
-          if (error) { failed++; console.error(error.message); } else updated++;
-        } else {
-          const { error } = await supabase.from("marketing_contacts").insert(c);
-          if (error) { failed++; console.error(error.message); } else inserted++;
-        }
+          },
+        });
+      } else {
+        toInsert.push({ ...r, source, tags });
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, inserted, updated, failed, total: rows.length }), {
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+    // Bulk insert in chunks
+    let inserted = 0, updated = 0, failed = 0;
+    for (let i = 0; i < toInsert.length; i += 500) {
+      const chunk = toInsert.slice(i, i + 500);
+      const { error } = await supabase.from("marketing_contacts").insert(chunk);
+      if (error) { failed += chunk.length; console.error("insert", error.message); }
+      else inserted += chunk.length;
+    }
+
+    // Updates - run in parallel batches
+    const PAR = 25;
+    for (let i = 0; i < toUpdate.length; i += PAR) {
+      const batch = toUpdate.slice(i, i + PAR);
+      const results = await Promise.all(batch.map(async (u) => {
+        const { error } = await supabase.from("marketing_contacts").update(u.patch).eq("id", u.id);
+        return error;
+      }));
+      for (const e of results) { if (e) { failed++; console.error("update", e.message); } else updated++; }
+    }
+
+    return new Response(JSON.stringify({
+      ok: true,
+      total_in_csv: unique.length,
+      existed: toUpdate.length,
+      new: toInsert.length,
+      inserted, updated, failed,
+    }), { headers: { ...cors, "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("import error", msg);
