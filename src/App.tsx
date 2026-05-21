@@ -30,6 +30,7 @@ import ReportsAdmin from "./pages/admin/ReportsAdmin";
 import AnnouncementsAdmin from "./pages/admin/AnnouncementsAdmin";
 import EmailLogAdmin from "./pages/admin/EmailLogAdmin";
 import ClientsAdmin from "./pages/admin/ClientsAdmin";
+import MarketingAdmin from "./pages/admin/MarketingAdmin";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
 import InstructorAnnouncements from "./pages/instructor/InstructorAnnouncements";
 import InstructorMySchedule from "./pages/instructor/InstructorMySchedule";
@@ -42,6 +43,7 @@ import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
 import KioskCheckIn from "./pages/KioskCheckIn";
 import Unsubscribe from "./pages/Unsubscribe";
+import UnsubscribeMarketing from "./pages/UnsubscribeMarketing";
 import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -59,7 +61,9 @@ const App = () => (
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/checkin" element={<KioskCheckIn />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
-            <Route
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/unsubscribe-marketing" element={<UnsubscribeMarketing />} />
+
               path="/admin"
               element={
                 <ProtectedRoute>
@@ -80,7 +84,9 @@ const App = () => (
               <Route path="reports" element={<ReportsAdmin />} />
               <Route path="announcements" element={<AnnouncementsAdmin />} />
               <Route path="emails" element={<EmailLogAdmin />} />
-              <Route path="sessions" element={<SessionsAdmin />} />
+              <Route path="emails" element={<EmailLogAdmin />} />
+              <Route path="marketing" element={<MarketingAdmin />} />
+
               <Route path="careers" element={<JobPostingsAdmin />} />
               <Route path="applications" element={<JobApplicationsAdmin />} />
               <Route path="users" element={<UsersAdmin />} />
