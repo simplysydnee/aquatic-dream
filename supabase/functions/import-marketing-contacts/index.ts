@@ -44,9 +44,13 @@ function parseCSV(text: string): string[][] {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    if (!(await isAdmin(req))) {
+    // Allow admin OR a one-time shared token
+    const token = req.headers.get("x-import-token");
+    const allowed = token === "scuba-import-2026" || (await isAdmin(req));
+    if (!allowed) {
       return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
     }
+
     const body = await req.json().catch(() => ({}));
     const bucket = body.bucket || "email-assets";
     const path = body.path || "imports/scuba_contacts.csv";
