@@ -76,9 +76,7 @@ Deno.serve(async (req) => {
       from += PAGE;
     }
 
-      if (!data || data.length < PAGE) break;
-      from += PAGE;
-    }
+    // existing now declared above? add declaration
 
     const toInsert: any[] = [];
     const toUpdate: { id: string; patch: any }[] = [];
