@@ -364,7 +364,7 @@ function CampaignEditor({
     if (error) { toast.error(error.message); return null; }
     setC(data as any);
     onSaved(data as any);
-    return data as Campaign;
+    return data as unknown as Campaign;
   };
 
   const sendNow = async () => {
