@@ -41,3 +41,14 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.admin-mark-waiver-complete]
     verify_jwt = false
+  [functions.preview-marketing-campaign]
+    verify_jwt = true
+  [functions.send-marketing-campaign]
+    verify_jwt = true
+  [functions.marketing-unsubscribe]
+    verify_jwt = false
+  [functions.resend-webhook]
+    verify_jwt = false
+  [functions.schedule-marketing-campaigns]
+    verify_jwt = false
+
