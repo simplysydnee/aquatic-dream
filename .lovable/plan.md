@@ -1,107 +1,68 @@
 
-# Marketing Campaigns (Resend)
+## What's broken
 
-A full marketing email system that lives alongside the existing transactional emails, with its own contact list, branded HTML builder, preview/edit, draft/schedule/send, and compliance (unsubscribe, suppression, CAN-SPAM footer).
+When Olive's owner clicked "Send Reg Fee + Waiver Email" from the admin panel, parents received the email — they could sign the waiver, but **the "Pay Registration Fee" button and the Stripe link line were completely missing** from the email body.
 
-## 1. Email infrastructure (Resend)
+## Root cause (confirmed from data, not guessed)
 
-**Sender:** `Aquatic Dreams <info@aquaticdreamsswim.com>` (your choice).
+I pulled the actual HTML of the last three sent emails (Stamy, Ghuman x2) from `email_send_log`. Each rendered:
 
-> ⚠️ Recommendation: use `info@news.aquaticdreamsswim.com` instead. Same display name in the inbox, but isolates marketing reputation from waivers and receipts. We can switch by changing one env var later — I'll build it so the sender is configurable.
+```
+STEP 2 of 2 — Pay $45.00 registration fee
+One-time charge per family — you won't be charged it again for future sessions.
+```
 
-**Setup steps (you do these once):**
-1. Add the domain in Resend → get 4 DNS records (MX, SPF, DKIM, DMARC).
-2. Add those records in **Project Settings → Domains → ⋯ → Configure → Manage DNS records**.
-3. When verified, I'll link the **Resend connector** (you'll pick the API key in a one-click flow).
-4. I'll set a secret `MARKETING_FROM_ADDRESS = "Aquatic Dreams <info@aquaticdreamsswim.com>"`.
+…and then **nothing** — no button, no "Payment link:" line.
 
-## 2. Database
+The template only renders the button/link when `paymentLink` is truthy:
 
-New tables:
+```tsx
+{paymentLink && (<Button href={paymentLink}>Pay Registration Fee…</Button>)}
+```
 
-- `marketing_contacts` — `email` (unique), `first_name`, `last_name`, `phone`, `source` (swim/lessons/dive/contact/import/manual), `tags` (text[]), `subscribed`, `unsubscribed_at`, `last_sent_at`, timestamps.
-- `marketing_campaigns` — `name`, `subject`, `preheader`, `from_address`, `body_html`, `body_blocks` (jsonb for the structured builder), `status` (draft/scheduled/sending/sent/failed/cancelled), `audience` (jsonb filter: tags, sources, custom), `scheduled_for`, `sent_at`, `sent_count`, `created_by`, timestamps.
-- `marketing_campaign_recipients` — per-recipient ledger: `campaign_id`, `contact_id`, `email`, `status` (queued/sent/failed/bounced/complained/opened/clicked), `resend_message_id`, `error`, `sent_at`, `opened_at`, `clicked_at`.
-- `marketing_unsubscribe_tokens` — one stable token per email for one-click unsubscribe.
+So `paymentLink` was falsy when the email rendered. `paymentLink` is set from:
 
-**RLS:** Admin-only for all four tables. Public unsubscribe page reads/writes via a SECURITY DEFINER RPC by token.
+```ts
+const paymentLink = checkoutSession.url   // returned from stripe.checkout.sessions.create
+```
 
-**Auto-sync triggers** (your "Master list + auto-tags" choice):
-- New row in `swim_enrollments` → upsert contact, add tag `swim`, plus a level tag (`level:white` etc.).
-- New row in `lesson_bookings` → upsert contact, add tag `private-lessons`.
-- New row in `dive_bookings` → upsert contact, add tag `scuba`.
-- New row in `contact_submissions` → upsert contact, add tag `inquiry`.
-- Initial backfill of all four sources runs once at migration time.
+Stripe's Checkout Sessions API returns `url` only when the session is created in the default **hosted** UI mode. With newer pinned API versions (the project's `_shared/stripe.ts` does not pin `apiVersion`, so it follows the account default — currently the `2026-03-25.dahlia` family), `session.url` is no longer guaranteed unless `ui_mode: 'hosted'` is set explicitly. That is exactly what's happening: `checkout.sessions.create({...})` succeeds, but `url` comes back `null`, the function still fires the email, and parents get a button-less email.
 
-Tags are append-only via trigger — existing contacts gain new tags without losing old ones.
+This is **not** a Stripe credentials/key problem (live charges through other flows still work, and the function reached the point of issuing the session). It's a missing `ui_mode` parameter in two edge functions.
 
-## 3. Edge functions
+## Fix
 
-- `send-marketing-campaign` — sends a campaign now. Resolves audience → de-dupes against `suppressed_emails` + `unsubscribed_at` → batches to Resend gateway (50/req, throttled to stay under rate limits) → writes per-recipient rows → updates campaign status.
-- `schedule-marketing-campaigns` — cron job (every minute) that picks up `status='scheduled' AND scheduled_for <= now()` and dispatches them.
-- `resend-webhook` — receives Resend webhook events (delivered/opened/clicked/bounced/complained), updates `marketing_campaign_recipients`, and adds hard bounces + complaints to `suppressed_emails`.
-- `marketing-unsubscribe` — public endpoint that takes a token, marks the contact `subscribed=false`, and shows a success page.
-- `preview-marketing-campaign` — renders the campaign HTML server-side so the admin preview matches what recipients see exactly (same shared layout/tokens as transactional emails).
+### 1. `supabase/functions/send-registration-fee-payment-link/index.ts`
+Add `ui_mode: 'hosted'` to the `checkout.sessions.create({ ... })` call so Stripe returns the redirect URL.
 
-Cron job is created via `supabase--insert` (not migration) since it includes the project URL + anon key.
+### 2. `supabase/functions/send-session-payment-link/index.ts`
+Same change — `ui_mode: 'hosted'`. This function has the identical bug; it just hasn't bitten yet because most returning families pay through the embedded enrollment flow.
 
-## 4. Branded HTML template
+### 3. Hard guard before sending the email (defense in depth)
 
-A new shared template `_shared/marketing-templates/campaign.tsx` reusing the maritime palette and typography from the existing transactional emails. Structured blocks:
+In both functions, right after creating the session:
 
-- Header w/ logo
-- Hero (image + headline + subhead)
-- Rich-text body
-- CTA button(s)
-- Image card row (1–3 cards, optional)
-- Footer with address, "why you're getting this", and one-click unsubscribe
+```ts
+if (!checkoutSession.url) {
+  return json({ error: 'Stripe did not return a checkout URL' }, 500)
+}
+```
 
-The builder UI stores `body_blocks` (jsonb) so non-technical edits stay non-technical, and the renderer produces email-safe HTML on the server.
+This guarantees that if Stripe ever changes behavior again, the admin gets an explicit error in the toast instead of parents receiving a half-broken email — and `reg_fee_link_sent_at` does not get stamped on a failed send.
 
-## 5. Admin UI (`/admin/marketing`)
+### 4. Pin the Stripe API version in `_shared/stripe.ts`
 
-Sidebar entry: **Marketing**. Three tabs:
+Add `apiVersion: '2026-03-25.dahlia'` (or whichever is current) to `new Stripe(...)` so behavior is deterministic across the three checkout-creating functions (`create-checkout`, `send-registration-fee-payment-link`, `send-session-payment-link`, `create-admin-phone-checkout`, `create-lesson-occurrence-checkout`). This prevents the same class of silent-default-change from biting again.
 
-**Campaigns**
-- Table: name, status badge, audience size, scheduled/sent at, open rate.
-- Buttons: New campaign, Duplicate, Delete (draft only).
-- Detail page = builder + preview pane side-by-side.
-  - Left: name, subject, preheader, audience picker (tag chips + source filter + live recipient count), block editor.
-  - Right: live HTML preview (iframe, like `EmailPreviewDialog`).
-  - Bottom actions: **Save Draft**, **Schedule…** (date/time picker), **Send Now**, **Send test to me**, **Delete**.
-- After send: per-recipient table with delivered/opened/bounced.
+## Out of scope (intentionally)
 
-**Contacts**
-- Table with search, source filter, tag filter, subscribed toggle.
-- Actions: Add contact, Import CSV (Dive 360 export), Bulk tag, Bulk unsubscribe, Export.
-- Per-contact drawer: history of campaigns received + opens/clicks.
+- No DB schema change.
+- No template changes — the template is correct; it just needs a real URL.
+- No new admin UI — the existing "Send Reg Fee + Waiver Email" button stays as-is.
 
-**Settings**
-- From address, reply-to, physical mailing address (required for CAN-SPAM), default footer text.
-- Suppression list view (read-only; entries added automatically).
+## Verification after deploy
 
-## 6. Compliance
-
-- Every campaign auto-includes physical address + one-click unsubscribe in the footer.
-- `List-Unsubscribe` and `List-Unsubscribe-Post` headers set on every send (Gmail/Yahoo bulk-sender requirement).
-- Send pipeline always filters out: `unsubscribed_at IS NOT NULL`, address in `suppressed_emails`, address with prior hard bounce or complaint.
-- Public `/unsubscribe/:token` page (separate from the existing transactional unsubscribe so we can show marketing-specific copy).
-
-## 7. Build order
-
-1. Migration: 4 tables + RLS + triggers + backfill.
-2. Resend connector + `MARKETING_FROM_ADDRESS` secret (after your DNS verifies).
-3. Edge functions (send, schedule cron, webhook, unsubscribe, preview).
-4. Shared marketing email template.
-5. Admin UI: Contacts tab.
-6. Admin UI: Campaigns tab + builder + preview.
-7. Public unsubscribe page.
-8. Settings tab + suppression view.
-9. End-to-end test: create campaign → preview → send test → schedule → real send to a 2-contact tag.
-
-## Out of scope (for now)
-- A/B testing, drip sequences/automations, SMS, link-shortened click tracking dashboards beyond raw counts. Easy to add later on top of this foundation.
-
----
-
-**Next action for you:** add the domain in Resend, paste the DNS records into Lovable's DNS manager. Ping me when Resend shows "Verified" and I'll start with the database migration and connector link.
+1. Re-trigger "Send Reg Fee + Waiver Email" for a test enrollment.
+2. Check `email_send_log.metadata.html` for the new send — confirm it contains `https://checkout.stripe.com/c/pay/...`.
+3. Click the link and confirm the hosted Stripe Checkout page loads.
+4. Repeat for "Send Session Fee Payment Link" on a returning-family enrollment.
