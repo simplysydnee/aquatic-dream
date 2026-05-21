@@ -887,6 +887,204 @@ export type Database = {
         }
         Relationships: []
       }
+      marketing_campaign_recipients: {
+        Row: {
+          campaign_id: string
+          clicked_at: string | null
+          contact_id: string | null
+          created_at: string
+          email: string
+          error: string | null
+          id: string
+          opened_at: string | null
+          resend_message_id: string | null
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          campaign_id: string
+          clicked_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          email: string
+          error?: string | null
+          id?: string
+          opened_at?: string | null
+          resend_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          campaign_id?: string
+          clicked_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          email?: string
+          error?: string | null
+          id?: string
+          opened_at?: string | null
+          resend_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaign_recipients_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_campaign_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_campaigns: {
+        Row: {
+          audience: Json
+          body_blocks: Json
+          body_html: string | null
+          clicked_count: number
+          created_at: string
+          created_by: string | null
+          error: string | null
+          failed_count: number
+          from_address: string | null
+          id: string
+          name: string
+          opened_count: number
+          preheader: string | null
+          reply_to: string | null
+          scheduled_for: string | null
+          sent_at: string | null
+          sent_count: number
+          status: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          audience?: Json
+          body_blocks?: Json
+          body_html?: string | null
+          clicked_count?: number
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          failed_count?: number
+          from_address?: string | null
+          id?: string
+          name: string
+          opened_count?: number
+          preheader?: string | null
+          reply_to?: string | null
+          scheduled_for?: string | null
+          sent_at?: string | null
+          sent_count?: number
+          status?: string
+          subject?: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: Json
+          body_blocks?: Json
+          body_html?: string | null
+          clicked_count?: number
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          failed_count?: number
+          from_address?: string | null
+          id?: string
+          name?: string
+          opened_count?: number
+          preheader?: string | null
+          reply_to?: string | null
+          scheduled_for?: string | null
+          sent_at?: string | null
+          sent_count?: number
+          status?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_contacts: {
+        Row: {
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          last_sent_at: string | null
+          notes: string | null
+          phone: string | null
+          source: string
+          subscribed: boolean
+          tags: string[]
+          unsubscribe_reason: string | null
+          unsubscribed_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          last_sent_at?: string | null
+          notes?: string | null
+          phone?: string | null
+          source?: string
+          subscribed?: boolean
+          tags?: string[]
+          unsubscribe_reason?: string | null
+          unsubscribed_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          last_sent_at?: string | null
+          notes?: string | null
+          phone?: string | null
+          source?: string
+          subscribed?: boolean
+          tags?: string[]
+          unsubscribe_reason?: string | null
+          unsubscribed_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_unsubscribe_tokens: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          token?: string
+        }
+        Relationships: []
+      }
       payment_reconciliation_alerts: {
         Row: {
           actual_amount: number
@@ -1778,6 +1976,10 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_email_by_unsubscribe_token: {
+        Args: { _token: string }
+        Returns: string
+      }
       get_lesson_booking_by_waiver_token: {
         Args: { _token: string }
         Returns: {
@@ -1808,6 +2010,10 @@ export type Database = {
           start_time: string
           waiver_signed_at: string
         }[]
+      }
+      get_or_create_unsubscribe_token: {
+        Args: { _email: string }
+        Returns: string
       }
       get_swim_enrollment_by_waiver_token: {
         Args: { _token: string }
@@ -1854,6 +2060,24 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      unsubscribe_marketing_by_token: {
+        Args: { _reason?: string; _token: string }
+        Returns: {
+          already: boolean
+          email: string
+        }[]
+      }
+      upsert_marketing_contact: {
+        Args: {
+          _email: string
+          _first_name: string
+          _last_name: string
+          _phone: string
+          _source: string
+          _tags: string[]
+        }
+        Returns: undefined
       }
     }
     Enums: {
