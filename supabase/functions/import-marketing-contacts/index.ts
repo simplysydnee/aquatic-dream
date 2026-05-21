@@ -82,10 +82,19 @@ Deno.serve(async (req) => {
       const ex = existing.get(r.email);
       if (ex) {
         const merged = Array.from(new Set([...(ex.tags || []), ...tags]));
+    for (const r of unique) {
+      const ex = existing.get(r.email);
+      if (ex) {
+        const currentTags = ex.tags || [];
+        const missingTags = tags.filter((t) => !currentTags.includes(t));
+        const needsName = !ex.first_name && r.first_name;
+        const needsLast = !ex.last_name && r.last_name;
+        const needsPhone = !ex.phone && r.phone;
+        if (missingTags.length === 0 && !needsName && !needsLast && !needsPhone) continue;
         toUpdate.push({
           id: ex.id,
           patch: {
-            tags: merged,
+            tags: [...currentTags, ...missingTags],
             first_name: ex.first_name || r.first_name,
             last_name: ex.last_name || r.last_name,
             phone: ex.phone || r.phone,
@@ -97,7 +106,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Bulk insert in chunks
     let inserted = 0, updated = 0, failed = 0;
     for (let i = 0; i < toInsert.length; i += 500) {
       const chunk = toInsert.slice(i, i + 500);
