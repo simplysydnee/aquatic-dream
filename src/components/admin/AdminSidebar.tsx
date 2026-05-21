@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Users, Waves, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText, PanelLeftClose, PanelLeft, UserCheck, Layers, CalendarClock, CalendarOff, Clock, BarChart3, Megaphone, Mail, IdCard, ChevronDown } from "lucide-react";
+import { Users, Waves, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText, PanelLeftClose, PanelLeft, UserCheck, Layers, CalendarClock, CalendarOff, Clock, BarChart3, Megaphone, Mail, IdCard, ChevronDown, Send } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,12 @@ export function AdminSidebar() {
       items: [
         { title: "Job Postings", url: "/admin/careers", icon: Briefcase, badge: 0 },
         { title: "Applications", url: "/admin/applications", icon: FileText, badge: newApplications },
+      ],
+    },
+    {
+      label: "Marketing",
+      items: [
+        { title: "Campaigns", url: "/admin/marketing", icon: Send, badge: 0 },
       ],
     },
     {
