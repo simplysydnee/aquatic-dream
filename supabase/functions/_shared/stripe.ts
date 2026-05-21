@@ -27,6 +27,10 @@ export function createStripeClient(env: StripeEnv): Stripe {
   if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
 
   const client = new Stripe(connectionApiKey, {
+    // Pin wire API version so Stripe response shapes (e.g. Checkout Session
+    // `url` only populated when ui_mode is explicitly hosted) don't drift
+    // silently as the account default rolls forward.
+    apiVersion: '2026-03-25.dahlia',
     httpClient: Stripe.createFetchHttpClient((url: string | URL, init?: RequestInit) => {
       const gatewayUrl = url.toString().replace('https://api.stripe.com', GATEWAY_STRIPE_BASE);
       return fetch(gatewayUrl, {

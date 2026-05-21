@@ -67,6 +67,7 @@ Deno.serve(async (req) => {
         },
       ],
       mode: 'payment',
+      ui_mode: 'hosted',
       // Stripe enforces a max of 24h on expires_at; use 23h to stay safely under the limit.
       expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
       success_url: `${returnBase}/swim-enrollment?step=done`,
@@ -76,6 +77,10 @@ Deno.serve(async (req) => {
     })
 
     const paymentLink = checkoutSession.url
+    if (!paymentLink) {
+      console.error('Stripe returned no checkout URL', { enrollmentId, sessionId: checkoutSession.id })
+      return json({ error: 'Stripe did not return a checkout URL — payment link not sent' }, 500)
+    }
     const session = enrollment.swim_sessions
     const sessionInfo = session
       ? `${session.session_name || session.swim_level} — ${session.day_of_week} ${session.start_time}`
