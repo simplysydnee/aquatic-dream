@@ -63,6 +63,7 @@ Deno.serve(async (req) => {
     const unique = [...map.values()];
 
     // Load all existing contacts (paged)
+    const existing = new Map<string, { id: string; tags: string[]; first_name: string|null; last_name: string|null; phone: string|null }>();
     let from = 0; const PAGE = 1000;
     while (true) {
       const { data, error } = await supabase
@@ -76,7 +77,6 @@ Deno.serve(async (req) => {
       from += PAGE;
     }
 
-    // existing now declared above? add declaration
 
     const toInsert: any[] = [];
     const toUpdate: { id: string; patch: any }[] = [];
