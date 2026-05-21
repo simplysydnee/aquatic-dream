@@ -63,15 +63,19 @@ Deno.serve(async (req) => {
     const unique = [...map.values()];
 
     // Load all existing contacts (paged)
-    const existing = new Map<string, { id: string; tags: string[]; first_name: string|null; last_name: string|null; phone: string|null }>();
     let from = 0; const PAGE = 1000;
     while (true) {
       const { data, error } = await supabase
         .from("marketing_contacts")
         .select("id, email, tags, first_name, last_name, phone")
+        .order("id", { ascending: true })
         .range(from, from + PAGE - 1);
       if (error) throw error;
       for (const r of (data || [])) existing.set((r.email as string).toLowerCase(), r as any);
+      if (!data || data.length < PAGE) break;
+      from += PAGE;
+    }
+
       if (!data || data.length < PAGE) break;
       from += PAGE;
     }
