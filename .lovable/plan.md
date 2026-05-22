@@ -1,68 +1,48 @@
+## Problem
 
-## What's broken
+Parent Vicky (`alejandrocorcam@gmail.com`) tried to self-enroll her first-time swimmer through `/swim-enrollment` three times on May 21 (20:37, 20:38, 20:50). Each attempt created a `pending_enrollments` row but **none** ever converted into a `swim_enrollments` row via the Stripe webhook. The admin had to manually enroll the family 3 minutes later (20:53), marking payment_method=`other`, payment_reference=`Stripe Invoice`. This pattern (pending rows pile up, webhook never fires) means the embedded Stripe checkout iframe is failing to complete payment — not that parents are abandoning.
 
-When Olive's owner clicked "Send Reg Fee + Waiver Email" from the admin panel, parents received the email — they could sign the waiver, but **the "Pay Registration Fee" button and the Stripe link line were completely missing** from the email body.
+## Root cause
 
-## Root cause (confirmed from data, not guessed)
-
-I pulled the actual HTML of the last three sent emails (Stamy, Ghuman x2) from `email_send_log`. Each rendered:
+All three server functions that mint embedded checkout sessions still pass:
 
 ```
-STEP 2 of 2 — Pay $45.00 registration fee
-One-time charge per family — you won't be charged it again for future sessions.
+ui_mode: "embedded"
 ```
 
-…and then **nothing** — no button, no "Payment link:" line.
+But our shared Stripe client (`_shared/stripe.ts`) is pinned to API version **`2026-03-25.dahlia`**, and the Stripe knowledge contract for that version requires:
 
-The template only renders the button/link when `paymentLink` is truthy:
-
-```tsx
-{paymentLink && (<Button href={paymentLink}>Pay Registration Fee…</Button>)}
+```
+ui_mode: "embedded_page"
 ```
 
-So `paymentLink` was falsy when the email rendered. `paymentLink` is set from:
+`"embedded"` is the older value. Under dahlia + `@stripe/stripe-js@9.2.0` + `@stripe/react-stripe-js@6.2.0` the returned client_secret no longer mounts reliably in `<EmbeddedCheckout/>` — the iframe errors silently, the parent never gets to submit a card, and the webhook never fires. This is the same family of bug we already fixed for the *hosted* link functions (which needed `ui_mode: "hosted"` to get a `session.url` back); this one is the embedded-mode counterpart.
 
-```ts
-const paymentLink = checkoutSession.url   // returned from stripe.checkout.sessions.create
-```
-
-Stripe's Checkout Sessions API returns `url` only when the session is created in the default **hosted** UI mode. With newer pinned API versions (the project's `_shared/stripe.ts` does not pin `apiVersion`, so it follows the account default — currently the `2026-03-25.dahlia` family), `session.url` is no longer guaranteed unless `ui_mode: 'hosted'` is set explicitly. That is exactly what's happening: `checkout.sessions.create({...})` succeeds, but `url` comes back `null`, the function still fires the email, and parents get a button-less email.
-
-This is **not** a Stripe credentials/key problem (live charges through other flows still work, and the function reached the point of issuing the session). It's a missing `ui_mode` parameter in two edge functions.
+This affects:
+- **Public swim enrollment** (`create-checkout`) — new families paying $45 reg fee, returning families paying $240, first-timers electing pay-ahead $285 — all broken
+- **Admin phone checkout** (`create-admin-phone-checkout`) — admin charging a card live over the phone
+- **Lesson occurrence checkout** (`create-lesson-occurrence-checkout`) — admin charging in-person for a single private lesson
 
 ## Fix
 
-### 1. `supabase/functions/send-registration-fee-payment-link/index.ts`
-Add `ui_mode: 'hosted'` to the `checkout.sessions.create({ ... })` call so Stripe returns the redirect URL.
+### 1. `supabase/functions/create-checkout/index.ts`
+- Change `ui_mode: "embedded"` → `ui_mode: "embedded_page"` on `stripe.checkout.sessions.create`.
+- After creation, hard-guard `if (!session.client_secret)` → return 500 with explicit error (mirrors the URL guard we added to the hosted link functions). Prevents silent failures and surfaces problems immediately in edge logs.
 
-### 2. `supabase/functions/send-session-payment-link/index.ts`
-Same change — `ui_mode: 'hosted'`. This function has the identical bug; it just hasn't bitten yet because most returning families pay through the embedded enrollment flow.
+### 2. `supabase/functions/create-admin-phone-checkout/index.ts`
+- Same `ui_mode` swap + `client_secret` guard.
 
-### 3. Hard guard before sending the email (defense in depth)
+### 3. `supabase/functions/create-lesson-occurrence-checkout/index.ts`
+- Same `ui_mode` swap + `client_secret` guard.
 
-In both functions, right after creating the session:
+### 4. Verification
+- Redeploy the three edge functions.
+- Curl `create-checkout` with a real test payload against a session that has open capacity and confirm a `clientSecret` is returned.
+- Load `/swim-enrollment` in the preview, walk through as a first-time family, and confirm the embedded card form renders and accepts the Stripe test card `4242 4242 4242 4242`.
+- After the test charge, confirm a new `swim_enrollments` row is written by the webhook with `payment_status='paid'` and a Stripe `pi_...` reference.
 
-```ts
-if (!checkoutSession.url) {
-  return json({ error: 'Stripe did not return a checkout URL' }, 500)
-}
-```
+## Out of scope
 
-This guarantees that if Stripe ever changes behavior again, the admin gets an explicit error in the toast instead of parents receiving a half-broken email — and `reg_fee_link_sent_at` does not get stamped on a failed send.
-
-### 4. Pin the Stripe API version in `_shared/stripe.ts`
-
-Add `apiVersion: '2026-03-25.dahlia'` (or whichever is current) to `new Stripe(...)` so behavior is deterministic across the three checkout-creating functions (`create-checkout`, `send-registration-fee-payment-link`, `send-session-payment-link`, `create-admin-phone-checkout`, `create-lesson-occurrence-checkout`). This prevents the same class of silent-default-change from biting again.
-
-## Out of scope (intentionally)
-
-- No DB schema change.
-- No template changes — the template is correct; it just needs a real URL.
-- No new admin UI — the existing "Send Reg Fee + Waiver Email" button stays as-is.
-
-## Verification after deploy
-
-1. Re-trigger "Send Reg Fee + Waiver Email" for a test enrollment.
-2. Check `email_send_log.metadata.html` for the new send — confirm it contains `https://checkout.stripe.com/c/pay/...`.
-3. Click the link and confirm the hosted Stripe Checkout page loads.
-4. Repeat for "Send Session Fee Payment Link" on a returning-family enrollment.
+- The two hosted-link functions (`send-registration-fee-payment-link`, `send-session-payment-link`) are already fixed and working — not touching them.
+- No DB schema, RLS, or UI changes. The React components (`EnrollmentCheckout`, `LessonOccurrenceCheckoutDialog`, `PhoneCheckoutPanel`) already consume `clientSecret`, so they need no edits.
+- No change to webhook handling — once embedded mounts and the parent pays, the existing `checkout.session.completed` handler converts the pending row exactly as designed.

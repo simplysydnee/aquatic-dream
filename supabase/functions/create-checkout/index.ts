@@ -247,6 +247,14 @@ serve(async (req) => {
       metadata: { pendingEnrollmentId: pending.id },
     });
 
+    if (!session.client_secret) {
+      console.error("Stripe returned no client_secret. Full session:", JSON.stringify(session));
+      return new Response(
+        JSON.stringify({ error: "Stripe did not return a client_secret — checkout cannot start" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     return new Response(JSON.stringify({ clientSecret: session.client_secret }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

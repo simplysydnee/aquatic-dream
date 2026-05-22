@@ -67,6 +67,11 @@ Deno.serve(async (req) => {
       },
     })
 
+    if (!session.client_secret) {
+      console.error('Stripe returned no client_secret for lesson occurrence checkout', { sessionId: session.id })
+      return json({ error: 'Stripe did not return a client_secret — checkout cannot start' }, 500)
+    }
+
     return json({ clientSecret: session.client_secret })
   } catch (err: any) {
     console.error('create-lesson-occurrence-checkout error', err)

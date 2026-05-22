@@ -70,6 +70,11 @@ Deno.serve(async (req) => {
       },
     })
 
+    if (!checkout.client_secret) {
+      console.error('Stripe returned no client_secret for admin phone checkout', { sessionId: checkout.id })
+      return json({ error: 'Stripe did not return a client_secret — checkout cannot start' }, 500)
+    }
+
     return json({ clientSecret: checkout.client_secret })
   } catch (err: any) {
     console.error('create-admin-phone-checkout error', err)
