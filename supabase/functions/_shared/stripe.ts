@@ -23,26 +23,39 @@ export function createStripeClient(env: StripeEnv): Stripe {
   if (cached) return cached;
 
   const connectionApiKey = getConnectionApiKey(env);
-  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-  if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
 
-  const client = new Stripe(connectionApiKey, {
-    // Pin wire API version so Stripe response shapes (e.g. Checkout Session
-    // `url` only populated when ui_mode is explicitly hosted) don't drift
-    // silently as the account default rolls forward.
+  // If the configured value is a real Stripe secret key (sk_ / rk_), call
+  // api.stripe.com directly. Otherwise treat it as a Lovable connector
+  // gateway connection key and route through the gateway with LOVABLE_API_KEY.
+  const isDirectStripeKey = /^(sk|rk)_(test|live)_/.test(connectionApiKey);
+
+  const baseOptions = {
+    // Pin wire API version so response shapes don't drift silently as the
+    // account default rolls forward.
     apiVersion: '2026-03-25.dahlia' as any,
-    httpClient: Stripe.createFetchHttpClient((url: string | URL, init?: RequestInit) => {
-      const gatewayUrl = url.toString().replace('https://api.stripe.com', GATEWAY_STRIPE_BASE);
-      return fetch(gatewayUrl, {
-        ...init,
-        headers: {
-          ...Object.fromEntries(new Headers(init?.headers).entries()),
-          'X-Connection-Api-Key': connectionApiKey,
-          'Lovable-API-Key': lovableApiKey,
-        },
-      });
-    }),
-  });
+  };
+
+  let client: Stripe;
+  if (isDirectStripeKey) {
+    client = new Stripe(connectionApiKey, baseOptions);
+  } else {
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
+    client = new Stripe(connectionApiKey, {
+      ...baseOptions,
+      httpClient: Stripe.createFetchHttpClient((url: string | URL, init?: RequestInit) => {
+        const gatewayUrl = url.toString().replace('https://api.stripe.com', GATEWAY_STRIPE_BASE);
+        return fetch(gatewayUrl, {
+          ...init,
+          headers: {
+            ...Object.fromEntries(new Headers(init?.headers).entries()),
+            'X-Connection-Api-Key': connectionApiKey,
+            'Lovable-API-Key': lovableApiKey,
+          },
+        });
+      }),
+    });
+  }
   stripeClientCache[env] = client;
   return client;
 }
