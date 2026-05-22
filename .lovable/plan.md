@@ -1,48 +1,43 @@
-## Problem
+## What's actually broken
 
-Parent Vicky (`alejandrocorcam@gmail.com`) tried to self-enroll her first-time swimmer through `/swim-enrollment` three times on May 21 (20:37, 20:38, 20:50). Each attempt created a `pending_enrollments` row but **none** ever converted into a `swim_enrollments` row via the Stripe webhook. The admin had to manually enroll the family 3 minutes later (20:53), marking payment_method=`other`, payment_reference=`Stripe Invoice`. This pattern (pending rows pile up, webhook never fires) means the embedded Stripe checkout iframe is failing to complete payment — not that parents are abandoning.
+The Stripe checkout failure is the same gateway-credential issue from earlier, not a new bug in the enrollment UI.
 
-## Root cause
-
-All three server functions that mint embedded checkout sessions still pass:
-
-```
-ui_mode: "embedded"
+```text
+/swim-enrollment  →  create-checkout edge fn  →  Lovable connector gateway
+                                              →  401 "Credential not found"
+                                              →  no client_secret  →  500
 ```
 
-But our shared Stripe client (`_shared/stripe.ts`) is pinned to API version **`2026-03-25.dahlia`**, and the Stripe knowledge contract for that version requires:
+The shared Stripe client (`supabase/functions/_shared/stripe.ts`) already has the auto-detect that bypasses the gateway when the configured key is a real Stripe key (`sk_test_...` / `rk_test_...`). It only routes through the gateway when the key looks like a connector key — and that's the path failing.
 
-```
-ui_mode: "embedded_page"
-```
+So either:
+1. The deployed `STRIPE_SANDBOX_API_KEY` is still a Lovable-connector key (not a real `sk_test_...`), and the gateway side is broken for that connection (disconnect/reconnect did not fix it), or
+2. The most recent `_shared/stripe.ts` change hasn't been redeployed to `create-checkout` and friends, so the bypass isn't running yet.
 
-`"embedded"` is the older value. Under dahlia + `@stripe/stripe-js@9.2.0` + `@stripe/react-stripe-js@6.2.0` the returned client_secret no longer mounts reliably in `<EmbeddedCheckout/>` — the iframe errors silently, the parent never gets to submit a card, and the webhook never fires. This is the same family of bug we already fixed for the *hosted* link functions (which needed `ui_mode: "hosted"` to get a `session.url` back); this one is the embedded-mode counterpart.
+The "loading times lagging between steps" is most likely the same root cause — when the embedded Stripe iframe can't mount, the checkout step sits spinning while requests fail and retry, which makes the whole flow feel slow.
 
-This affects:
-- **Public swim enrollment** (`create-checkout`) — new families paying $45 reg fee, returning families paying $240, first-timers electing pay-ahead $285 — all broken
-- **Admin phone checkout** (`create-admin-phone-checkout`) — admin charging a card live over the phone
-- **Lesson occurrence checkout** (`create-lesson-occurrence-checkout`) — admin charging in-person for a single private lesson
+## Plan
 
-## Fix
+1. **Redeploy** the four functions that import `_shared/stripe.ts` so the direct-key bypass is guaranteed live:
+   - `create-checkout`
+   - `create-admin-phone-checkout`
+   - `create-lesson-occurrence-checkout`
+   - `get-stripe-price`
 
-### 1. `supabase/functions/create-checkout/index.ts`
-- Change `ui_mode: "embedded"` → `ui_mode: "embedded_page"` on `stripe.checkout.sessions.create`.
-- After creation, hard-guard `if (!session.client_secret)` → return 500 with explicit error (mirrors the URL guard we added to the hosted link functions). Prevents silent failures and surfaces problems immediately in edge logs.
+2. **Probe the credential** with a one-shot call to the gateway's `verify_credentials` endpoint inside an edge function. This tells us definitively whether the current `STRIPE_SANDBOX_API_KEY` is a working connector key, a broken connector key, or a real `sk_test_...` key.
 
-### 2. `supabase/functions/create-admin-phone-checkout/index.ts`
-- Same `ui_mode` swap + `client_secret` guard.
+3. **Re-test** `create-checkout` directly with a real payload and read the logs. Two outcomes:
 
-### 3. `supabase/functions/create-lesson-occurrence-checkout/index.ts`
-- Same `ui_mode` swap + `client_secret` guard.
+   - Gateway returns ok → bypass logic just needed redeployment; checkout works.
+   - Gateway still says "Credential not found" → the connector-side credential is bad. In that case the fix is to replace `STRIPE_SANDBOX_API_KEY` (and `STRIPE_LIVE_API_KEY`) with a **real Stripe secret key** from the Stripe dashboard (`sk_test_...` for sandbox, `sk_live_...` for live). The shared client will then call `api.stripe.com` directly and bypass the broken gateway entirely.
 
-### 4. Verification
-- Redeploy the three edge functions.
-- Curl `create-checkout` with a real test payload against a session that has open capacity and confirm a `clientSecret` is returned.
-- Load `/swim-enrollment` in the preview, walk through as a first-time family, and confirm the embedded card form renders and accepts the Stripe test card `4242 4242 4242 4242`.
-- After the test charge, confirm a new `swim_enrollments` row is written by the webhook with `payment_status='paid'` and a Stripe `pi_...` reference.
+4. **Walk the enrollment flow** in preview as a first-time family using test card `4242 4242 4242 4242` and confirm:
+   - Each step transitions without long stalls
+   - Embedded Stripe form mounts
+   - A `swim_enrollments` row is written by the webhook after payment
 
-## Out of scope
+## Non-changes
 
-- The two hosted-link functions (`send-registration-fee-payment-link`, `send-session-payment-link`) are already fixed and working — not touching them.
-- No DB schema, RLS, or UI changes. The React components (`EnrollmentCheckout`, `LessonOccurrenceCheckoutDialog`, `PhoneCheckoutPanel`) already consume `clientSecret`, so they need no edits.
-- No change to webhook handling — once embedded mounts and the parent pays, the existing `checkout.session.completed` handler converts the pending row exactly as designed.
+- No changes to the React enrollment components — the embedded checkout wiring is already correct.
+- No DB / RLS / schema changes.
+- Hosted-link functions (`send-registration-fee-payment-link`, `send-session-payment-link`) are out of scope.
