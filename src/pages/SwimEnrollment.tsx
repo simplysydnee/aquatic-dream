@@ -206,16 +206,14 @@ const SwimEnrollment = () => {
 
     const sessionMap = Object.fromEntries(sessions.map(s => [s.id, s]));
 
-    // Capacity check — only count CONFIRMED rows (paid). Pending checkouts don't hold seats.
-    const { data: existingEnrollments } = await supabase
-      .from("swim_enrollments")
-      .select("session_id")
-      .in("session_id", uniqueSessionIds)
-      .eq("status", "confirmed");
+    // Capacity check — only count CONFIRMED/PENDING rows. Public RPC returns aggregates only.
+    const { data: existingEnrollments } = await supabase.rpc("get_session_enrollment_counts", {
+      _session_ids: uniqueSessionIds,
+    } as any);
 
     const countMap: Record<string, number> = {};
-    existingEnrollments?.forEach(e => {
-      if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
+    (existingEnrollments as any[] | null)?.forEach((e) => {
+      if (e?.session_id) countMap[e.session_id] = e.enrolled_count || 0;
     });
 
     const fullSessions = sessions.filter(s => (countMap[s.id] || 0) >= s.max_students);
