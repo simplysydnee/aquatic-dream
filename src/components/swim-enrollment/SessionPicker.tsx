@@ -97,15 +97,11 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         }
 
         const allIds = activeSessions.map(s => s.id);
-        const { data: enrollments } = await supabase
-          .from("swim_enrollments")
-          .select("session_id")
-          .in("session_id", allIds)
-          .in("status", ["pending", "confirmed", "enrolled"]);
+        const { data: enrollments } = await supabase.rpc("get_session_enrollment_counts", { _session_ids: allIds } as any);
 
         const countMap: Record<string, number> = {};
-        enrollments?.forEach(e => {
-          if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1;
+        (enrollments as any[] | null)?.forEach((e) => {
+          if (e?.session_id) countMap[e.session_id] = e.enrolled_count || 0;
         });
 
         const periodMap = Object.fromEntries(periods.map(p => [p.id, p]));

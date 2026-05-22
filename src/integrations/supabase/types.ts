@@ -2015,6 +2015,13 @@ export type Database = {
         Args: { _email: string }
         Returns: string
       }
+      get_session_enrollment_counts: {
+        Args: { _session_ids: string[] }
+        Returns: {
+          enrolled_count: number
+          session_id: string
+        }[]
+      }
       get_swim_enrollment_by_waiver_token: {
         Args: { _token: string }
         Returns: {

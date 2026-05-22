@@ -212,19 +212,18 @@ function ScheduleSection() {
   useEffect(() => {
     async function load() {
       const today = new Date().toISOString().slice(0, 10);
-      const [periodsRes, sessionsRes, countsRes] = await Promise.all([
+      const [periodsRes, sessionsRes] = await Promise.all([
         supabase.from("session_periods").select("id, name, start_date, end_date").eq("is_active", true).gte("end_date", today).order("start_date"),
         supabase.from("swim_sessions").select("id, swim_level, age_group, start_time, end_time, max_students, session_name, session_period_id, registration_status").eq("is_active", true).eq("registration_status", "open").order("start_time"),
-        supabase.from("swim_enrollments").select("session_id").in("status", ["pending", "confirmed", "enrolled"]),
       ]);
       if (periodsRes.data) setPeriods(periodsRes.data);
       if (sessionsRes.data) setSessions(sessionsRes.data);
-      if (countsRes.data) {
-        const map = new Map<string, number>();
-        countsRes.data.forEach((e) => {
-          if (e.session_id) map.set(e.session_id, (map.get(e.session_id) || 0) + 1);
-        });
-        setCounts(Array.from(map, ([session_id, count]) => ({ session_id, count })));
+      const sessionIds = (sessionsRes.data || []).map((s) => s.id);
+      if (sessionIds.length) {
+        const { data: countsData } = await supabase.rpc("get_session_enrollment_counts", { _session_ids: sessionIds } as any);
+        if (countsData) {
+          setCounts((countsData as any[]).map((r: any) => ({ session_id: r.session_id, count: r.enrolled_count })));
+        }
       }
       setLoading(false);
     }
