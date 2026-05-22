@@ -239,13 +239,21 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       line_items: lineItems,
       mode: "payment",
-      ui_mode: "embedded",
+      ui_mode: "embedded_page",
       return_url:
         returnUrl ||
         `${req.headers.get("origin")}/swim-enrollment?step=done&session_id={CHECKOUT_SESSION_ID}`,
       ...(customerEmail && { customer_email: customerEmail }),
       metadata: { pendingEnrollmentId: pending.id },
     });
+
+    if (!session.client_secret) {
+      console.error("Stripe returned no client_secret for embedded checkout", { sessionId: session.id });
+      return new Response(
+        JSON.stringify({ error: "Stripe did not return a client_secret — checkout cannot start" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     return new Response(JSON.stringify({ clientSecret: session.client_secret }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

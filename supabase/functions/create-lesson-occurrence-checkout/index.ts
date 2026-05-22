@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
         quantity: 1,
       }],
       mode: 'payment',
-      ui_mode: 'embedded',
+      ui_mode: 'embedded_page',
       // Stripe enforces a max of 24h on expires_at; use 23h to stay safely under the limit.
       expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
       return_url: (returnUrl || 'https://aquaticdreamsswim.com/admin') + '?lesson_paid=1&session_id={CHECKOUT_SESSION_ID}',
@@ -66,6 +66,11 @@ Deno.serve(async (req) => {
         bookingId: booking.id,
       },
     })
+
+    if (!session.client_secret) {
+      console.error('Stripe returned no client_secret for lesson occurrence checkout', { sessionId: session.id })
+      return json({ error: 'Stripe did not return a client_secret — checkout cannot start' }, 500)
+    }
 
     return json({ clientSecret: session.client_secret })
   } catch (err: any) {

@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
         quantity: 1,
       }],
       mode: 'payment',
-      ui_mode: 'embedded',
+      ui_mode: 'embedded_page',
       expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
       return_url: (returnUrl || 'https://aquaticdreamsswim.com/admin') + '?phone_paid=1&session_id={CHECKOUT_SESSION_ID}',
       customer_email: enrollment.parent_email || undefined,
@@ -69,6 +69,11 @@ Deno.serve(async (req) => {
         enrollmentId: enrollment.id,
       },
     })
+
+    if (!checkout.client_secret) {
+      console.error('Stripe returned no client_secret for admin phone checkout', { sessionId: checkout.id })
+      return json({ error: 'Stripe did not return a client_secret — checkout cannot start' }, 500)
+    }
 
     return json({ clientSecret: checkout.client_secret })
   } catch (err: any) {
