@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,7 +38,7 @@ export default function EnrollmentCheckout({
     [confirmed, payAhead, buildPayload],
   );
 
-  const fetchClientSecret = async (): Promise<string> => {
+  const fetchClientSecret = useCallback(async (): Promise<string> => {
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: {
         payload,
@@ -51,7 +51,7 @@ export default function EnrollmentCheckout({
       throw new Error(error?.message || "Failed to create checkout session");
     }
     return data.clientSecret;
-  };
+  }, [customerEmail, payload]);
 
   const sessionTotal = sessionFeeUsd * sessionFeeCount;
 

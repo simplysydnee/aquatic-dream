@@ -226,14 +226,6 @@ const SwimEnrollment = () => {
       return;
     }
 
-    // Best-effort capture signer IP for the agreement record (created server-side after payment)
-    let signerIp: string | null = null;
-    try {
-      const ipRes = await fetch("https://api.ipify.org?format=json");
-      const ipData = await ipRes.json();
-      signerIp = ipData.ip;
-    } catch { /* best-effort */ }
-
     // Calculate "today" total for display purposes — assumes payAhead=false
     // (i.e. just reg fees for first-timers). The user can opt to pay ahead in
     // the next step; that updates the Stripe-side total. The server is
@@ -252,7 +244,7 @@ const SwimEnrollment = () => {
     const sessionPrices: Record<string, number> = {};
     for (const s of sessions) sessionPrices[s.id] = Number(s.session_price ?? 240);
 
-    setCheckoutInputs({ children: allChildren, signerIp, sessionPrices });
+    setCheckoutInputs({ children: allChildren, signerIp: null, sessionPrices });
     setTotalDue(total);
     setConfirmedChildren(allChildren);
 
