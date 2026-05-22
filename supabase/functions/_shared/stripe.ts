@@ -7,9 +7,10 @@ export function getConnectionApiKey(env: StripeEnv): string {
     ? ['STRIPE_TEST_SECRET_KEY', 'STRIPE_SANDBOX_SECRET_KEY', 'STRIPE_SECRET_KEY']
     : ['STRIPE_LIVE_SECRET_KEY', 'STRIPE_SECRET_KEY'];
 
+  const directKeyRe = env === 'sandbox' ? /^(sk|rk)_test_/ : /^(sk|rk)_live_/;
   for (const name of directCandidates) {
     const value = Deno.env.get(name);
-    if (value && /^(sk|rk)_(test|live)_/.test(value)) return value;
+    if (value && directKeyRe.test(value)) return value;
   }
 
   const key = env === 'sandbox'
