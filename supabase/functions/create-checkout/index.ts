@@ -248,7 +248,7 @@ serve(async (req) => {
     });
 
     if (!session.client_secret) {
-      console.error("Stripe returned no client_secret for embedded checkout", { sessionId: session.id });
+      console.error("Stripe returned no client_secret. Full session:", JSON.stringify(session));
       return new Response(
         JSON.stringify({ error: "Stripe did not return a client_secret — checkout cannot start" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
