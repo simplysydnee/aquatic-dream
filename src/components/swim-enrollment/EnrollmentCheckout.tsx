@@ -34,8 +34,8 @@ export default function EnrollmentCheckout({
   // The embedded checkout will mount with the payload at confirmation time.
   // Changing the toggle after confirming requires "Change" → re-mounts with new payload.
   const payload = useMemo(
-    () => (confirmed ? buildPayload({ payAheadForFirstTimers: payAhead === "pay_ahead" }) : null),
-    [confirmed, payAhead, buildPayload],
+    () => (confirmed || !hasFirstTimers ? buildPayload({ payAheadForFirstTimers: payAhead === "pay_ahead" }) : null),
+    [confirmed, hasFirstTimers, payAhead, buildPayload],
   );
 
   const fetchClientSecret = useCallback(async (): Promise<string> => {
