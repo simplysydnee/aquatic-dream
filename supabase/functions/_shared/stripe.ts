@@ -3,6 +3,16 @@ import { encode } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 export type StripeEnv = 'sandbox' | 'live';
 
 export function getConnectionApiKey(env: StripeEnv): string {
+  const directCandidates = env === 'sandbox'
+    ? ['STRIPE_TEST_SECRET_KEY', 'STRIPE_SANDBOX_SECRET_KEY', 'STRIPE_SECRET_KEY']
+    : ['STRIPE_LIVE_SECRET_KEY', 'STRIPE_SECRET_KEY'];
+
+  const directKeyRe = env === 'sandbox' ? /^(sk|rk)_test_/ : /^(sk|rk)_live_/;
+  for (const name of directCandidates) {
+    const value = Deno.env.get(name);
+    if (value && directKeyRe.test(value)) return value;
+  }
+
   const key = env === 'sandbox'
     ? Deno.env.get('STRIPE_SANDBOX_API_KEY')
     : Deno.env.get('STRIPE_LIVE_API_KEY');

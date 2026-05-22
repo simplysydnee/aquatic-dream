@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,11 +34,11 @@ export default function EnrollmentCheckout({
   // The embedded checkout will mount with the payload at confirmation time.
   // Changing the toggle after confirming requires "Change" → re-mounts with new payload.
   const payload = useMemo(
-    () => (confirmed ? buildPayload({ payAheadForFirstTimers: payAhead === "pay_ahead" }) : null),
-    [confirmed, payAhead, buildPayload],
+    () => (confirmed || !hasFirstTimers ? buildPayload({ payAheadForFirstTimers: payAhead === "pay_ahead" }) : null),
+    [confirmed, hasFirstTimers, payAhead, buildPayload],
   );
 
-  const fetchClientSecret = async (): Promise<string> => {
+  const fetchClientSecret = useCallback(async (): Promise<string> => {
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: {
         payload,
@@ -51,7 +51,7 @@ export default function EnrollmentCheckout({
       throw new Error(error?.message || "Failed to create checkout session");
     }
     return data.clientSecret;
-  };
+  }, [customerEmail, payload]);
 
   const sessionTotal = sessionFeeUsd * sessionFeeCount;
 
