@@ -1,43 +1,46 @@
-## What's actually broken
+## Goal
+Stop losing enrollments while the Stripe embedded checkout is broken. Let families complete the form now and pay via a link emailed to them, without weakening the "no Stripe = no enrollment" rule once checkout is fixed.
 
-The Stripe checkout failure is the same gateway-credential issue from earlier, not a new bug in the enrollment UI.
+## The workaround (feature-flagged "Reserve seat, pay by link")
+
+On the public `/swim-enrollment` flow, replace the embedded Stripe step with a single button: **"Reserve seat — we'll email your payment link"**. The reservation creates the enrollment row in a `pending_payment` state and immediately fires the existing hosted-link email (which we already confirmed works after the `ui_mode: 'hosted'` fix). The family pays from the email; the webhook flips the row to `paid` exactly like today.
+
+Why this is safe:
+- Hosted payment links (`send-registration-fee-payment-link` / `send-session-payment-link`) go through a different code path than embedded checkout and are currently working.
+- The webhook is still the only writer for `payment_status='paid'` / `session_fee_status='paid'`. No rule change.
+- A new `pending_payment` status means "seat is soft-held, not yet earned" — admin can see and clean up unpaid rows after N hours.
 
 ```text
-/swim-enrollment  →  create-checkout edge fn  →  Lovable connector gateway
-                                              →  401 "Credential not found"
-                                              →  no client_secret  →  500
+Family submits form
+   │
+   ▼
+create-pending-enrollment edge fn
+   │   ├─ inserts swim_enrollments row, status='pending_payment'
+   │   └─ invokes send-registration-fee-payment-link (or session link)
+   ▼
+Family receives email → clicks hosted Stripe link → pays
+   ▼
+payments-webhook → status='confirmed', payment_status='paid'
 ```
 
-The shared Stripe client (`supabase/functions/_shared/stripe.ts`) already has the auto-detect that bypasses the gateway when the configured key is a real Stripe key (`sk_test_...` / `rk_test_...`). It only routes through the gateway when the key looks like a connector key — and that's the path failing.
+## What changes
 
-So either:
-1. The deployed `STRIPE_SANDBOX_API_KEY` is still a Lovable-connector key (not a real `sk_test_...`), and the gateway side is broken for that connection (disconnect/reconnect did not fix it), or
-2. The most recent `_shared/stripe.ts` change hasn't been redeployed to `create-checkout` and friends, so the bypass isn't running yet.
+1. **New edge function `create-pending-enrollment`** (verify_jwt=false). Same payload as `create-checkout`. Inserts the row, then invokes the right hosted-link function. Returns `{ ok: true, enrollmentId }`.
+2. **`EnrollmentCheckout.tsx`**: behind a flag `VITE_CHECKOUT_FALLBACK=1`, render the "Reserve seat" panel instead of `EmbeddedCheckoutProvider`. Same back button, same summary copy, just no iframe.
+3. **DB**: add `'pending_payment'` to allowed `status` values on `swim_enrollments` (or use existing string column if it's free-text — needs a 1-line check). No new columns.
+4. **Admin visibility**: `SwimEnrollmentsAdmin.tsx` and the calendar already render `status`. Add a "Pending payment" badge + filter chip so owner can chase or delete stale reservations.
+5. **Auto-expire (optional, low risk)**: nightly cron deletes `pending_payment` rows older than 72h with no payment. Skip in v1 if you want to manually triage.
 
-The "loading times lagging between steps" is most likely the same root cause — when the embedded Stripe iframe can't mount, the checkout step sits spinning while requests fail and retry, which makes the whole flow feel slow.
+## What stays the same
+- Webhook logic, payment_status math, dashboard totals.
+- Admin manual enrollment path (`admin-create-enrollment`) — unchanged.
+- All emails (waiver, reg fee, session fee) — already working via hosted links.
+- Once embedded checkout is fixed, flip `VITE_CHECKOUT_FALLBACK` off and the public flow returns to instant in-page payment with zero code revert.
 
-## Plan
+## Out of scope
+- Fixing the underlying gateway / `STRIPE_*_SECRET_KEY` issue (separate track; real fix).
+- Changing the returning-swimmer $240-at-checkout rule. They'll just receive a $240 link instead of paying in the iframe — same money, one extra click.
+- Any change to `payments-webhook`, refunds, or `session_fee_status` semantics.
 
-1. **Redeploy** the four functions that import `_shared/stripe.ts` so the direct-key bypass is guaranteed live:
-   - `create-checkout`
-   - `create-admin-phone-checkout`
-   - `create-lesson-occurrence-checkout`
-   - `get-stripe-price`
-
-2. **Probe the credential** with a one-shot call to the gateway's `verify_credentials` endpoint inside an edge function. This tells us definitively whether the current `STRIPE_SANDBOX_API_KEY` is a working connector key, a broken connector key, or a real `sk_test_...` key.
-
-3. **Re-test** `create-checkout` directly with a real payload and read the logs. Two outcomes:
-
-   - Gateway returns ok → bypass logic just needed redeployment; checkout works.
-   - Gateway still says "Credential not found" → the connector-side credential is bad. In that case the fix is to replace `STRIPE_SANDBOX_API_KEY` (and `STRIPE_LIVE_API_KEY`) with a **real Stripe secret key** from the Stripe dashboard (`sk_test_...` for sandbox, `sk_live_...` for live). The shared client will then call `api.stripe.com` directly and bypass the broken gateway entirely.
-
-4. **Walk the enrollment flow** in preview as a first-time family using test card `4242 4242 4242 4242` and confirm:
-   - Each step transitions without long stalls
-   - Embedded Stripe form mounts
-   - A `swim_enrollments` row is written by the webhook after payment
-
-## Non-changes
-
-- No changes to the React enrollment components — the embedded checkout wiring is already correct.
-- No DB / RLS / schema changes.
-- Hosted-link functions (`send-registration-fee-payment-link`, `send-session-payment-link`) are out of scope.
+## Open question for you
+Do you want pending reservations to **auto-delete after 72h** if unpaid, or stay forever until an admin clears them? Default in the plan is "stay forever, admin triages" — safer for v1.
