@@ -58,14 +58,74 @@ export default function EnrollmentCheckout({
 
   const sessionTotal = sessionFeeUsd * sessionFeeCount;
 
+  // ---- FALLBACK PATH: reserve seat + email payment link ----
+  const [reserving, setReserving] = useState(false);
+  const [reserved, setReserved] = useState(false);
+
+  const handleReserve = useCallback(async () => {
+    setReserving(true);
+    try {
+      const built = buildPayload({ payAheadForFirstTimers: false }) as any;
+      const { data, error } = await supabase.functions.invoke("create-pending-enrollment", {
+        body: { payload: built, environment: getStripeEnvironment() },
+      });
+      if (error || !data?.success) {
+        throw new Error(error?.message || data?.error || "Failed to reserve seat");
+      }
+      setReserved(true);
+    } catch (e) {
+      toast({
+        title: "Could not reserve your seat",
+        description: (e as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setReserving(false);
+    }
+  }, [buildPayload]);
+
+  if (CHECKOUT_FALLBACK && reserved) {
+    return (
+      <div className="max-w-2xl mx-auto px-0 sm:px-0">
+        <h3 className="font-display text-2xl font-bold text-foreground mb-2">Seat reserved 🎉</h3>
+        <p className="text-muted-foreground mb-4">
+          We just emailed <strong>{customerEmail}</strong> a secure payment link to finish your enrollment.
+          Your spot is held until you complete payment. Check your inbox (and spam folder).
+        </p>
+        <Button onClick={() => (window.location.href = "/")}>Done</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-0 sm:px-0">
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">
-        Complete Payment
+        {CHECKOUT_FALLBACK ? "Reserve your seat" : "Complete Payment"}
       </h3>
       <p className="text-muted-foreground text-sm mb-6">
-        Please complete your payment to finalize enrollment. Your seat is reserved when payment succeeds.
+        {CHECKOUT_FALLBACK
+          ? "Card payment in this window is temporarily unavailable. Reserve your seat now and we'll email you a secure Stripe payment link to complete enrollment."
+          : "Please complete your payment to finalize enrollment. Your seat is reserved when payment succeeds."}
       </p>
+
+      {CHECKOUT_FALLBACK && (
+        <div className="rounded-lg border border-border p-5 mb-4 bg-muted/30">
+          <p className="font-semibold text-foreground mb-2">What happens next</p>
+          <ol className="list-decimal pl-5 text-sm text-muted-foreground space-y-1 mb-4">
+            <li>We reserve your seat in the requested class(es).</li>
+            <li>You receive an email from Aquatic Dreams with a Stripe payment link.</li>
+            <li>Pay {hasFirstTimers ? "the $45 registration fee" : `the $${sessionFeeUsd} session fee`} from the link to confirm.</li>
+          </ol>
+          <Button className="w-full" onClick={handleReserve} disabled={reserving}>
+            {reserving ? (
+              <><Loader2 className="mr-2 w-4 h-4 animate-spin" /> Reserving…</>
+            ) : (
+              <><Mail className="mr-2 w-4 h-4" /> Reserve seat — email me the payment link</>
+            )}
+          </Button>
+        </div>
+      )}
+
 
       {hasFirstTimers && !confirmed && (
         <div className="rounded-lg border border-border p-4 mb-4 bg-muted/30">
