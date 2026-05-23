@@ -78,7 +78,7 @@ const ScheduleAdmin = () => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [instRes, posRes, shiftRes, pubRes, sessRes, ldRes, ptoRes] = await Promise.all([
+    const [instRes, posRes, shiftRes, pubRes, sessRes, ldRes, ptoRes, wageRes] = await Promise.all([
       supabase.from("instructors").select("id, name, is_active, email").eq("is_active", true).order("name"),
       supabase.from("shift_positions").select("*").eq("is_active", true).order("name"),
       supabase.from("shifts").select("*").gte("shift_date", weekStartStr).lte("shift_date", weekEndStr),
@@ -95,7 +95,10 @@ const ScheduleAdmin = () => {
         .lte("start_date", weekEndStr).gte("end_date", weekStartStr),
       supabase.rpc("get_instructor_wages"),
     ]);
-    const wages = (arguments as any); // placeholder removed below
+    if (instRes.data) {
+      const wageMap = new Map(((wageRes.data ?? []) as any[]).map((w) => [w.id, w.hourly_wage]));
+      setInstructors(instRes.data.map((i) => ({ ...i, hourly_wage: wageMap.get(i.id) ?? null })));
+    }
     if (posRes.data) setPositions(posRes.data);
     if (shiftRes.data) setShifts(shiftRes.data);
     setPublication(pubRes.data ?? null);
