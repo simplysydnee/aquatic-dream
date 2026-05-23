@@ -1,0 +1,2 @@
+ALTER TABLE public.swim_enrollments DROP CONSTRAINT swim_enrollments_status_check;
+ALTER TABLE public.swim_enrollments ADD CONSTRAINT swim_enrollments_status_check CHECK (status = ANY (ARRAY['pending'::text, 'confirmed'::text, 'cancelled'::text, 'enrolled'::text, 'pending_payment'::text]));
