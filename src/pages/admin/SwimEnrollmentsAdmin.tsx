@@ -316,6 +316,7 @@ const SwimEnrollmentsAdmin = () => {
   const enrollmentStateColor = (status: string) => {
     switch (status) {
       case "confirmed": return "bg-green-100 text-green-700 border-green-300";
+      case "pending_payment": return "bg-orange-100 text-orange-800 border-orange-300";
       case "waitlist": return "bg-amber-100 text-amber-700 border-amber-300";
       case "no_show": return "bg-slate-100 text-slate-700 border-slate-300";
       case "cancelled": return "bg-red-100 text-red-700 border-red-300";
