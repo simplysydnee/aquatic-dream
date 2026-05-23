@@ -3,9 +3,12 @@ import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Mail, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { toast } from "@/hooks/use-toast";
+
+const CHECKOUT_FALLBACK = import.meta.env.VITE_CHECKOUT_FALLBACK === "1";
 
 interface EnrollmentCheckoutProps {
   /** Builds the checkout payload. Called once per "Continue to payment" click. */
