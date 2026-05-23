@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/hooks/use-toast";
 
-const CHECKOUT_FALLBACK = import.meta.env.VITE_CHECKOUT_FALLBACK === "1";
+// Force-on while Stripe connector gateway is returning "Credential not found".
+// Flip back to env-driven once the gateway credential is restored.
+const CHECKOUT_FALLBACK = import.meta.env.VITE_CHECKOUT_FALLBACK === "1" || true;
 
 interface EnrollmentCheckoutProps {
   /** Builds the checkout payload. Called once per "Continue to payment" click. */
