@@ -78,8 +78,8 @@ const ScheduleAdmin = () => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [instRes, posRes, shiftRes, pubRes, sessRes, ldRes, ptoRes] = await Promise.all([
-      supabase.from("instructors").select("id, name, is_active, email, hourly_wage").eq("is_active", true).order("name"),
+    const [instRes, posRes, shiftRes, pubRes, sessRes, ldRes, ptoRes, wageRes] = await Promise.all([
+      supabase.from("instructors").select("id, name, is_active, email").eq("is_active", true).order("name"),
       supabase.from("shift_positions").select("*").eq("is_active", true).order("name"),
       supabase.from("shifts").select("*").gte("shift_date", weekStartStr).lte("shift_date", weekEndStr),
       supabase.from("schedule_publications").select("week_start, published_at").eq("week_start", weekStartStr).maybeSingle(),
@@ -93,8 +93,12 @@ const ScheduleAdmin = () => {
         .select("id, instructor_id, start_date, end_date, reason")
         .eq("status", "approved")
         .lte("start_date", weekEndStr).gte("end_date", weekStartStr),
+      supabase.rpc("get_instructor_wages"),
     ]);
-    if (instRes.data) setInstructors(instRes.data);
+    if (instRes.data) {
+      const wageMap = new Map(((wageRes.data ?? []) as any[]).map((w) => [w.id, w.hourly_wage]));
+      setInstructors(instRes.data.map((i) => ({ ...i, hourly_wage: wageMap.get(i.id) ?? null })));
+    }
     if (posRes.data) setPositions(posRes.data);
     if (shiftRes.data) setShifts(shiftRes.data);
     setPublication(pubRes.data ?? null);

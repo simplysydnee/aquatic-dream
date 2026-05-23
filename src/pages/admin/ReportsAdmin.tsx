@@ -67,8 +67,8 @@ export default function ReportsAdmin() {
     setLoading(true);
     const fromDt = `${from}T00:00:00Z`;
     const toDt = `${to}T23:59:59Z`;
-    const [iRes, pRes, sRes, aRes, ssRes, eRes] = await Promise.all([
-      supabase.from("instructors").select("id,name,hourly_wage"),
+    const [iRes, pRes, sRes, aRes, ssRes, eRes, wRes] = await Promise.all([
+      supabase.from("instructors").select("id,name"),
       supabase.from("time_clock_entries").select("id,instructor_id,clock_in_at,clock_out_at,break_minutes,status")
         .gte("clock_in_at", fromDt).lte("clock_in_at", toDt),
       supabase.from("shifts").select("id,instructor_id,shift_date,start_time,end_time,status")
@@ -77,8 +77,10 @@ export default function ReportsAdmin() {
         .gte("lesson_date", from).lte("lesson_date", to),
       supabase.from("swim_sessions").select("id,instructor_id,swim_level,session_name"),
       supabase.from("swim_enrollments").select("id,child_name,session_id,status"),
+      supabase.rpc("get_instructor_wages"),
     ]);
-    setInstructors((iRes.data ?? []) as Instructor[]);
+    const wageMap = new Map(((wRes.data ?? []) as any[]).map((w) => [w.id, w.hourly_wage]));
+    setInstructors(((iRes.data ?? []) as any[]).map((i) => ({ ...i, hourly_wage: wageMap.get(i.id) ?? null })) as Instructor[]);
     setPunches((pRes.data ?? []) as Punch[]);
     setShifts((sRes.data ?? []) as Shift[]);
     setAttendance((aRes.data ?? []) as Attendance[]);

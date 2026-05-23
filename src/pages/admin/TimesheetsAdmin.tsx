@@ -49,15 +49,17 @@ export default function TimesheetsAdmin() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: pData }, { data: iData }] = await Promise.all([
+    const [{ data: pData }, { data: iData }, { data: wData }] = await Promise.all([
       supabase.from("time_clock_entries").select("*")
         .gte("clock_in_at", weekStart.toISOString())
         .lte("clock_in_at", weekEnd.toISOString())
         .order("clock_in_at", { ascending: false }),
-      supabase.from("instructors").select("id,name,hourly_wage"),
+      supabase.from("instructors").select("id,name"),
+      supabase.rpc("get_instructor_wages"),
     ]);
     setPunches((pData ?? []) as Punch[]);
-    setInstructors((iData ?? []) as Instructor[]);
+    const wageMap = new Map(((wData ?? []) as any[]).map((w) => [w.id, w.hourly_wage]));
+    setInstructors(((iData ?? []) as any[]).map((i) => ({ ...i, hourly_wage: wageMap.get(i.id) ?? null })) as Instructor[]);
     setLoading(false);
   };
   useEffect(() => { load(); }, [weekStart]);

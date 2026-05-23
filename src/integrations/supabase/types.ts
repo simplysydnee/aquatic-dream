@@ -1980,6 +1980,13 @@ export type Database = {
         Args: { _token: string }
         Returns: string
       }
+      get_instructor_wages: {
+        Args: never
+        Returns: {
+          hourly_wage: number
+          id: string
+        }[]
+      }
       get_lesson_booking_by_waiver_token: {
         Args: { _token: string }
         Returns: {
