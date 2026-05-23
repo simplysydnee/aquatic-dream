@@ -341,6 +341,8 @@ async function handleRegistrationFeePaid(checkoutSession: any) {
       payment_method: "stripe",
       payment_reference: stripeId,
       stripe_payment_id: stripeId,
+      // Promote pending_payment reservations to confirmed once Stripe collects.
+      status: "confirmed",
     })
     .eq("id", enrollmentId);
   if (error) {
