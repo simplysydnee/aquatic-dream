@@ -365,6 +365,8 @@ async function handleSessionFeePaid(checkoutSession: any) {
       session_fee_status: "paid",
       session_fee_stripe_id: stripeId,
       session_fee_paid_at: new Date().toISOString(),
+      // Returning-swimmer fallback rows are pending_payment until session fee is collected.
+      status: "confirmed",
     })
     .eq("id", enrollmentId);
   if (error) {
