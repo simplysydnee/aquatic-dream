@@ -1,46 +1,36 @@
 ## Goal
-Stop losing enrollments while the Stripe embedded checkout is broken. Let families complete the form now and pay via a link emailed to them, without weakening the "no Stripe = no enrollment" rule once checkout is fixed.
+Make sure soft-held `pending_payment` seats count toward capacity everywhere — public AND admin — so no one (parent or owner) accidentally overbooks a class. Keep admin override behavior: warn, don't block.
 
-## The workaround (feature-flagged "Reserve seat, pay by link")
+## Audit results
 
-On the public `/swim-enrollment` flow, replace the embedded Stripe step with a single button: **"Reserve seat — we'll email your payment link"**. The reservation creates the enrollment row in a `pending_payment` state and immediately fires the existing hosted-link email (which we already confirmed works after the `ui_mode: 'hosted'` fix). The family pays from the email; the webhook flips the row to `paid` exactly like today.
+**Already correct ✅**
+- `get_session_enrollment_counts` RPC (public `SessionPicker`, `SwimLessons`) — includes `pending_payment`.
+- `MoveSwimmerDialog.tsx` — counts every enrollment except `cancelled`, so pending_payment is included. Already shows "FULL" warning + override.
 
-Why this is safe:
-- Hosted payment links (`send-registration-fee-payment-link` / `send-session-payment-link`) go through a different code path than embedded checkout and are currently working.
-- The webhook is still the only writer for `payment_status='paid'` / `session_fee_status='paid'`. No rule change.
-- A new `pending_payment` status means "seat is soft-held, not yet earned" — admin can see and clean up unpaid rows after N hours.
+**Bugs to fix ❌**
+1. `src/hooks/useCalendarData.ts:119` — admin calendar fetches only `status IN ('pending','confirmed')`. Pending-payment seats are invisible on the day view (the "2/3 swimmers" badge under-reports).
+2. `src/pages/admin/ClassRosterAdmin.tsx:117` — same filter, same problem on the roster page.
 
-```text
-Family submits form
-   │
-   ▼
-create-pending-enrollment edge fn
-   │   ├─ inserts swim_enrollments row, status='pending_payment'
-   │   └─ invokes send-registration-fee-payment-link (or session link)
-   ▼
-Family receives email → clicks hosted Stripe link → pays
-   ▼
-payments-webhook → status='confirmed', payment_status='paid'
+## Fix
+
+Change both queries to:
+```ts
+.in("status", ["pending", "confirmed", "enrolled", "pending_payment"])
 ```
+This mirrors the RPC's allowlist exactly. One-line edits, no schema or UI changes.
 
-## What changes
+## Admin Add Swimmer — soft warning
 
-1. **New edge function `create-pending-enrollment`** (verify_jwt=false). Same payload as `create-checkout`. Inserts the row, then invokes the right hosted-link function. Returns `{ ok: true, enrollmentId }`.
-2. **`EnrollmentCheckout.tsx`**: behind a flag `VITE_CHECKOUT_FALLBACK=1`, render the "Reserve seat" panel instead of `EmbeddedCheckoutProvider`. Same back button, same summary copy, just no iframe.
-3. **DB**: add `'pending_payment'` to allowed `status` values on `swim_enrollments` (or use existing string column if it's free-text — needs a 1-line check). No new columns.
-4. **Admin visibility**: `SwimEnrollmentsAdmin.tsx` and the calendar already render `status`. Add a "Pending payment" badge + filter chip so owner can chase or delete stale reservations.
-5. **Auto-expire (optional, low risk)**: nightly cron deletes `pending_payment` rows older than 72h with no payment. Skip in v1 if you want to manually triage.
+`AddSwimmerDialog.tsx` doesn't currently gate on capacity at all (it trusts the admin). After the fix above, the day-view roster card the admin clicks will already show the correct "3/3 swimmers" badge including pending_payment, so the visual warning is automatic.
 
-## What stays the same
-- Webhook logic, payment_status math, dashboard totals.
-- Admin manual enrollment path (`admin-create-enrollment`) — unchanged.
-- All emails (waiver, reg fee, session fee) — already working via hosted links.
-- Once embedded checkout is fixed, flip `VITE_CHECKOUT_FALLBACK` off and the public flow returns to instant in-page payment with zero code revert.
+No new modal or block — admin can still add over capacity if needed (same philosophy as MoveSwimmerDialog).
 
 ## Out of scope
-- Fixing the underlying gateway / `STRIPE_*_SECRET_KEY` issue (separate track; real fix).
-- Changing the returning-swimmer $240-at-checkout rule. They'll just receive a $240 link instead of paying in the iframe — same money, one extra click.
-- Any change to `payments-webhook`, refunds, or `session_fee_status` semantics.
+- No DB migration.
+- No change to public flow (already correct).
+- No change to webhook, payment logic, or `status` enum.
 
-## Open question for you
-Do you want pending reservations to **auto-delete after 72h** if unpaid, or stay forever until an admin clears them? Default in the plan is "stay forever, admin triages" — safer for v1.
+## Verification
+- Open Calendar day view → a session with 1 confirmed + 1 pending_payment should now show "2/3 swimmers" (was "1/3").
+- Open Class Roster → same session shows 2 swimmers grouped.
+- Public `/swim-enrollment` → unchanged (already counted via RPC).

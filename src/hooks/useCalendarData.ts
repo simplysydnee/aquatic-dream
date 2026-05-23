@@ -116,7 +116,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
       supabase
         .from("swim_enrollments")
         .select("id, child_name, child_age, parent_name, parent_phone, parent_email, swim_level, session_id, status, payment_status, is_first_time, medical_notes")
-        .in("status", ["pending", "confirmed"]),
+        .in("status", ["pending", "confirmed", "enrolled", "pending_payment"]),
       supabase
         .from("pool_events")
         .select("*")

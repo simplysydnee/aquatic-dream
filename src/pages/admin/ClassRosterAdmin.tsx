@@ -114,7 +114,7 @@ const ClassRosterAdmin = () => {
   const fetchData = async () => {
     const [sessRes, enrRes, instrRes, periodRes] = await Promise.all([
       supabase.from("swim_sessions").select("*").eq("is_active", true).order("start_time"),
-      supabase.from("swim_enrollments").select("*").in("status", ["pending", "confirmed"]),
+      supabase.from("swim_enrollments").select("*").in("status", ["pending", "confirmed", "enrolled", "pending_payment"]),
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
       supabase.from("session_periods").select("*").order("start_date"),
     ]);
