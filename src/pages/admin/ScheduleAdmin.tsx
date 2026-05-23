@@ -93,8 +93,9 @@ const ScheduleAdmin = () => {
         .select("id, instructor_id, start_date, end_date, reason")
         .eq("status", "approved")
         .lte("start_date", weekEndStr).gte("end_date", weekStartStr),
+      supabase.rpc("get_instructor_wages"),
     ]);
-    if (instRes.data) setInstructors(instRes.data);
+    const wages = (arguments as any); // placeholder removed below
     if (posRes.data) setPositions(posRes.data);
     if (shiftRes.data) setShifts(shiftRes.data);
     setPublication(pubRes.data ?? null);
