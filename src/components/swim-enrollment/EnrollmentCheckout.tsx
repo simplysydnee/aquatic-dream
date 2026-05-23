@@ -127,7 +127,7 @@ export default function EnrollmentCheckout({
       )}
 
 
-      {hasFirstTimers && !confirmed && (
+      {!CHECKOUT_FALLBACK && hasFirstTimers && !confirmed && (
         <div className="rounded-lg border border-border p-4 mb-4 bg-muted/30">
           <p className="font-semibold text-foreground mb-3">How would you like to pay the session fee?</p>
           <RadioGroup value={payAhead} onValueChange={(v) => setPayAhead(v as "reg_only" | "pay_ahead")}>
