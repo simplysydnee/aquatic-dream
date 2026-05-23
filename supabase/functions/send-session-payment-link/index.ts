@@ -96,26 +96,25 @@ Deno.serve(async (req) => {
       lineItem = { price: stripePrice.id, quantity: 1 }
     }
 
-    const returnBase = siteUrl || 'https://aquatic-dream-quest.lovable.app'
-    const checkoutSession = await stripe.checkout.sessions.create({
-      line_items: [lineItem],
-      mode: 'payment',
-      ui_mode: 'hosted',
-      // Stripe enforces a max of 24h on expires_at; use 23h to stay safely under the limit.
-      expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
-      success_url: `${returnBase}/swim-enrollment?step=done`,
-      cancel_url: `${returnBase}/swim-enrollment`,
-      customer_email: enrollment.parent_email,
-      metadata: { enrollmentId, type: 'session_fee' },
-    })
-
-    const paymentLink = checkoutSession.url
-    if (!paymentLink) {
-      console.error('Stripe returned no checkout URL', { enrollmentId, sessionId: checkoutSession.id })
-      return new Response(JSON.stringify({ error: 'Stripe did not return a checkout URL — payment link not sent' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const returnBase = siteUrl || 'https://aquaticdreamsswim.com'
+    let paymentLink: string | undefined
+    try {
+      const checkoutSession = await stripe.checkout.sessions.create({
+        line_items: [lineItem],
+        mode: 'payment',
+        ui_mode: 'hosted',
+        expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
+        success_url: `${returnBase}/swim-enrollment?step=done`,
+        cancel_url: `${returnBase}/swim-enrollment`,
+        customer_email: enrollment.parent_email,
+        metadata: { enrollmentId, type: 'session_fee' },
       })
+      paymentLink = checkoutSession?.url || undefined
+      if (!paymentLink) {
+        console.error('Stripe returned no checkout URL', { enrollmentId, sessionId: checkoutSession?.id })
+      }
+    } catch (stripeErr) {
+      console.error('Stripe checkout creation failed — sending fallback email without pay link', stripeErr)
     }
 
     // Send email via transactional email system in the background so the

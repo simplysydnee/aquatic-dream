@@ -118,6 +118,14 @@ const RegistrationFeePaymentLinkEmail = ({
             </>
           )}
 
+          {!paymentLink && (
+            <Section style={infoBox}>
+              <Text style={infoText}>
+                💳 Your secure payment link will arrive in a follow-up email shortly. Your seat is reserved.
+              </Text>
+            </Section>
+          )}
+
           <Hr style={hr} />
           <Text style={text}>
             Questions? Email info@aquaticdreamsswim.com or call (209) 577-3483.

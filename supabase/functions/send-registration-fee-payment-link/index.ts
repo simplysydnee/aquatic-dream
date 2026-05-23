@@ -52,34 +52,36 @@ Deno.serve(async (req) => {
     }
 
     const env = (environment || 'sandbox') as StripeEnv
-    const stripe = createStripeClient(env)
-
+    // Try Stripe Checkout. If the gateway/credential is broken, still send the
+    // email — without a clickable pay link — so the parent gets the waiver and
+    // a heads-up that we'll follow up. Admin can resend from PaymentsTab.
     const returnBase = siteUrl || 'https://aquaticdreamsswim.com'
-    const checkoutSession = await stripe.checkout.sessions.create({
-      line_items: [
-        {
+    let paymentLink: string | undefined
+    try {
+      const stripe = createStripeClient(env)
+      const checkoutSession = await stripe.checkout.sessions.create({
+        line_items: [{
           price_data: {
             currency: 'usd',
             product_data: { name: 'Aquatic Dreams Registration Fee (one-time)' },
             unit_amount: chargeCents,
           },
           quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      ui_mode: 'hosted',
-      // Stripe enforces a max of 24h on expires_at; use 23h to stay safely under the limit.
-      expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
-      success_url: `${returnBase}/swim-enrollment?step=done`,
-      cancel_url: `${returnBase}/swim-enrollment`,
-      customer_email: enrollment.parent_email,
-      metadata: { enrollmentId, type: 'registration_fee' },
-    })
-
-    const paymentLink = checkoutSession.url
-    if (!paymentLink) {
-      console.error('Stripe returned no checkout URL', { enrollmentId, sessionId: checkoutSession.id })
-      return json({ error: 'Stripe did not return a checkout URL — payment link not sent' }, 500)
+        }],
+        mode: 'payment',
+        ui_mode: 'hosted',
+        expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
+        success_url: `${returnBase}/swim-enrollment?step=done`,
+        cancel_url: `${returnBase}/swim-enrollment`,
+        customer_email: enrollment.parent_email,
+        metadata: { enrollmentId, type: 'registration_fee' },
+      })
+      paymentLink = checkoutSession?.url || undefined
+      if (!paymentLink) {
+        console.error('Stripe returned no checkout URL', { enrollmentId, sessionId: checkoutSession?.id })
+      }
+    } catch (stripeErr) {
+      console.error('Stripe checkout creation failed — sending waiver-only fallback', stripeErr)
     }
     const session = enrollment.swim_sessions
     const sessionInfo = session
