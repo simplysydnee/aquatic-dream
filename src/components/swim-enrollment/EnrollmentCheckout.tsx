@@ -158,7 +158,7 @@ export default function EnrollmentCheckout({
         </div>
       )}
 
-      {(!hasFirstTimers || confirmed) && (
+      {!CHECKOUT_FALLBACK && (!hasFirstTimers || confirmed) && (
         <>
           {hasFirstTimers && (
             <div className="flex items-center justify-between mb-3 text-sm">
