@@ -14,6 +14,7 @@ import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/type
 import { Checkbox } from "@/components/ui/checkbox";
 import AddSwimmerDialog from "./AddSwimmerDialog";
 import LessonOccurrenceCheckoutDialog from "./LessonOccurrenceCheckoutDialog";
+import PhoneCheckoutPanel from "./PhoneCheckoutPanel";
 import FrontDeskWaiverDialog from "./FrontDeskWaiverDialog";
 import FrontDeskEnrollmentWaiverDialog from "./FrontDeskEnrollmentWaiverDialog";
 import EditSwimmerDialog, { type EditTarget } from "./EditSwimmerDialog";
@@ -90,6 +91,77 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   const [markMethod, setMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
   const [markReference, setMarkReference] = useState("");
   const [cancelTargets, setCancelTargets] = useState<CancelTarget[] | null>(null);
+  // Per-enrollment quick actions
+  const [enrPhoneCheckout, setEnrPhoneCheckout] = useState<{ enrollmentId: string; amountCents: number; label: string } | null>(null);
+  const [enrMarkTarget, setEnrMarkTarget] = useState<{ enrollmentId: string; field: "payment_status" | "session_fee_status"; feeLabel: string } | null>(null);
+  const [enrMarkMethod, setEnrMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
+  const [enrMarkRef, setEnrMarkRef] = useState("");
+  const [enrMarkBusy, setEnrMarkBusy] = useState(false);
+  const [sendingWaiverFor, setSendingWaiverFor] = useState<string | null>(null);
+  const [sendingRegFor, setSendingRegFor] = useState<string | null>(null);
+
+  const sendEnrollmentWaiverLink = async (enrollmentId: string) => {
+    setSendingWaiverFor(enrollmentId);
+    try {
+      const { error } = await supabase.functions.invoke("send-enrollment-waiver-link", {
+        body: { enrollmentId, siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast.success("Waiver link emailed");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send waiver link");
+    } finally {
+      setSendingWaiverFor(null);
+    }
+  };
+
+  const sendRegFeeLink = async (enrollmentId: string) => {
+    setSendingRegFor(enrollmentId);
+    try {
+      const { error } = await supabase.functions.invoke("send-registration-fee-payment-link", {
+        body: { enrollmentId, environment: getStripeEnvironment(), siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast.success("Registration fee link emailed");
+      onRefetch?.();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send registration fee link");
+    } finally {
+      setSendingRegFor(null);
+    }
+  };
+
+  const confirmEnrMark = async () => {
+    if (!enrMarkTarget) return;
+    if (enrMarkMethod !== "comp" && !enrMarkRef.trim()) {
+      toast.error("Reference required for cash/check");
+      return;
+    }
+    setEnrMarkBusy(true);
+    try {
+      const update: Record<string, any> = {
+        [enrMarkTarget.field]: enrMarkMethod === "comp" ? "comp" : "paid",
+        payment_method: enrMarkMethod,
+        payment_reference: enrMarkMethod === "comp" ? enrMarkRef.trim() || "comp" : enrMarkRef.trim(),
+      };
+      if (enrMarkTarget.field === "session_fee_status" && enrMarkMethod !== "comp") {
+        update.session_fee_paid_at = new Date().toISOString();
+      }
+      const { error } = await supabase
+        .from("swim_enrollments")
+        .update(update)
+        .eq("id", enrMarkTarget.enrollmentId);
+      if (error) throw error;
+      toast.success(`${enrMarkTarget.feeLabel} marked ${enrMarkMethod === "comp" ? "comp" : "paid"}`);
+      setEnrMarkTarget(null);
+      onRefetch?.();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to record payment");
+    } finally {
+      setEnrMarkBusy(false);
+    }
+  };
+
 
   const refetchLesson = async () => {
     if (!eventId) return;
@@ -424,14 +496,38 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                               </div>
                               <p className="text-xs text-muted-foreground">Age {enr.child_age}</p>
                             </div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-[160px]">
+                              {enr.is_first_time && (
+                                <Badge className={cn(
+                                  "text-[10px] px-1.5 py-0.5",
+                                  enr.payment_status === "paid"
+                                    ? "bg-green-100 text-green-700 hover:bg-green-100"
+                                    : enr.payment_status === "comp" || enr.payment_status === "waived"
+                                    ? "bg-gray-100 text-gray-700 hover:bg-gray-100"
+                                    : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
+                                )}>
+                                  Reg: {enr.payment_status === "paid" ? "Paid" : enr.payment_status === "comp" ? "Comp" : enr.payment_status === "waived" ? "Waived" : "Unpaid"}
+                                </Badge>
+                              )}
                               <Badge className={cn(
                                 "text-[10px] px-1.5 py-0.5",
-                                enr.payment_status === "paid"
+                                enr.session_fee_status === "paid"
                                   ? "bg-green-100 text-green-700 hover:bg-green-100"
+                                  : enr.session_fee_status === "comp"
+                                  ? "bg-gray-100 text-gray-700 hover:bg-gray-100"
+                                  : enr.payment_reminder_sent_at
+                                  ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
                                   : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
                               )}>
-                                {enr.payment_status === "paid" ? "Paid" : "Unpaid"}
+                                Session: {enr.session_fee_status === "paid" ? "Paid" : enr.session_fee_status === "comp" ? "Comp" : enr.payment_reminder_sent_at ? "Sent" : "Due day 1"}
+                              </Badge>
+                              <Badge className={cn(
+                                "text-[10px] px-1.5 py-0.5",
+                                enr.waiver_signed_at
+                                  ? "bg-green-100 text-green-700 hover:bg-green-100"
+                                  : "bg-orange-100 text-orange-700 hover:bg-orange-100"
+                              )}>
+                                {enr.waiver_signed_at ? "Waiver ✓" : "Waiver !"}
                               </Badge>
                               {isCheckedIn && (
                                 <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
@@ -508,21 +604,53 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                             </div>
                           )}
 
-                          {/* Row 4: Send Payment Link for unpaid */}
-                          {enr.payment_status !== "paid" && (
-                            <div className="mt-2 pl-[52px] pt-2 border-t border-dashed">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs gap-1.5"
-                                disabled={sendingPaymentFor === enr.id}
-                                onClick={() => handleSendPaymentLink(enr.id)}
-                              >
-                                <Send className="w-3 h-3" />
-                                {sendingPaymentFor === enr.id ? "Sending…" : "Send Payment Link"}
-                              </Button>
-                            </div>
-                          )}
+                          {/* Quick action row */}
+                          {(() => {
+                            const regUnpaid = enr.is_first_time && enr.payment_status !== "paid" && enr.payment_status !== "comp" && enr.payment_status !== "waived";
+                            const sessionUnpaid = enr.session_fee_status !== "paid" && enr.session_fee_status !== "comp";
+                            const sessionPrice = Number((block.session as any).session_price ?? 240);
+                            const showAny = regUnpaid || sessionUnpaid || !enr.waiver_signed_at;
+                            if (!showAny) return null;
+                            return (
+                              <div className="mt-2 pl-[52px] pt-2 border-t border-dashed flex flex-wrap gap-1.5">
+                                {regUnpaid && (
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingRegFor === enr.id} onClick={() => sendRegFeeLink(enr.id)}>
+                                    <Send className="w-3 h-3" />{sendingRegFor === enr.id ? "…" : (enr.reg_fee_link_sent_at ? "Resend reg link" : "Email reg link")}
+                                  </Button>
+                                )}
+                                {sessionUnpaid && (
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingPaymentFor === enr.id} onClick={() => handleSendPaymentLink(enr.id)}>
+                                    <Send className="w-3 h-3" />{sendingPaymentFor === enr.id ? "…" : (enr.payment_reminder_sent_at ? "Resend session link" : "Email session link")}
+                                  </Button>
+                                )}
+                                {!enr.waiver_signed_at && (
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingWaiverFor === enr.id} onClick={() => sendEnrollmentWaiverLink(enr.id)}>
+                                    <Send className="w-3 h-3" />{sendingWaiverFor === enr.id ? "…" : "Email waiver"}
+                                  </Button>
+                                )}
+                                {(regUnpaid || sessionUnpaid) && (
+                                  <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => {
+                                    const field = sessionUnpaid ? "session_fee_status" : "payment_status";
+                                    setEnrMarkTarget({ enrollmentId: enr.id, field, feeLabel: sessionUnpaid ? "Session fee" : "Registration fee" });
+                                    setEnrMarkMethod("cash"); setEnrMarkRef("");
+                                  }}>
+                                    <CheckCircle2 className="w-3 h-3" />Mark paid…
+                                  </Button>
+                                )}
+                                {(regUnpaid || sessionUnpaid) && (
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => {
+                                    const cents = sessionUnpaid ? Math.round(sessionPrice * 100) : 4500;
+                                    const label = sessionUnpaid
+                                      ? `${enr.child_name} — Session fee`
+                                      : `${enr.child_name} — Registration fee`;
+                                    setEnrPhoneCheckout({ enrollmentId: enr.id, amountCents: cents, label });
+                                  }}>
+                                    <CreditCard className="w-3 h-3" />Charge card now
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
@@ -845,6 +973,58 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
               targets={cancelTargets || []}
               onDone={() => { setCancelTargets(null); onClose(); onRefetch?.(); }}
             />
+
+            {/* Per-enrollment mark-paid dialog */}
+            <Dialog open={!!enrMarkTarget} onOpenChange={(o) => { if (!o) setEnrMarkTarget(null); }}>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>Mark {enrMarkTarget?.feeLabel.toLowerCase()} paid</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs">Method</Label>
+                    <Select value={enrMarkMethod} onValueChange={(v) => setEnrMarkMethod(v as any)}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="check">Check</SelectItem>
+                        <SelectItem value="comp">Comp (no charge)</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Reference {enrMarkMethod !== "comp" && <span className="text-destructive">*</span>}</Label>
+                    <Input
+                      placeholder={enrMarkMethod === "cash" ? "Receipt #" : enrMarkMethod === "check" ? "Check #" : enrMarkMethod === "comp" ? "Reason (optional)" : "Reference"}
+                      value={enrMarkRef}
+                      onChange={(e) => setEnrMarkRef(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end pt-2">
+                    <Button size="sm" variant="ghost" onClick={() => setEnrMarkTarget(null)}>Cancel</Button>
+                    <Button size="sm" disabled={enrMarkBusy} onClick={confirmEnrMark}>{enrMarkBusy ? "Saving…" : "Confirm"}</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Per-enrollment phone-card checkout */}
+            <Dialog open={!!enrPhoneCheckout} onOpenChange={(o) => { if (!o) { setEnrPhoneCheckout(null); onRefetch?.(); } }}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>{enrPhoneCheckout?.label} — ${((enrPhoneCheckout?.amountCents || 0) / 100).toFixed(2)}</DialogTitle>
+                </DialogHeader>
+                {enrPhoneCheckout && (
+                  <PhoneCheckoutPanel
+                    enrollmentId={enrPhoneCheckout.enrollmentId}
+                    amountCents={enrPhoneCheckout.amountCents}
+                    label={enrPhoneCheckout.label}
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
           </>
         )}
       </div>
