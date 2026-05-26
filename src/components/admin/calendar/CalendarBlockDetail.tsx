@@ -973,6 +973,58 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
               targets={cancelTargets || []}
               onDone={() => { setCancelTargets(null); onClose(); onRefetch?.(); }}
             />
+
+            {/* Per-enrollment mark-paid dialog */}
+            <Dialog open={!!enrMarkTarget} onOpenChange={(o) => { if (!o) setEnrMarkTarget(null); }}>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>Mark {enrMarkTarget?.feeLabel.toLowerCase()} paid</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs">Method</Label>
+                    <Select value={enrMarkMethod} onValueChange={(v) => setEnrMarkMethod(v as any)}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="check">Check</SelectItem>
+                        <SelectItem value="comp">Comp (no charge)</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Reference {enrMarkMethod !== "comp" && <span className="text-destructive">*</span>}</Label>
+                    <Input
+                      placeholder={enrMarkMethod === "cash" ? "Receipt #" : enrMarkMethod === "check" ? "Check #" : enrMarkMethod === "comp" ? "Reason (optional)" : "Reference"}
+                      value={enrMarkRef}
+                      onChange={(e) => setEnrMarkRef(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end pt-2">
+                    <Button size="sm" variant="ghost" onClick={() => setEnrMarkTarget(null)}>Cancel</Button>
+                    <Button size="sm" disabled={enrMarkBusy} onClick={confirmEnrMark}>{enrMarkBusy ? "Saving…" : "Confirm"}</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Per-enrollment phone-card checkout */}
+            <Dialog open={!!enrPhoneCheckout} onOpenChange={(o) => { if (!o) { setEnrPhoneCheckout(null); onRefetch?.(); } }}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>{enrPhoneCheckout?.label} — ${((enrPhoneCheckout?.amountCents || 0) / 100).toFixed(2)}</DialogTitle>
+                </DialogHeader>
+                {enrPhoneCheckout && (
+                  <PhoneCheckoutPanel
+                    enrollmentId={enrPhoneCheckout.enrollmentId}
+                    amountCents={enrPhoneCheckout.amountCents}
+                    label={enrPhoneCheckout.label}
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
           </>
         )}
       </div>
