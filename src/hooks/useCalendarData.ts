@@ -28,6 +28,12 @@ export interface CalendarEnrollment {
   payment_status: string;
   is_first_time: boolean;
   medical_notes: string | null;
+  waiver_signed_at: string | null;
+  waiver_token: string | null;
+  session_fee_status: string;
+  payment_reminder_sent_at: string | null;
+  reg_fee_link_sent_at: string | null;
+  payment_method: string | null;
 }
 
 export interface CalendarPoolEvent {
