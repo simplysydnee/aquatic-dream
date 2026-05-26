@@ -1,58 +1,35 @@
-## What's wrong today
+## Problem recap
 
-On the calendar group-class block, each enrolled swimmer shows a single green **"Paid"** badge as soon as `swim_enrollments.payment_status = 'paid'`. That column only tracks the **$45 registration fee**. The **$240 session fee** lives on a different column (`session_fee_status`, default `'due_day_1'`) and is ignored by this view. So first-timers who paid only the reg fee show "Paid" even though they owe $240 on day 1 — exactly the confusion you described at startup.
+The "Something went wrong" error inside the Stripe iframe on `/swim-enrollment` step 5 is caused by a **Stripe account mismatch**:
 
-The block also only offers one action ("Send Payment Link" → reg-fee email) and "Complete Waivers" (opens an in-app waiver form on the current device — good, keep). There is no quick way to: send a waiver-only link by email, mark a session fee paid by cash/check, or run a card right now.
+- **Frontend** loads Stripe.js with publishable key `pk_live_51TLCtt2HpbBBx5ls…` (this is the Lovable-connector key, from Stripe account `51TLCtt…`).
+- **Backend** (`create-checkout` edge function) creates the Checkout Session using the manually-set `STRIPE_API_KEY` secret, which belongs to a **different Stripe account**.
 
-## What this plan changes
+Stripe.js asks account `51TLCtt…` for a session that only exists in the other account → generic "Something went wrong" rendered inside the iframe.
 
-All changes are inside the calendar block (`CalendarBlockDetail.tsx`) for group classes. The Payments tab in the swimmer drawer stays as the deep view; this is the day-of, at-the-pool quick-action surface.
+The new key you just pasted is the same `51TLCtt…` account, so the `.env` files don't need to change. We need to fix the backend instead.
 
-### 1. Two accurate status pills per swimmer (replaces single "Paid"/"Unpaid")
+## Fix (recommended): remove the override so backend uses the connector key
 
-For each enrolled swimmer in the group block:
+The file `supabase/functions/_shared/stripe.ts` was edited at some point to read from a manual `STRIPE_API_KEY` secret instead of the Lovable-connector-managed `STRIPE_LIVE_API_KEY` / `STRIPE_SANDBOX_API_KEY`. Reverting it makes the backend use the same Stripe account as the frontend.
 
-```text
-[Reg fee: Paid ✓]  [Session: Due day 1]
-```
+Steps:
 
-- **Reg fee pill** — only shown for `is_first_time` enrollments. Green "Paid" / yellow "Unpaid" / gray "Comp" / gray "Waived" from `payment_status`.
-- **Session pill** — always shown. Green "Paid" / yellow "Due day 1" / blue "Sent" (if `payment_reminder_sent_at` and still unpaid) / gray "Comp" from `session_fee_status` and `payment_reminder_sent_at`.
-- **Waiver pill** — small icon-only pill: green check if `waiver_signed_at`, red triangle otherwise. Replaces the standalone "No waiver / emergency contact" line copy (we still keep the Complete Waivers button below).
+1. Restore `supabase/functions/_shared/stripe.ts` to the canonical version that reads `STRIPE_LIVE_API_KEY` (live) and `STRIPE_SANDBOX_API_KEY` (sandbox) from env, routing through the connector gateway. No code in any edge function needs to change — they all call `createStripeClient(env)`.
+2. Delete the orphaned `STRIPE_API_KEY` secret so nothing accidentally reads from it later.
+3. Add `payment_method_types: ['card']` to the `stripe.checkout.sessions.create({…})` call in `supabase/functions/create-checkout/index.ts` (bonus polish — hides the Stripe Link panel and skips the "Confirm it's you" SMS prompt that some parents were hitting before).
 
-### 2. New action row per swimmer (replaces single "Send Payment Link")
+## Verification
 
-A compact button row under each swimmer card. Each button only appears when it actually applies:
+After deploy:
 
-```text
-[Email reg link]  [Email session link]  [Email waiver]  [Mark paid…]  [Charge card now]
-```
+1. Open `/swim-enrollment` in an incognito window with a fresh email.
+2. Run through to step 5 — the card form should render immediately, no blank box, no "Something went wrong", no Link/SMS prompt.
+3. Use Stripe test card `4242 4242 4242 4242` (only works if you flip to sandbox; for a true production check, run a real $45 charge and immediately refund from the Stripe dashboard).
+4. Confirm in your Stripe dashboard (account `51TLCtt…`) that the charge shows up there — proving frontend and backend are on the same account.
 
-- **Email reg link** — first-timers only, reg fee not yet paid. Calls existing `send-registration-fee-payment-link`.
-- **Email session link** — session fee due. Calls existing `send-session-payment-link`.
-- **Email waiver** — waiver not signed. NEW edge function `send-enrollment-waiver-link` that emails a plain link to `/enrollment-waiver/{waiver_token}` (no payment, no reg-fee email). Uses a new minimal transactional template `enrollment-waiver-link`.
-- **Complete Waivers (on this device)** — keep the existing button when waiver is unsigned; opens the front-desk waiver dialog.
-- **Mark paid…** — opens a small dialog letting admin pick which fee (Reg / Session), method (cash / check / comp), and reference. Writes to `swim_enrollments` directly (same logic the swimmer-drawer Payments tab already uses, copy-pasted into a small shared hook). Requires reference for cash/check.
-- **Charge card now** — opens the existing `PhoneCheckoutPanel` in a dialog using `create-admin-phone-checkout`. Admin picks Reg or Session fee from a dropdown at the top of the dialog (defaults to whichever is owed; if both, defaults to Session). The webhook (`metadata.type='admin_phone_checkout'`) already flips the right row to paid — no backend change needed beyond passing the correct `amountCents` and a `feeType` flag we add to the metadata so the webhook flips `session_fee_status` vs `payment_status` correctly.
+## Out of scope
 
-### 3. Backend changes
-
-1. **New edge function** `supabase/functions/send-enrollment-waiver-link/index.ts` — looks up enrollment by id, ensures `waiver_token`, emails the parent a single-purpose waiver link. ~40 lines, mirrors `send-registration-fee-payment-link` shape but with no Stripe call.
-2. **New transactional template** `enrollment-waiver-link.tsx` registered in `transactional-email-templates/registry.ts`.
-3. **`create-admin-phone-checkout`** — accept `feeType: 'registration' | 'session'` (default `'session'`) and stamp it on `metadata`.
-4. **`payments-webhook`** `admin_phone_checkout` branch — read `metadata.feeType` and update either `payment_status` (registration) or `session_fee_status` + `session_fee_paid_at` + `session_fee_stripe_id` (session). Today it only flips one of them; this is the only behavior change to the webhook.
-
-### 4. Out of scope
-
-- Private/semi-private lesson occurrence block (already has its own paid/unpaid badge + mark-paid dialog and a send-payment-link button — it's correct).
-- Payments tab in the swimmer drawer.
-- Compliance tab and `admin-mark-waiver-complete`.
-
-### Verification
-
-- Open a first-time swimmer's group block: reg pill says "Paid", session pill says "Due day 1". Bug reproduced and now fixed.
-- "Email waiver" sends a clean email with only the waiver link.
-- "Charge card now" → pick Session → key test card `4242…` → webhook flips `session_fee_status='paid'` and pill turns green on refresh.
-- "Mark paid → Session → cash" with reference "rcpt-123" writes `session_fee_status='paid'`, `payment_method='cash'`, `payment_reference='rcpt-123'`.
-
-Approve and I'll build it.
+- `create-admin-phone-checkout` (staff-typed cards on calendar) — uses the same shared stripe client, so it benefits automatically.
+- `send-registration-fee-payment-link` / `send-session-payment-link` — hosted Stripe Checkout links, unrelated to the embedded iframe issue.
+- Frontend code in `EnrollmentCheckout.tsx` — no change needed.
