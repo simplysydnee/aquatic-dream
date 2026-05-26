@@ -496,14 +496,38 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                               </div>
                               <p className="text-xs text-muted-foreground">Age {enr.child_age}</p>
                             </div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-[160px]">
+                              {enr.is_first_time && (
+                                <Badge className={cn(
+                                  "text-[10px] px-1.5 py-0.5",
+                                  enr.payment_status === "paid"
+                                    ? "bg-green-100 text-green-700 hover:bg-green-100"
+                                    : enr.payment_status === "comp" || enr.payment_status === "waived"
+                                    ? "bg-gray-100 text-gray-700 hover:bg-gray-100"
+                                    : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
+                                )}>
+                                  Reg: {enr.payment_status === "paid" ? "Paid" : enr.payment_status === "comp" ? "Comp" : enr.payment_status === "waived" ? "Waived" : "Unpaid"}
+                                </Badge>
+                              )}
                               <Badge className={cn(
                                 "text-[10px] px-1.5 py-0.5",
-                                enr.payment_status === "paid"
+                                enr.session_fee_status === "paid"
                                   ? "bg-green-100 text-green-700 hover:bg-green-100"
+                                  : enr.session_fee_status === "comp"
+                                  ? "bg-gray-100 text-gray-700 hover:bg-gray-100"
+                                  : enr.payment_reminder_sent_at
+                                  ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
                                   : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
                               )}>
-                                {enr.payment_status === "paid" ? "Paid" : "Unpaid"}
+                                Session: {enr.session_fee_status === "paid" ? "Paid" : enr.session_fee_status === "comp" ? "Comp" : enr.payment_reminder_sent_at ? "Sent" : "Due day 1"}
+                              </Badge>
+                              <Badge className={cn(
+                                "text-[10px] px-1.5 py-0.5",
+                                enr.waiver_signed_at
+                                  ? "bg-green-100 text-green-700 hover:bg-green-100"
+                                  : "bg-orange-100 text-orange-700 hover:bg-orange-100"
+                              )}>
+                                {enr.waiver_signed_at ? "Waiver ✓" : "Waiver !"}
                               </Badge>
                               {isCheckedIn && (
                                 <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
