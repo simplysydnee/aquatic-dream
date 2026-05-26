@@ -4,8 +4,8 @@ export type StripeEnv = 'sandbox' | 'live';
 
 export function getConnectionApiKey(env: StripeEnv): string {
   const directCandidates = env === 'sandbox'
-    ? ['STRIPE_TEST_SECRET_KEY', 'STRIPE_SANDBOX_SECRET_KEY', 'STRIPE_SECRET_KEY']
-    : ['STRIPE_LIVE_SECRET_KEY', 'STRIPE_SECRET_KEY'];
+    ? ['STRIPE_TEST_SECRET_KEY', 'STRIPE_SANDBOX_SECRET_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_API_KEY']
+    : ['STRIPE_LIVE_SECRET_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_API_KEY'];
 
   const directKeyRe = env === 'sandbox' ? /^(sk|rk)_test_/ : /^(sk|rk)_live_/;
   for (const name of directCandidates) {
