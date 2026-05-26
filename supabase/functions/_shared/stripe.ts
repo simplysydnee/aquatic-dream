@@ -2,31 +2,23 @@ import { encode } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 
 export type StripeEnv = 'sandbox' | 'live';
 
-export function getConnectionApiKey(env: StripeEnv): string {
-  // If user manually configured a real Stripe secret key, prefer it (bypass gateway).
+export function getConnectionApiKey(_env: StripeEnv): string {
+  // SINGLE SOURCE OF TRUTH: manually-configured Stripe secret key.
+  // Lovable's sandbox connector gateway is broken, so we always prefer
+  // STRIPE_API_KEY (a real sk_/rk_ key) regardless of requested env.
   const manual = Deno.env.get('STRIPE_API_KEY');
-  if (manual && /^(sk|rk)_/.test(manual)) {
-    // Use it for whichever env matches; if no test/live prefix, use it for both.
-    if (env === 'sandbox' && /^(sk|rk)_(test|)/.test(manual)) return manual;
-    if (env === 'live' && /^(sk|rk)_(live|)/.test(manual)) return manual;
-    return manual;
-  }
+  if (manual && /^(sk|rk)_/.test(manual)) return manual;
 
-  const directCandidates = env === 'sandbox'
-    ? ['STRIPE_TEST_SECRET_KEY', 'STRIPE_SANDBOX_SECRET_KEY', 'STRIPE_SECRET_KEY']
-    : ['STRIPE_LIVE_SECRET_KEY', 'STRIPE_SECRET_KEY'];
+  // Fallback: optional direct keys, then the gateway connection key.
+  const direct = Deno.env.get('STRIPE_SECRET_KEY')
+    || Deno.env.get('STRIPE_LIVE_SECRET_KEY')
+    || Deno.env.get('STRIPE_TEST_SECRET_KEY');
+  if (direct && /^(sk|rk)_/.test(direct)) return direct;
 
-  const directKeyRe = env === 'sandbox' ? /^(sk|rk)_test_/ : /^(sk|rk)_live_/;
-  for (const name of directCandidates) {
-    const value = Deno.env.get(name);
-    if (value && directKeyRe.test(value)) return value;
-  }
-
-  const key = env === 'sandbox'
-    ? Deno.env.get('STRIPE_SANDBOX_API_KEY')
-    : Deno.env.get('STRIPE_LIVE_API_KEY');
-  if (!key) throw new Error(`STRIPE_${env.toUpperCase()}_API_KEY is not configured`);
-  return key;
+  const gateway = Deno.env.get('STRIPE_LIVE_API_KEY')
+    || Deno.env.get('STRIPE_SANDBOX_API_KEY');
+  if (!gateway) throw new Error('No Stripe API key configured (STRIPE_API_KEY)');
+  return gateway;
 }
 
 import Stripe from "https://esm.sh/stripe@18.5.0";
@@ -82,9 +74,13 @@ export function createStripeClient(env: StripeEnv): Stripe {
 export async function verifyWebhook(req: Request, env: StripeEnv): Promise<{ type: string; data: { object: any } }> {
   const signature = req.headers.get("stripe-signature");
   const body = await req.text();
-  const secret = env === 'sandbox'
+  const primary = env === 'sandbox'
     ? Deno.env.get('PAYMENTS_SANDBOX_WEBHOOK_SECRET')
     : Deno.env.get('PAYMENTS_LIVE_WEBHOOK_SECRET');
+  const fallback = env === 'sandbox'
+    ? Deno.env.get('PAYMENTS_LIVE_WEBHOOK_SECRET')
+    : Deno.env.get('PAYMENTS_SANDBOX_WEBHOOK_SECRET');
+  const secret = primary || fallback;
 
   if (!secret) {
     throw new Error('Webhook secret environment variable is not configured');
