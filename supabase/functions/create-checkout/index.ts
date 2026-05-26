@@ -240,6 +240,9 @@ serve(async (req) => {
       line_items: lineItems,
       mode: "payment",
       ui_mode: "embedded_page",
+      // Exclude Stripe Link to avoid the "Confirm it's you" SMS step
+      // and the iframe "Something went wrong" loop some parents hit.
+      payment_method_types: ["card"],
       return_url:
         returnUrl ||
         `${req.headers.get("origin")}/swim-enrollment?step=done&session_id={CHECKOUT_SESSION_ID}`,
