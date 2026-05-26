@@ -3,17 +3,24 @@ import { encode } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 export type StripeEnv = 'sandbox' | 'live';
 
 export function getConnectionApiKey(env: StripeEnv): string {
-  // Use Lovable's connector gateway keys so the backend Stripe account
-  // matches the publishable key (VITE_PAYMENTS_CLIENT_TOKEN) on the
-  // frontend. Mixing accounts causes "Something went wrong" inside the
-  // embedded checkout iframe.
+  // Prefer a manually-configured real Stripe secret key (sk_/rk_) when set.
+  // The Lovable connector gateway has been returning "Credential not found"
+  // for STRIPE_LIVE_API_KEY in this project, so a real key from the same
+  // Stripe account as the publishable key is the reliable path for live.
+  const manual = Deno.env.get('STRIPE_API_KEY');
+  if (manual && /^(sk|rk)_(test|live)_/.test(manual)) {
+    return manual;
+  }
+
+  // Fallback: Lovable connector gateway keys (used when no manual key set).
   const gateway = env === 'sandbox'
     ? Deno.env.get('STRIPE_SANDBOX_API_KEY')
     : Deno.env.get('STRIPE_LIVE_API_KEY');
   if (!gateway) {
     throw new Error(
-      `Stripe gateway key not configured for env=${env} ` +
-      `(expected ${env === 'sandbox' ? 'STRIPE_SANDBOX_API_KEY' : 'STRIPE_LIVE_API_KEY'})`
+      `No Stripe key configured for env=${env}. ` +
+      `Set STRIPE_API_KEY (sk_live_/sk_test_) or ` +
+      `${env === 'sandbox' ? 'STRIPE_SANDBOX_API_KEY' : 'STRIPE_LIVE_API_KEY'}.`
     );
   }
   return gateway;
