@@ -2,7 +2,9 @@ import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { supabase } from "@/integrations/supabase/client";
 
 const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN;
-const environment = clientToken?.startsWith('pk_test_') ? 'sandbox' : 'live';
+// Sandbox connector gateway is broken — force live everywhere so all
+// Stripe-touching edge functions use the manual STRIPE_API_KEY (a live key).
+const environment = 'live';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
