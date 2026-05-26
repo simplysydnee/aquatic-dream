@@ -38,4 +38,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'lesson-cancellation': lessonCancellation,
   'internal-lesson-request-alert': internalLessonRequestAlert,
   'internal-job-application-alert': internalJobApplicationAlert,
+  'enrollment-waiver-link': enrollmentWaiverLink,
 }
