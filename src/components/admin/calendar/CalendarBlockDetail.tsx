@@ -14,6 +14,7 @@ import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/type
 import { Checkbox } from "@/components/ui/checkbox";
 import AddSwimmerDialog from "./AddSwimmerDialog";
 import LessonOccurrenceCheckoutDialog from "./LessonOccurrenceCheckoutDialog";
+import PhoneCheckoutPanel from "./PhoneCheckoutPanel";
 import FrontDeskWaiverDialog from "./FrontDeskWaiverDialog";
 import FrontDeskEnrollmentWaiverDialog from "./FrontDeskEnrollmentWaiverDialog";
 import EditSwimmerDialog, { type EditTarget } from "./EditSwimmerDialog";
