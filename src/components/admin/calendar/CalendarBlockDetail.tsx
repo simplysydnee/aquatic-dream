@@ -91,6 +91,77 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
   const [markMethod, setMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
   const [markReference, setMarkReference] = useState("");
   const [cancelTargets, setCancelTargets] = useState<CancelTarget[] | null>(null);
+  // Per-enrollment quick actions
+  const [enrPhoneCheckout, setEnrPhoneCheckout] = useState<{ enrollmentId: string; amountCents: number; label: string } | null>(null);
+  const [enrMarkTarget, setEnrMarkTarget] = useState<{ enrollmentId: string; field: "payment_status" | "session_fee_status"; feeLabel: string } | null>(null);
+  const [enrMarkMethod, setEnrMarkMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
+  const [enrMarkRef, setEnrMarkRef] = useState("");
+  const [enrMarkBusy, setEnrMarkBusy] = useState(false);
+  const [sendingWaiverFor, setSendingWaiverFor] = useState<string | null>(null);
+  const [sendingRegFor, setSendingRegFor] = useState<string | null>(null);
+
+  const sendEnrollmentWaiverLink = async (enrollmentId: string) => {
+    setSendingWaiverFor(enrollmentId);
+    try {
+      const { error } = await supabase.functions.invoke("send-enrollment-waiver-link", {
+        body: { enrollmentId, siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast.success("Waiver link emailed");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send waiver link");
+    } finally {
+      setSendingWaiverFor(null);
+    }
+  };
+
+  const sendRegFeeLink = async (enrollmentId: string) => {
+    setSendingRegFor(enrollmentId);
+    try {
+      const { error } = await supabase.functions.invoke("send-registration-fee-payment-link", {
+        body: { enrollmentId, environment: getStripeEnvironment(), siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast.success("Registration fee link emailed");
+      onRefetch?.();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send registration fee link");
+    } finally {
+      setSendingRegFor(null);
+    }
+  };
+
+  const confirmEnrMark = async () => {
+    if (!enrMarkTarget) return;
+    if (enrMarkMethod !== "comp" && !enrMarkRef.trim()) {
+      toast.error("Reference required for cash/check");
+      return;
+    }
+    setEnrMarkBusy(true);
+    try {
+      const update: Record<string, any> = {
+        [enrMarkTarget.field]: enrMarkMethod === "comp" ? "comp" : "paid",
+        payment_method: enrMarkMethod,
+        payment_reference: enrMarkMethod === "comp" ? enrMarkRef.trim() || "comp" : enrMarkRef.trim(),
+      };
+      if (enrMarkTarget.field === "session_fee_status" && enrMarkMethod !== "comp") {
+        update.session_fee_paid_at = new Date().toISOString();
+      }
+      const { error } = await supabase
+        .from("swim_enrollments")
+        .update(update)
+        .eq("id", enrMarkTarget.enrollmentId);
+      if (error) throw error;
+      toast.success(`${enrMarkTarget.feeLabel} marked ${enrMarkMethod === "comp" ? "comp" : "paid"}`);
+      setEnrMarkTarget(null);
+      onRefetch?.();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to record payment");
+    } finally {
+      setEnrMarkBusy(false);
+    }
+  };
+
 
   const refetchLesson = async () => {
     if (!eventId) return;
