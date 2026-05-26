@@ -52,9 +52,6 @@ Deno.serve(async (req) => {
     }
 
     const env = (environment || 'sandbox') as StripeEnv
-    // Try Stripe Checkout. If the gateway/credential is broken, still send the
-    // email — without a clickable pay link — so the parent gets the waiver and
-    // a heads-up that we'll follow up. Admin can resend from PaymentsTab.
     const returnBase = siteUrl || 'https://aquaticdreamsswim.com'
     let paymentLink: string | undefined
     try {
@@ -69,7 +66,7 @@ Deno.serve(async (req) => {
           quantity: 1,
         }],
         mode: 'payment',
-        ui_mode: 'hosted',
+        ui_mode: 'hosted_page',
         expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
         success_url: `${returnBase}/swim-enrollment?step=done`,
         cancel_url: `${returnBase}/swim-enrollment`,
@@ -77,11 +74,13 @@ Deno.serve(async (req) => {
         metadata: { enrollmentId, type: 'registration_fee' },
       })
       paymentLink = checkoutSession?.url || undefined
-      if (!paymentLink) {
-        console.error('Stripe returned no checkout URL', { enrollmentId, sessionId: checkoutSession?.id })
-      }
     } catch (stripeErr) {
-      console.error('Stripe checkout creation failed — sending waiver-only fallback', stripeErr)
+      const msg = stripeErr instanceof Error ? stripeErr.message : String(stripeErr)
+      console.error('Stripe checkout creation failed:', msg)
+      return json({ error: `Stripe checkout failed: ${msg}` }, 502)
+    }
+    if (!paymentLink) {
+      return json({ error: 'Stripe returned no checkout URL' }, 502)
     }
     const session = enrollment.swim_sessions
     const sessionInfo = session
