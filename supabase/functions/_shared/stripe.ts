@@ -3,9 +3,18 @@ import { encode } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 export type StripeEnv = 'sandbox' | 'live';
 
 export function getConnectionApiKey(env: StripeEnv): string {
+  // If user manually configured a real Stripe secret key, prefer it (bypass gateway).
+  const manual = Deno.env.get('STRIPE_API_KEY');
+  if (manual && /^(sk|rk)_/.test(manual)) {
+    // Use it for whichever env matches; if no test/live prefix, use it for both.
+    if (env === 'sandbox' && /^(sk|rk)_(test|)/.test(manual)) return manual;
+    if (env === 'live' && /^(sk|rk)_(live|)/.test(manual)) return manual;
+    return manual;
+  }
+
   const directCandidates = env === 'sandbox'
-    ? ['STRIPE_TEST_SECRET_KEY', 'STRIPE_SANDBOX_SECRET_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_API_KEY']
-    : ['STRIPE_LIVE_SECRET_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_API_KEY'];
+    ? ['STRIPE_TEST_SECRET_KEY', 'STRIPE_SANDBOX_SECRET_KEY', 'STRIPE_SECRET_KEY']
+    : ['STRIPE_LIVE_SECRET_KEY', 'STRIPE_SECRET_KEY'];
 
   const directKeyRe = env === 'sandbox' ? /^(sk|rk)_test_/ : /^(sk|rk)_live_/;
   for (const name of directCandidates) {
