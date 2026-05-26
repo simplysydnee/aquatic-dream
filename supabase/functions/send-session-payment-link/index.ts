@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
       const checkoutSession = await stripe.checkout.sessions.create({
         line_items: [lineItem],
         mode: 'payment',
-        ui_mode: 'hosted',
+        ui_mode: 'hosted_page',
         expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
         success_url: `${returnBase}/swim-enrollment?step=done`,
         cancel_url: `${returnBase}/swim-enrollment`,
@@ -110,11 +110,17 @@ Deno.serve(async (req) => {
         metadata: { enrollmentId, type: 'session_fee' },
       })
       paymentLink = checkoutSession?.url || undefined
-      if (!paymentLink) {
-        console.error('Stripe returned no checkout URL', { enrollmentId, sessionId: checkoutSession?.id })
-      }
     } catch (stripeErr) {
-      console.error('Stripe checkout creation failed — sending fallback email without pay link', stripeErr)
+      const msg = stripeErr instanceof Error ? stripeErr.message : String(stripeErr)
+      console.error('Stripe checkout creation failed:', msg)
+      return new Response(JSON.stringify({ error: `Stripe checkout failed: ${msg}` }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!paymentLink) {
+      return new Response(JSON.stringify({ error: 'Stripe returned no checkout URL' }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // Send email via transactional email system in the background so the

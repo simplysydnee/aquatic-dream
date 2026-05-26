@@ -317,7 +317,11 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
                             : undefined
                         }
                         linkSentAt={e.reg_fee_link_sent_at}
-                        sendLabel={e.reg_fee_link_sent_at ? "Resend reg fee + waiver email" : "Email reg fee + waiver"}
+                        sendLabel={
+                          e.waiver_signed_at
+                            ? (e.reg_fee_link_sent_at ? "Resend payment link" : "Email payment link")
+                            : (e.reg_fee_link_sent_at ? "Resend reg fee + waiver email" : "Email reg fee + waiver")
+                        }
                       />
                       <WaiverRow
                         signedAt={e.waiver_signed_at}
