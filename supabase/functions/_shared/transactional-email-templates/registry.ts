@@ -22,6 +22,7 @@ import { template as adminFreeform } from './admin-freeform.tsx'
 import { template as lessonCancellation } from './lesson-cancellation.tsx'
 import { template as internalLessonRequestAlert } from './internal-lesson-request-alert.tsx'
 import { template as internalJobApplicationAlert } from './internal-job-application-alert.tsx'
+import { template as enrollmentWaiverLink } from './enrollment-waiver-link.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'session-payment-link': sessionPaymentLink,
