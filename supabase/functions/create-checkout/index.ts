@@ -252,8 +252,12 @@ serve(async (req) => {
 
     if (!session.client_secret) {
       console.error("Stripe returned no client_secret. Full session:", JSON.stringify(session));
+      const gatewayErr = (session as any)?.message || (session as any)?.error?.message;
+      const detail = gatewayErr
+        ? `Stripe/gateway error: ${gatewayErr}`
+        : "Stripe did not return a client_secret — checkout cannot start";
       return new Response(
-        JSON.stringify({ error: "Stripe did not return a client_secret — checkout cannot start" }),
+        JSON.stringify({ error: detail }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
