@@ -604,21 +604,53 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                             </div>
                           )}
 
-                          {/* Row 4: Send Payment Link for unpaid */}
-                          {enr.payment_status !== "paid" && (
-                            <div className="mt-2 pl-[52px] pt-2 border-t border-dashed">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs gap-1.5"
-                                disabled={sendingPaymentFor === enr.id}
-                                onClick={() => handleSendPaymentLink(enr.id)}
-                              >
-                                <Send className="w-3 h-3" />
-                                {sendingPaymentFor === enr.id ? "Sending…" : "Send Payment Link"}
-                              </Button>
-                            </div>
-                          )}
+                          {/* Quick action row */}
+                          {(() => {
+                            const regUnpaid = enr.is_first_time && enr.payment_status !== "paid" && enr.payment_status !== "comp" && enr.payment_status !== "waived";
+                            const sessionUnpaid = enr.session_fee_status !== "paid" && enr.session_fee_status !== "comp";
+                            const sessionPrice = Number((block.session as any).session_price ?? 240);
+                            const showAny = regUnpaid || sessionUnpaid || !enr.waiver_signed_at;
+                            if (!showAny) return null;
+                            return (
+                              <div className="mt-2 pl-[52px] pt-2 border-t border-dashed flex flex-wrap gap-1.5">
+                                {regUnpaid && (
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingRegFor === enr.id} onClick={() => sendRegFeeLink(enr.id)}>
+                                    <Send className="w-3 h-3" />{sendingRegFor === enr.id ? "…" : (enr.reg_fee_link_sent_at ? "Resend reg link" : "Email reg link")}
+                                  </Button>
+                                )}
+                                {sessionUnpaid && (
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingPaymentFor === enr.id} onClick={() => handleSendPaymentLink(enr.id)}>
+                                    <Send className="w-3 h-3" />{sendingPaymentFor === enr.id ? "…" : (enr.payment_reminder_sent_at ? "Resend session link" : "Email session link")}
+                                  </Button>
+                                )}
+                                {!enr.waiver_signed_at && (
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingWaiverFor === enr.id} onClick={() => sendEnrollmentWaiverLink(enr.id)}>
+                                    <Send className="w-3 h-3" />{sendingWaiverFor === enr.id ? "…" : "Email waiver"}
+                                  </Button>
+                                )}
+                                {(regUnpaid || sessionUnpaid) && (
+                                  <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => {
+                                    const field = sessionUnpaid ? "session_fee_status" : "payment_status";
+                                    setEnrMarkTarget({ enrollmentId: enr.id, field, feeLabel: sessionUnpaid ? "Session fee" : "Registration fee" });
+                                    setEnrMarkMethod("cash"); setEnrMarkRef("");
+                                  }}>
+                                    <CheckCircle2 className="w-3 h-3" />Mark paid…
+                                  </Button>
+                                )}
+                                {(regUnpaid || sessionUnpaid) && (
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => {
+                                    const cents = sessionUnpaid ? Math.round(sessionPrice * 100) : 4500;
+                                    const label = sessionUnpaid
+                                      ? `${enr.child_name} — Session fee`
+                                      : `${enr.child_name} — Registration fee`;
+                                    setEnrPhoneCheckout({ enrollmentId: enr.id, amountCents: cents, label });
+                                  }}>
+                                    <CreditCard className="w-3 h-3" />Charge card now
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
