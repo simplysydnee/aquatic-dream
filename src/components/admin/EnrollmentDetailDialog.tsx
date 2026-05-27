@@ -206,6 +206,20 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
     }
   };
 
+  const handleSendRegFeeLink = async () => {
+    if (!form) return;
+    setSendingRegLink(true);
+    const { data, error } = await supabase.functions.invoke("send-registration-fee-payment-link", {
+      body: { enrollmentId: form.id, environment: "live" },
+    });
+    setSendingRegLink(false);
+    if (error || !data?.success) {
+      toast({ title: "Failed to send", description: error?.message || data?.error || "Please try again.", variant: "destructive" });
+    } else {
+      toast({ title: "Registration fee link sent!", description: `Email sent to ${form.parent_email}` });
+    }
+  };
+
   if (!form) return null;
 
   const levelInfo = LEVEL_DISPLAY[form.swim_level as SwimLevel];
