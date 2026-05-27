@@ -22,7 +22,7 @@ project_id = "jilrijklnehbfuulykty"
   [functions.send-session-payment-link]
     verify_jwt = true
   [functions.send-transactional-email]
-    verify_jwt = false
+    verify_jwt = true
   [functions.admin-create-enrollment]
     verify_jwt = true
   [functions.create-admin-phone-checkout]
