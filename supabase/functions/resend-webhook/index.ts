@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { Webhook } from "https://esm.sh/svix@1.24.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,14 +8,46 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const WEBHOOK_SECRET = Deno.env.get("RESEND_WEBHOOK_SECRET");
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   try {
-    const event = await req.json();
-    // Resend webhook payload: { type, created_at, data: { email_id, to, subject, ... } }
+    if (!WEBHOOK_SECRET) {
+      console.error("RESEND_WEBHOOK_SECRET not configured");
+      return new Response(JSON.stringify({ error: "server_misconfigured" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const rawBody = await req.text();
+    const svixId = req.headers.get("svix-id");
+    const svixTimestamp = req.headers.get("svix-timestamp");
+    const svixSignature = req.headers.get("svix-signature");
+
+    if (!svixId || !svixTimestamp || !svixSignature) {
+      return new Response(JSON.stringify({ error: "missing_signature" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let event: any;
+    try {
+      const wh = new Webhook(WEBHOOK_SECRET);
+      event = wh.verify(rawBody, {
+        "svix-id": svixId,
+        "svix-timestamp": svixTimestamp,
+        "svix-signature": svixSignature,
+      });
+    } catch (err) {
+      console.warn("svix verification failed", err);
+      return new Response(JSON.stringify({ error: "invalid_signature" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const type: string = event?.type || "";
     const data = event?.data || {};
     const messageId: string | undefined = data.email_id || data.id;
@@ -42,7 +75,6 @@ Deno.serve(async (req) => {
         .eq("resend_message_id", messageId);
     }
 
-    // Suppress hard bounces + complaints
     if ((type === "email.bounced" || type === "email.complained") && to) {
       await supabase.from("suppressed_emails").insert({
         email: String(to).toLowerCase(),
