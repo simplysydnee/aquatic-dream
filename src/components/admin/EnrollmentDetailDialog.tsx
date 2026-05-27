@@ -99,6 +99,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
   const [loadingAgreement, setLoadingAgreement] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
+  const [sendingRegLink, setSendingRegLink] = useState(false);
   const [sessions, setSessions] = useState<SessionOption[]>([]);
   const [originalSessionId, setOriginalSessionId] = useState<string | null>(null);
 
