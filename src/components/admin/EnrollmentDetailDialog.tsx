@@ -392,6 +392,20 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                         <p className="text-sm font-mono">{form.session_fee_stripe_id}</p>
                       </div>
                     )}
+                    {form.is_first_time && form.payment_status === "unpaid" && (
+                      <div className="col-span-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={handleSendRegFeeLink}
+                          disabled={sendingRegLink}
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          {sendingRegLink ? "Sending..." : "Send $45 Registration Fee Payment Link"}
+                        </Button>
+                      </div>
+                    )}
                     {form.session_fee_status === "due_day_1" && (
                       <div className="col-span-2">
                         <Button
