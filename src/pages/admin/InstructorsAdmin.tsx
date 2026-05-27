@@ -31,12 +31,12 @@ const InstructorsAdmin = () => {
 
   const fetchInstructors = async () => {
     const [{ data }, { data: wages }] = await Promise.all([
-      supabase.from("instructors").select("id,name,email,phone,is_active,created_at,updated_at,user_id").order("name"),
+      supabase.rpc("get_instructors_admin"),
       supabase.rpc("get_instructor_wages"),
     ]);
     if (data) {
       const wageMap = new Map((wages ?? []).map((w: any) => [w.id, w.hourly_wage]));
-      setInstructors(data.map((i: any) => ({ ...i, hourly_wage: wageMap.get(i.id) ?? null })) as Instructor[]);
+      setInstructors((data as any[]).map((i: any) => ({ ...i, hourly_wage: wageMap.get(i.id) ?? i.hourly_wage ?? null })) as Instructor[]);
     }
     setLoading(false);
   };
