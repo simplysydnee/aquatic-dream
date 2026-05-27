@@ -347,20 +347,20 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                       <Label className="text-[11px] text-muted-foreground">
                         Registration Fee {form.is_first_time ? "($45)" : "(N/A — returning)"}
                       </Label>
-                      {form.is_first_time ? (
-                        <Select value={form.payment_status} onValueChange={(v) => update("payment_status", v)}>
-                          <SelectTrigger className="mt-1 h-8"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unpaid">Unpaid</SelectItem>
-                            <SelectItem value="paid">Paid</SelectItem>
-                            <SelectItem value="refunded">Refunded</SelectItem>
-                            <SelectItem value="waived">Waived</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic mt-1">N/A</p>
-                      )}
+                      <Select value={form.payment_status} onValueChange={(v) => update("payment_status", v)}>
+                        <SelectTrigger className="mt-1 h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unpaid">Unpaid</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="refunded">Refunded</SelectItem>
+                          <SelectItem value="waived">Waived</SelectItem>
+                          <SelectItem value="not_required">N/A (returning)</SelectItem>
+                          <SelectItem value="comp">Comp</SelectItem>
+                          <SelectItem value="flagged_no_pay">Flagged (no pay)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+
                     <div className="p-3 rounded-md border">
                       <Label className="text-[11px] text-muted-foreground">Session Fee ($240)</Label>
                       <Select value={form.session_fee_status} onValueChange={(v) => update("session_fee_status", v)}>
