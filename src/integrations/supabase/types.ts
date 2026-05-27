@@ -1987,6 +1987,20 @@ export type Database = {
           id: string
         }[]
       }
+      get_instructors_admin: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          hourly_wage: number
+          id: string
+          is_active: boolean
+          name: string
+          phone: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
       get_lesson_booking_by_waiver_token: {
         Args: { _token: string }
         Returns: {
