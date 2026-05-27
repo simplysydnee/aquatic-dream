@@ -1,17 +1,24 @@
 ## Goal
-In the swim enrollment detail dialog (admin), add a button to email the parent a $45 registration-fee payment link — mirroring the existing $240 session-fee link button.
+In the admin Enrollment Detail dialog, the Registration Fee field is locked to "N/A" whenever `is_first_time = false`. After manually confirming a returning-swimmer enrollment (e.g., Ramanpreety Kaur), there's no way to mark a reg fee as paid. Make this field an editable dropdown in all cases.
 
 ## Change
-File: `src/components/admin/EnrollmentDetailDialog.tsx`
+File: `src/components/admin/EnrollmentDetailDialog.tsx` (lines ~346–363)
 
-1. Add a second handler `handleSendRegFeeLink` that invokes the existing `send-registration-fee-payment-link` edge function (already used by `admin-create-enrollment`), passing `{ enrollmentId, environment: "live" }`. Use a separate `sendingRegLink` state so the two buttons don't share a spinner.
-2. In the Payment section, render a new button under the grid (next to / above the existing session-fee button) when `form.is_first_time && form.payment_status === "unpaid"`:
-   - Label: "Send $45 Registration Fee Payment Link" (Sending… while in flight)
-   - Same outline/sm/full-width styling and `Send` icon as the session-fee button
-3. On success: toast "Registration fee link sent! Email sent to {parent_email}". On error: destructive toast with the error message.
+Replace the `is_first_time ? <Select/> : <p>N/A</p>` conditional with a single always-rendered `<Select>` for `payment_status`, with options:
 
-No backend changes — the `send-registration-fee-payment-link` function already exists and is wired through Stripe.
+- Unpaid
+- Paid
+- Refunded
+- Waived
+- N/A (returning) → value `not_required`
+- Comp → value `comp`
+- Flagged (no pay) → value `flagged_no_pay`
+
+Label stays "Registration Fee" with the `$45` / `N/A — returning` hint based on `is_first_time` (unchanged copy). No change to `handleSave` — it already persists `payment_status`.
+
+Keep the existing "Send $45 Registration Fee Payment Link" button gated on `is_first_time && payment_status === "unpaid"` (unchanged).
 
 ## Out of scope
-- No change to the session-fee button.
-- No change to the edge function or payment-flow rules.
+- No DB / edge function changes.
+- No change to Session Fee dropdown or any other field.
+- No change to how new enrollments default `payment_status` (webhook + trigger logic untouched).
