@@ -22,7 +22,7 @@ project_id = "jilrijklnehbfuulykty"
   [functions.send-session-payment-link]
     verify_jwt = true
   [functions.send-transactional-email]
-    verify_jwt = false
+    verify_jwt = true
   [functions.admin-create-enrollment]
     verify_jwt = true
   [functions.create-admin-phone-checkout]
@@ -40,7 +40,7 @@ project_id = "jilrijklnehbfuulykty"
   [functions.lesson-calendar-ics]
     verify_jwt = false
   [functions.admin-issue-refund]
-    verify_jwt = false
+    verify_jwt = true
   [functions.admin-mark-waiver-complete]
     verify_jwt = false
   [functions.preview-marketing-campaign]

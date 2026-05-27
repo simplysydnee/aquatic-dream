@@ -27,19 +27,27 @@ serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
   try {
-    // Auth: best-effort. If a valid Supabase JWT is provided we record the
-    // user as the resolver of the alert; otherwise we proceed (this function
-    // is one-shot admin tooling and is not exposed in any UI).
+    // Require an authenticated admin caller. Issues real Stripe refunds —
+    // must never be callable anonymously.
     let resolverId: string | null = null;
     let resolverEmail: string | null = null;
     const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.replace("Bearer ", "");
-    if (token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(token);
-      if (userData?.user) {
-        resolverId = userData.user.id;
-        resolverEmail = userData.user.email ?? null;
-      }
+    if (!token) {
+      return json({ error: "Unauthorized" }, 401);
+    }
+    const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return json({ error: "Unauthorized" }, 401);
+    }
+    resolverId = userData.user.id;
+    resolverEmail = userData.user.email ?? null;
+    const { data: isAdmin, error: roleErr } = await supabaseAdmin.rpc("has_role", {
+      _user_id: resolverId,
+      _role: "admin",
+    });
+    if (roleErr || !isAdmin) {
+      return json({ error: "Forbidden: admin role required" }, 403);
     }
 
     const body = (await req.json()) as Body;

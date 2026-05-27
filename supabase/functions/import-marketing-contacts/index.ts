@@ -32,8 +32,9 @@ function parseCSV(text: string): string[][] {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
+    const expected = Deno.env.get("IMPORT_SECRET");
     const token = req.headers.get("x-import-token");
-    if (token !== "scuba-import-2026") {
+    if (!expected || !token || token !== expected) {
       return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
     }
     const body = await req.json().catch(() => ({}));
