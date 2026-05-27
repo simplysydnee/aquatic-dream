@@ -1,26 +1,17 @@
-## What is actually broken
+## Goal
+In the swim enrollment detail dialog (admin), add a button to email the parent a $45 registration-fee payment link — mirroring the existing $240 session-fee link button.
 
-The issue changed after the last deploy:
+## Change
+File: `src/components/admin/EnrollmentDetailDialog.tsx`
 
-- The browser calls `create-checkout` successfully, but the edge function returns 500.
-- The deployed function log says Stripe did not return a checkout `client_secret` because the response was:
+1. Add a second handler `handleSendRegFeeLink` that invokes the existing `send-registration-fee-payment-link` edge function (already used by `admin-create-enrollment`), passing `{ enrollmentId, environment: "live" }`. Use a separate `sendingRegLink` state so the two buttons don't share a spinner.
+2. In the Payment section, render a new button under the grid (next to / above the existing session-fee button) when `form.is_first_time && form.payment_status === "unpaid"`:
+   - Label: "Send $45 Registration Fee Payment Link" (Sending… while in flight)
+   - Same outline/sm/full-width styling and `Send` icon as the session-fee button
+3. On success: toast "Registration fee link sent! Email sent to {parent_email}". On error: destructive toast with the error message.
 
-```text
-{"type":"unauthorized","message":"Credential not found","props":{"source":"connectors_gateway"}}
-```
+No backend changes — the `send-registration-fee-payment-link` function already exists and is wired through Stripe.
 
-That means `STRIPE_LIVE_API_KEY` is not usable in this project right now because the Lovable connector gateway cannot find the linked credential. So yes: this is likely why `STRIPE_API_KEY` was added before.
-
-Since you confirmed `STRIPE_API_KEY` was copied from the same Stripe dashboard/account as the `pk_live_51TLCtt…` publishable key, using it directly is the correct fix for production checkout.
-
-## Plan
-
-1. Restore `supabase/functions/_shared/stripe.ts` so live mode prefers a validated direct `STRIPE_API_KEY` when it starts with `sk_live_` or `rk_live_`.
-2. Keep sandbox mode on the Lovable gateway unless there is a test direct key; the enrollment flow is currently forcing `live`, so production checkout will use `STRIPE_API_KEY`.
-3. Keep `payment_method_types: ["card"]` in `create-checkout` to remove Link/SMS from the embedded checkout.
-4. Improve the error handling in `create-checkout` so if Stripe/gateway returns an error-shaped object again, we return that real message instead of the misleading “Stripe did not return a client_secret”.
-5. Deploy `create-checkout` and test the function call again.
-
-## Expected result
-
-`/swim-enrollment` step 5 should get a real embedded Checkout `clientSecret`, so the card form can render instead of showing the generic iframe error.
+## Out of scope
+- No change to the session-fee button.
+- No change to the edge function or payment-flow rules.

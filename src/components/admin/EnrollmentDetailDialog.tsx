@@ -99,6 +99,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
   const [loadingAgreement, setLoadingAgreement] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
+  const [sendingRegLink, setSendingRegLink] = useState(false);
   const [sessions, setSessions] = useState<SessionOption[]>([]);
   const [originalSessionId, setOriginalSessionId] = useState<string | null>(null);
 
@@ -202,6 +203,20 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
       toast({ title: "Failed to send", description: error?.message || data?.error || "Please try again.", variant: "destructive" });
     } else {
       toast({ title: "Payment link sent!", description: `Email sent to ${form.parent_email}` });
+    }
+  };
+
+  const handleSendRegFeeLink = async () => {
+    if (!form) return;
+    setSendingRegLink(true);
+    const { data, error } = await supabase.functions.invoke("send-registration-fee-payment-link", {
+      body: { enrollmentId: form.id, environment: "live" },
+    });
+    setSendingRegLink(false);
+    if (error || !data?.success) {
+      toast({ title: "Failed to send", description: error?.message || data?.error || "Please try again.", variant: "destructive" });
+    } else {
+      toast({ title: "Registration fee link sent!", description: `Email sent to ${form.parent_email}` });
     }
   };
 
@@ -375,6 +390,20 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                       <div className="col-span-2 p-3 rounded-md border">
                         <p className="text-[11px] text-muted-foreground">Stripe Reference (Session Fee)</p>
                         <p className="text-sm font-mono">{form.session_fee_stripe_id}</p>
+                      </div>
+                    )}
+                    {form.is_first_time && form.payment_status === "unpaid" && (
+                      <div className="col-span-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={handleSendRegFeeLink}
+                          disabled={sendingRegLink}
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          {sendingRegLink ? "Sending..." : "Send $45 Registration Fee Payment Link"}
+                        </Button>
                       </div>
                     )}
                     {form.session_fee_status === "due_day_1" && (
