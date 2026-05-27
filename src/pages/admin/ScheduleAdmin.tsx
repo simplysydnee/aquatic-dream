@@ -19,7 +19,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import PositionsManager from "@/components/admin/schedule/PositionsManager";
 
-interface Instructor { id: string; name: string; is_active: boolean; email: string | null; hourly_wage: number | null; }
+interface Instructor { id: string; name: string; is_active: boolean; hourly_wage: number | null; }
 interface Position { id: string; name: string; color: string; is_active: boolean; }
 interface Shift {
   id: string;
