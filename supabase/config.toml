@@ -40,7 +40,7 @@ project_id = "jilrijklnehbfuulykty"
   [functions.lesson-calendar-ics]
     verify_jwt = false
   [functions.admin-issue-refund]
-    verify_jwt = false
+    verify_jwt = true
   [functions.admin-mark-waiver-complete]
     verify_jwt = false
   [functions.preview-marketing-campaign]
