@@ -468,6 +468,65 @@ export type Database = {
         }
         Relationships: []
       }
+      instructor_booking_blocks: {
+        Row: {
+          created_at: string
+          day_of_week: number | null
+          end_date: string | null
+          end_time: string
+          id: string
+          instructor_id: string
+          is_blackout: boolean
+          kind: string
+          notes: string | null
+          pool_area: string
+          slot_minutes: number
+          start_date: string | null
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week?: number | null
+          end_date?: string | null
+          end_time: string
+          id?: string
+          instructor_id: string
+          is_blackout?: boolean
+          kind: string
+          notes?: string | null
+          pool_area?: string
+          slot_minutes?: number
+          start_date?: string | null
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number | null
+          end_date?: string | null
+          end_time?: string
+          id?: string
+          instructor_id?: string
+          is_blackout?: boolean
+          kind?: string
+          notes?: string | null
+          pool_area?: string
+          slot_minutes?: number
+          start_date?: string | null
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_booking_blocks_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instructors: {
         Row: {
           created_at: string
@@ -652,8 +711,12 @@ export type Database = {
       }
       lesson_booking_occurrences: {
         Row: {
+          auto_charge_attempted_at: string | null
+          auto_charge_error: string | null
+          auto_charge_status: string
           booking_id: string
           cancel_reason: string | null
+          cancel_token: string | null
           cancelled_at: string | null
           cancelled_by: string | null
           created_at: string
@@ -670,12 +733,17 @@ export type Database = {
           reminder_attempted_at: string | null
           status: string
           stripe_checkout_url: string | null
+          stripe_payment_intent_id: string | null
           stripe_session_id: string | null
           updated_at: string
         }
         Insert: {
+          auto_charge_attempted_at?: string | null
+          auto_charge_error?: string | null
+          auto_charge_status?: string
           booking_id: string
           cancel_reason?: string | null
+          cancel_token?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           created_at?: string
@@ -692,12 +760,17 @@ export type Database = {
           reminder_attempted_at?: string | null
           status?: string
           stripe_checkout_url?: string | null
+          stripe_payment_intent_id?: string | null
           stripe_session_id?: string | null
           updated_at?: string
         }
         Update: {
+          auto_charge_attempted_at?: string | null
+          auto_charge_error?: string | null
+          auto_charge_status?: string
           booking_id?: string
           cancel_reason?: string | null
+          cancel_token?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           created_at?: string
@@ -714,6 +787,7 @@ export type Database = {
           reminder_attempted_at?: string | null
           status?: string
           stripe_checkout_url?: string | null
+          stripe_payment_intent_id?: string | null
           stripe_session_id?: string | null
           updated_at?: string
         }
@@ -736,6 +810,9 @@ export type Database = {
       }
       lesson_bookings: {
         Row: {
+          booking_source: string
+          cancellation_policy_hours: number
+          child_age: number | null
           child_first_name: string | null
           child_last_name: string | null
           child_name: string | null
@@ -743,6 +820,7 @@ export type Database = {
           end_time: string
           frequency: string | null
           id: string
+          instructor_id: string | null
           instructor_name: string | null
           lesson_type: string
           notes: string | null
@@ -759,11 +837,16 @@ export type Database = {
           series_start: string
           start_time: string
           status: string
+          stripe_customer_id: string | null
+          stripe_payment_method_id: string | null
           updated_at: string
           waiver_signed_at: string | null
           waiver_token: string | null
         }
         Insert: {
+          booking_source?: string
+          cancellation_policy_hours?: number
+          child_age?: number | null
           child_first_name?: string | null
           child_last_name?: string | null
           child_name?: string | null
@@ -771,6 +854,7 @@ export type Database = {
           end_time: string
           frequency?: string | null
           id?: string
+          instructor_id?: string | null
           instructor_name?: string | null
           lesson_type: string
           notes?: string | null
@@ -787,11 +871,16 @@ export type Database = {
           series_start: string
           start_time: string
           status?: string
+          stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
           updated_at?: string
           waiver_signed_at?: string | null
           waiver_token?: string | null
         }
         Update: {
+          booking_source?: string
+          cancellation_policy_hours?: number
+          child_age?: number | null
           child_first_name?: string | null
           child_last_name?: string | null
           child_name?: string | null
@@ -799,6 +888,7 @@ export type Database = {
           end_time?: string
           frequency?: string | null
           id?: string
+          instructor_id?: string | null
           instructor_name?: string | null
           lesson_type?: string
           notes?: string | null
@@ -815,11 +905,21 @@ export type Database = {
           series_start?: string
           start_time?: string
           status?: string
+          stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
           updated_at?: string
           waiver_signed_at?: string | null
           waiver_token?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lesson_bookings_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lesson_requests: {
         Row: {
@@ -1469,6 +1569,47 @@ export type Database = {
           },
         ]
       }
+      slot_holds: {
+        Row: {
+          created_at: string
+          end_time: string
+          held_until: string
+          id: string
+          instructor_id: string
+          session_token: string
+          slot_date: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          held_until?: string
+          id?: string
+          instructor_id: string
+          session_token: string
+          slot_date: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          held_until?: string
+          id?: string
+          instructor_id?: string
+          session_token?: string
+          slot_date?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slot_holds_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -2111,6 +2252,24 @@ export type Database = {
           series_start: string
           start_time: string
           waiver_signed_at: string
+        }[]
+      }
+      get_occurrence_by_cancel_token: {
+        Args: { _token: string }
+        Returns: {
+          auto_charge_status: string
+          booking_id: string
+          cancellation_policy_hours: number
+          child_name: string
+          end_time: string
+          id: string
+          instructor_name: string
+          occurrence_date: string
+          parent_email: string
+          parent_name: string
+          payment_status: string
+          start_time: string
+          status: string
         }[]
       }
       get_or_create_unsubscribe_token: {
