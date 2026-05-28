@@ -23,6 +23,7 @@ import { template as lessonCancellation } from './lesson-cancellation.tsx'
 import { template as internalLessonRequestAlert } from './internal-lesson-request-alert.tsx'
 import { template as internalJobApplicationAlert } from './internal-job-application-alert.tsx'
 import { template as enrollmentWaiverLink } from './enrollment-waiver-link.tsx'
+import { template as visitorWaiverCopy } from './visitor-waiver-copy.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'session-payment-link': sessionPaymentLink,
@@ -39,4 +40,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'internal-lesson-request-alert': internalLessonRequestAlert,
   'internal-job-application-alert': internalJobApplicationAlert,
   'enrollment-waiver-link': enrollmentWaiverLink,
+  'visitor-waiver-copy': visitorWaiverCopy,
 }
