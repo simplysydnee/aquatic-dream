@@ -1,56 +1,110 @@
-# Visitor Waivers
+## Goal
 
-Add a standalone liability + photo consent waiver flow for anyone visiting the pool (not tied to a lesson booking or enrollment), plus an admin tab to view completed waivers, capture new ones on a tablet, and email the signer a copy.
+Let parents book private lessons online by picking real instructor time slots, then save a card with Stripe to confirm. Auto-charge $65 the day after each lesson. Replace the "Request a Private or Semi-Private Lesson" tab on `/swim-enrollment` with a contact-only Semi-Private form (manual booking) and a full Private flow that mirrors the group enrollment UX.
 
-## Public side
+## Public flow (`/swim-enrollment` → Private/Semi-Private tab)
 
-- New route `/waivers` added to `PublicLayout` nav between **Enroll** and **Careers**.
-- Page shows a short intro + the waiver form. Reuses `<LegalAgreements />` so the language, photo release, and emergency contact fields match the enrollment waiver.
-- Adds a "Swimmers covered" repeater above the legal block: name + DOB + relationship to signer (1–6 rows).
-- On submit: insert row into new `visitor_waivers` table, capture IP, then trigger an email confirmation with a copy of the waiver (see Email section). Success screen says "Waiver received — a copy has been sent to your email. Please check in at the front desk."
-- No login required.
+Tab becomes two cards:
+- **Private lessons → Book online** (new flow)
+- **Semi-private → Request info** (the existing form, simplified to a contact request only; admin books manually)
 
-## Admin side
+Private booking steps:
+1. **Parent & swimmer info** (parent name/email/phone, child name/age/notes) — same fields as group enrollment.
+2. **Pick instructor (optional)** — list active instructors with bookable availability. "Any instructor" allowed.
+3. **Pick slots** — calendar showing the next 8 weeks. Open instructor slots render as 30‑min tappable chips per day. Parent can:
+   - Tap individual slots across multiple days/times (one-offs), OR
+   - Toggle "Book weekly" → pick a weekday + time → system pre-selects all matching dates for N weeks; parent can uncheck any date.
+   - Running total shows "X lessons × $65 = $X (charged after each lesson)".
+4. **Legal agreements** — reuse `<LegalAgreements />`.
+5. **Save card on file** — Stripe Embedded Checkout in `setup` mode (SetupIntent, no charge). On success, all selected slots are atomically claimed first-come-first-served; any taken slots are reported back and the parent can pick replacements.
+6. **Confirmation** screen + email with full schedule and cancellation policy.
 
-- New sidebar item **Waivers** (Compliance area).
-- Route `/admin/waivers` with:
-  1. **Completed waivers** table — searchable: signer name, email, phone, swimmers (count + names), photo consent Y/N, signed date, source (`visitor` | `lesson` | `enrollment`). Source filter, date range, search. Row click → drawer with full detail (signature text, IP, versions, swimmers, emergency contact, "Resend copy to signer" button).
-  2. **Complete new waiver** button (top-right) → full-screen dialog with the `<LegalAgreements />` flow + amber "hand the device to the signer" banner (mirrors `FrontDeskWaiverDialog`). Submits as `source = 'kiosk'`, `completed_by_staff_id = auth.uid()`, and also emails the signer a copy.
-- The list surfaces lesson + enrollment waivers (from `enrollment_agreements`) alongside visitor waivers, with a "Visitors only / All sources" filter.
+Cancellation: 24‑hour rule. Parents get a per-occurrence cancel link in the confirmation email; <24h cancellations are still charged.
 
-## Email confirmation
+## Admin
 
-- New transactional email template `visitor-waiver-copy` in `supabase/functions/_shared/transactional-email-templates/` and registered in `registry.ts`.
-- Template content: branded header, "Thanks for signing your waiver" message, signed date, swimmers covered, photo release Y/N, emergency contact, full waiver/TOS/privacy version IDs, and a plain-text rendering of the waiver body (built from `legal-content.ts`) so the signer has a real copy.
-- Triggered from the client after a successful insert (both public form and admin kiosk dialog) via `supabase.functions.invoke('send-transactional-email', { body: { templateName: 'visitor-waiver-copy', recipientEmail, idempotencyKey: \`visitor-waiver-${id}\`, templateData: { ... } } })`.
-- Admin drawer's "Resend copy" button calls the same function with a fresh idempotency key (`visitor-waiver-${id}-resend-${Date.now()}`).
-- Requires the project's existing email domain + email infrastructure. The agent will verify domain status before scaffolding and, if missing, set up infrastructure first.
+### New page: `/admin/private-lessons` (sidebar under Lessons)
 
-## Technical details
+Two tabs:
 
-**New table `public.visitor_waivers`**
-- `id`, `signer_first_name`, `signer_last_name`, `signer_email`, `signer_phone`, `signature_text`
-- `waiver_accepted`, `terms_accepted`, `privacy_policy_accepted`, `photo_release_accepted` (bool)
-- `emergency_contact_first_name`, `_last_name`, `_phone`, `_relationship`
-- `swimmers` jsonb `[{ first_name, last_name, dob, relationship }]`
-- `waiver_version`, `tos_version`, `privacy_policy_version` (defaults from `legal-content.ts`)
-- `signer_ip text`, `source text default 'public'` (`'public' | 'kiosk'`), `completed_by_staff_id uuid` (nullable)
-- `email_sent_at timestamptz` (set after the confirmation email is queued)
-- `signed_at`, `created_at`
+**Availability**
+- For each instructor: list recurring weekly blocks (e.g. Mon 3–6pm) + one-off date blocks + blackouts.
+- Add/edit/delete blocks. Inputs: instructor, day-of-week OR specific date range, start–end time, slot length (default 30 min), pool area, optional notes.
+- Generated slots are computed on read (no separate slot table) by combining blocks − existing bookings − pool_events − blackouts.
 
-**GRANTs + RLS**
-- `GRANT INSERT ON public.visitor_waivers TO anon, authenticated` (public form needs to insert).
-- `GRANT SELECT, UPDATE, DELETE ON public.visitor_waivers TO authenticated` — gated by RLS to admins only.
-- `GRANT ALL ON public.visitor_waivers TO service_role`.
-- Policies: `INSERT` allowed to anyone with `WITH CHECK (true)`; `SELECT/UPDATE/DELETE` gated by `has_role(auth.uid(), 'admin')`.
+**Bookings**
+- Table of `lesson_bookings` where `lesson_type='private'` and `booking_source='self_serve'`. Filters: upcoming, past, cancelled. Row click opens existing `LessonRequestDetailDialog`-style drawer showing occurrences + charge status. Buttons: cancel occurrence, refund last charge, resend card-update link.
 
-**Files**
-- New: `src/pages/Waivers.tsx`, `src/pages/admin/WaiversAdmin.tsx`, `src/components/admin/waivers/WaiverDetailDrawer.tsx`, `src/components/admin/waivers/FrontDeskVisitorWaiverDialog.tsx`, `src/lib/visitorWaiver.ts`, `supabase/functions/_shared/transactional-email-templates/visitor-waiver-copy.tsx`.
-- Edit: `src/App.tsx` (routes), `src/components/Navbar.tsx` (Waivers link), `src/components/admin/AdminSidebar.tsx` (Waivers item), `supabase/functions/_shared/transactional-email-templates/registry.ts` (register template), redeploy `send-transactional-email`.
-- Migration: create `visitor_waivers` with grants + RLS.
+### Sidebar nav
+Add "Private Lessons" item.
+
+## Database
+
+New table `instructor_booking_blocks`:
+- `instructor_id`, `kind` ('weekly' | 'date_range'), `day_of_week` (nullable int 0–6), `start_date`/`end_date` (nullable), `start_time`, `end_time`, `slot_minutes` (default 30), `pool_area`, `is_blackout` (bool), `notes`, timestamps.
+- RLS: admins manage; anon `SELECT` allowed (needed so public page can compute open slots without auth).
+
+Extend `lesson_bookings`:
+- `booking_source` text ('admin' | 'self_serve'), default 'admin'
+- `stripe_customer_id` text
+- `stripe_payment_method_id` text
+- `cancellation_policy_hours` int default 24
+
+Extend `lesson_booking_occurrences`:
+- `auto_charge_status` text ('pending' | 'succeeded' | 'failed' | 'skipped'), default 'pending'
+- `auto_charge_attempted_at`, `auto_charge_error`
+- `stripe_payment_intent_id`
+- `cancel_token` text unique (for one-click cancel emails)
+
+New table `slot_holds` (for the brief window between "Pick slots" and "Card saved"):
+- `id`, `instructor_id`, `slot_date`, `start_time`, `end_time`, `held_until` (now + 5 min), `session_token`. Cleaned on insert via "expired holds where held_until < now()". Used only to prevent thundering-herd double-book during the SetupIntent flow.
+
+RLS: all new/extended rules keep current admin-only writes; public can `SELECT` blocks and `INSERT/DELETE` their own slot holds keyed by `session_token` (no auth).
+
+## Stripe
+
+New edge functions (all `verify_jwt = false`):
+- `create-private-booking-setup` — input: parent info, selected slots, swimmer info, legal agreement payload. Validates slots are still open, creates `lesson_bookings` row + `lesson_booking_occurrences` rows in `pending_card` status, creates Stripe Customer (via `resolveOrCreateCustomer` keyed on email), returns a SetupIntent `client_secret` for embedded checkout in `setup` mode.
+- `confirm-private-booking` — input: bookingId + setup_intent id. Verifies SetupIntent succeeded, stores `payment_method_id` on the booking, flips occurrences to `scheduled`, sends confirmation email.
+- `charge-private-lesson-occurrence` — cron-style function, hit by `pg_cron` daily. Finds occurrences whose `occurrence_date = yesterday` and `auto_charge_status='pending'`, creates an off-session PaymentIntent for $65 using stored `payment_method_id`. Updates status; on failure, emails parent + admin.
+- `cancel-private-lesson-occurrence` — token-authenticated, cancels one occurrence. If <24h before, marks `auto_charge_status` to charge as normal. If ≥24h, marks `skipped`.
+
+Use `_shared/stripe.ts` `createStripeClient` for all Stripe calls.
+
+Webhook (`payments-webhook`) — add handler for `setup_intent.succeeded` and `payment_intent.payment_failed` to mirror state.
+
+## Files
+
+**New**
+- `src/pages/admin/PrivateLessonsAdmin.tsx`
+- `src/components/admin/private-lessons/InstructorAvailabilityManager.tsx`
+- `src/components/admin/private-lessons/PrivateBookingsTable.tsx`
+- `src/components/admin/private-lessons/PrivateBookingDetailDrawer.tsx`
+- `src/components/private-lessons/PrivateBookingFlow.tsx` (5-step wrapper)
+- `src/components/private-lessons/SlotPicker.tsx` (calendar + chips + weekly toggle)
+- `src/components/private-lessons/PrivateCardSetup.tsx` (Stripe embedded SetupIntent)
+- `src/lib/privateBooking.ts` (slot computation, edge-fn callers)
+- `supabase/functions/create-private-booking-setup/index.ts`
+- `supabase/functions/confirm-private-booking/index.ts`
+- `supabase/functions/charge-private-lesson-occurrence/index.ts`
+- `supabase/functions/cancel-private-lesson-occurrence/index.ts`
+- `supabase/functions/_shared/transactional-email-templates/private-booking-confirmation.tsx`
+- `supabase/functions/_shared/transactional-email-templates/private-lesson-cancelled.tsx`
+- `supabase/functions/_shared/transactional-email-templates/private-lesson-charge-failed.tsx`
+- Migration: new tables + columns + RLS + grants
+
+**Edited**
+- `src/pages/SwimEnrollment.tsx` — replace the existing Request tab with the new Private booking flow + a simplified Semi-Private contact request form
+- `src/components/swim-enrollment/LessonRequestForm.tsx` — trim to Semi-Private inquiry only
+- `src/components/admin/AdminSidebar.tsx` — add "Private Lessons"
+- `src/App.tsx` — route for `/admin/private-lessons`
+- `supabase/functions/payments-webhook/index.ts` — handle setup/charge events
+- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register new templates
+- `supabase/config.toml` — `verify_jwt = false` for new functions
 
 ## Out of scope
-
-- No PDF export (email copy is HTML; can add PDF later).
-- No annual re-sign reminders.
-- No edits to existing lesson or enrollment waiver flows.
+- Semi-private online booking (stays manual; new form is contact-only).
+- Package pricing / discounts / multi-swimmer per booking.
+- Rescheduling UI for parents (cancel + rebook only for v1).
+- Instructor-side acceptance flow (admin manages availability, all bookings auto-confirm).
+- SMS reminders.
