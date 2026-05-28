@@ -56,3 +56,12 @@ project_id = "jilrijklnehbfuulykty"
 
   [functions.import-marketing-contacts]
     verify_jwt = false
+  [functions.create-private-booking-setup]
+    verify_jwt = false
+  [functions.confirm-private-booking]
+    verify_jwt = false
+  [functions.charge-private-lesson-occurrence]
+    verify_jwt = false
+  [functions.cancel-private-lesson-occurrence]
+    verify_jwt = false
+
