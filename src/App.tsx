@@ -31,6 +31,8 @@ import AnnouncementsAdmin from "./pages/admin/AnnouncementsAdmin";
 import EmailLogAdmin from "./pages/admin/EmailLogAdmin";
 import ClientsAdmin from "./pages/admin/ClientsAdmin";
 import MarketingAdmin from "./pages/admin/MarketingAdmin";
+import WaiversAdmin from "./pages/admin/WaiversAdmin";
+import Waivers from "./pages/Waivers";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
 import InstructorAnnouncements from "./pages/instructor/InstructorAnnouncements";
 import InstructorMySchedule from "./pages/instructor/InstructorMySchedule";
@@ -85,6 +87,7 @@ const App = () => (
               <Route path="announcements" element={<AnnouncementsAdmin />} />
               <Route path="emails" element={<EmailLogAdmin />} />
               <Route path="marketing" element={<MarketingAdmin />} />
+              <Route path="waivers" element={<WaiversAdmin />} />
               <Route path="sessions" element={<SessionsAdmin />} />
 
 
@@ -113,6 +116,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/swim-lessons" element={<SwimLessons />} />
               <Route path="/swim-enrollment" element={<SwimEnrollment />} />
+              <Route path="/waivers" element={<Waivers />} />
               <Route path="/careers" element={<Careers />} />
               <Route path="*" element={<NotFound />} />
             </Route>
