@@ -1867,6 +1867,87 @@ export type Database = {
         }
         Relationships: []
       }
+      visitor_waivers: {
+        Row: {
+          completed_by_staff_id: string | null
+          created_at: string
+          email_sent_at: string | null
+          emergency_contact_first_name: string | null
+          emergency_contact_last_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
+          id: string
+          photo_release_accepted: boolean
+          privacy_policy_accepted: boolean
+          privacy_policy_version: string
+          signature_text: string
+          signed_at: string
+          signer_email: string
+          signer_first_name: string
+          signer_ip: string | null
+          signer_last_name: string
+          signer_phone: string | null
+          source: string
+          swimmers: Json
+          terms_accepted: boolean
+          tos_version: string
+          waiver_accepted: boolean
+          waiver_version: string
+        }
+        Insert: {
+          completed_by_staff_id?: string | null
+          created_at?: string
+          email_sent_at?: string | null
+          emergency_contact_first_name?: string | null
+          emergency_contact_last_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
+          id?: string
+          photo_release_accepted?: boolean
+          privacy_policy_accepted?: boolean
+          privacy_policy_version?: string
+          signature_text: string
+          signed_at?: string
+          signer_email: string
+          signer_first_name: string
+          signer_ip?: string | null
+          signer_last_name: string
+          signer_phone?: string | null
+          source?: string
+          swimmers?: Json
+          terms_accepted?: boolean
+          tos_version?: string
+          waiver_accepted?: boolean
+          waiver_version?: string
+        }
+        Update: {
+          completed_by_staff_id?: string | null
+          created_at?: string
+          email_sent_at?: string | null
+          emergency_contact_first_name?: string | null
+          emergency_contact_last_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
+          id?: string
+          photo_release_accepted?: boolean
+          privacy_policy_accepted?: boolean
+          privacy_policy_version?: string
+          signature_text?: string
+          signed_at?: string
+          signer_email?: string
+          signer_first_name?: string
+          signer_ip?: string | null
+          signer_last_name?: string
+          signer_phone?: string | null
+          source?: string
+          swimmers?: Json
+          terms_accepted?: boolean
+          tos_version?: string
+          waiver_accepted?: boolean
+          waiver_version?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

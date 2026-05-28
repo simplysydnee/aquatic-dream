@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Users, Waves, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText, PanelLeftClose, PanelLeft, UserCheck, Layers, CalendarClock, CalendarOff, Clock, BarChart3, Megaphone, Mail, IdCard, ChevronDown, Send } from "lucide-react";
+import { Users, Waves, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText, PanelLeftClose, PanelLeft, UserCheck, Layers, CalendarClock, CalendarOff, Clock, BarChart3, Megaphone, Mail, IdCard, ChevronDown, Send, FileSignature } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ export function AdminSidebar() {
         { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves, badge: 0 },
         { title: "Lesson Requests", url: "/admin/lesson-requests", icon: BookOpen, badge: newLessonRequests },
         { title: "Contact Inquiries", url: "/admin/contacts", icon: MessageSquare, badge: newContacts },
+        { title: "Waivers", url: "/admin/waivers", icon: FileSignature, badge: 0 },
       ],
     },
     {
