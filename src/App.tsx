@@ -32,6 +32,7 @@ import EmailLogAdmin from "./pages/admin/EmailLogAdmin";
 import ClientsAdmin from "./pages/admin/ClientsAdmin";
 import MarketingAdmin from "./pages/admin/MarketingAdmin";
 import WaiversAdmin from "./pages/admin/WaiversAdmin";
+import PrivateLessonsAdmin from "./pages/admin/PrivateLessonsAdmin";
 import Waivers from "./pages/Waivers";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
 import InstructorAnnouncements from "./pages/instructor/InstructorAnnouncements";
@@ -89,6 +90,7 @@ const App = () => (
               <Route path="marketing" element={<MarketingAdmin />} />
               <Route path="waivers" element={<WaiversAdmin />} />
               <Route path="sessions" element={<SessionsAdmin />} />
+              <Route path="private-lessons" element={<PrivateLessonsAdmin />} />
 
 
               <Route path="careers" element={<JobPostingsAdmin />} />

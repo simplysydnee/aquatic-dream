@@ -52,9 +52,11 @@ export function AdminSidebar() {
       ],
     },
     {
+    {
       label: "Programs",
       items: [
         { title: "Sessions", url: "/admin/sessions", icon: Layers, badge: 0 },
+        { title: "Private Lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: 0 },
         { title: "Reports", url: "/admin/reports", icon: BarChart3, badge: 0 },
       ],
     },
