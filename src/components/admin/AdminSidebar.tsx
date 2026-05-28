@@ -52,7 +52,6 @@ export function AdminSidebar() {
       ],
     },
     {
-    {
       label: "Programs",
       items: [
         { title: "Sessions", url: "/admin/sessions", icon: Layers, badge: 0 },

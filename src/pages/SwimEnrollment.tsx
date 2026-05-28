@@ -264,7 +264,6 @@ const SwimEnrollment = () => {
   const swimmerCount = completedChildren.length + 1;
 
   if (mode === "request") {
-  if (mode === "request") {
     return (
       <main className="min-h-screen bg-background">
         <PaymentTestModeBanner />
