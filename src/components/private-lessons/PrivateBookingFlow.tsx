@@ -121,7 +121,7 @@ export default function PrivateBookingFlow() {
         return;
       }
       if (!data?.client_secret) throw new Error((data as any)?.error || "Could not start card setup");
-      setSetup({ clientSecret: data.client_secret, bookingId: data.booking_id, setupIntentId: data.setup_intent_id });
+      setSetup({ clientSecret: data.client_secret, bookingId: data.booking_id, checkoutSessionId: data.checkout_session_id });
       setStep("card");
     } catch (e: any) {
       toast({ title: "Could not save booking", description: e?.message || "Try again", variant: "destructive" });
