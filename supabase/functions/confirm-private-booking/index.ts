@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
             instructorName: b.instructor_name,
             seriesMode: schedule.length > 1,
             totalOccurrences: schedule.length,
-            totalAmountDue: `$${(schedule.length * Number(b.price_per_session)).toFixed(2)} (charged $${Number(b.price_per_session).toFixed(0)} after each lesson)`,
+            totalAmountDue: `$${(schedule.length * Number(b.price_per_session)).toFixed(2)} (charged $${Number(b.price_per_session).toFixed(0)} the day of each lesson)`,
             scheduleList: schedule,
             lessonDate: schedule[0]?.date,
             lessonTime: schedule[0]?.time,
