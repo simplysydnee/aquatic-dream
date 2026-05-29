@@ -12,7 +12,7 @@ const corsHeaders = {
 const BodySchema = z.object({
   environment: z.enum(["sandbox", "live"]),
   booking_id: z.string().uuid(),
-  setup_intent_id: z.string().min(3),
+  checkout_session_id: z.string().min(3),
   session_token: z.string().optional(),
 });
 
@@ -28,10 +28,16 @@ Deno.serve(async (req) => {
   try {
     const parsed = BodySchema.safeParse(await req.json());
     if (!parsed.success) return j({ error: parsed.error.flatten() }, 400);
-    const { environment, booking_id, setup_intent_id, session_token } = parsed.data;
+    const { environment, booking_id, checkout_session_id, session_token } = parsed.data;
 
     const stripe = createStripeClient(environment as StripeEnv);
-    const si = await stripe.setupIntents.retrieve(setup_intent_id);
+    const cs = await stripe.checkout.sessions.retrieve(checkout_session_id);
+    if (cs.status !== "complete" || !cs.setup_intent) {
+      return j({ error: `Checkout not complete: ${cs.status}` }, 400);
+    }
+
+    const setupIntentId = typeof cs.setup_intent === "string" ? cs.setup_intent : cs.setup_intent.id;
+    const si = await stripe.setupIntents.retrieve(setupIntentId);
     if (si.status !== "succeeded" || !si.payment_method) {
       return j({ error: `SetupIntent not ready: ${si.status}` }, 400);
     }
