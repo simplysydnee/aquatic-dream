@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
     // and stores the resulting payment method on the customer for off-session charges.
     const session = await stripe.checkout.sessions.create({
       mode: "setup",
-      ui_mode: "embedded",
+      ui_mode: "embedded_page",
       customer: customerId,
       currency: "usd",
       payment_method_types: ["card"],
