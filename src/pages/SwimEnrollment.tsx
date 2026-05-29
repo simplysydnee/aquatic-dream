@@ -283,7 +283,7 @@ const SwimEnrollment = () => {
           <div className="grid lg:grid-cols-2 gap-8">
             <div className="border border-border rounded-xl p-6 bg-card">
               <h2 className="font-display text-xl font-bold mb-1">Private lessons</h2>
-              <p className="text-sm text-muted-foreground mb-6">Book online. Pick your instructor, days and times, and save a card on file. $65 charged after each lesson.</p>
+              <p className="text-sm text-muted-foreground mb-6">Book online. Pick your instructor, days and times, and save a card on file. $65 charged on the day of each lesson.</p>
               <PrivateBookingFlow />
             </div>
             <div className="border border-border rounded-xl p-6 bg-card">
