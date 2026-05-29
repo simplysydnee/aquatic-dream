@@ -195,7 +195,7 @@ export default function PrivateBookingFlow() {
   return (
     <form onSubmit={handleInfoSubmit} className="max-w-lg mx-auto space-y-4">
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">Book a private lesson</h3>
-      <p className="text-muted-foreground text-sm mb-4">$65 per 30-minute lesson. Card on file required; charged after each lesson. Cancel free up to 24 hours before.</p>
+      <p className="text-muted-foreground text-sm mb-4">$65 per 30-minute lesson. Card on file required; charged the day of each lesson. Cancel free up to 24 hours before — late cancellations and no-shows are charged in full.</p>
 
       <div>
         <Label>Parent / Guardian Name *</Label>
