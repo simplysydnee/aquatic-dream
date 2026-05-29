@@ -1,5 +1,5 @@
 // Creates lesson_bookings + lesson_booking_occurrences (pending),
-// resolves/creates a Stripe Customer, returns a SetupIntent client_secret.
+// resolves/creates a Stripe Customer, returns an Embedded Checkout (setup mode) client_secret.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
@@ -176,19 +176,23 @@ Deno.serve(async (req) => {
       emergency_contact_relationship: body.agreement.emergency_contact_relationship,
     });
 
-    // SetupIntent for off-session future charges
-    const setupIntent = await stripe.setupIntents.create({
+    // Embedded Checkout in setup mode — Stripe renders the card form inside an iframe
+    // and stores the resulting payment method on the customer for off-session charges.
+    const session = await stripe.checkout.sessions.create({
+      mode: "setup",
+      ui_mode: "embedded",
       customer: customerId,
-      usage: "off_session",
+      currency: "usd",
       payment_method_types: ["card"],
+      redirect_on_completion: "never",
       metadata: { booking_id: bookingId, type: "private_lesson_card_on_file" },
     });
 
     return j({
       booking_id: bookingId,
-      client_secret: setupIntent.client_secret,
+      client_secret: session.client_secret,
+      checkout_session_id: session.id,
       customer_id: customerId,
-      setup_intent_id: setupIntent.id,
     });
   } catch (err: any) {
     console.error("create-private-booking-setup error", err);
