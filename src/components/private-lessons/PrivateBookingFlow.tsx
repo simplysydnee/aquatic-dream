@@ -149,7 +149,7 @@ export default function PrivateBookingFlow() {
       <PrivateCardSetup
         setupClientSecret={setup.clientSecret}
         bookingId={setup.bookingId}
-        setupIntentId={setup.setupIntentId}
+        checkoutSessionId={setup.checkoutSessionId}
         sessionToken={sessionToken}
         onComplete={() => setStep("done")}
         onBack={() => setStep("legal")}
