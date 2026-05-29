@@ -40,8 +40,21 @@ Deno.serve(async (req) => {
     if (error) throw error;
 
     const results: any[] = [];
+    const nowMs = Date.now();
     for (const row of (due as any[]) ?? []) {
       const b = row.lesson_bookings;
+      // Don't charge a lesson before it has ended (Pacific time). Past days always pass.
+      if (row.occurrence_date === yyyy_mm_dd && b?.end_time) {
+        const lessonEnd = new Date(
+          new Date(`${row.occurrence_date}T${b.end_time}`).toLocaleString("en-US", {
+            timeZone: "America/Los_Angeles",
+          }),
+        );
+        if (nowMs < lessonEnd.getTime()) {
+          results.push({ id: row.id, ok: false, reason: "lesson_not_ended" });
+          continue;
+        }
+      }
       if (!b?.stripe_customer_id || !b?.stripe_payment_method_id) {
         await supabase.from("lesson_booking_occurrences").update({
           auto_charge_status: "failed",
