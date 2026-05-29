@@ -66,9 +66,10 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await supabase
       .from("lesson_booking_occurrences")
-      .select("occurrence_date, lesson_bookings!inner(instructor_id, start_time)")
+      .select("occurrence_date, lesson_bookings!inner(instructor_id, start_time, status)")
       .in("occurrence_date", uniqDates)
-      .neq("status", "cancelled");
+      .neq("status", "cancelled")
+      .neq("status", "pending_card");
 
     const taken = new Set<string>();
     for (const row of (existing as any[] | null) ?? []) {
