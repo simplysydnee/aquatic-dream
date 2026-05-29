@@ -109,7 +109,7 @@ const LessonRequestForm = () => {
           templateData: {
             parentName,
             childName,
-            lessonType: parsed.data.lessonType,
+            lessonType: "semi-private",
           },
         },
       })
