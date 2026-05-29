@@ -50,7 +50,6 @@ const LessonRequestForm = () => {
     childFirstName: "",
     childLastName: "",
     childDob: undefined as Date | undefined,
-    lessonType: "private" as "private" | "semi-private",
     preferredTimes: "",
     notes: "",
   });
