@@ -1,110 +1,59 @@
-## Goal
+## What's broken
 
-Let parents book private lessons online by picking real instructor time slots, then save a card with Stripe to confirm. Auto-charge $65 the day after each lesson. Replace the "Request a Private or Semi-Private Lesson" tab on `/swim-enrollment` with a contact-only Semi-Private form (manual booking) and a full Private flow that mirrors the group enrollment UX.
+The "Save card" step crashes with:
 
-## Public flow (`/swim-enrollment` → Private/Semi-Private tab)
+> Invalid value for stripe.confirmSetup(): elements should have a mounted Payment Element or Express Checkout Element.
 
-Tab becomes two cards:
-- **Private lessons → Book online** (new flow)
-- **Semi-private → Request info** (the existing form, simplified to a contact request only; admin books manually)
+`PrivateCardSetup.tsx` mounts a custom `<Elements>` + `<PaymentElement>` and calls `stripe.confirmSetup()`. This pattern is fragile (the PaymentElement isn't reliably mounted when submit fires, and it violates the project's Embedded Checkout rule). The fix is to use **Stripe Embedded Checkout in `mode: "setup"`** — same component family already used elsewhere in the app, fully managed by Stripe.
 
-Private booking steps:
-1. **Parent & swimmer info** (parent name/email/phone, child name/age/notes) — same fields as group enrollment.
-2. **Pick instructor (optional)** — list active instructors with bookable availability. "Any instructor" allowed.
-3. **Pick slots** — calendar showing the next 8 weeks. Open instructor slots render as 30‑min tappable chips per day. Parent can:
-   - Tap individual slots across multiple days/times (one-offs), OR
-   - Toggle "Book weekly" → pick a weekday + time → system pre-selects all matching dates for N weeks; parent can uncheck any date.
-   - Running total shows "X lessons × $65 = $X (charged after each lesson)".
-4. **Legal agreements** — reuse `<LegalAgreements />`.
-5. **Save card on file** — Stripe Embedded Checkout in `setup` mode (SetupIntent, no charge). On success, all selected slots are atomically claimed first-come-first-served; any taken slots are reported back and the parent can pick replacements.
-6. **Confirmation** screen + email with full schedule and cancellation policy.
+Separately, the cron currently charges the day **after** each lesson. You want it to charge the **day of** the lesson, with no-shows billed in full and a 24-hour cancellation window (already implemented correctly in cancel function — late cancels keep the charge pending, ≥24h cancels are skipped).
 
-Cancellation: 24‑hour rule. Parents get a per-occurrence cancel link in the confirmation email; <24h cancellations are still charged.
+## Changes
 
-## Admin
+### 1. Switch card capture to Embedded Checkout (setup mode) — fixes the crash
 
-### New page: `/admin/private-lessons` (sidebar under Lessons)
+**`supabase/functions/create-private-booking-setup/index.ts`**
+- Replace the raw `stripe.setupIntents.create(...)` with `stripe.checkout.sessions.create({ mode: "setup", ui_mode: "embedded", customer, return_url, payment_method_types: ["card"], metadata: { booking_id } })`.
+- Return `{ booking_id, client_secret, session_token }` (Checkout client secret, not SetupIntent's).
 
-Two tabs:
+**`src/components/private-lessons/PrivateCardSetup.tsx`** — rewrite:
+- Remove `Elements` / `PaymentElement` / `useStripe` / `useElements` / `confirmSetup`.
+- Render `<EmbeddedCheckoutProvider stripe={getStripe()} options={{ fetchClientSecret }}><EmbeddedCheckout /></EmbeddedCheckoutProvider>`.
+- `return_url` points back to `/swim-enrollment?private_booking_id=…&checkout_session_id={CHECKOUT_SESSION_ID}`.
 
-**Availability**
-- For each instructor: list recurring weekly blocks (e.g. Mon 3–6pm) + one-off date blocks + blackouts.
-- Add/edit/delete blocks. Inputs: instructor, day-of-week OR specific date range, start–end time, slot length (default 30 min), pool area, optional notes.
-- Generated slots are computed on read (no separate slot table) by combining blocks − existing bookings − pool_events − blackouts.
+**`src/pages/SwimEnrollment.tsx`**
+- On mount, if `private_booking_id` + `checkout_session_id` are present in the URL, call `confirm-private-booking` with the session id, then jump the flow to the confirmation step and clean the URL.
 
-**Bookings**
-- Table of `lesson_bookings` where `lesson_type='private'` and `booking_source='self_serve'`. Filters: upcoming, past, cancelled. Row click opens existing `LessonRequestDetailDialog`-style drawer showing occurrences + charge status. Buttons: cancel occurrence, refund last charge, resend card-update link.
+**`supabase/functions/confirm-private-booking/index.ts`**
+- Accept `checkout_session_id` instead of `setup_intent_id`. Retrieve the Checkout Session, read `session.setup_intent`, retrieve that SetupIntent, persist `payment_method_id` + `customer` on the booking, flip occurrences to `scheduled`, send confirmation email.
 
-### Sidebar nav
-Add "Private Lessons" item.
+### 2. Charge on the day of the lesson (no-show = full charge)
 
-## Database
+**`supabase/functions/charge-private-lesson-occurrence/index.ts`**
+- Change the query filter from `.lt("occurrence_date", today)` to `.lte("occurrence_date", today)` so today's lessons are eligible.
+- Add a safety guard: only charge an occurrence whose lesson `end_time` has already passed in America/Los_Angeles (so we don't charge mid-class). Past dates always pass this check.
+- Update charge `description` to `Private Lesson — {child} — {date} {start_time}`.
 
-New table `instructor_booking_blocks`:
-- `instructor_id`, `kind` ('weekly' | 'date_range'), `day_of_week` (nullable int 0–6), `start_date`/`end_date` (nullable), `start_time`, `end_time`, `slot_minutes` (default 30), `pool_area`, `is_blackout` (bool), `notes`, timestamps.
-- RLS: admins manage; anon `SELECT` allowed (needed so public page can compute open slots without auth).
+Cancellation logic in `cancel-private-lesson-occurrence` already enforces the 24-hour policy correctly (`within window` → keep `auto_charge_status='pending'` so the cron bills; `outside window` → `skipped`). No changes needed there.
 
-Extend `lesson_bookings`:
-- `booking_source` text ('admin' | 'self_serve'), default 'admin'
-- `stripe_customer_id` text
-- `stripe_payment_method_id` text
-- `cancellation_policy_hours` int default 24
+### 3. UI copy
 
-Extend `lesson_booking_occurrences`:
-- `auto_charge_status` text ('pending' | 'succeeded' | 'failed' | 'skipped'), default 'pending'
-- `auto_charge_attempted_at`, `auto_charge_error`
-- `stripe_payment_intent_id`
-- `cancel_token` text unique (for one-click cancel emails)
-
-New table `slot_holds` (for the brief window between "Pick slots" and "Card saved"):
-- `id`, `instructor_id`, `slot_date`, `start_time`, `end_time`, `held_until` (now + 5 min), `session_token`. Cleaned on insert via "expired holds where held_until < now()". Used only to prevent thundering-herd double-book during the SetupIntent flow.
-
-RLS: all new/extended rules keep current admin-only writes; public can `SELECT` blocks and `INSERT/DELETE` their own slot holds keyed by `session_token` (no auth).
-
-## Stripe
-
-New edge functions (all `verify_jwt = false`):
-- `create-private-booking-setup` — input: parent info, selected slots, swimmer info, legal agreement payload. Validates slots are still open, creates `lesson_bookings` row + `lesson_booking_occurrences` rows in `pending_card` status, creates Stripe Customer (via `resolveOrCreateCustomer` keyed on email), returns a SetupIntent `client_secret` for embedded checkout in `setup` mode.
-- `confirm-private-booking` — input: bookingId + setup_intent id. Verifies SetupIntent succeeded, stores `payment_method_id` on the booking, flips occurrences to `scheduled`, sends confirmation email.
-- `charge-private-lesson-occurrence` — cron-style function, hit by `pg_cron` daily. Finds occurrences whose `occurrence_date = yesterday` and `auto_charge_status='pending'`, creates an off-session PaymentIntent for $65 using stored `payment_method_id`. Updates status; on failure, emails parent + admin.
-- `cancel-private-lesson-occurrence` — token-authenticated, cancels one occurrence. If <24h before, marks `auto_charge_status` to charge as normal. If ≥24h, marks `skipped`.
-
-Use `_shared/stripe.ts` `createStripeClient` for all Stripe calls.
-
-Webhook (`payments-webhook`) — add handler for `setup_intent.succeeded` and `payment_intent.payment_failed` to mirror state.
+In `PrivateCardSetup.tsx` and the "Private lessons" intro paragraph in `SwimEnrollment.tsx`:
+- "$65 charged after each lesson" → "$65 charged the day of each lesson".
+- "No charge today. We'll charge $65 to your card the day after each lesson." → "No charge today. We'll charge $65 on the day of each lesson. No-shows and cancellations within 24 hours are charged in full."
 
 ## Files
 
-**New**
-- `src/pages/admin/PrivateLessonsAdmin.tsx`
-- `src/components/admin/private-lessons/InstructorAvailabilityManager.tsx`
-- `src/components/admin/private-lessons/PrivateBookingsTable.tsx`
-- `src/components/admin/private-lessons/PrivateBookingDetailDrawer.tsx`
-- `src/components/private-lessons/PrivateBookingFlow.tsx` (5-step wrapper)
-- `src/components/private-lessons/SlotPicker.tsx` (calendar + chips + weekly toggle)
-- `src/components/private-lessons/PrivateCardSetup.tsx` (Stripe embedded SetupIntent)
-- `src/lib/privateBooking.ts` (slot computation, edge-fn callers)
+**Edited**
 - `supabase/functions/create-private-booking-setup/index.ts`
 - `supabase/functions/confirm-private-booking/index.ts`
 - `supabase/functions/charge-private-lesson-occurrence/index.ts`
-- `supabase/functions/cancel-private-lesson-occurrence/index.ts`
-- `supabase/functions/_shared/transactional-email-templates/private-booking-confirmation.tsx`
-- `supabase/functions/_shared/transactional-email-templates/private-lesson-cancelled.tsx`
-- `supabase/functions/_shared/transactional-email-templates/private-lesson-charge-failed.tsx`
-- Migration: new tables + columns + RLS + grants
+- `src/components/private-lessons/PrivateCardSetup.tsx`
+- `src/pages/SwimEnrollment.tsx` (return-URL handler + copy)
 
-**Edited**
-- `src/pages/SwimEnrollment.tsx` — replace the existing Request tab with the new Private booking flow + a simplified Semi-Private contact request form
-- `src/components/swim-enrollment/LessonRequestForm.tsx` — trim to Semi-Private inquiry only
-- `src/components/admin/AdminSidebar.tsx` — add "Private Lessons"
-- `src/App.tsx` — route for `/admin/private-lessons`
-- `supabase/functions/payments-webhook/index.ts` — handle setup/charge events
-- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register new templates
-- `supabase/config.toml` — `verify_jwt = false` for new functions
+**No DB migration needed** — existing columns (`stripe_customer_id`, `stripe_payment_method_id`, `auto_charge_status`) cover the new flow.
 
 ## Out of scope
-- Semi-private online booking (stays manual; new form is contact-only).
-- Package pricing / discounts / multi-swimmer per booking.
-- Rescheduling UI for parents (cancel + rebook only for v1).
-- Instructor-side acceptance flow (admin manages availability, all bookings auto-confirm).
-- SMS reminders.
+- Email reminders the morning of each lesson.
+- Failed-charge retry UI for parents (admin can resend a card-update link from the bookings drawer).
+- Pre-auth holds (we save card and capture day-of instead).
