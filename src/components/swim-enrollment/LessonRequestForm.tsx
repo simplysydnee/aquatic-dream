@@ -34,7 +34,6 @@ const requestSchema = z.object({
   childDob: z.date({ required_error: "Date of birth is required" })
     .refine((d) => d <= new Date(), { message: "Date of birth must be in the past" })
     .refine((d) => d >= new Date("1920-01-01"), { message: "Please enter a valid date" }),
-  lessonType: z.enum(["private", "semi-private"]),
   preferredTimes: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(500).optional(),
 });
