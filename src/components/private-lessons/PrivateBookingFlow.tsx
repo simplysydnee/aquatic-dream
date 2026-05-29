@@ -137,7 +137,7 @@ export default function PrivateBookingFlow() {
         <h3 className="font-display text-2xl font-bold mb-2">You're booked!</h3>
         <p className="text-muted-foreground mb-6">
           A confirmation email is on the way to <strong>{form.parentEmail}</strong> with your full schedule.
-          We'll charge $65 to your card after each lesson.
+          We'll charge $65 to your card on the day of each lesson. No-shows and cancellations within 24 hours are charged in full.
         </p>
         <Button asChild><a href="/">Back to home</a></Button>
       </div>
