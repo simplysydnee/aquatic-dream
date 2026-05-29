@@ -71,13 +71,13 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
   // Group by date
   const byDate = useMemo(() => {
     const m = new Map<string, Slot[]>();
-    for (const s of slots) {
+    for (const s of filteredSlots) {
       if (!m.has(s.slot_date)) m.set(s.slot_date, []);
       m.get(s.slot_date)!.push(s);
     }
     for (const arr of m.values()) arr.sort((a, b) => a.start_time.localeCompare(b.start_time));
     return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [slots]);
+  }, [filteredSlots]);
 
   const toggle = (s: Slot) => {
     const k = `${s.instructor_id}|${s.slot_date}|${s.start_time}`;
