@@ -90,7 +90,7 @@ const LessonRequestForm = () => {
       child_last_name: parsed.data.childLastName,
       child_age: childAge,
       child_dob: dobIso,
-      lesson_type: parsed.data.lessonType,
+      lesson_type: "semi-private",
       preferred_times: parsed.data.preferredTimes || null,
       notes: parsed.data.notes || null,
     });
