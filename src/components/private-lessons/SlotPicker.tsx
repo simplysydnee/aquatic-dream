@@ -29,6 +29,8 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Record<string, Slot>>({});
   const [weeklyMode, setWeeklyMode] = useState(false);
+  const [dayFilter, setDayFilter] = useState<Set<number>>(new Set());
+  const [timeFilter, setTimeFilter] = useState<"all" | "am" | "pm">("all");
 
   useEffect(() => {
     fetchInstructors().then(setInstructors);
@@ -45,16 +47,37 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
     }).then((s) => { setSlots(s); setLoading(false); });
   }, [instructorId, sessionToken]);
 
+  const toggleDay = (d: number) => {
+    setDayFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d); else next.add(d);
+      return next;
+    });
+  };
+
+  const filteredSlots = useMemo(() => {
+    return slots.filter((s) => {
+      const dow = new Date(s.slot_date + "T00:00").getDay();
+      if (dayFilter.size > 0 && !dayFilter.has(dow)) return false;
+      if (timeFilter !== "all") {
+        const hour = Number(s.start_time.split(":")[0]);
+        if (timeFilter === "am" && hour >= 12) return false;
+        if (timeFilter === "pm" && hour < 12) return false;
+      }
+      return true;
+    });
+  }, [slots, dayFilter, timeFilter]);
+
   // Group by date
   const byDate = useMemo(() => {
     const m = new Map<string, Slot[]>();
-    for (const s of slots) {
+    for (const s of filteredSlots) {
       if (!m.has(s.slot_date)) m.set(s.slot_date, []);
       m.get(s.slot_date)!.push(s);
     }
     for (const arr of m.values()) arr.sort((a, b) => a.start_time.localeCompare(b.start_time));
     return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [slots]);
+  }, [filteredSlots]);
 
   const toggle = (s: Slot) => {
     const k = `${s.instructor_id}|${s.slot_date}|${s.start_time}`;
@@ -129,6 +152,42 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
           <Label htmlFor="weekly">Show weekly options</Label>
           <Switch id="weekly" checked={weeklyMode} onCheckedChange={setWeeklyMode} />
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <span className="text-xs font-semibold text-muted-foreground mr-1">Days:</span>
+        {WEEKDAYS.map((label, idx) => {
+          const active = dayFilter.has(idx);
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => toggleDay(idx)}
+              className={`px-2.5 py-1 text-xs rounded-md border transition ${active
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background hover:bg-muted border-border"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+        {dayFilter.size > 0 && (
+          <button type="button" onClick={() => setDayFilter(new Set())}
+            className="text-xs text-muted-foreground underline ml-1">Clear</button>
+        )}
+        <span className="text-xs font-semibold text-muted-foreground ml-3 mr-1">Time:</span>
+        {(["all", "am", "pm"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setTimeFilter(v)}
+            className={`px-2.5 py-1 text-xs rounded-md border transition ${timeFilter === v
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background hover:bg-muted border-border"}`}
+          >
+            {v === "all" ? "All" : v.toUpperCase()}
+          </button>
+        ))}
       </div>
 
       {weeklyMode && (
