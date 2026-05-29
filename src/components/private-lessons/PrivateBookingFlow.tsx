@@ -64,6 +64,10 @@ export default function PrivateBookingFlow() {
     return () => { releaseHolds(sessionToken).catch(() => {}); };
   }, [sessionToken]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step]);
+
   const computedAge = useMemo(() => (form.childDob ? calcAge(form.childDob) : null), [form.childDob]);
   const update = (k: string, v: any) => { setForm({ ...form, [k]: v }); if (errors[k]) setErrors({ ...errors, [k]: "" }); };
 
