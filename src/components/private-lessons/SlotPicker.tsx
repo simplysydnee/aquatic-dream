@@ -29,6 +29,8 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Record<string, Slot>>({});
   const [weeklyMode, setWeeklyMode] = useState(false);
+  const [dayFilter, setDayFilter] = useState<Set<number>>(new Set());
+  const [timeFilter, setTimeFilter] = useState<"all" | "am" | "pm">("all");
 
   useEffect(() => {
     fetchInstructors().then(setInstructors);
@@ -44,6 +46,27 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
       sessionToken,
     }).then((s) => { setSlots(s); setLoading(false); });
   }, [instructorId, sessionToken]);
+
+  const toggleDay = (d: number) => {
+    setDayFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d); else next.add(d);
+      return next;
+    });
+  };
+
+  const filteredSlots = useMemo(() => {
+    return slots.filter((s) => {
+      const dow = new Date(s.slot_date + "T00:00").getDay();
+      if (dayFilter.size > 0 && !dayFilter.has(dow)) return false;
+      if (timeFilter !== "all") {
+        const hour = Number(s.start_time.split(":")[0]);
+        if (timeFilter === "am" && hour >= 12) return false;
+        if (timeFilter === "pm" && hour < 12) return false;
+      }
+      return true;
+    });
+  }, [slots, dayFilter, timeFilter]);
 
   // Group by date
   const byDate = useMemo(() => {
