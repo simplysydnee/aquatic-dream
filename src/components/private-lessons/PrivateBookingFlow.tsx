@@ -58,7 +58,7 @@ export default function PrivateBookingFlow() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [slots, setSlots] = useState<Slot[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [setup, setSetup] = useState<{ clientSecret: string; bookingId: string; setupIntentId: string } | null>(null);
+  const [setup, setSetup] = useState<{ clientSecret: string; bookingId: string; checkoutSessionId: string } | null>(null);
 
   useEffect(() => {
     return () => { releaseHolds(sessionToken).catch(() => {}); };
@@ -121,7 +121,7 @@ export default function PrivateBookingFlow() {
         return;
       }
       if (!data?.client_secret) throw new Error((data as any)?.error || "Could not start card setup");
-      setSetup({ clientSecret: data.client_secret, bookingId: data.booking_id, setupIntentId: data.setup_intent_id });
+      setSetup({ clientSecret: data.client_secret, bookingId: data.booking_id, checkoutSessionId: data.checkout_session_id });
       setStep("card");
     } catch (e: any) {
       toast({ title: "Could not save booking", description: e?.message || "Try again", variant: "destructive" });
@@ -137,7 +137,7 @@ export default function PrivateBookingFlow() {
         <h3 className="font-display text-2xl font-bold mb-2">You're booked!</h3>
         <p className="text-muted-foreground mb-6">
           A confirmation email is on the way to <strong>{form.parentEmail}</strong> with your full schedule.
-          We'll charge $65 to your card after each lesson.
+          We'll charge $65 to your card on the day of each lesson. No-shows and cancellations within 24 hours are charged in full.
         </p>
         <Button asChild><a href="/">Back to home</a></Button>
       </div>
@@ -149,7 +149,7 @@ export default function PrivateBookingFlow() {
       <PrivateCardSetup
         setupClientSecret={setup.clientSecret}
         bookingId={setup.bookingId}
-        setupIntentId={setup.setupIntentId}
+        checkoutSessionId={setup.checkoutSessionId}
         sessionToken={sessionToken}
         onComplete={() => setStep("done")}
         onBack={() => setStep("legal")}
@@ -195,7 +195,7 @@ export default function PrivateBookingFlow() {
   return (
     <form onSubmit={handleInfoSubmit} className="max-w-lg mx-auto space-y-4">
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">Book a private lesson</h3>
-      <p className="text-muted-foreground text-sm mb-4">$65 per 30-minute lesson. Card on file required; charged after each lesson. Cancel free up to 24 hours before.</p>
+      <p className="text-muted-foreground text-sm mb-4">$65 per 30-minute lesson. Card on file required; charged the day of each lesson. Cancel free up to 24 hours before — late cancellations and no-shows are charged in full.</p>
 
       <div>
         <Label>Parent / Guardian Name *</Label>

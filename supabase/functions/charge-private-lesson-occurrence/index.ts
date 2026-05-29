@@ -21,23 +21,40 @@ Deno.serve(async (req) => {
     const envParam = url.searchParams.get("env") || "live";
     const stripe = createStripeClient(envParam === "sandbox" ? "sandbox" : "live");
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const yyyy_mm_dd = today.toISOString().slice(0, 10);
+    // "Today" in America/Los_Angeles (the studio's local time).
+    const laToday = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }),
+    );
+    laToday.setHours(0, 0, 0, 0);
+    const yyyy_mm_dd = laToday.toISOString().slice(0, 10);
 
-    // Charge occurrences whose date < today and status is still pending.
+    // Charge occurrences whose date <= today (so we capture day-of charges
+    // and any missed prior days) and are still pending.
     const { data: due, error } = await supabase
       .from("lesson_booking_occurrences")
       .select("id, booking_id, occurrence_date, status, lesson_bookings!inner(id, parent_email, parent_first_name, parent_name, child_name, stripe_customer_id, stripe_payment_method_id, price_per_session, instructor_name, start_time, end_time)")
       .eq("auto_charge_status", "pending")
-      .lt("occurrence_date", yyyy_mm_dd)
+      .lte("occurrence_date", yyyy_mm_dd)
       .neq("status", "cancelled")
       .limit(50);
     if (error) throw error;
 
     const results: any[] = [];
+    const nowMs = Date.now();
     for (const row of (due as any[]) ?? []) {
       const b = row.lesson_bookings;
+      // Don't charge a lesson before it has ended (Pacific time). Past days always pass.
+      if (row.occurrence_date === yyyy_mm_dd && b?.end_time) {
+        const lessonEnd = new Date(
+          new Date(`${row.occurrence_date}T${b.end_time}`).toLocaleString("en-US", {
+            timeZone: "America/Los_Angeles",
+          }),
+        );
+        if (nowMs < lessonEnd.getTime()) {
+          results.push({ id: row.id, ok: false, reason: "lesson_not_ended" });
+          continue;
+        }
+      }
       if (!b?.stripe_customer_id || !b?.stripe_payment_method_id) {
         await supabase.from("lesson_booking_occurrences").update({
           auto_charge_status: "failed",
