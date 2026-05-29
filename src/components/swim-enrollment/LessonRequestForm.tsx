@@ -126,7 +126,7 @@ const LessonRequestForm = () => {
       parentPhone: parsed.data.parentPhone || "",
       childName,
       childAge,
-      lessonType: parsed.data.lessonType,
+      lessonType: "semi-private",
       preferredTimes: parsed.data.preferredTimes || "",
       notes: parsed.data.notes || "",
       submittedAt: new Date().toLocaleString(),
@@ -153,7 +153,7 @@ const LessonRequestForm = () => {
           <CardContent className="pt-8 pb-6 px-6">
             <CheckCircle className="w-12 h-12 text-primary mx-auto mb-4" />
             <h3 className="font-display text-2xl font-bold text-foreground mb-2">Request Submitted!</h3>
-            <p className="text-muted-foreground mb-4">We'll reach out soon to schedule your {form.lessonType} lesson.</p>
+            <p className="text-muted-foreground mb-4">We'll reach out soon to schedule your semi-private lesson.</p>
             <Button asChild className="bg-primary text-primary-foreground">
               <a href="/swim-lessons">Back to Swim Lessons <ArrowRight className="ml-1 w-4 h-4" /></a>
             </Button>
@@ -165,28 +165,15 @@ const LessonRequestForm = () => {
 
   return (
     <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="max-w-lg mx-auto">
-      <h3 className="font-display text-2xl font-bold text-foreground mb-1">Request a Private or Semi-Private Lesson</h3>
+      <h3 className="font-display text-2xl font-bold text-foreground mb-1">Request a Semi-Private Lesson</h3>
       <p className="text-muted-foreground text-sm mb-6">Fill out the form and we'll get back to you to schedule. Open to all ages.</p>
 
       <div className="flex items-center gap-4 text-sm bg-accent/50 border border-accent rounded-lg p-3 mb-6">
         <DollarSign className="w-4 h-4 text-primary shrink-0" />
-        <span>Private: ${PRICING.private}/lesson · Semi-Private: ${PRICING.semiPrivate}/lesson</span>
+        <span>Semi-Private: ${PRICING.semiPrivate}/lesson</span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label className="text-sm font-medium">Lesson Type</Label>
-          <RadioGroup value={form.lessonType} onValueChange={(v) => update("lessonType", v)} className="flex gap-4 mt-2">
-            <div className="flex items-center gap-2">
-              <RadioGroupItem value="private" id="private" />
-              <Label htmlFor="private" className="cursor-pointer">Private ($65)</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <RadioGroupItem value="semi-private" id="semi-private" />
-              <Label htmlFor="semi-private" className="cursor-pointer">Semi-Private ($45)</Label>
-            </div>
-          </RadioGroup>
-        </div>
 
         <div>
           <Label className="text-sm font-semibold">Parent / Guardian Name *</Label>
