@@ -154,6 +154,42 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <span className="text-xs font-semibold text-muted-foreground mr-1">Days:</span>
+        {WEEKDAYS.map((label, idx) => {
+          const active = dayFilter.has(idx);
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => toggleDay(idx)}
+              className={`px-2.5 py-1 text-xs rounded-md border transition ${active
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background hover:bg-muted border-border"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+        {dayFilter.size > 0 && (
+          <button type="button" onClick={() => setDayFilter(new Set())}
+            className="text-xs text-muted-foreground underline ml-1">Clear</button>
+        )}
+        <span className="text-xs font-semibold text-muted-foreground ml-3 mr-1">Time:</span>
+        {(["all", "am", "pm"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setTimeFilter(v)}
+            className={`px-2.5 py-1 text-xs rounded-md border transition ${timeFilter === v
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background hover:bg-muted border-border"}`}
+          >
+            {v === "all" ? "All" : v.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
       {weeklyMode && (
         <div className="border border-border rounded-lg p-4 mb-6 bg-muted/30">
           <p className="text-sm font-semibold mb-3">Recurring slot quick-picks</p>
