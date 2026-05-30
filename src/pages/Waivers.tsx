@@ -19,7 +19,7 @@ const Waivers = () => {
           </h1>
           <p className="text-secondary-foreground/80 text-lg">
             Please sign before entering the pool. Takes about 2 minutes — a copy
-            will be emailed to you and we'll have it ready at the front desk.
+            will be emailed to you.
           </p>
         </div>
       </section>
