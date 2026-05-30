@@ -1,22 +1,34 @@
-## Plan
+## Problem
 
-1. **Fix the visitor waiver submission path**
-   - Stop the `/waivers` public form from depending on direct browser access to `visitor_waivers` returning rows after insert, because that table intentionally has no public read access for private waiver data.
-   - Add a small backend function for public visitor waiver submissions that uses server-side credentials to save the waiver, send the emailed copy, and mark the email timestamp without exposing waiver records publicly.
-   - Keep admin-only viewing/editing rules intact so visitor PII is still protected.
+On `/waivers`, when you pick a Month (or Day, or Year) from the dropdowns for a swimmer's date of birth, the selection visually reverts to the "Month" placeholder. Same for Day and Year until all three are chosen.
 
-2. **Update the frontend submission helper**
-   - Change the public/kiosk waiver form to call the new backend submission function.
-   - Preserve the existing success message: “A copy has been emailed to you.”
-   - Show a clearer error if the backend submission fails.
+## Root cause
 
-3. **Make birthdate day selection easier**
-   - Replace the single browser-native `type="date"` control in `SwimmersCoveredFields` with three explicit fields: Month, Day, Year.
-   - Store the final value in the same `YYYY-MM-DD` format already used by the waiver payload, so existing database/email behavior remains compatible.
-   - Keep it mobile-friendly with compact dropdown/input controls and validation-safe formatting.
+In `src/components/waivers/SwimmersCoveredFields.tsx`, the swimmer's DOB is stored as a single `YYYY-MM-DD` string on the `SwimmerCovered` object. The `joinDob(y, m, d)` helper returns an empty string unless **all three** parts are filled:
 
-## Technical details
+```ts
+if (!y || !m || !d) return "";
+```
 
-- The current `visitor_waivers` table has public create access but not public read access, which is good for privacy. The current client insert asks the database to return `id`, which can conflict with the no-public-read policy.
-- The backend function avoids widening public read permissions and is the safest way to “bypass” the visitor RLS problem for `/waivers` submissions only.
-- No public SELECT policy will be added to `visitor_waivers`.
+So picking just Month writes `""` back to `s.dob`. On re-render, `splitDob("")` returns `{ y:"", m:"", d:"" }`, the `<Select value={m}>` becomes empty, and the trigger falls back to the "Month" placeholder. The user's choice is silently discarded.
+
+## Fix
+
+Preserve partial selections so each dropdown reflects what the user picked, while still only emitting a valid `YYYY-MM-DD` to downstream code once all three are filled.
+
+Approach: track the three parts in component-local state (keyed by swimmer index), and only sync to `s.dob` when all three are present (otherwise clear `s.dob`). Initialize local state from `s.dob` so existing values still hydrate.
+
+### Changes (single file)
+
+**`src/components/waivers/SwimmersCoveredFields.tsx`**
+1. Add a `useState<Record<number, { y: string; m: string; d: string }>>` for DOB parts.
+2. On mount / when `swimmers` length changes, hydrate any missing entries from `splitDob(s.dob)`.
+3. Replace the three `<Select>` `value` props to read from local parts state.
+4. In each `onValueChange`, update local parts state, then call `update(idx, "dob", allThreeFilled ? "YYYY-MM-DD" : "")`.
+5. Keep the existing `safeDay` clamping when month/year changes shrinks the month length.
+6. No changes to `SwimmerCovered` type, parent components, validation, or submission payload.
+
+## Out of scope
+
+- No changes to validation rules, the edge function, or the visitor waiver submission flow.
+- No styling changes beyond what's needed for the fix.
