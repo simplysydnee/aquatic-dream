@@ -90,6 +90,9 @@ interface Props {
   defaultEmergencyContactLastName?: string;
   defaultEmergencyContactPhone?: string;
   defaultEmergencyContactRelationship?: string;
+  signerFirstName?: string;
+  signerLastName?: string;
+  signerPhone?: string;
   showAddAnother?: boolean;
   onAddAnother?: (data: LegalAgreementData) => void;
   submitLabel?: string;
@@ -99,7 +102,7 @@ interface Props {
   headerSubtitle?: React.ReactNode;
 }
 
-const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
+const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, signerFirstName, signerLastName, signerPhone, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
   const [form, setForm] = useState({
     waiverAccepted: false,
     privacyPolicyAccepted: false,
