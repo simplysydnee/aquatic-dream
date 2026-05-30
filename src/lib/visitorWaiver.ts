@@ -24,69 +24,38 @@ export interface SubmitVisitorWaiverArgs {
 }
 
 export async function submitVisitorWaiver(args: SubmitVisitorWaiverArgs): Promise<{ id: string }> {
-  const { data: userData } = await supabase.auth.getUser();
-  const staffId =
-    args.source === "kiosk" ? userData?.user?.id ?? null : null;
-
-  const { data, error } = await supabase
-    .from("visitor_waivers")
-    .insert({
-      signer_first_name: args.signerFirstName.trim(),
-      signer_last_name: args.signerLastName.trim(),
-      signer_email: args.signerEmail.trim().toLowerCase(),
-      signer_phone: args.signerPhone?.trim() || null,
-      signature_text: args.legal.signatureText,
-      waiver_accepted: args.legal.waiverAccepted,
-      terms_accepted: args.legal.termsAccepted,
-      privacy_policy_accepted: args.legal.privacyPolicyAccepted,
-      photo_release_accepted: args.legal.photoReleaseAccepted === "yes",
-      emergency_contact_first_name: args.legal.emergencyContactFirstName,
-      emergency_contact_last_name: args.legal.emergencyContactLastName,
-      emergency_contact_phone: args.legal.emergencyContactPhone,
-      emergency_contact_relationship: args.legal.emergencyContactRelationship,
-      swimmers: args.swimmers as any,
-      waiver_version: WAIVER_VERSION,
-      tos_version: TOS_VERSION,
-      privacy_policy_version: PRIVACY_POLICY_VERSION,
+  const { data, error } = await supabase.functions.invoke("submit-visitor-waiver", {
+    body: {
+      signerFirstName: args.signerFirstName.trim(),
+      signerLastName: args.signerLastName.trim(),
+      signerEmail: args.signerEmail.trim().toLowerCase(),
+      signerPhone: args.signerPhone?.trim() || null,
+      swimmers: args.swimmers,
       source: args.source,
-      completed_by_staff_id: staffId,
-    } as any)
-    .select("id")
-    .single();
+      legal: {
+        signatureText: args.legal.signatureText,
+        waiverAccepted: args.legal.waiverAccepted,
+        termsAccepted: args.legal.termsAccepted,
+        privacyPolicyAccepted: args.legal.privacyPolicyAccepted,
+        photoReleaseAccepted: args.legal.photoReleaseAccepted,
+        emergencyContactFirstName: args.legal.emergencyContactFirstName,
+        emergencyContactLastName: args.legal.emergencyContactLastName,
+        emergencyContactName: args.legal.emergencyContactName,
+        emergencyContactPhone: args.legal.emergencyContactPhone,
+        emergencyContactRelationship: args.legal.emergencyContactRelationship,
+      },
+      waiverVersion: WAIVER_VERSION,
+      tosVersion: TOS_VERSION,
+      privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+    },
+  });
 
   if (error) throw error;
+  if (!data?.id) throw new Error((data as any)?.error || "Could not save waiver");
 
-  // Fire-and-await email confirmation; failures are non-fatal for the user.
-  try {
-    await supabase.functions.invoke("send-transactional-email", {
-      body: {
-        templateName: "visitor-waiver-copy",
-        recipientEmail: args.signerEmail.trim().toLowerCase(),
-        idempotencyKey: `visitor-waiver-${data.id}`,
-        templateData: {
-          signerName: `${args.signerFirstName} ${args.signerLastName}`.trim(),
-          signedAt: new Date().toISOString(),
-          swimmers: args.swimmers,
-          photoRelease: args.legal.photoReleaseAccepted === "yes",
-          emergencyContactName: args.legal.emergencyContactName,
-          emergencyContactPhone: args.legal.emergencyContactPhone,
-          emergencyContactRelationship: args.legal.emergencyContactRelationship,
-          waiverVersion: WAIVER_VERSION,
-          tosVersion: TOS_VERSION,
-          privacyPolicyVersion: PRIVACY_POLICY_VERSION,
-        },
-      },
-    });
-    await supabase
-      .from("visitor_waivers")
-      .update({ email_sent_at: new Date().toISOString() } as any)
-      .eq("id", data.id);
-  } catch (e) {
-    console.warn("Visitor waiver email send failed", e);
-  }
-
-  return { id: data.id };
+  return { id: data.id as string };
 }
+
 
 export async function resendVisitorWaiverCopy(waiverId: string): Promise<void> {
   const { data: waiver, error } = await supabase
