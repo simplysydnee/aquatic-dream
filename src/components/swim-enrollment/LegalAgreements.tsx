@@ -115,6 +115,27 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
     emergencyContactRelationship: defaultEmergencyContactRelationship || "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [sameAsSigner, setSameAsSigner] = useState(false);
+
+  const fillEmergencyFromSigner = (checked: boolean) => {
+    setSameAsSigner(checked);
+    if (checked) {
+      setForm((prev) => ({
+        ...prev,
+        emergencyContactFirstName: signerFirstName || prev.emergencyContactFirstName,
+        emergencyContactLastName: signerLastName || prev.emergencyContactLastName,
+        emergencyContactPhone: signerPhone || prev.emergencyContactPhone,
+        emergencyContactRelationship: "Self",
+      }));
+      setErrors((prev) => ({
+        ...prev,
+        emergencyContactFirstName: "",
+        emergencyContactLastName: "",
+        emergencyContactPhone: "",
+        emergencyContactRelationship: "",
+      }));
+    }
+  };
 
   const validate = (): LegalAgreementData | null => {
     const result = legalSchema.safeParse(form);
