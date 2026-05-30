@@ -121,6 +121,9 @@ const VisitorWaiverForm = ({ source, onSubmitted, hideSuccessScreen, submitLabel
         onSubmit={handleLegalSubmit}
         onBack={() => setStep("contact")}
         submitting={submitting}
+        signerFirstName={signerFirstName}
+        signerLastName={signerLastName}
+        signerPhone={signerPhone}
         submitLabel={submitLabel ?? "Sign & Submit Waiver"}
         submittingLabel="Submitting..."
         headerTitle="Sign your waiver"
