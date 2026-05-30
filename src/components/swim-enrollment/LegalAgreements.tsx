@@ -90,6 +90,9 @@ interface Props {
   defaultEmergencyContactLastName?: string;
   defaultEmergencyContactPhone?: string;
   defaultEmergencyContactRelationship?: string;
+  signerFirstName?: string;
+  signerLastName?: string;
+  signerPhone?: string;
   showAddAnother?: boolean;
   onAddAnother?: (data: LegalAgreementData) => void;
   submitLabel?: string;
@@ -99,7 +102,7 @@ interface Props {
   headerSubtitle?: React.ReactNode;
 }
 
-const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
+const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, signerFirstName, signerLastName, signerPhone, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
   const [form, setForm] = useState({
     waiverAccepted: false,
     privacyPolicyAccepted: false,
@@ -112,6 +115,27 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
     emergencyContactRelationship: defaultEmergencyContactRelationship || "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [sameAsSigner, setSameAsSigner] = useState(false);
+
+  const fillEmergencyFromSigner = (checked: boolean) => {
+    setSameAsSigner(checked);
+    if (checked) {
+      setForm((prev) => ({
+        ...prev,
+        emergencyContactFirstName: signerFirstName || prev.emergencyContactFirstName,
+        emergencyContactLastName: signerLastName || prev.emergencyContactLastName,
+        emergencyContactPhone: signerPhone || prev.emergencyContactPhone,
+        emergencyContactRelationship: "Self",
+      }));
+      setErrors((prev) => ({
+        ...prev,
+        emergencyContactFirstName: "",
+        emergencyContactLastName: "",
+        emergencyContactPhone: "",
+        emergencyContactRelationship: "",
+      }));
+    }
+  };
 
   const validate = (): LegalAgreementData | null => {
     const result = legalSchema.safeParse(form);
@@ -256,6 +280,18 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
           <p className="text-xs text-muted-foreground">
             Required per the liability waiver. This person will be contacted in case of emergency.
           </p>
+          {signerFirstName && signerLastName && (
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="same-as-signer"
+                checked={sameAsSigner}
+                onCheckedChange={(v) => fillEmergencyFromSigner(v === true)}
+              />
+              <Label htmlFor="same-as-signer" className="text-sm cursor-pointer leading-snug">
+                Same as person completing this form ({signerFirstName} {signerLastName})
+              </Label>
+            </div>
+          )}
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
             <div>
               <Label htmlFor="emergencyContactFirstName" className="text-xs">First Name</Label>
