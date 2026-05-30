@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,16 +26,10 @@ const splitDob = (dob?: string | null) => {
   return { y: m[1], m: m[2], d: m[3] };
 };
 
-const joinDob = (y: string, m: string, d: string) => {
-  if (!y && !m && !d) return "";
-  if (!y || !m || !d) return "";
-  return `${y}-${m}-${d}`;
-};
-
 const daysInMonth = (year: string, month: string) => {
-  const y = parseInt(year, 10);
+  const y = parseInt(year, 10) || 2000; // leap-safe default
   const mo = parseInt(month, 10);
-  if (!y || !mo) return 31;
+  if (!mo) return 31;
   return new Date(y, mo, 0).getDate();
 };
 
@@ -52,7 +47,50 @@ const empty = (): SwimmerCovered => ({
   relationship: "",
 });
 
+type DobParts = { y: string; m: string; d: string };
+
 const SwimmersCoveredFields = ({ swimmers, onChange, errors = {} }: Props) => {
+  const [dobParts, setDobParts] = useState<Record<number, DobParts>>(() => {
+    const init: Record<number, DobParts> = {};
+    swimmers.forEach((s, i) => { init[i] = splitDob(s.dob); });
+    return init;
+  });
+
+  useEffect(() => {
+    setDobParts((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      swimmers.forEach((s, i) => {
+        if (!next[i]) {
+          next[i] = splitDob(s.dob);
+          changed = true;
+        }
+      });
+      Object.keys(next).forEach((k) => {
+        if (parseInt(k, 10) >= swimmers.length) {
+          delete next[k as unknown as number];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [swimmers.length]);
+
+  const setDobPart = (idx: number, key: keyof DobParts, value: string) => {
+    const current = dobParts[idx] ?? splitDob(swimmers[idx]?.dob);
+    const updated: DobParts = { ...current, [key]: value };
+    const maxDay = daysInMonth(updated.y, updated.m);
+    const dayNum = parseInt(updated.d, 10);
+    if (dayNum && dayNum > maxDay) updated.d = "";
+
+    setDobParts((prev) => ({ ...prev, [idx]: updated }));
+
+    const dob = updated.y && updated.m && updated.d
+      ? `${updated.y}-${updated.m}-${updated.d}`
+      : "";
+    onChange(swimmers.map((s, i) => (i === idx ? { ...s, dob } : s)));
+  };
+
   const update = (idx: number, key: keyof SwimmerCovered, value: string) => {
     const next = swimmers.map((s, i) => (i === idx ? { ...s, [key]: value } : s));
     onChange(next);
@@ -64,6 +102,14 @@ const SwimmersCoveredFields = ({ swimmers, onChange, errors = {} }: Props) => {
   const remove = (idx: number) => {
     if (swimmers.length <= 1) return;
     onChange(swimmers.filter((_, i) => i !== idx));
+    setDobParts((prev) => {
+      const next: Record<number, DobParts> = {};
+      swimmers.filter((_, i) => i !== idx).forEach((_, i) => {
+        const sourceIdx = i >= idx ? i + 1 : i;
+        next[i] = prev[sourceIdx] ?? { y: "", m: "", d: "" };
+      });
+      return next;
+    });
   };
 
   return (
