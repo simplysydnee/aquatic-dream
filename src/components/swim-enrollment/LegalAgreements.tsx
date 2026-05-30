@@ -280,6 +280,18 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
           <p className="text-xs text-muted-foreground">
             Required per the liability waiver. This person will be contacted in case of emergency.
           </p>
+          {signerFirstName && signerLastName && (
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="same-as-signer"
+                checked={sameAsSigner}
+                onCheckedChange={(v) => fillEmergencyFromSigner(v === true)}
+              />
+              <Label htmlFor="same-as-signer" className="text-sm cursor-pointer leading-snug">
+                Same as person completing this form ({signerFirstName} {signerLastName})
+              </Label>
+            </div>
+          )}
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
             <div>
               <Label htmlFor="emergencyContactFirstName" className="text-xs">First Name</Label>
