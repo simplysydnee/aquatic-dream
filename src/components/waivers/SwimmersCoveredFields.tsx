@@ -27,12 +27,11 @@ const splitDob = (dob?: string | null) => {
 };
 
 const daysInMonth = (year: string, month: string) => {
-  const y = parseInt(year, 10) || 2000; // leap-safe default
+  const y = parseInt(year, 10) || 2000;
   const mo = parseInt(month, 10);
   if (!mo) return 31;
   return new Date(y, mo, 0).getDate();
 };
-
 
 interface Props {
   swimmers: SwimmerCovered[];
@@ -133,110 +132,107 @@ const SwimmersCoveredFields = ({ swimmers, onChange, errors = {} }: Props) => {
       </div>
 
       <div className="space-y-3">
-        {swimmers.map((s, idx) => (
-          <div
-            key={idx}
-            className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end border border-border/60 rounded-md p-3 bg-muted/20"
-          >
-            <div className="sm:col-span-3">
-              <Label className="text-xs">First name</Label>
-              <Input
-                value={s.first_name}
-                onChange={(e) => update(idx, "first_name", e.target.value)}
-                placeholder="First"
-              />
-              {errors[idx]?.first_name && (
-                <p className="text-xs text-destructive mt-1">{errors[idx]?.first_name}</p>
-              )}
-            </div>
-            <div className="sm:col-span-3">
-              <Label className="text-xs">Last name</Label>
-              <Input
-                value={s.last_name}
-                onChange={(e) => update(idx, "last_name", e.target.value)}
-                placeholder="Last"
-              />
-              {errors[idx]?.last_name && (
-                <p className="text-xs text-destructive mt-1">{errors[idx]?.last_name}</p>
-              )}
-            </div>
-            <div className="sm:col-span-3">
-              <Label className="text-xs">Date of birth</Label>
-              {(() => {
-                const { y, m, d } = splitDob(s.dob);
-                const currentYear = new Date().getFullYear();
-                const years = Array.from({ length: 100 }, (_, i) => String(currentYear - i));
-                const maxDay = daysInMonth(y, m);
-                const dayNum = parseInt(d, 10);
-                const safeDay = dayNum && dayNum > maxDay ? "" : d;
-                return (
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <Select
-                      value={m}
-                      onValueChange={(val) => update(idx, "dob", joinDob(y, val, safeDay))}
-                    >
-                      <SelectTrigger className="h-9 text-xs px-2">
-                        <SelectValue placeholder="Month" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[280px]">
-                        {MONTHS.map((name, i) => (
-                          <SelectItem key={i} value={pad(i + 1)}>{name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={safeDay}
-                      onValueChange={(val) => update(idx, "dob", joinDob(y, m, val))}
-                    >
-                      <SelectTrigger className="h-9 text-xs px-2">
-                        <SelectValue placeholder="Day" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[280px]">
-                        {Array.from({ length: maxDay }, (_, i) => (
-                          <SelectItem key={i + 1} value={pad(i + 1)}>{i + 1}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={y}
-                      onValueChange={(val) => update(idx, "dob", joinDob(val, m, safeDay))}
-                    >
-                      <SelectTrigger className="h-9 text-xs px-2">
-                        <SelectValue placeholder="Year" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[280px]">
-                        {years.map((yr) => (
-                          <SelectItem key={yr} value={yr}>{yr}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                );
-              })()}
-            </div>
+        {swimmers.map((s, idx) => {
+          const parts = dobParts[idx] ?? splitDob(s.dob);
+          const { y, m, d } = parts;
+          const currentYear = new Date().getFullYear();
+          const years = Array.from({ length: 100 }, (_, i) => String(currentYear - i));
+          const maxDay = daysInMonth(y, m);
+          return (
+            <div
+              key={idx}
+              className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end border border-border/60 rounded-md p-3 bg-muted/20"
+            >
+              <div className="sm:col-span-3">
+                <Label className="text-xs">First name</Label>
+                <Input
+                  value={s.first_name}
+                  onChange={(e) => update(idx, "first_name", e.target.value)}
+                  placeholder="First"
+                />
+                {errors[idx]?.first_name && (
+                  <p className="text-xs text-destructive mt-1">{errors[idx]?.first_name}</p>
+                )}
+              </div>
+              <div className="sm:col-span-3">
+                <Label className="text-xs">Last name</Label>
+                <Input
+                  value={s.last_name}
+                  onChange={(e) => update(idx, "last_name", e.target.value)}
+                  placeholder="Last"
+                />
+                {errors[idx]?.last_name && (
+                  <p className="text-xs text-destructive mt-1">{errors[idx]?.last_name}</p>
+                )}
+              </div>
+              <div className="sm:col-span-3">
+                <Label className="text-xs">Date of birth</Label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Select
+                    value={m || undefined}
+                    onValueChange={(val) => setDobPart(idx, "m", val)}
+                  >
+                    <SelectTrigger className="h-9 text-xs px-2">
+                      <SelectValue placeholder="Month" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[280px]">
+                      {MONTHS.map((name, i) => (
+                        <SelectItem key={i} value={pad(i + 1)}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={d || undefined}
+                    onValueChange={(val) => setDobPart(idx, "d", val)}
+                  >
+                    <SelectTrigger className="h-9 text-xs px-2">
+                      <SelectValue placeholder="Day" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[280px]">
+                      {Array.from({ length: maxDay }, (_, i) => (
+                        <SelectItem key={i + 1} value={pad(i + 1)}>{i + 1}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={y || undefined}
+                    onValueChange={(val) => setDobPart(idx, "y", val)}
+                  >
+                    <SelectTrigger className="h-9 text-xs px-2">
+                      <SelectValue placeholder="Year" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[280px]">
+                      {years.map((yr) => (
+                        <SelectItem key={yr} value={yr}>{yr}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-            <div className="sm:col-span-2">
-              <Label className="text-xs">Relationship</Label>
-              <Input
-                value={s.relationship || ""}
-                onChange={(e) => update(idx, "relationship", e.target.value)}
-                placeholder="Child, self…"
-              />
+              <div className="sm:col-span-2">
+                <Label className="text-xs">Relationship</Label>
+                <Input
+                  value={s.relationship || ""}
+                  onChange={(e) => update(idx, "relationship", e.target.value)}
+                  placeholder="Child, self…"
+                />
+              </div>
+              <div className="sm:col-span-1 flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => remove(idx)}
+                  disabled={swimmers.length <= 1}
+                  aria-label="Remove swimmer"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-            <div className="sm:col-span-1 flex justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => remove(idx)}
-                disabled={swimmers.length <= 1}
-                aria-label="Remove swimmer"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
