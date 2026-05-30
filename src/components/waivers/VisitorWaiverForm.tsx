@@ -93,8 +93,8 @@ const VisitorWaiverForm = ({ source, onSubmitted, hideSuccessScreen, submitLabel
         <CheckCircle2 className="w-16 h-16 text-primary mx-auto" />
         <h2 className="font-display text-2xl font-bold">Waiver received</h2>
         <p className="text-muted-foreground">
-          Thank you, {signerFullName}. A copy of your signed waiver has been emailed to{" "}
-          <strong>{signerEmail}</strong>. Please check in at the front desk when you arrive.
+          Thank you, {signerFullName}. A copy of your signed waiver will be emailed to{" "}
+          <strong>{signerEmail}</strong>.
         </p>
         <Button
           variant="outline"

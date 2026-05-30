@@ -177,9 +177,8 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
               and the federal ESIGN Act, by typing your name and clicking "Complete Enrollment"
               below, you agree that your electronic signature has the same legal effect,
               validity, and enforceability as a handwritten signature. You consent to
-              conduct this transaction electronically and acknowledge that you may request
-              a paper copy of these documents at any time by contacting us at
-              info@aquaticdreams.com or (209) 577-3483.
+              conduct this transaction electronically. A copy of the signed documents
+              will be emailed to you.
             </p>
           </div>
         </div>
