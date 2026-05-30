@@ -1,21 +1,22 @@
-## Problem
+## Plan
 
-Public visitors at `/waivers` can't submit the form. The `visitor_waivers` table has a correct INSERT policy (`Anyone can submit visitor waiver`, roles `public`, `WITH CHECK true`), no blocking triggers, and no check constraints — but the table has **zero table-level GRANTs**. Without `GRANT INSERT` to `anon` (and `authenticated` for kiosk staff), PostgREST rejects the insert. Supabase often surfaces this as the RLS violation message the user is seeing.
+1. **Fix the visitor waiver submission path**
+   - Stop the `/waivers` public form from depending on direct browser access to `visitor_waivers` returning rows after insert, because that table intentionally has no public read access for private waiver data.
+   - Add a small backend function for public visitor waiver submissions that uses server-side credentials to save the waiver, send the emailed copy, and mark the email timestamp without exposing waiver records publicly.
+   - Keep admin-only viewing/editing rules intact so visitor PII is still protected.
 
-## Fix
+2. **Update the frontend submission helper**
+   - Change the public/kiosk waiver form to call the new backend submission function.
+   - Preserve the existing success message: “A copy has been emailed to you.”
+   - Show a clearer error if the backend submission fails.
 
-Run a migration that grants the missing privileges on `public.visitor_waivers`:
+3. **Make birthdate day selection easier**
+   - Replace the single browser-native `type="date"` control in `SwimmersCoveredFields` with three explicit fields: Month, Day, Year.
+   - Store the final value in the same `YYYY-MM-DD` format already used by the waiver payload, so existing database/email behavior remains compatible.
+   - Keep it mobile-friendly with compact dropdown/input controls and validation-safe formatting.
 
-```sql
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.visitor_waivers TO authenticated;
-GRANT INSERT ON public.visitor_waivers TO anon;
-GRANT ALL ON public.visitor_waivers TO service_role;
-```
+## Technical details
 
-- `anon` gets INSERT only — matches the public submission policy at `/waivers`. No SELECT for anon (waivers contain PII; admins read via the existing authenticated policy).
-- `authenticated` gets full CRUD — RLS still scopes reads/updates/deletes to admins via existing policies, and kiosk staff inserts still work.
-- `service_role` gets ALL — required for the `send-transactional-email` flow and any backend updates (e.g. `email_sent_at`).
-
-## Out of scope
-
-No code changes to `VisitorWaiverForm.tsx` or `submitVisitorWaiver` — they're already correct. No RLS policy changes.
+- The current `visitor_waivers` table has public create access but not public read access, which is good for privacy. The current client insert asks the database to return `id`, which can conflict with the no-public-read policy.
+- The backend function avoids widening public read permissions and is the safest way to “bypass” the visitor RLS problem for `/waivers` submissions only.
+- No public SELECT policy will be added to `visitor_waivers`.

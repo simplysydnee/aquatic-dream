@@ -1,8 +1,43 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, X } from "lucide-react";
 import type { SwimmerCovered } from "@/lib/visitorWaiver";
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+const splitDob = (dob?: string | null) => {
+  if (!dob) return { y: "", m: "", d: "" };
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob);
+  if (!m) return { y: "", m: "", d: "" };
+  return { y: m[1], m: m[2], d: m[3] };
+};
+
+const joinDob = (y: string, m: string, d: string) => {
+  if (!y && !m && !d) return "";
+  if (!y || !m || !d) return "";
+  return `${y}-${m}-${d}`;
+};
+
+const daysInMonth = (year: string, month: string) => {
+  const y = parseInt(year, 10);
+  const mo = parseInt(month, 10);
+  if (!y || !mo) return 31;
+  return new Date(y, mo, 0).getDate();
+};
+
 
 interface Props {
   swimmers: SwimmerCovered[];
@@ -81,12 +116,59 @@ const SwimmersCoveredFields = ({ swimmers, onChange, errors = {} }: Props) => {
             </div>
             <div className="sm:col-span-3">
               <Label className="text-xs">Date of birth</Label>
-              <Input
-                type="date"
-                value={s.dob || ""}
-                onChange={(e) => update(idx, "dob", e.target.value)}
-              />
+              {(() => {
+                const { y, m, d } = splitDob(s.dob);
+                const currentYear = new Date().getFullYear();
+                const years = Array.from({ length: 100 }, (_, i) => String(currentYear - i));
+                const maxDay = daysInMonth(y, m);
+                const dayNum = parseInt(d, 10);
+                const safeDay = dayNum && dayNum > maxDay ? "" : d;
+                return (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <Select
+                      value={m}
+                      onValueChange={(val) => update(idx, "dob", joinDob(y, val, safeDay))}
+                    >
+                      <SelectTrigger className="h-9 text-xs px-2">
+                        <SelectValue placeholder="Month" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[280px]">
+                        {MONTHS.map((name, i) => (
+                          <SelectItem key={i} value={pad(i + 1)}>{name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={safeDay}
+                      onValueChange={(val) => update(idx, "dob", joinDob(y, m, val))}
+                    >
+                      <SelectTrigger className="h-9 text-xs px-2">
+                        <SelectValue placeholder="Day" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[280px]">
+                        {Array.from({ length: maxDay }, (_, i) => (
+                          <SelectItem key={i + 1} value={pad(i + 1)}>{i + 1}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={y}
+                      onValueChange={(val) => update(idx, "dob", joinDob(val, m, safeDay))}
+                    >
+                      <SelectTrigger className="h-9 text-xs px-2">
+                        <SelectValue placeholder="Year" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[280px]">
+                        {years.map((yr) => (
+                          <SelectItem key={yr} value={yr}>{yr}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })()}
             </div>
+
             <div className="sm:col-span-2">
               <Label className="text-xs">Relationship</Label>
               <Input
