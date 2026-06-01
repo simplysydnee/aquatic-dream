@@ -54,12 +54,28 @@ const WaiversAdmin = () => {
         supabase
           .from("enrollment_agreements")
           .select(
-            "*, swim_enrollments:enrollment_id(child_name, parent_email), lesson_bookings:lesson_booking_id(child_name, parent_email)",
+            "*, swim_enrollments:enrollment_id(child_name, parent_email)",
           )
           .order("signed_at", { ascending: false }),
       ]);
       if (visitorsRes.error) throw visitorsRes.error;
       if (agreementsRes.error) throw agreementsRes.error;
+
+      const lessonBookingIds = Array.from(
+        new Set(
+          (agreementsRes.data || [])
+            .map((a: any) => a.lesson_booking_id)
+            .filter(Boolean),
+        ),
+      );
+      const lessonBookingsById: Record<string, any> = {};
+      if (lessonBookingIds.length > 0) {
+        const { data: lb } = await supabase
+          .from("lesson_bookings")
+          .select("id, child_name, parent_email")
+          .in("id", lessonBookingIds as string[]);
+        for (const row of lb || []) lessonBookingsById[(row as any).id] = row;
+      }
 
       const visitors: UnifiedWaiverRow[] = (visitorsRes.data || []).map((v: any) => ({
         id: v.id,
