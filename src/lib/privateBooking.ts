@@ -123,7 +123,14 @@ export async function fetchOpenSlots(opts: {
       // Generate slots
       let t = normTime(blk.start_time);
       const end = normTime(blk.end_time);
+      const brkStart = blk.break_start_time ? normTime(blk.break_start_time) : null;
+      const brkEnd = blk.break_end_time ? normTime(blk.break_end_time) : null;
       while (addMinutes(t, blk.slot_minutes) <= end) {
+        const slotEnd = addMinutes(t, blk.slot_minutes);
+        if (brkStart && brkEnd && t < brkEnd && slotEnd > brkStart) {
+          t = brkEnd;
+          continue;
+        }
         const key = `${blk.instructor_id}|${dateStr}|${t}`;
         if (!takenSet.has(key)) {
           out.push({
@@ -131,10 +138,10 @@ export async function fetchOpenSlots(opts: {
             instructor_name: instructorMap[blk.instructor_id] || "Instructor",
             slot_date: dateStr,
             start_time: t,
-            end_time: addMinutes(t, blk.slot_minutes),
+            end_time: slotEnd,
           });
         }
-        t = addMinutes(t, blk.slot_minutes);
+        t = slotEnd;
       }
     }
   }
