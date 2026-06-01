@@ -222,9 +222,13 @@ const WaiversAdmin = () => {
                     </TableCell>
                     <TableCell>
                       {r.photo_release ? (
-                        <Mail className="w-4 h-4 text-primary" aria-label="Consented" />
+                        <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white gap-1">
+                          <Camera className="w-3 h-3" /> Yes
+                        </Badge>
                       ) : (
-                        <MailX className="w-4 h-4 text-muted-foreground" aria-label="Declined" />
+                        <Badge variant="destructive" className="gap-1">
+                          <CameraOff className="w-3 h-3" /> No
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell>
