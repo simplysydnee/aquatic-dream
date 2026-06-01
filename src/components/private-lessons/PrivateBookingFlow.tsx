@@ -13,6 +13,8 @@ import SlotPicker from "./SlotPicker";
 import PrivateCardSetup from "./PrivateCardSetup";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { Slot, releaseHolds } from "@/lib/privateBooking";
+import { lookupActiveWaiver, legalDataFromWaiver, backfillVisitorWaiver, ActiveWaiver } from "@/lib/swimmerWaiver";
+
 import { z } from "zod";
 import { toast } from "@/hooks/use-toast";
 import { CheckCircle } from "lucide-react";
@@ -58,6 +60,8 @@ export default function PrivateBookingFlow() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [setup, setSetup] = useState<{ clientSecret: string; bookingId: string; checkoutSessionId: string } | null>(null);
+  const [activeWaiver, setActiveWaiver] = useState<ActiveWaiver | null>(null);
+
 
   useEffect(() => {
     return () => { releaseHolds(sessionToken).catch(() => {}); };
@@ -70,7 +74,7 @@ export default function PrivateBookingFlow() {
   const computedAge = useMemo(() => (form.childDob ? calcAge(form.childDob) : null), [form.childDob]);
   const update = (k: string, v: any) => { setForm({ ...form, [k]: v }); if (errors[k]) setErrors({ ...errors, [k]: "" }); };
 
-  const handleInfoSubmit = (e: React.FormEvent) => {
+  const handleInfoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = infoSchema.safeParse(form);
     if (!parsed.success) {
@@ -79,11 +83,22 @@ export default function PrivateBookingFlow() {
       setErrors(fe);
       return;
     }
+    // Look up an active waiver for this swimmer so we can skip the legal step
+    // later if one already exists (same first/last name + DOB within 12 months).
+    if (form.childDob) {
+      const w = await lookupActiveWaiver(form.childFirstName, form.childLastName, form.childDob);
+      setActiveWaiver(w);
+    } else {
+      setActiveWaiver(null);
+    }
     setStep("slots");
   };
 
-  const handleLegalSubmit = async (legal: LegalAgreementData) => {
+
+  const handleLegalSubmit = async (legal: LegalAgreementData, slotsOverride?: Slot[]) => {
     if (!form.childDob) return;
+    const slotsToUse = slotsOverride ?? slots;
+
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-private-booking-setup", {
@@ -98,12 +113,13 @@ export default function PrivateBookingFlow() {
           child_last_name: form.childLastName,
           child_age: calcAge(form.childDob),
           notes: form.notes || null,
-          slots: slots.map((s) => ({
+          slots: slotsToUse.map((s) => ({
             instructor_id: s.instructor_id,
             slot_date: s.slot_date,
             start_time: s.start_time,
             end_time: s.end_time,
           })),
+
           agreement: {
             waiver_accepted: legal.waiverAccepted,
             photo_release_accepted: legal.photoReleaseAccepted === "yes",
@@ -125,6 +141,15 @@ export default function PrivateBookingFlow() {
       }
       if (!data?.client_secret) throw new Error((data as any)?.error || "Could not start card setup");
       setSetup({ clientSecret: data.client_secret, bookingId: data.booking_id, checkoutSessionId: data.checkout_session_id });
+      // If this was a freshly-signed waiver (not carried over), backfill visitor_waivers
+      // so the next booking for the same swimmer auto-skips the legal step.
+      if (!activeWaiver && form.childDob) {
+        backfillVisitorWaiver({
+          legal,
+          signerEmail: form.parentEmail,
+          child: { firstName: form.childFirstName, lastName: form.childLastName, dob: form.childDob },
+        });
+      }
       setStep("card");
     } catch (e: any) {
       toast({ title: "Could not save booking", description: e?.message || "Try again", variant: "destructive" });
@@ -132,6 +157,7 @@ export default function PrivateBookingFlow() {
       setSubmitting(false);
     }
   };
+
 
   if (step === "done") {
     return (
@@ -187,13 +213,30 @@ export default function PrivateBookingFlow() {
 
   if (step === "slots") {
     return (
-      <SlotPicker
-        sessionToken={sessionToken}
-        onContinue={(s) => { setSlots(s); setStep("legal"); }}
-        onBack={() => setStep("info")}
-      />
+      <div>
+        {activeWaiver && (
+          <div className="max-w-2xl mx-auto mb-4 p-3 border border-primary/30 bg-primary/5 rounded-lg text-sm">
+            ✓ Waiver on file for <strong>{form.childFirstName} {form.childLastName}</strong>. You won't need to re-sign — we'll go straight to payment after picking times.
+          </div>
+        )}
+        <SlotPicker
+          sessionToken={sessionToken}
+          onContinue={(s) => {
+            setSlots(s);
+            if (activeWaiver) {
+              const legal = legalDataFromWaiver(activeWaiver);
+              handleLegalSubmit(legal, s);
+            } else {
+              setStep("legal");
+            }
+          }}
+
+          onBack={() => setStep("info")}
+        />
+      </div>
     );
   }
+
 
   return (
     <form onSubmit={handleInfoSubmit} className="max-w-lg mx-auto space-y-4">
