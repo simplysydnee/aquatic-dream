@@ -367,6 +367,25 @@ export default function PrivateLessonsAdmin() {
                 <Switch checked={draft.is_blackout} onCheckedChange={(v) => setDraft({ ...draft, is_blackout: v })} />
                 <Label>Blackout (block off, not bookable)</Label>
               </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Switch checked={draft.has_break} onCheckedChange={(v) => setDraft({ ...draft, has_break: v })} />
+                <Label>Add a break</Label>
+              </div>
+              {draft.has_break && (
+                <>
+                  <div>
+                    <Label>Break start</Label>
+                    <Input type="time" value={draft.break_start_time} onChange={(e) => setDraft({ ...draft, break_start_time: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Break end</Label>
+                    <Input type="time" value={draft.break_end_time} onChange={(e) => setDraft({ ...draft, break_end_time: e.target.value })} />
+                  </div>
+                  <div className="sm:col-span-3 -mt-2 text-xs text-muted-foreground">
+                    Slots will pause during the break and resume right when it ends.
+                  </div>
+                </>
+              )}
               <div className="sm:col-span-3"><Button onClick={addBlock} disabled={!draft.start_date || (draft.kind !== "one_time" && !draft.end_date)}><Plus className="w-4 h-4 mr-1" />Add block</Button></div>
             </CardContent>
           </Card>
