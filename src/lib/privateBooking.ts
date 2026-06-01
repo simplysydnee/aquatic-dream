@@ -21,6 +21,8 @@ interface Block {
   end_time: string;
   slot_minutes: number;
   is_blackout: boolean;
+  break_start_time: string | null;
+  break_end_time: string | null;
 }
 
 interface Instructor { id: string; name: string }
