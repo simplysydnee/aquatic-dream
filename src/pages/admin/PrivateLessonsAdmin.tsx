@@ -75,8 +75,8 @@ export default function PrivateLessonsAdmin() {
       slot_minutes: draft.slot_minutes, pool_area: draft.pool_area,
       is_blackout: draft.is_blackout, notes: draft.notes || null,
       day_of_week: draft.kind === "weekly" ? draft.day_of_week : (draft.day_of_week ?? null),
-      start_date: draft.kind === "date_range" ? draft.start_date || null : null,
-      end_date: draft.kind === "date_range" ? draft.end_date || null : null,
+      start_date: draft.start_date || null,
+      end_date: draft.end_date || null,
     };
     const { error } = await supabase.from("instructor_booking_blocks").insert(payload);
     if (error) { toast({ title: "Could not add", description: error.message, variant: "destructive" }); return; }
