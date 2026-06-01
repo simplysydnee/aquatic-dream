@@ -69,6 +69,14 @@ export default function PrivateLessonsAdmin() {
 
   const addBlock = async () => {
     if (!draft.instructor_id) return;
+    if (!draft.start_date || !draft.end_date) {
+      toast({ title: "Dates required", description: "Start date and end date are both required.", variant: "destructive" });
+      return;
+    }
+    if (draft.end_date < draft.start_date) {
+      toast({ title: "Invalid range", description: "End date must be on or after start date.", variant: "destructive" });
+      return;
+    }
     const payload: any = {
       instructor_id: draft.instructor_id, kind: draft.kind,
       start_time: draft.start_time, end_time: draft.end_time,
