@@ -210,13 +210,31 @@ export default function PrivateBookingFlow() {
 
   if (step === "slots") {
     return (
-      <SlotPicker
-        sessionToken={sessionToken}
-        onContinue={(s) => { setSlots(s); setStep("legal"); }}
-        onBack={() => setStep("info")}
-      />
+      <div>
+        {activeWaiver && (
+          <div className="max-w-2xl mx-auto mb-4 p-3 border border-primary/30 bg-primary/5 rounded-lg text-sm">
+            ✓ Waiver on file for <strong>{form.childFirstName} {form.childLastName}</strong>. You won't need to re-sign — we'll go straight to payment after picking times.
+          </div>
+        )}
+        <SlotPicker
+          sessionToken={sessionToken}
+          onContinue={(s) => {
+            setSlots(s);
+            if (activeWaiver) {
+              // Skip legal step entirely — submit using the on-file waiver data.
+              const legal = legalDataFromWaiver(activeWaiver);
+              // We need slots in handleLegalSubmit closure to be current, so wait a tick.
+              setTimeout(() => handleLegalSubmit(legal), 0);
+            } else {
+              setStep("legal");
+            }
+          }}
+          onBack={() => setStep("info")}
+        />
+      </div>
     );
   }
+
 
   return (
     <form onSubmit={handleInfoSubmit} className="max-w-lg mx-auto space-y-4">
