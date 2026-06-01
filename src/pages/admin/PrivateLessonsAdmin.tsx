@@ -425,7 +425,12 @@ export default function PrivateLessonsAdmin() {
                           <TableCell>{instructorName(b.instructor_id)}</TableCell>
                           <TableCell>{typeLabel}</TableCell>
                           <TableCell>{whenLabel}</TableCell>
-                          <TableCell>{b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}</TableCell>
+                          <TableCell>
+                            {b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}
+                            {b.break_start_time && b.break_end_time && (
+                              <div className="text-[10px] text-muted-foreground">Break {b.break_start_time.slice(0,5)}–{b.break_end_time.slice(0,5)}</div>
+                            )}
+                          </TableCell>
                           <TableCell>{b.slot_minutes}m</TableCell>
                           <TableCell>{b.pool_area}</TableCell>
                           <TableCell><Button variant="ghost" size="icon" onClick={() => remove(b.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
