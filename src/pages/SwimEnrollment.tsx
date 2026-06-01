@@ -14,6 +14,8 @@ import PrivateBookingFlow from "@/components/private-lessons/PrivateBookingFlow"
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { SwimLevel, PRICING } from "@/components/swim-enrollment/types";
 import { WAIVER_VERSION, TOS_VERSION, PRIVACY_POLICY_VERSION } from "@/components/swim-enrollment/legal-content";
+import { lookupActiveWaiver, legalDataFromWaiver, backfillVisitorWaiver, type ActiveWaiver } from "@/lib/swimmerWaiver";
+import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
