@@ -250,9 +250,7 @@ export default function PrivateBookingFlow() {
         {errors.childDob && <p className="text-xs text-destructive mt-1">{errors.childDob}</p>}
       </div>
 
-        {computedAge !== null && <p className="text-xs text-muted-foreground mt-1">Age: {computedAge}</p>}
-        {errors.childDob && <p className="text-xs text-destructive mt-1">{errors.childDob}</p>}
-      </div>
+
 
       <div>
         <Label>Notes (optional)</Label>
