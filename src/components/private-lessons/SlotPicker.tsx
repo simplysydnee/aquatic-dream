@@ -111,16 +111,16 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
     onContinue(selectedList);
   };
 
-  // For weekly helper: derive available recurring options from currently visible slots
+  // For weekly helper: derive available recurring options from currently filtered slots
   const weeklyOptions = useMemo(() => {
     const seen = new Set<string>();
     const opts: { key: string; label: string; instructorId: string; startTime: string; dow: number; count: number }[] = [];
-    for (const s of slots) {
+    for (const s of filteredSlots) {
       const dow = new Date(s.slot_date + "T00:00").getDay();
       const key = `${s.instructor_id}|${dow}|${s.start_time}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const count = slots.filter((x) =>
+      const count = filteredSlots.filter((x) =>
         x.instructor_id === s.instructor_id && x.start_time === s.start_time &&
         new Date(x.slot_date + "T00:00").getDay() === dow).length;
       if (count < 2) continue;
@@ -128,7 +128,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
         label: `${s.instructor_name} — ${WEEKDAYS[dow]}s at ${formatTime(s.start_time)} (${count} dates)` });
     }
     return opts.slice(0, 12);
-  }, [slots]);
+  }, [filteredSlots]);
 
   return (
     <div className="max-w-3xl mx-auto">
