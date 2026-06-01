@@ -161,10 +161,20 @@ const LessonBookingConfirmationEmail = ({
           </Section>
         )}
 
+        <Section style={parentInfoBox}>
+          <Text style={parentInfoHeading}>Parent Information</Text>
+          <Text style={parentInfoItem}>• All swimmers who might have an accident in the pool <strong>MUST wear a swim diaper</strong>.</Text>
+          <Text style={parentInfoItem}>• Please have all swimmers use the restroom prior to the start of swim lessons.</Text>
+          <Text style={parentInfoItem}>• Please <strong>do not</strong> have your child eat 30 minutes prior to swim lessons.</Text>
+          <Text style={parentInfoItem}>• Please only bring required family with you to the pool to ensure we have enough space on the pool deck.</Text>
+          <Text style={parentInfoItem}>• All children not with an instructor in the pool may <strong>NOT</strong> touch the water at any time.</Text>
+        </Section>
+
         <Hr style={hr} />
         <Text style={text}>
           Questions? Reach us at info@aquaticdreamsswim.com or (209) 577-3483.
         </Text>
+
         <Text style={footer}>
           See you at the pool!<br />
           The {SITE_NAME} Team
