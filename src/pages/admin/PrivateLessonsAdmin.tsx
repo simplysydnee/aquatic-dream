@@ -288,15 +288,15 @@ export default function PrivateLessonsAdmin() {
                   </SelectContent>
                 </Select>
               </div>
-              {draft.kind !== "one_time" && (
+              {draft.kind === "weekly" && draft.start_date && (
                 <div>
-                  <Label>Day of week {draft.kind === "date_range" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
-                  <Select value={String(draft.day_of_week)} onValueChange={(v) => setDraft({ ...draft, day_of_week: Number(v) })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{WEEKDAYS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <Label>Day of week</Label>
+                  <div className="mt-2 px-3 py-2 text-sm rounded-md border border-border bg-muted/40 text-muted-foreground">
+                    {WEEKDAYS[new Date(draft.start_date + "T00:00").getDay()]} (auto from start date)
+                  </div>
                 </div>
               )}
+
               {draft.kind === "one_time" ? (
                 <div>
                   <Label>Date</Label>
