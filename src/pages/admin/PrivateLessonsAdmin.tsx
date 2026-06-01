@@ -212,7 +212,7 @@ export default function PrivateLessonsAdmin() {
                 <Switch checked={draft.is_blackout} onCheckedChange={(v) => setDraft({ ...draft, is_blackout: v })} />
                 <Label>Blackout (block off, not bookable)</Label>
               </div>
-              <div className="sm:col-span-3"><Button onClick={addBlock}><Plus className="w-4 h-4 mr-1" />Add block</Button></div>
+              <div className="sm:col-span-3"><Button onClick={addBlock} disabled={!draft.start_date || !draft.end_date}><Plus className="w-4 h-4 mr-1" />Add block</Button></div>
             </CardContent>
           </Card>
 
