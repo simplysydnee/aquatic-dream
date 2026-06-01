@@ -76,6 +76,7 @@ export default function PrivateLessonsAdmin() {
     day_of_week: 1, start_date: "", end_date: "",
     start_time: "15:00", end_time: "18:00", slot_minutes: 30,
     pool_area: "shallow", is_blackout: false, notes: "",
+    has_break: false, break_start_time: "", break_end_time: "",
   });
 
   const load = async () => {
