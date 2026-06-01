@@ -91,8 +91,9 @@ const WaiversAdmin = () => {
 
       const agreements: UnifiedWaiverRow[] = (agreementsRes.data || []).map((a: any) => {
         const source: WaiverSource = a.enrollment_id ? "enrollment" : "lesson";
+        const lb = a.lesson_booking_id ? lessonBookingsById[a.lesson_booking_id] : null;
         const childName =
-          a.swim_enrollments?.child_name || a.lesson_bookings?.child_name || null;
+          a.swim_enrollments?.child_name || lb?.child_name || null;
         return {
           id: a.id,
           source,
