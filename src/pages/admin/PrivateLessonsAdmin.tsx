@@ -78,21 +78,26 @@ export default function PrivateLessonsAdmin() {
   });
 
   const load = async () => {
-    const [{ data: ins }, { data: bks }, { data: bkg }] = await Promise.all([
+    const [{ data: ins }, { data: bks }, { data: bkg }, { data: allBkg }] = await Promise.all([
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
       supabase.from("instructor_booking_blocks").select("*").order("created_at", { ascending: false }),
       supabase.from("lesson_bookings")
         .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error)")
         .eq("lesson_type", "private")
         .eq("booking_source", "self_serve")
-        .neq("status", "pending_card") // hide bookings whose card was never saved
+        .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(100),
+      supabase.from("lesson_bookings")
+        .select("id, instructor_id, start_time, parent_name, child_name, status, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status)")
+        .eq("lesson_type", "private")
+        .neq("status", "pending_card")
+        .neq("status", "cancelled"),
     ]);
     setInstructors((ins as any[]) || []);
     setBlocks((bks as any[]) || []);
     setBookings((bkg as any[]) || []);
+    setAllPrivateBookings((allBkg as any[]) || []);
     if (!draft.instructor_id && ins && ins.length) setDraft((d) => ({ ...d, instructor_id: (ins as any[])[0].id }));
-    // Keep detail dialog in sync after actions
     if (detailBooking) {
       const updated = (bkg as any[] | null)?.find((x) => x.id === detailBooking.id);
       if (updated) setDetailBooking(updated);
@@ -102,22 +107,25 @@ export default function PrivateLessonsAdmin() {
 
   const addBlock = async () => {
     if (!draft.instructor_id) return;
-    if (!draft.start_date || !draft.end_date) {
-      toast({ title: "Dates required", description: "Start date and end date are both required.", variant: "destructive" });
+    if (!draft.start_date || (draft.kind !== "one_time" && !draft.end_date)) {
+      toast({ title: "Dates required", description: "Please choose the date(s) for this availability.", variant: "destructive" });
       return;
     }
-    if (draft.end_date < draft.start_date) {
+    const endDate = draft.kind === "one_time" ? draft.start_date : draft.end_date;
+    if (endDate < draft.start_date) {
       toast({ title: "Invalid range", description: "End date must be on or after start date.", variant: "destructive" });
       return;
     }
+    // Persist UI "one_time" as a single-day date_range with no day-of-week constraint.
+    const dbKind: "weekly" | "date_range" = draft.kind === "weekly" ? "weekly" : "date_range";
     const payload: any = {
-      instructor_id: draft.instructor_id, kind: draft.kind,
+      instructor_id: draft.instructor_id, kind: dbKind,
       start_time: draft.start_time, end_time: draft.end_time,
       slot_minutes: draft.slot_minutes, pool_area: draft.pool_area,
       is_blackout: draft.is_blackout, notes: draft.notes || null,
-      day_of_week: draft.kind === "weekly" ? draft.day_of_week : (draft.day_of_week ?? null),
-      start_date: draft.start_date || null,
-      end_date: draft.end_date || null,
+      day_of_week: draft.kind === "weekly" ? draft.day_of_week : null,
+      start_date: draft.start_date,
+      end_date: endDate,
     };
     const { error } = await supabase.from("instructor_booking_blocks").insert(payload);
     if (error) { toast({ title: "Could not add", description: error.message, variant: "destructive" }); return; }
@@ -128,6 +136,64 @@ export default function PrivateLessonsAdmin() {
   const remove = async (id: string) => {
     await supabase.from("instructor_booking_blocks").delete().eq("id", id);
     load();
+  };
+
+  // Map of `${instructor_id}|${date}|${HH:MM}` -> booking info
+  const bookingMap = useMemo(() => {
+    const m = new Map<string, SlotRow["booking"]>();
+    for (const b of allPrivateBookings) {
+      if (!b.instructor_id || !b.start_time) continue;
+      const t = normTime(b.start_time);
+      for (const o of (b.lesson_booking_occurrences || [])) {
+        if (o.status === "cancelled") continue;
+        m.set(`${b.instructor_id}|${o.occurrence_date}|${t}`, {
+          booking_id: b.id,
+          child_name: b.child_name || "—",
+          parent_name: b.parent_name || "",
+          payment_status: o.payment_status,
+          auto_charge_status: o.auto_charge_status,
+          status: o.status,
+        });
+      }
+    }
+    return m;
+  }, [allPrivateBookings]);
+
+  const computeBlockSlots = (b: Block): SlotRow[] => {
+    if (b.is_blackout) return [];
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const rangeStart = b.start_date && new Date(b.start_date + "T00:00") > today ? new Date(b.start_date + "T00:00") : today;
+    const horizon = new Date(today); horizon.setDate(horizon.getDate() + SLOT_WINDOW_DAYS);
+    const rangeEnd = b.end_date && new Date(b.end_date + "T00:00") < horizon ? new Date(b.end_date + "T00:00") : horizon;
+
+    const slots: SlotRow[] = [];
+    const cursor = new Date(rangeStart);
+    while (cursor <= rangeEnd) {
+      const dateStr = isoDate(cursor);
+      const dow = cursor.getDay();
+      let matchesDay = true;
+      if (b.kind === "weekly") matchesDay = b.day_of_week === dow;
+      else if (b.kind === "date_range" && b.day_of_week !== null) matchesDay = b.day_of_week === dow;
+      if (matchesDay) {
+        let t = normTime(b.start_time);
+        const end = normTime(b.end_time);
+        while (addMinutes(t, b.slot_minutes) <= end) {
+          const key = `${b.instructor_id}|${dateStr}|${t}`;
+          slots.push({ date: dateStr, start: t, end: addMinutes(t, b.slot_minutes), booking: bookingMap.get(key) });
+          t = addMinutes(t, b.slot_minutes);
+        }
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return slots;
+  };
+
+  const toggleBlockExpanded = (id: string) => {
+    setExpandedBlocks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   const instructorName = (id: string) => instructors.find((i) => i.id === id)?.name || "?";
