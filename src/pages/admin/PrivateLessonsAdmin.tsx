@@ -127,6 +127,22 @@ export default function PrivateLessonsAdmin() {
 
     // Persist UI "one_time" as a single-day date_range with no day-of-week constraint.
     const dbKind: "weekly" | "date_range" = draft.kind === "weekly" ? "weekly" : "date_range";
+    if (draft.has_break) {
+      if (!draft.break_start_time || !draft.break_end_time) {
+        toast({ title: "Break times required", description: "Enter both break start and end, or turn off the break.", variant: "destructive" });
+        return;
+      }
+      if (draft.break_end_time <= draft.break_start_time) {
+        toast({ title: "Invalid break", description: "Break end must be after break start.", variant: "destructive" });
+        return;
+      }
+      if (draft.break_start_time < draft.start_time || draft.break_end_time > draft.end_time) {
+        toast({ title: "Break outside block", description: "Break must fall within the block start/end times.", variant: "destructive" });
+        return;
+      }
+    }
+
+    const dbKind: "weekly" | "date_range" = draft.kind === "weekly" ? "weekly" : "date_range";
     const payload: any = {
       instructor_id: draft.instructor_id, kind: dbKind,
       start_time: draft.start_time, end_time: draft.end_time,
@@ -135,6 +151,8 @@ export default function PrivateLessonsAdmin() {
       day_of_week: draft.kind === "weekly" ? derivedDow : null,
       start_date: draft.start_date,
       end_date: endDate,
+      break_start_time: draft.has_break ? draft.break_start_time : null,
+      break_end_time: draft.has_break ? draft.break_end_time : null,
     };
 
     const { error } = await supabase.from("instructor_booking_blocks").insert(payload);
