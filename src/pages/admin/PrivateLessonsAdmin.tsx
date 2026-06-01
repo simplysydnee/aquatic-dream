@@ -275,24 +275,36 @@ export default function PrivateLessonsAdmin() {
                   <SelectContent>
                     <SelectItem value="weekly">Weekly recurring</SelectItem>
                     <SelectItem value="date_range">Date range</SelectItem>
+                    <SelectItem value="one_time">One-time (single day)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Day of week</Label>
-                <Select value={String(draft.day_of_week)} onValueChange={(v) => setDraft({ ...draft, day_of_week: Number(v) })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{WEEKDAYS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Start date</Label>
-                <Input type="date" required value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
-              </div>
-              <div>
-                <Label>End date</Label>
-                <Input type="date" required value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
-              </div>
+              {draft.kind !== "one_time" && (
+                <div>
+                  <Label>Day of week {draft.kind === "date_range" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
+                  <Select value={String(draft.day_of_week)} onValueChange={(v) => setDraft({ ...draft, day_of_week: Number(v) })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{WEEKDAYS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              )}
+              {draft.kind === "one_time" ? (
+                <div>
+                  <Label>Date</Label>
+                  <Input type="date" required value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value, end_date: e.target.value })} />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <Label>Start date</Label>
+                    <Input type="date" required value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>End date</Label>
+                    <Input type="date" required value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
+                  </div>
+                </>
+              )}
               <div><Label>Start time</Label><Input type="time" value={draft.start_time} onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} /></div>
               <div><Label>End time</Label><Input type="time" value={draft.end_time} onChange={(e) => setDraft({ ...draft, end_time: e.target.value })} /></div>
               <div><Label>Slot minutes</Label><Input type="number" min={15} step={5} value={draft.slot_minutes} onChange={(e) => setDraft({ ...draft, slot_minutes: Number(e.target.value) })} /></div>
@@ -311,7 +323,7 @@ export default function PrivateLessonsAdmin() {
                 <Switch checked={draft.is_blackout} onCheckedChange={(v) => setDraft({ ...draft, is_blackout: v })} />
                 <Label>Blackout (block off, not bookable)</Label>
               </div>
-              <div className="sm:col-span-3"><Button onClick={addBlock} disabled={!draft.start_date || !draft.end_date}><Plus className="w-4 h-4 mr-1" />Add block</Button></div>
+              <div className="sm:col-span-3"><Button onClick={addBlock} disabled={!draft.start_date || (draft.kind !== "one_time" && !draft.end_date)}><Plus className="w-4 h-4 mr-1" />Add block</Button></div>
             </CardContent>
           </Card>
 
@@ -320,26 +332,84 @@ export default function PrivateLessonsAdmin() {
             <CardContent>
               <Table>
                 <TableHeader><TableRow>
+                  <TableHead className="w-8"></TableHead>
                   <TableHead>Instructor</TableHead><TableHead>Type</TableHead><TableHead>When</TableHead>
                   <TableHead>Time</TableHead><TableHead>Slot</TableHead><TableHead>Pool</TableHead><TableHead></TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {blocks.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No availability set</TableCell></TableRow>}
-                  {blocks.map((b) => (
-                    <TableRow key={b.id} className={b.is_blackout ? "opacity-60" : ""}>
-                      <TableCell>{instructorName(b.instructor_id)}</TableCell>
-                      <TableCell>{b.is_blackout ? "Blackout" : b.kind === "weekly" ? "Weekly" : "Date range"}</TableCell>
-                      <TableCell>
-                        {b.kind === "weekly"
-                          ? `${WEEKDAYS[b.day_of_week ?? 0]}${b.start_date || b.end_date ? ` (${b.start_date || "…"} → ${b.end_date || "…"})` : ""}`
-                          : `${b.start_date || ""} → ${b.end_date || ""}${b.day_of_week !== null ? ` (${WEEKDAYS[b.day_of_week]})` : ""}`}
-                      </TableCell>
-                      <TableCell>{b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}</TableCell>
-                      <TableCell>{b.slot_minutes}m</TableCell>
-                      <TableCell>{b.pool_area}</TableCell>
-                      <TableCell><Button variant="ghost" size="icon" onClick={() => remove(b.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
-                    </TableRow>
-                  ))}
+                  {blocks.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No availability set</TableCell></TableRow>}
+                  {blocks.map((b) => {
+                    const isOneTime = b.kind === "date_range" && b.start_date && b.start_date === b.end_date && b.day_of_week === null;
+                    const typeLabel = b.is_blackout ? "Blackout" : b.kind === "weekly" ? "Weekly" : isOneTime ? "One-time" : "Date range";
+                    const whenLabel = b.kind === "weekly"
+                      ? `${WEEKDAYS[b.day_of_week ?? 0]}${b.start_date || b.end_date ? ` (${b.start_date || "…"} → ${b.end_date || "…"})` : ""}`
+                      : isOneTime
+                        ? fmtDate(b.start_date!)
+                        : `${b.start_date || ""} → ${b.end_date || ""}${b.day_of_week !== null ? ` (${WEEKDAYS[b.day_of_week]})` : ""}`;
+                    const isExpanded = expandedBlocks.has(b.id);
+                    const slots = isExpanded ? computeBlockSlots(b) : [];
+                    const booked = slots.filter((s) => s.booking).length;
+                    return (
+                      <>
+                        <TableRow key={b.id} className={b.is_blackout ? "opacity-60" : ""}>
+                          <TableCell>
+                            {!b.is_blackout && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleBlockExpanded(b.id)} aria-label="Toggle slots">
+                                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                              </Button>
+                            )}
+                          </TableCell>
+                          <TableCell>{instructorName(b.instructor_id)}</TableCell>
+                          <TableCell>{typeLabel}</TableCell>
+                          <TableCell>{whenLabel}</TableCell>
+                          <TableCell>{b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}</TableCell>
+                          <TableCell>{b.slot_minutes}m</TableCell>
+                          <TableCell>{b.pool_area}</TableCell>
+                          <TableCell><Button variant="ghost" size="icon" onClick={() => remove(b.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow key={b.id + "-slots"} className="bg-muted/30">
+                            <TableCell></TableCell>
+                            <TableCell colSpan={7} className="py-3">
+                              <div className="text-xs text-muted-foreground mb-2">
+                                {slots.length === 0
+                                  ? "No upcoming slots in this block."
+                                  : `${slots.length} slot${slots.length === 1 ? "" : "s"} · ${booked} booked · ${slots.length - booked} open${b.kind === "weekly" ? ` (next ${SLOT_WINDOW_DAYS} days)` : ""}`}
+                              </div>
+                              {slots.length > 0 && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+                                  {slots.map((s) => (
+                                    <div
+                                      key={`${s.date}-${s.start}`}
+                                      className={`flex items-center justify-between rounded border px-2 py-1.5 text-xs ${
+                                        s.booking ? "bg-primary/5 border-primary/30" : "bg-background border-border"
+                                      }`}
+                                    >
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{fmtDate(s.date)}</span>
+                                        <span className="text-muted-foreground">{fmtTime(s.start)} – {fmtTime(s.end)}</span>
+                                      </div>
+                                      {s.booking ? (
+                                        <div className="flex flex-col items-end gap-0.5">
+                                          <Badge variant="default" className="text-[10px]">Booked</Badge>
+                                          <span className="text-[11px] font-medium truncate max-w-[140px]">{s.booking.child_name}</span>
+                                          <span className="text-[10px] text-muted-foreground capitalize">
+                                            {s.booking.auto_charge_status === "succeeded" ? "paid" : (s.booking.payment_status || "unpaid")}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <Badge variant="outline" className="text-[10px]">Open</Badge>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
