@@ -60,6 +60,8 @@ export default function PrivateBookingFlow() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [setup, setSetup] = useState<{ clientSecret: string; bookingId: string; checkoutSessionId: string } | null>(null);
+  const [activeWaiver, setActiveWaiver] = useState<ActiveWaiver | null>(null);
+
 
   useEffect(() => {
     return () => { releaseHolds(sessionToken).catch(() => {}); };
