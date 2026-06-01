@@ -319,7 +319,16 @@ export default function PrivateLessonsAdmin() {
                 <>
                   <div>
                     <Label>Start date</Label>
-                    <Input type="date" required value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
+                    <Input type="date" required value={draft.start_date} onChange={(e) => {
+                      const v = e.target.value;
+                      setDraft((prev) => ({
+                        ...prev,
+                        start_date: v,
+                        day_of_week: prev.kind === "weekly" && v
+                          ? new Date(v + "T00:00").getDay()
+                          : prev.day_of_week,
+                      }));
+                    }} />
                   </div>
                   <div>
                     <Label>End date</Label>
