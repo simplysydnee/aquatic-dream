@@ -113,12 +113,13 @@ export default function PrivateBookingFlow() {
           child_last_name: form.childLastName,
           child_age: calcAge(form.childDob),
           notes: form.notes || null,
-          slots: slots.map((s) => ({
+          slots: slotsToUse.map((s) => ({
             instructor_id: s.instructor_id,
             slot_date: s.slot_date,
             start_time: s.start_time,
             end_time: s.end_time,
           })),
+
           agreement: {
             waiver_accepted: legal.waiverAccepted,
             photo_release_accepted: legal.photoReleaseAccepted === "yes",
