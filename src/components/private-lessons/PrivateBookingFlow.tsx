@@ -74,7 +74,7 @@ export default function PrivateBookingFlow() {
   const computedAge = useMemo(() => (form.childDob ? calcAge(form.childDob) : null), [form.childDob]);
   const update = (k: string, v: any) => { setForm({ ...form, [k]: v }); if (errors[k]) setErrors({ ...errors, [k]: "" }); };
 
-  const handleInfoSubmit = (e: React.FormEvent) => {
+  const handleInfoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = infoSchema.safeParse(form);
     if (!parsed.success) {
@@ -83,8 +83,17 @@ export default function PrivateBookingFlow() {
       setErrors(fe);
       return;
     }
+    // Look up an active waiver for this swimmer so we can skip the legal step
+    // later if one already exists (same first/last name + DOB within 12 months).
+    if (form.childDob) {
+      const w = await lookupActiveWaiver(form.childFirstName, form.childLastName, form.childDob);
+      setActiveWaiver(w);
+    } else {
+      setActiveWaiver(null);
+    }
     setStep("slots");
   };
+
 
   const handleLegalSubmit = async (legal: LegalAgreementData) => {
     if (!form.childDob) return;
