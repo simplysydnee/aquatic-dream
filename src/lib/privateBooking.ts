@@ -108,7 +108,11 @@ export async function fetchOpenSlots(opts: {
 
     for (const blk of blocksList) {
       if (blk.is_blackout) continue;
-      if (blk.kind === "weekly" && blk.day_of_week !== dow) continue;
+      if (blk.kind === "weekly") {
+        if (blk.day_of_week !== dow) continue;
+        if (blk.start_date && dateStr < blk.start_date) continue;
+        if (blk.end_date && dateStr > blk.end_date) continue;
+      }
       if (blk.kind === "date_range") {
         if (blk.start_date && dateStr < blk.start_date) continue;
         if (blk.end_date && dateStr > blk.end_date) continue;
