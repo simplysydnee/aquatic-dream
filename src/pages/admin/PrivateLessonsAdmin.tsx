@@ -292,7 +292,7 @@ export default function PrivateLessonsAdmin() {
               </div>
               <div>
                 <Label>Type</Label>
-                <Select value={draft.kind} onValueChange={(v: any) => setDraft({ ...draft, kind: v })}>
+                <Select value={draft.kind} onValueChange={(v: any) => setDraft({ ...draft, kind: v, start_date: "", end_date: "", day_of_week: 1 })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="weekly">Weekly recurring</SelectItem>
