@@ -266,3 +266,6 @@ const calBtnSecondary = {
   display: 'inline-block' as const,
   border: '1.5px solid #0f2343',
 }
+const parentInfoBox = { backgroundColor: '#fff7ed', border: '1px solid #fdba74', padding: '14px 18px', borderRadius: '6px', margin: '20px 0 0' }
+const parentInfoHeading = { fontSize: '14px', fontWeight: '700' as const, color: '#9a3412', margin: '0 0 8px', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }
+const parentInfoItem = { fontSize: '13px', color: '#7c2d12', lineHeight: '1.5', margin: '4px 0' }
