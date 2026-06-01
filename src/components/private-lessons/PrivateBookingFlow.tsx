@@ -13,6 +13,8 @@ import SlotPicker from "./SlotPicker";
 import PrivateCardSetup from "./PrivateCardSetup";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { Slot, releaseHolds } from "@/lib/privateBooking";
+import { lookupActiveWaiver, legalDataFromWaiver, backfillVisitorWaiver, ActiveWaiver } from "@/lib/swimmerWaiver";
+
 import { z } from "zod";
 import { toast } from "@/hooks/use-toast";
 import { CheckCircle } from "lucide-react";
