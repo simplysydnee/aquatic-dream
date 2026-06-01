@@ -69,6 +69,14 @@ export default function PrivateLessonsAdmin() {
 
   const addBlock = async () => {
     if (!draft.instructor_id) return;
+    if (!draft.start_date || !draft.end_date) {
+      toast({ title: "Dates required", description: "Start date and end date are both required.", variant: "destructive" });
+      return;
+    }
+    if (draft.end_date < draft.start_date) {
+      toast({ title: "Invalid range", description: "End date must be on or after start date.", variant: "destructive" });
+      return;
+    }
     const payload: any = {
       instructor_id: draft.instructor_id, kind: draft.kind,
       start_time: draft.start_time, end_time: draft.end_time,
@@ -179,12 +187,12 @@ export default function PrivateLessonsAdmin() {
                 </Select>
               </div>
               <div>
-                <Label>Start date {draft.kind === "weekly" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
-                <Input type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
+                <Label>Start date</Label>
+                <Input type="date" required value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
               </div>
               <div>
-                <Label>End date {draft.kind === "weekly" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
-                <Input type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
+                <Label>End date</Label>
+                <Input type="date" required value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
               </div>
               <div><Label>Start time</Label><Input type="time" value={draft.start_time} onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} /></div>
               <div><Label>End time</Label><Input type="time" value={draft.end_time} onChange={(e) => setDraft({ ...draft, end_time: e.target.value })} /></div>
@@ -204,7 +212,7 @@ export default function PrivateLessonsAdmin() {
                 <Switch checked={draft.is_blackout} onCheckedChange={(v) => setDraft({ ...draft, is_blackout: v })} />
                 <Label>Blackout (block off, not bookable)</Label>
               </div>
-              <div className="sm:col-span-3"><Button onClick={addBlock}><Plus className="w-4 h-4 mr-1" />Add block</Button></div>
+              <div className="sm:col-span-3"><Button onClick={addBlock} disabled={!draft.start_date || !draft.end_date}><Plus className="w-4 h-4 mr-1" />Add block</Button></div>
             </CardContent>
           </Card>
 
