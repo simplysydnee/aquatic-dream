@@ -31,6 +31,7 @@ interface Block {
   day_of_week: number | null; start_date: string | null; end_date: string | null;
   start_time: string; end_time: string; slot_minutes: number; pool_area: string;
   is_blackout: boolean; notes: string | null;
+  break_start_time: string | null; break_end_time: string | null;
 }
 
 function normTime(t: string) { return t.length >= 5 ? t.substring(0, 5) : t; }
