@@ -1,30 +1,34 @@
-## Fix two issues on private lessons
+## Skip waiver step when swimmer already has one (name + DOB, within 1 year)
 
-### 1. Better DOB picker on the public private-lesson enrollment form
+### Source of truth
+Use `visitor_waivers.swimmers` (jsonb array of `{first_name, last_name, dob}`) signed within the last 365 days. A swimmer is considered covered when at least one row's `swimmers` array contains a case-insensitive name match plus an exact DOB match, AND `signed_at >= now() - interval '1 year'`.
+
+### 1. Database — security-definer RPC
+Add `public.swimmer_has_active_waiver(_first text, _last text, _dob date) returns boolean` so the public flows can query without exposing the whole `visitor_waivers` table. Granted to `anon` and `authenticated`. Uses a jsonb existence subquery and a 1-year cutoff.
+
+### 2. Private lesson booking flow
 File: `src/components/private-lessons/PrivateBookingFlow.tsx`
 
-Replace the single `<Calendar captionLayout="dropdown-buttons">` popover (where day cells get cramped) with a clearer, more obvious control:
+After the **info** step (which already collects child first/last + DOB) and before transitioning to the **legal** step, call the RPC. If it returns `true`:
+- Skip directly from `slots` → `card` (bypass `legal`).
+- Display an inline note on the info step: "✓ Waiver on file for {Child Name} — you won't need to re-sign."
+- On `confirm-private-booking`, mark the booking's `waiver_signed_at` to `now()` so it doesn't look unsigned.
 
-- Three side-by-side `<Select>` dropdowns: **Month** (Jan–Dec), **Day** (1–31, auto-clamped to the valid days for the chosen month/year), **Year** (current year down to current year − 18, since this is for kids; fall back to 1920 if needed).
-- Live "Age: X" preview below the row (already exists, keep).
-- Inline validation: if the resulting date is in the future or yields age > 17, show a friendly error.
-- Keep the underlying `form.childDob: Date` shape so the rest of the flow (`calcAge`, submit payload) is unchanged.
+### 3. Swim enrollment flow
+Files: `src/pages/SwimEnrollment.tsx` and its `LegalAgreements` step.
 
-This is the standard pattern for birthdays and removes the calendar-grid confusion the user hit.
+Same pattern: after the parent enters child first/last + DOB, call the RPC. If covered:
+- Skip the legal step entirely.
+- Show a small "Waiver on file" badge.
+- On enrollment insert, set `waiver_signed_at = now()` (or copy from the matched waiver's `signed_at`).
 
-### 2. New private-lesson blocks not appearing in booking flow
-Root cause: the admin form in `src/pages/admin/PrivateLessonsAdmin.tsx` is saving inconsistent rows. The most recent insert is `kind:"weekly"`, `day_of_week:1` (Monday) but `start_date=end_date=2026-06-09` (a Tuesday) — so `fetchOpenSlots` in `src/lib/privateBooking.ts` correctly filters it out (no Monday exists in the 1-day window).
+### 4. Backfill on completion (so flows are self-reinforcing)
+When a user *does* complete the legal step in either flow, also insert a row into `visitor_waivers` containing that swimmer (in the `swimmers` jsonb). This means a child who signs once via the swim enrollment flow will auto-skip on the next private booking, and vice versa. Done inside the existing `confirm-private-booking` and swim enrollment edge functions / write paths.
 
-Fixes in `PrivateLessonsAdmin.tsx` `addBlock()`:
+### Edge cases
+- DOB stored on the existing swimmer entries as ISO `YYYY-MM-DD`; the RPC compares as `date` and trims/lowercases name strings.
+- If `dob` is missing on stored swimmers (older rows), they're ignored — no false positive.
+- Admin-created bookings are unaffected.
 
-- **One-time** type → force `kind="date_range"`, `day_of_week=null`, `end_date = start_date`. Do not allow a stray `day_of_week` from prior form state.
-- **Weekly** type → validate that `start_date`'s weekday and `end_date`'s weekday range actually contains at least one occurrence of the chosen `day_of_week`; otherwise show a toast: "The selected weekday doesn't fall inside the date range."
-- **Date range** type → if `day_of_week` is left blank, store `null` (every day in range becomes available); otherwise validate as in Weekly.
-- Clear `day_of_week` / `start_date` / `end_date` from form state whenever the Type select changes, so leftover values from a previous selection can't get persisted.
-
-No changes needed in `src/lib/privateBooking.ts` — the resolver logic is correct; the bad data was the problem.
-
-### Verification
-- Add a Weekly block (Mon, two-week range) → confirm Monday slots appear in the public booking flow.
-- Add a One-time block (single date, any weekday) → confirm only that day's slots appear.
-- Open the enrollment form, use the three dropdowns to pick a child's birthday, confirm Age preview updates and submit works.
+### No file changes yet — migration first
+Migration runs first so the new RPC and any indexes (GIN on `visitor_waivers.swimmers`) exist before the front-end calls it.

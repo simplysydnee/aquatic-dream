@@ -2329,6 +2329,10 @@ export type Database = {
           read_ct: number
         }[]
       }
+      swimmer_has_active_waiver: {
+        Args: { _dob: string; _first: string; _last: string }
+        Returns: boolean
+      }
       unsubscribe_marketing_by_token: {
         Args: { _reason?: string; _token: string }
         Returns: {
