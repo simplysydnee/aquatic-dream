@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -15,11 +16,14 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2 } from "lucide-react";
+import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getStripeEnvironment } from "@/lib/stripe";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const SLOT_WINDOW_DAYS = 56; // show ~8 weeks of upcoming slots per block
+
+type UiKind = "weekly" | "date_range" | "one_time";
 
 interface Instructor { id: string; name: string }
 interface Block {
@@ -29,16 +33,45 @@ interface Block {
   is_blackout: boolean; notes: string | null;
 }
 
+function normTime(t: string) { return t.length >= 5 ? t.substring(0, 5) : t; }
+function isoDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function addMinutes(time: string, mins: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const total = h * 60 + m + mins;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+function fmtTime(t: string) {
+  const [h, m] = t.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hr = ((h + 11) % 12) + 1;
+  return `${hr}:${String(m).padStart(2, "0")} ${period}`;
+}
+function fmtDate(dateStr: string) {
+  const d = new Date(dateStr + "T00:00");
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+interface SlotRow {
+  date: string;
+  start: string;
+  end: string;
+  booking?: { booking_id: string; child_name: string; parent_name: string; payment_status: string; auto_charge_status: string; status: string };
+}
+
 export default function PrivateLessonsAdmin() {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [allPrivateBookings, setAllPrivateBookings] = useState<any[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<any | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
   const [detailBooking, setDetailBooking] = useState<any | null>(null);
+  const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState({
-    instructor_id: "", kind: "weekly" as "weekly" | "date_range",
+    instructor_id: "", kind: "weekly" as UiKind,
     day_of_week: 1, start_date: "", end_date: "",
     start_time: "15:00", end_time: "18:00", slot_minutes: 30,
     pool_area: "shallow", is_blackout: false, notes: "",
