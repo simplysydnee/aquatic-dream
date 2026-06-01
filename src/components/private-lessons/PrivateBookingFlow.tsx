@@ -3,11 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ChevronLeft, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronLeft, Loader2 } from "lucide-react";
+
+
 import { supabase } from "@/integrations/supabase/client";
 import LegalAgreements, { LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import SlotPicker from "./SlotPicker";
@@ -243,25 +242,15 @@ export default function PrivateBookingFlow() {
 
       <div>
         <Label>Swimmer Date of Birth *</Label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline"
-              className={cn("mt-1 w-full justify-start text-left font-normal", !form.childDob && "text-muted-foreground")}>
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {form.childDob ? format(form.childDob, "PPP") : <span>Pick a date</span>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={form.childDob} onSelect={(d) => update("childDob", d)}
-              disabled={(d) => d > new Date() || d < new Date("1920-01-01")}
-              captionLayout="dropdown-buttons" fromYear={1920} toYear={new Date().getFullYear()}
-              defaultMonth={form.childDob ?? new Date(new Date().getFullYear() - 8, 0)}
-              initialFocus className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
+        <DobPicker
+          value={form.childDob}
+          onChange={(d) => update("childDob", d)}
+        />
         {computedAge !== null && <p className="text-xs text-muted-foreground mt-1">Age: {computedAge}</p>}
         {errors.childDob && <p className="text-xs text-destructive mt-1">{errors.childDob}</p>}
       </div>
+
+
 
       <div>
         <Label>Notes (optional)</Label>
@@ -272,3 +261,105 @@ export default function PrivateBookingFlow() {
     </form>
   );
 }
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function DobPicker({ value, onChange }: { value: Date | undefined; onChange: (d: Date | undefined) => void }) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const years = useMemo(() => {
+    const arr: number[] = [];
+    for (let y = currentYear; y >= currentYear - 18; y--) arr.push(y);
+    return arr;
+  }, [currentYear]);
+
+  const month = value ? value.getMonth() : "";
+  const day = value ? value.getDate() : "";
+  const year = value ? value.getFullYear() : "";
+
+  const update = (next: { month?: number | ""; day?: number | ""; year?: number | "" }) => {
+    const m = next.month !== undefined ? next.month : month;
+    const y = next.year !== undefined ? next.year : year;
+    let d = next.day !== undefined ? next.day : day;
+    if (m === "" || y === "" || d === "") {
+      // If incomplete, still try to render — but only emit a Date once all three are set
+      if (m !== "" && y !== "") {
+        const max = daysInMonth(Number(y), Number(m));
+        if (d !== "" && Number(d) > max) d = max;
+      }
+      // Update partial state by passing through onChange only when complete
+      // We need local state for partial selections — fall through below.
+    }
+    if (m !== "" && y !== "" && d !== "") {
+      const max = daysInMonth(Number(y), Number(m));
+      const clampedDay = Math.min(Number(d), max);
+      onChange(new Date(Number(y), Number(m), clampedDay));
+    } else {
+      // Keep partial selection alive by storing as an invalid placeholder is hard;
+      // instead, set undefined so the parent shows "incomplete".
+      // To avoid losing partial picks, use the local refs below.
+    }
+  };
+
+  // Local partial state so users can pick month/year before day, etc.
+  const [partial, setPartial] = useState<{ m: number | ""; d: number | ""; y: number | "" }>({
+    m: value ? value.getMonth() : "",
+    d: value ? value.getDate() : "",
+    y: value ? value.getFullYear() : "",
+  });
+
+  useEffect(() => {
+    if (value) setPartial({ m: value.getMonth(), d: value.getDate(), y: value.getFullYear() });
+  }, [value]);
+
+  const commit = (next: { m: number | ""; d: number | ""; y: number | "" }) => {
+    setPartial(next);
+    if (next.m !== "" && next.d !== "" && next.y !== "") {
+      const max = daysInMonth(Number(next.y), Number(next.m));
+      const clampedDay = Math.min(Number(next.d), max);
+      onChange(new Date(Number(next.y), Number(next.m), clampedDay));
+    } else {
+      onChange(undefined);
+    }
+  };
+
+  const maxDay = partial.m !== "" && partial.y !== "" ? daysInMonth(Number(partial.y), Number(partial.m)) : 31;
+  const dayOptions = Array.from({ length: maxDay }, (_, i) => i + 1);
+
+  return (
+    <div className="mt-1 grid grid-cols-3 gap-2">
+      <Select
+        value={partial.m === "" ? undefined : String(partial.m)}
+        onValueChange={(v) => commit({ ...partial, m: Number(v) })}
+      >
+        <SelectTrigger><SelectValue placeholder="Month" /></SelectTrigger>
+        <SelectContent className="max-h-64">
+          {MONTHS.map((name, i) => <SelectItem key={i} value={String(i)}>{name}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <Select
+        value={partial.d === "" ? undefined : String(partial.d)}
+        onValueChange={(v) => commit({ ...partial, d: Number(v) })}
+      >
+        <SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger>
+        <SelectContent className="max-h-64">
+          {dayOptions.map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <Select
+        value={partial.y === "" ? undefined : String(partial.y)}
+        onValueChange={(v) => commit({ ...partial, y: Number(v) })}
+      >
+        <SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger>
+        <SelectContent className="max-h-64">
+          {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+

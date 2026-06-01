@@ -116,6 +116,27 @@ export default function PrivateLessonsAdmin() {
       toast({ title: "Invalid range", description: "End date must be on or after start date.", variant: "destructive" });
       return;
     }
+
+    // Validate that a weekly/day-of-week-constrained block actually contains the chosen weekday.
+    const containsWeekday = (startIso: string, endIso: string, dow: number) => {
+      const start = new Date(startIso + "T00:00");
+      const end = new Date(endIso + "T00:00");
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        if (d.getDay() === dow) return true;
+      }
+      return false;
+    };
+    if (draft.kind === "weekly") {
+      if (!containsWeekday(draft.start_date, endDate, draft.day_of_week)) {
+        toast({
+          title: "Weekday not in range",
+          description: "The selected day of the week never occurs between the start and end dates.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     // Persist UI "one_time" as a single-day date_range with no day-of-week constraint.
     const dbKind: "weekly" | "date_range" = draft.kind === "weekly" ? "weekly" : "date_range";
     const payload: any = {
@@ -132,6 +153,7 @@ export default function PrivateLessonsAdmin() {
     toast({ title: "Block added" });
     load();
   };
+
 
   const remove = async (id: string) => {
     await supabase.from("instructor_booking_blocks").delete().eq("id", id);
@@ -270,7 +292,7 @@ export default function PrivateLessonsAdmin() {
               </div>
               <div>
                 <Label>Type</Label>
-                <Select value={draft.kind} onValueChange={(v: any) => setDraft({ ...draft, kind: v })}>
+                <Select value={draft.kind} onValueChange={(v: any) => setDraft({ ...draft, kind: v, start_date: "", end_date: "", day_of_week: 1 })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="weekly">Weekly recurring</SelectItem>

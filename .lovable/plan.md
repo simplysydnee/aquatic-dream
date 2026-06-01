@@ -1,43 +1,30 @@
-# Per-Slot View + One-Time Availability for Private Lessons
+## Fix two issues on private lessons
 
-Two related improvements to `/admin/private-lessons`:
+### 1. Better DOB picker on the public private-lesson enrollment form
+File: `src/components/private-lessons/PrivateBookingFlow.tsx`
 
-## 1. Add "One-time" availability type
+Replace the single `<Calendar captionLayout="dropdown-buttons">` popover (where day cells get cramped) with a clearer, more obvious control:
 
-Today the **Type** dropdown only has "Weekly recurring" and "Date range". Add a third option:
+- Three side-by-side `<Select>` dropdowns: **Month** (Jan–Dec), **Day** (1–31, auto-clamped to the valid days for the chosen month/year), **Year** (current year down to current year − 18, since this is for kids; fall back to 1920 if needed).
+- Live "Age: X" preview below the row (already exists, keep).
+- Inline validation: if the resulting date is in the future or yields age > 17, show a friendly error.
+- Keep the underlying `form.childDob: Date` shape so the rest of the flow (`calcAge`, submit payload) is unchanged.
 
-- **One-time** — instructor opens a single day's worth of slots (e.g., "Saturday 11/15, 3pm–6pm, 30-min slots"). Internally stored as `kind = 'date_range'` with `start_date = end_date` and no `day_of_week` constraint, so the existing slot resolver in `src/lib/privateBooking.ts` works unchanged.
+This is the standard pattern for birthdays and removes the calendar-grid confusion the user hit.
 
-Form behavior:
-- One-time → show single "Date" picker, hide Day-of-week.
-- Weekly → require Start/End date + Day-of-week (as today).
-- Date range → require Start/End date, optional Day-of-week (as today).
+### 2. New private-lesson blocks not appearing in booking flow
+Root cause: the admin form in `src/pages/admin/PrivateLessonsAdmin.tsx` is saving inconsistent rows. The most recent insert is `kind:"weekly"`, `day_of_week:1` (Monday) but `start_date=end_date=2026-06-09` (a Tuesday) — so `fetchOpenSlots` in `src/lib/privateBooking.ts` correctly filters it out (no Monday exists in the 1-day window).
 
-## 2. Show generated slots per block
+Fixes in `PrivateLessonsAdmin.tsx` `addBlock()`:
 
-In the **Current blocks** table, make each row expandable. When expanded, list the individual lesson slots that block produces (using the same slot-generation logic that powers the public booking page):
+- **One-time** type → force `kind="date_range"`, `day_of_week=null`, `end_date = start_date`. Do not allow a stray `day_of_week` from prior form state.
+- **Weekly** type → validate that `start_date`'s weekday and `end_date`'s weekday range actually contains at least one occurrence of the chosen `day_of_week`; otherwise show a toast: "The selected weekday doesn't fall inside the date range."
+- **Date range** type → if `day_of_week` is left blank, store `null` (every day in range becomes available); otherwise validate as in Weekly.
+- Clear `day_of_week` / `start_date` / `end_date` from form state whenever the Type select changes, so leftover values from a previous selection can't get persisted.
 
-```text
-▸ Maddie · Weekly · Sat · 3:00–6:00 · 30m  · Shallow         [delete]
-  └ Sat Nov 15  3:00 PM   ● Booked — Smith, Liam (paid)
-    Sat Nov 15  3:30 PM   ○ Open
-    Sat Nov 15  4:00 PM   ○ Open
-    Sat Nov 15  4:30 PM   ● Booked — Patel, Anika (card on file)
-    Sat Nov 15  5:00 PM   ○ Open
-    Sat Nov 15  5:30 PM   ○ Open
-    Sat Nov 22  3:00 PM   ○ Open
-    ...
-```
+No changes needed in `src/lib/privateBooking.ts` — the resolver logic is correct; the bad data was the problem.
 
-Each slot row shows: date, time, status (Open / Held / Booked), and if booked, the swimmer name + payment status. For Weekly blocks we show the next ~4 occurrences by default with a "Show more" toggle to avoid huge lists. For one-time / short date ranges, show all slots.
-
-## Technical details
-
-- **Slot generation**: reuse the existing helper that builds slots from a block (in `src/lib/privateBooking.ts`). Run it client-side on the loaded `instructor_booking_blocks` for a configurable window (default: today through 8 weeks out).
-- **Booking overlay**: cross-reference with already-loaded `lesson_bookings` + `lesson_booking_occurrences` (private, non-cancelled) and active `slot_holds` to mark each slot Open / Held / Booked.
-- **No DB changes** — schema already supports all three kinds via existing `kind` + `start_date`/`end_date`/`day_of_week` columns.
-
-## Files
-
-- `src/pages/admin/PrivateLessonsAdmin.tsx` — add "One-time" type, expandable rows, slot rendering.
-- `src/lib/privateBooking.ts` — export the per-block slot-generation helper if not already exported, so the admin page can reuse it.
+### Verification
+- Add a Weekly block (Mon, two-week range) → confirm Monday slots appear in the public booking flow.
+- Add a One-time block (single date, any weekday) → confirm only that day's slots appear.
+- Open the enrollment form, use the three dropdowns to pick a child's birthday, confirm Age preview updates and submit works.
