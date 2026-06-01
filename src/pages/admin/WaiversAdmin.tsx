@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileSignature, Plus, Search, Mail, MailX } from "lucide-react";
+import { FileSignature, Plus, Search, Camera, CameraOff } from "lucide-react";
 import FrontDeskVisitorWaiverDialog from "@/components/admin/waivers/FrontDeskVisitorWaiverDialog";
 import WaiverDetailDrawer from "@/components/admin/waivers/WaiverDetailDrawer";
 
