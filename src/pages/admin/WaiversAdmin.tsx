@@ -182,7 +182,7 @@ const WaiversAdmin = () => {
               <TableHead>Signer</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Swimmers</TableHead>
-              <TableHead>Photo</TableHead>
+              <TableHead>Photo Consent</TableHead>
               <TableHead>Source</TableHead>
               <TableHead>Signed</TableHead>
             </TableRow>
