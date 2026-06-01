@@ -242,22 +242,14 @@ export default function PrivateBookingFlow() {
 
       <div>
         <Label>Swimmer Date of Birth *</Label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline"
-              className={cn("mt-1 w-full justify-start text-left font-normal", !form.childDob && "text-muted-foreground")}>
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {form.childDob ? format(form.childDob, "PPP") : <span>Pick a date</span>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={form.childDob} onSelect={(d) => update("childDob", d)}
-              disabled={(d) => d > new Date() || d < new Date("1920-01-01")}
-              captionLayout="dropdown-buttons" fromYear={1920} toYear={new Date().getFullYear()}
-              defaultMonth={form.childDob ?? new Date(new Date().getFullYear() - 8, 0)}
-              initialFocus className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
+        <DobPicker
+          value={form.childDob}
+          onChange={(d) => update("childDob", d)}
+        />
+        {computedAge !== null && <p className="text-xs text-muted-foreground mt-1">Age: {computedAge}</p>}
+        {errors.childDob && <p className="text-xs text-destructive mt-1">{errors.childDob}</p>}
+      </div>
+
         {computedAge !== null && <p className="text-xs text-muted-foreground mt-1">Age: {computedAge}</p>}
         {errors.childDob && <p className="text-xs text-destructive mt-1">{errors.childDob}</p>}
       </div>
