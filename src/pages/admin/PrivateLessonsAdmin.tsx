@@ -179,12 +179,12 @@ export default function PrivateLessonsAdmin() {
                 </Select>
               </div>
               <div>
-                <Label>Start date {draft.kind === "weekly" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
-                <Input type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
+                <Label>Start date</Label>
+                <Input type="date" required value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
               </div>
               <div>
-                <Label>End date {draft.kind === "weekly" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
-                <Input type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
+                <Label>End date</Label>
+                <Input type="date" required value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
               </div>
               <div><Label>Start time</Label><Input type="time" value={draft.start_time} onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} /></div>
               <div><Label>End time</Label><Input type="time" value={draft.end_time} onChange={(e) => setDraft({ ...draft, end_time: e.target.value })} /></div>
