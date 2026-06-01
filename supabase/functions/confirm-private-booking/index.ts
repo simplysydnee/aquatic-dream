@@ -76,28 +76,33 @@ Deno.serve(async (req) => {
         time: `${formatTime(b.start_time)} – ${formatTime(b.end_time)}`,
       }));
 
-      supabase.functions.invoke("send-transactional-email", {
-        body: {
-          templateName: "lesson-booking-confirmation",
-          recipientEmail: b.parent_email,
-          idempotencyKey: `private-booking-${booking_id}`,
-          templateData: {
-            parentName: b.parent_first_name || b.parent_name,
-            childName: b.child_first_name || b.child_name,
-            lessonTypeLabel: "Private Lesson",
-            instructorName: b.instructor_name,
-            seriesMode: schedule.length > 1,
-            totalOccurrences: schedule.length,
-            totalAmountDue: `$${(schedule.length * Number(b.price_per_session)).toFixed(2)} (charged $${Number(b.price_per_session).toFixed(0)} the day of each lesson)`,
-            scheduleList: schedule,
-            lessonDate: schedule[0]?.date,
-            lessonTime: schedule[0]?.time,
-            amountDue: `$${Number(b.price_per_session).toFixed(0)}`,
-            waiverSigned: true,
+      try {
+        await supabase.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "lesson-booking-confirmation",
+            recipientEmail: b.parent_email,
+            idempotencyKey: `private-booking-${booking_id}`,
+            templateData: {
+              parentName: b.parent_first_name || b.parent_name,
+              childName: b.child_first_name || b.child_name,
+              lessonTypeLabel: "Private Lesson",
+              instructorName: b.instructor_name,
+              seriesMode: schedule.length > 1,
+              totalOccurrences: schedule.length,
+              totalAmountDue: `$${(schedule.length * Number(b.price_per_session)).toFixed(2)} (charged $${Number(b.price_per_session).toFixed(0)} the day of each lesson)`,
+              scheduleList: schedule,
+              lessonDate: schedule[0]?.date,
+              lessonTime: schedule[0]?.time,
+              amountDue: `$${Number(b.price_per_session).toFixed(0)}`,
+              waiverSigned: true,
+            },
           },
-        },
-      }).catch((e) => console.error("confirmation email failed", e));
+        });
+      } catch (e) {
+        console.error("confirmation email failed", e);
+      }
     }
+
 
     return j({ success: true, booking_id });
   } catch (err: any) {
