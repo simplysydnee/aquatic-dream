@@ -75,8 +75,8 @@ export default function PrivateLessonsAdmin() {
       slot_minutes: draft.slot_minutes, pool_area: draft.pool_area,
       is_blackout: draft.is_blackout, notes: draft.notes || null,
       day_of_week: draft.kind === "weekly" ? draft.day_of_week : (draft.day_of_week ?? null),
-      start_date: draft.kind === "date_range" ? draft.start_date || null : null,
-      end_date: draft.kind === "date_range" ? draft.end_date || null : null,
+      start_date: draft.start_date || null,
+      end_date: draft.end_date || null,
     };
     const { error } = await supabase.from("instructor_booking_blocks").insert(payload);
     if (error) { toast({ title: "Could not add", description: error.message, variant: "destructive" }); return; }
@@ -178,12 +178,14 @@ export default function PrivateLessonsAdmin() {
                   <SelectContent>{WEEKDAYS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              {draft.kind === "date_range" && (
-                <>
-                  <div><Label>Start date</Label><Input type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} /></div>
-                  <div><Label>End date</Label><Input type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} /></div>
-                </>
-              )}
+              <div>
+                <Label>Start date {draft.kind === "weekly" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
+                <Input type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
+              </div>
+              <div>
+                <Label>End date {draft.kind === "weekly" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
+                <Input type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
+              </div>
               <div><Label>Start time</Label><Input type="time" value={draft.start_time} onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} /></div>
               <div><Label>End time</Label><Input type="time" value={draft.end_time} onChange={(e) => setDraft({ ...draft, end_time: e.target.value })} /></div>
               <div><Label>Slot minutes</Label><Input type="number" min={15} step={5} value={draft.slot_minutes} onChange={(e) => setDraft({ ...draft, slot_minutes: Number(e.target.value) })} /></div>
@@ -221,8 +223,9 @@ export default function PrivateLessonsAdmin() {
                       <TableCell>{instructorName(b.instructor_id)}</TableCell>
                       <TableCell>{b.is_blackout ? "Blackout" : b.kind === "weekly" ? "Weekly" : "Date range"}</TableCell>
                       <TableCell>
-                        {b.kind === "weekly" ? WEEKDAYS[b.day_of_week ?? 0] :
-                          `${b.start_date || ""} → ${b.end_date || ""}${b.day_of_week !== null ? ` (${WEEKDAYS[b.day_of_week]})` : ""}`}
+                        {b.kind === "weekly"
+                          ? `${WEEKDAYS[b.day_of_week ?? 0]}${b.start_date || b.end_date ? ` (${b.start_date || "…"} → ${b.end_date || "…"})` : ""}`
+                          : `${b.start_date || ""} → ${b.end_date || ""}${b.day_of_week !== null ? ` (${WEEKDAYS[b.day_of_week]})` : ""}`}
                       </TableCell>
                       <TableCell>{b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}</TableCell>
                       <TableCell>{b.slot_minutes}m</TableCell>
