@@ -138,6 +138,15 @@ export default function PrivateBookingFlow() {
       }
       if (!data?.client_secret) throw new Error((data as any)?.error || "Could not start card setup");
       setSetup({ clientSecret: data.client_secret, bookingId: data.booking_id, checkoutSessionId: data.checkout_session_id });
+      // If this was a freshly-signed waiver (not carried over), backfill visitor_waivers
+      // so the next booking for the same swimmer auto-skips the legal step.
+      if (!activeWaiver && form.childDob) {
+        backfillVisitorWaiver({
+          legal,
+          signerEmail: form.parentEmail,
+          child: { firstName: form.childFirstName, lastName: form.childLastName, dob: form.childDob },
+        });
+      }
       setStep("card");
     } catch (e: any) {
       toast({ title: "Could not save booking", description: e?.message || "Try again", variant: "destructive" });
@@ -145,6 +154,7 @@ export default function PrivateBookingFlow() {
       setSubmitting(false);
     }
   };
+
 
   if (step === "done") {
     return (
