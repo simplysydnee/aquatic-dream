@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileSignature, Plus, Search, Mail, MailX } from "lucide-react";
+import { FileSignature, Plus, Search, Camera, CameraOff } from "lucide-react";
 import FrontDeskVisitorWaiverDialog from "@/components/admin/waivers/FrontDeskVisitorWaiverDialog";
 import WaiverDetailDrawer from "@/components/admin/waivers/WaiverDetailDrawer";
 
@@ -182,7 +182,7 @@ const WaiversAdmin = () => {
               <TableHead>Signer</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Swimmers</TableHead>
-              <TableHead>Photo</TableHead>
+              <TableHead>Photo Consent</TableHead>
               <TableHead>Source</TableHead>
               <TableHead>Signed</TableHead>
             </TableRow>
@@ -222,9 +222,13 @@ const WaiversAdmin = () => {
                     </TableCell>
                     <TableCell>
                       {r.photo_release ? (
-                        <Mail className="w-4 h-4 text-primary" aria-label="Consented" />
+                        <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white gap-1">
+                          <Camera className="w-3 h-3" /> Yes
+                        </Badge>
                       ) : (
-                        <MailX className="w-4 h-4 text-muted-foreground" aria-label="Declined" />
+                        <Badge variant="destructive" className="gap-1">
+                          <CameraOff className="w-3 h-3" /> No
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell>
