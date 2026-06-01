@@ -117,25 +117,11 @@ export default function PrivateLessonsAdmin() {
       return;
     }
 
-    // Validate that a weekly/day-of-week-constrained block actually contains the chosen weekday.
-    const containsWeekday = (startIso: string, endIso: string, dow: number) => {
-      const start = new Date(startIso + "T00:00");
-      const end = new Date(endIso + "T00:00");
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        if (d.getDay() === dow) return true;
-      }
-      return false;
-    };
-    if (draft.kind === "weekly") {
-      if (!containsWeekday(draft.start_date, endDate, draft.day_of_week)) {
-        toast({
-          title: "Weekday not in range",
-          description: "The selected day of the week never occurs between the start and end dates.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
+    // For weekly recurring blocks, derive day-of-week directly from the start date
+    // so admins can't accidentally mismatch the two.
+    const derivedDow = draft.start_date
+      ? new Date(draft.start_date + "T00:00").getDay()
+      : draft.day_of_week;
 
     // Persist UI "one_time" as a single-day date_range with no day-of-week constraint.
     const dbKind: "weekly" | "date_range" = draft.kind === "weekly" ? "weekly" : "date_range";
@@ -144,10 +130,11 @@ export default function PrivateLessonsAdmin() {
       start_time: draft.start_time, end_time: draft.end_time,
       slot_minutes: draft.slot_minutes, pool_area: draft.pool_area,
       is_blackout: draft.is_blackout, notes: draft.notes || null,
-      day_of_week: draft.kind === "weekly" ? draft.day_of_week : null,
+      day_of_week: draft.kind === "weekly" ? derivedDow : null,
       start_date: draft.start_date,
       end_date: endDate,
     };
+
     const { error } = await supabase.from("instructor_booking_blocks").insert(payload);
     if (error) { toast({ title: "Could not add", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Block added" });
@@ -301,15 +288,15 @@ export default function PrivateLessonsAdmin() {
                   </SelectContent>
                 </Select>
               </div>
-              {draft.kind !== "one_time" && (
+              {draft.kind === "weekly" && draft.start_date && (
                 <div>
-                  <Label>Day of week {draft.kind === "date_range" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
-                  <Select value={String(draft.day_of_week)} onValueChange={(v) => setDraft({ ...draft, day_of_week: Number(v) })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{WEEKDAYS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <Label>Day of week</Label>
+                  <div className="mt-2 px-3 py-2 text-sm rounded-md border border-border bg-muted/40 text-muted-foreground">
+                    {WEEKDAYS[new Date(draft.start_date + "T00:00").getDay()]} (auto from start date)
+                  </div>
                 </div>
               )}
+
               {draft.kind === "one_time" ? (
                 <div>
                   <Label>Date</Label>
