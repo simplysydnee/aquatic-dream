@@ -95,8 +95,10 @@ export default function PrivateBookingFlow() {
   };
 
 
-  const handleLegalSubmit = async (legal: LegalAgreementData) => {
+  const handleLegalSubmit = async (legal: LegalAgreementData, slotsOverride?: Slot[]) => {
     if (!form.childDob) return;
+    const slotsToUse = slotsOverride ?? slots;
+
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-private-booking-setup", {
