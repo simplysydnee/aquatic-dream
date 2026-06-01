@@ -204,10 +204,18 @@ export default function PrivateLessonsAdmin() {
       if (matchesDay) {
         let t = normTime(b.start_time);
         const end = normTime(b.end_time);
+        const brkStart = b.break_start_time ? normTime(b.break_start_time) : null;
+        const brkEnd = b.break_end_time ? normTime(b.break_end_time) : null;
         while (addMinutes(t, b.slot_minutes) <= end) {
+          const slotEnd = addMinutes(t, b.slot_minutes);
+          // If this slot overlaps the break, skip to break end.
+          if (brkStart && brkEnd && t < brkEnd && slotEnd > brkStart) {
+            t = brkEnd;
+            continue;
+          }
           const key = `${b.instructor_id}|${dateStr}|${t}`;
-          slots.push({ date: dateStr, start: t, end: addMinutes(t, b.slot_minutes), booking: bookingMap.get(key) });
-          t = addMinutes(t, b.slot_minutes);
+          slots.push({ date: dateStr, start: t, end: slotEnd, booking: bookingMap.get(key) });
+          t = slotEnd;
         }
       }
       cursor.setDate(cursor.getDate() + 1);
