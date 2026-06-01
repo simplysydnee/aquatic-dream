@@ -125,8 +125,6 @@ export default function PrivateLessonsAdmin() {
       ? new Date(draft.start_date + "T00:00").getDay()
       : draft.day_of_week;
 
-    // Persist UI "one_time" as a single-day date_range with no day-of-week constraint.
-    const dbKind: "weekly" | "date_range" = draft.kind === "weekly" ? "weekly" : "date_range";
     if (draft.has_break) {
       if (!draft.break_start_time || !draft.break_end_time) {
         toast({ title: "Break times required", description: "Enter both break start and end, or turn off the break.", variant: "destructive" });
