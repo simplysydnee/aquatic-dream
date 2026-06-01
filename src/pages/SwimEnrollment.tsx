@@ -121,6 +121,25 @@ const SwimEnrollment = () => {
       });
     }
 
+    // Check for an existing active waiver (name + DOB, within last 12 months).
+    // If found, skip the legal step entirely and use the stored signature.
+    if (data.childFirstName && data.childLastName && childDob) {
+      try {
+        const existing = await lookupActiveWaiver(data.childFirstName, data.childLastName, childDob);
+        if (existing) {
+          toast({
+            title: "Waiver already on file",
+            description: `Using ${data.childFirstName}'s signed waiver — skipping the legal step.`,
+          });
+          const legal = legalDataFromWaiver(existing);
+          await proceedToPayment(data, legal, { skipBackfill: true });
+          return;
+        }
+      } catch (e) {
+        console.warn("waiver lookup failed", e);
+      }
+    }
+
     setStep("legal");
   };
 
@@ -136,6 +155,17 @@ const SwimEnrollment = () => {
         relationship: legalData.emergencyContactRelationship,
       });
     }
+
+    // Best-effort backfill so this child is auto-detected next time
+    backfillVisitorWaiver({
+      legal: legalData,
+      signerEmail: enrollmentData.parentEmail,
+      child: {
+        firstName: enrollmentData.childFirstName,
+        lastName: enrollmentData.childLastName,
+        dob: childDob,
+      },
+    });
 
     const child: ChildEnrollment = {
       level,
@@ -163,7 +193,16 @@ const SwimEnrollment = () => {
   };
 
   const handleLegalSubmit = async (legalData: LegalAgreementData) => {
-    if (!level || sessionIds.length === 0 || !enrollmentData) return;
+    if (!enrollmentData) return;
+    await proceedToPayment(enrollmentData, legalData);
+  };
+
+  const proceedToPayment = async (
+    enrollmentDataArg: EnrollmentFormData,
+    legalData: LegalAgreementData,
+    opts: { skipBackfill?: boolean } = {},
+  ) => {
+    if (!level || sessionIds.length === 0) return;
     setSubmitting(true);
 
     // Save emergency contact
@@ -181,13 +220,13 @@ const SwimEnrollment = () => {
       level,
       childAge,
       childDob,
-      childName: enrollmentData.childName,
-      childFirstName: enrollmentData.childFirstName,
-      childLastName: enrollmentData.childLastName,
+      childName: enrollmentDataArg.childName,
+      childFirstName: enrollmentDataArg.childFirstName,
+      childLastName: enrollmentDataArg.childLastName,
       sessionIds,
-      enrollmentData,
+      enrollmentData: enrollmentDataArg,
       legalData,
-      isFirstTime: enrollmentData.isFirstTime === "yes",
+      isFirstTime: enrollmentDataArg.isFirstTime === "yes",
     };
     const allChildren = [...completedChildren, currentChild];
 
@@ -227,6 +266,19 @@ const SwimEnrollment = () => {
       return;
     }
 
+    // Backfill waiver for this child (skip if we already reused a stored one)
+    if (!opts.skipBackfill) {
+      backfillVisitorWaiver({
+        legal: legalData,
+        signerEmail: enrollmentDataArg.parentEmail,
+        child: {
+          firstName: enrollmentDataArg.childFirstName,
+          lastName: enrollmentDataArg.childLastName,
+          dob: childDob,
+        },
+      });
+    }
+
     // Calculate "today" total for display purposes — assumes payAhead=false
     // (i.e. just reg fees for first-timers). The user can opt to pay ahead in
     // the next step; that updates the Stripe-side total. The server is
@@ -260,6 +312,7 @@ const SwimEnrollment = () => {
     setSubmitting(false);
     setStep("payment");
   };
+
 
 
   // Count of swimmers added so far (for the progress indicator)
