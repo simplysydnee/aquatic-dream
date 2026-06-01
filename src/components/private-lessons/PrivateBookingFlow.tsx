@@ -224,14 +224,13 @@ export default function PrivateBookingFlow() {
           onContinue={(s) => {
             setSlots(s);
             if (activeWaiver) {
-              // Skip legal step entirely — submit using the on-file waiver data.
               const legal = legalDataFromWaiver(activeWaiver);
-              // We need slots in handleLegalSubmit closure to be current, so wait a tick.
-              setTimeout(() => handleLegalSubmit(legal), 0);
+              handleLegalSubmit(legal, s);
             } else {
               setStep("legal");
             }
           }}
+
           onBack={() => setStep("info")}
         />
       </div>
