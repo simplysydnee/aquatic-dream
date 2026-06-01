@@ -178,12 +178,14 @@ export default function PrivateLessonsAdmin() {
                   <SelectContent>{WEEKDAYS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              {draft.kind === "date_range" && (
-                <>
-                  <div><Label>Start date</Label><Input type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} /></div>
-                  <div><Label>End date</Label><Input type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} /></div>
-                </>
-              )}
+              <div>
+                <Label>Start date {draft.kind === "weekly" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
+                <Input type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
+              </div>
+              <div>
+                <Label>End date {draft.kind === "weekly" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
+                <Input type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
+              </div>
               <div><Label>Start time</Label><Input type="time" value={draft.start_time} onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} /></div>
               <div><Label>End time</Label><Input type="time" value={draft.end_time} onChange={(e) => setDraft({ ...draft, end_time: e.target.value })} /></div>
               <div><Label>Slot minutes</Label><Input type="number" min={15} step={5} value={draft.slot_minutes} onChange={(e) => setDraft({ ...draft, slot_minutes: Number(e.target.value) })} /></div>
