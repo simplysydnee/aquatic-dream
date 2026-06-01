@@ -223,8 +223,9 @@ export default function PrivateLessonsAdmin() {
                       <TableCell>{instructorName(b.instructor_id)}</TableCell>
                       <TableCell>{b.is_blackout ? "Blackout" : b.kind === "weekly" ? "Weekly" : "Date range"}</TableCell>
                       <TableCell>
-                        {b.kind === "weekly" ? WEEKDAYS[b.day_of_week ?? 0] :
-                          `${b.start_date || ""} → ${b.end_date || ""}${b.day_of_week !== null ? ` (${WEEKDAYS[b.day_of_week]})` : ""}`}
+                        {b.kind === "weekly"
+                          ? `${WEEKDAYS[b.day_of_week ?? 0]}${b.start_date || b.end_date ? ` (${b.start_date || "…"} → ${b.end_date || "…"})` : ""}`
+                          : `${b.start_date || ""} → ${b.end_date || ""}${b.day_of_week !== null ? ` (${WEEKDAYS[b.day_of_week]})` : ""}`}
                       </TableCell>
                       <TableCell>{b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}</TableCell>
                       <TableCell>{b.slot_minutes}m</TableCell>
