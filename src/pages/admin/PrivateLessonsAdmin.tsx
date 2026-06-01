@@ -31,6 +31,7 @@ interface Block {
   day_of_week: number | null; start_date: string | null; end_date: string | null;
   start_time: string; end_time: string; slot_minutes: number; pool_area: string;
   is_blackout: boolean; notes: string | null;
+  break_start_time: string | null; break_end_time: string | null;
 }
 
 function normTime(t: string) { return t.length >= 5 ? t.substring(0, 5) : t; }
@@ -75,6 +76,7 @@ export default function PrivateLessonsAdmin() {
     day_of_week: 1, start_date: "", end_date: "",
     start_time: "15:00", end_time: "18:00", slot_minutes: 30,
     pool_area: "shallow", is_blackout: false, notes: "",
+    has_break: false, break_start_time: "", break_end_time: "",
   });
 
   const load = async () => {
@@ -123,7 +125,21 @@ export default function PrivateLessonsAdmin() {
       ? new Date(draft.start_date + "T00:00").getDay()
       : draft.day_of_week;
 
-    // Persist UI "one_time" as a single-day date_range with no day-of-week constraint.
+    if (draft.has_break) {
+      if (!draft.break_start_time || !draft.break_end_time) {
+        toast({ title: "Break times required", description: "Enter both break start and end, or turn off the break.", variant: "destructive" });
+        return;
+      }
+      if (draft.break_end_time <= draft.break_start_time) {
+        toast({ title: "Invalid break", description: "Break end must be after break start.", variant: "destructive" });
+        return;
+      }
+      if (draft.break_start_time < draft.start_time || draft.break_end_time > draft.end_time) {
+        toast({ title: "Break outside block", description: "Break must fall within the block start/end times.", variant: "destructive" });
+        return;
+      }
+    }
+
     const dbKind: "weekly" | "date_range" = draft.kind === "weekly" ? "weekly" : "date_range";
     const payload: any = {
       instructor_id: draft.instructor_id, kind: dbKind,
@@ -133,6 +149,8 @@ export default function PrivateLessonsAdmin() {
       day_of_week: draft.kind === "weekly" ? derivedDow : null,
       start_date: draft.start_date,
       end_date: endDate,
+      break_start_time: draft.has_break ? draft.break_start_time : null,
+      break_end_time: draft.has_break ? draft.break_end_time : null,
     };
 
     const { error } = await supabase.from("instructor_booking_blocks").insert(payload);
@@ -186,10 +204,18 @@ export default function PrivateLessonsAdmin() {
       if (matchesDay) {
         let t = normTime(b.start_time);
         const end = normTime(b.end_time);
+        const brkStart = b.break_start_time ? normTime(b.break_start_time) : null;
+        const brkEnd = b.break_end_time ? normTime(b.break_end_time) : null;
         while (addMinutes(t, b.slot_minutes) <= end) {
+          const slotEnd = addMinutes(t, b.slot_minutes);
+          // If this slot overlaps the break, skip to break end.
+          if (brkStart && brkEnd && t < brkEnd && slotEnd > brkStart) {
+            t = brkEnd;
+            continue;
+          }
           const key = `${b.instructor_id}|${dateStr}|${t}`;
-          slots.push({ date: dateStr, start: t, end: addMinutes(t, b.slot_minutes), booking: bookingMap.get(key) });
-          t = addMinutes(t, b.slot_minutes);
+          slots.push({ date: dateStr, start: t, end: slotEnd, booking: bookingMap.get(key) });
+          t = slotEnd;
         }
       }
       cursor.setDate(cursor.getDate() + 1);
@@ -341,6 +367,25 @@ export default function PrivateLessonsAdmin() {
                 <Switch checked={draft.is_blackout} onCheckedChange={(v) => setDraft({ ...draft, is_blackout: v })} />
                 <Label>Blackout (block off, not bookable)</Label>
               </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Switch checked={draft.has_break} onCheckedChange={(v) => setDraft({ ...draft, has_break: v })} />
+                <Label>Add a break</Label>
+              </div>
+              {draft.has_break && (
+                <>
+                  <div>
+                    <Label>Break start</Label>
+                    <Input type="time" value={draft.break_start_time} onChange={(e) => setDraft({ ...draft, break_start_time: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Break end</Label>
+                    <Input type="time" value={draft.break_end_time} onChange={(e) => setDraft({ ...draft, break_end_time: e.target.value })} />
+                  </div>
+                  <div className="sm:col-span-3 -mt-2 text-xs text-muted-foreground">
+                    Slots will pause during the break and resume right when it ends.
+                  </div>
+                </>
+              )}
               <div className="sm:col-span-3"><Button onClick={addBlock} disabled={!draft.start_date || (draft.kind !== "one_time" && !draft.end_date)}><Plus className="w-4 h-4 mr-1" />Add block</Button></div>
             </CardContent>
           </Card>
@@ -380,7 +425,12 @@ export default function PrivateLessonsAdmin() {
                           <TableCell>{instructorName(b.instructor_id)}</TableCell>
                           <TableCell>{typeLabel}</TableCell>
                           <TableCell>{whenLabel}</TableCell>
-                          <TableCell>{b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}</TableCell>
+                          <TableCell>
+                            {b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}
+                            {b.break_start_time && b.break_end_time && (
+                              <div className="text-[10px] text-muted-foreground">Break {b.break_start_time.slice(0,5)}–{b.break_end_time.slice(0,5)}</div>
+                            )}
+                          </TableCell>
                           <TableCell>{b.slot_minutes}m</TableCell>
                           <TableCell>{b.pool_area}</TableCell>
                           <TableCell><Button variant="ghost" size="icon" onClick={() => remove(b.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>

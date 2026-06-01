@@ -470,6 +470,8 @@ export type Database = {
       }
       instructor_booking_blocks: {
         Row: {
+          break_end_time: string | null
+          break_start_time: string | null
           created_at: string
           day_of_week: number | null
           end_date: string | null
@@ -486,6 +488,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          break_end_time?: string | null
+          break_start_time?: string | null
           created_at?: string
           day_of_week?: number | null
           end_date?: string | null
@@ -502,6 +506,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          break_end_time?: string | null
+          break_start_time?: string | null
           created_at?: string
           day_of_week?: number | null
           end_date?: string | null
