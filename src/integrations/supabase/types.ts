@@ -2198,6 +2198,22 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_active_waiver_for_swimmer: {
+        Args: { _dob: string; _first: string; _last: string }
+        Returns: {
+          emergency_contact_first_name: string
+          emergency_contact_last_name: string
+          emergency_contact_phone: string
+          emergency_contact_relationship: string
+          photo_release_accepted: boolean
+          signature_text: string
+          signed_at: string
+          signer_email: string
+          signer_first_name: string
+          signer_last_name: string
+          waiver_id: string
+        }[]
+      }
       get_email_by_unsubscribe_token: {
         Args: { _token: string }
         Returns: string
