@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -15,11 +16,14 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2 } from "lucide-react";
+import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getStripeEnvironment } from "@/lib/stripe";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const SLOT_WINDOW_DAYS = 56; // show ~8 weeks of upcoming slots per block
+
+type UiKind = "weekly" | "date_range" | "one_time";
 
 interface Instructor { id: string; name: string }
 interface Block {
@@ -29,37 +33,71 @@ interface Block {
   is_blackout: boolean; notes: string | null;
 }
 
+function normTime(t: string) { return t.length >= 5 ? t.substring(0, 5) : t; }
+function isoDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function addMinutes(time: string, mins: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const total = h * 60 + m + mins;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+function fmtTime(t: string) {
+  const [h, m] = t.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hr = ((h + 11) % 12) + 1;
+  return `${hr}:${String(m).padStart(2, "0")} ${period}`;
+}
+function fmtDate(dateStr: string) {
+  const d = new Date(dateStr + "T00:00");
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+interface SlotRow {
+  date: string;
+  start: string;
+  end: string;
+  booking?: { booking_id: string; child_name: string; parent_name: string; payment_status: string; auto_charge_status: string; status: string };
+}
+
 export default function PrivateLessonsAdmin() {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [allPrivateBookings, setAllPrivateBookings] = useState<any[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<any | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
   const [detailBooking, setDetailBooking] = useState<any | null>(null);
+  const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState({
-    instructor_id: "", kind: "weekly" as "weekly" | "date_range",
+    instructor_id: "", kind: "weekly" as UiKind,
     day_of_week: 1, start_date: "", end_date: "",
     start_time: "15:00", end_time: "18:00", slot_minutes: 30,
     pool_area: "shallow", is_blackout: false, notes: "",
   });
 
   const load = async () => {
-    const [{ data: ins }, { data: bks }, { data: bkg }] = await Promise.all([
+    const [{ data: ins }, { data: bks }, { data: bkg }, { data: allBkg }] = await Promise.all([
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
       supabase.from("instructor_booking_blocks").select("*").order("created_at", { ascending: false }),
       supabase.from("lesson_bookings")
         .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error)")
         .eq("lesson_type", "private")
         .eq("booking_source", "self_serve")
-        .neq("status", "pending_card") // hide bookings whose card was never saved
+        .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(100),
+      supabase.from("lesson_bookings")
+        .select("id, instructor_id, start_time, parent_name, child_name, status, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status)")
+        .eq("lesson_type", "private")
+        .neq("status", "pending_card")
+        .neq("status", "cancelled"),
     ]);
     setInstructors((ins as any[]) || []);
     setBlocks((bks as any[]) || []);
     setBookings((bkg as any[]) || []);
+    setAllPrivateBookings((allBkg as any[]) || []);
     if (!draft.instructor_id && ins && ins.length) setDraft((d) => ({ ...d, instructor_id: (ins as any[])[0].id }));
-    // Keep detail dialog in sync after actions
     if (detailBooking) {
       const updated = (bkg as any[] | null)?.find((x) => x.id === detailBooking.id);
       if (updated) setDetailBooking(updated);
@@ -69,22 +107,25 @@ export default function PrivateLessonsAdmin() {
 
   const addBlock = async () => {
     if (!draft.instructor_id) return;
-    if (!draft.start_date || !draft.end_date) {
-      toast({ title: "Dates required", description: "Start date and end date are both required.", variant: "destructive" });
+    if (!draft.start_date || (draft.kind !== "one_time" && !draft.end_date)) {
+      toast({ title: "Dates required", description: "Please choose the date(s) for this availability.", variant: "destructive" });
       return;
     }
-    if (draft.end_date < draft.start_date) {
+    const endDate = draft.kind === "one_time" ? draft.start_date : draft.end_date;
+    if (endDate < draft.start_date) {
       toast({ title: "Invalid range", description: "End date must be on or after start date.", variant: "destructive" });
       return;
     }
+    // Persist UI "one_time" as a single-day date_range with no day-of-week constraint.
+    const dbKind: "weekly" | "date_range" = draft.kind === "weekly" ? "weekly" : "date_range";
     const payload: any = {
-      instructor_id: draft.instructor_id, kind: draft.kind,
+      instructor_id: draft.instructor_id, kind: dbKind,
       start_time: draft.start_time, end_time: draft.end_time,
       slot_minutes: draft.slot_minutes, pool_area: draft.pool_area,
       is_blackout: draft.is_blackout, notes: draft.notes || null,
-      day_of_week: draft.kind === "weekly" ? draft.day_of_week : (draft.day_of_week ?? null),
-      start_date: draft.start_date || null,
-      end_date: draft.end_date || null,
+      day_of_week: draft.kind === "weekly" ? draft.day_of_week : null,
+      start_date: draft.start_date,
+      end_date: endDate,
     };
     const { error } = await supabase.from("instructor_booking_blocks").insert(payload);
     if (error) { toast({ title: "Could not add", description: error.message, variant: "destructive" }); return; }
@@ -95,6 +136,64 @@ export default function PrivateLessonsAdmin() {
   const remove = async (id: string) => {
     await supabase.from("instructor_booking_blocks").delete().eq("id", id);
     load();
+  };
+
+  // Map of `${instructor_id}|${date}|${HH:MM}` -> booking info
+  const bookingMap = useMemo(() => {
+    const m = new Map<string, SlotRow["booking"]>();
+    for (const b of allPrivateBookings) {
+      if (!b.instructor_id || !b.start_time) continue;
+      const t = normTime(b.start_time);
+      for (const o of (b.lesson_booking_occurrences || [])) {
+        if (o.status === "cancelled") continue;
+        m.set(`${b.instructor_id}|${o.occurrence_date}|${t}`, {
+          booking_id: b.id,
+          child_name: b.child_name || "—",
+          parent_name: b.parent_name || "",
+          payment_status: o.payment_status,
+          auto_charge_status: o.auto_charge_status,
+          status: o.status,
+        });
+      }
+    }
+    return m;
+  }, [allPrivateBookings]);
+
+  const computeBlockSlots = (b: Block): SlotRow[] => {
+    if (b.is_blackout) return [];
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const rangeStart = b.start_date && new Date(b.start_date + "T00:00") > today ? new Date(b.start_date + "T00:00") : today;
+    const horizon = new Date(today); horizon.setDate(horizon.getDate() + SLOT_WINDOW_DAYS);
+    const rangeEnd = b.end_date && new Date(b.end_date + "T00:00") < horizon ? new Date(b.end_date + "T00:00") : horizon;
+
+    const slots: SlotRow[] = [];
+    const cursor = new Date(rangeStart);
+    while (cursor <= rangeEnd) {
+      const dateStr = isoDate(cursor);
+      const dow = cursor.getDay();
+      let matchesDay = true;
+      if (b.kind === "weekly") matchesDay = b.day_of_week === dow;
+      else if (b.kind === "date_range" && b.day_of_week !== null) matchesDay = b.day_of_week === dow;
+      if (matchesDay) {
+        let t = normTime(b.start_time);
+        const end = normTime(b.end_time);
+        while (addMinutes(t, b.slot_minutes) <= end) {
+          const key = `${b.instructor_id}|${dateStr}|${t}`;
+          slots.push({ date: dateStr, start: t, end: addMinutes(t, b.slot_minutes), booking: bookingMap.get(key) });
+          t = addMinutes(t, b.slot_minutes);
+        }
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return slots;
+  };
+
+  const toggleBlockExpanded = (id: string) => {
+    setExpandedBlocks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   const instructorName = (id: string) => instructors.find((i) => i.id === id)?.name || "?";
@@ -176,24 +275,36 @@ export default function PrivateLessonsAdmin() {
                   <SelectContent>
                     <SelectItem value="weekly">Weekly recurring</SelectItem>
                     <SelectItem value="date_range">Date range</SelectItem>
+                    <SelectItem value="one_time">One-time (single day)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Day of week</Label>
-                <Select value={String(draft.day_of_week)} onValueChange={(v) => setDraft({ ...draft, day_of_week: Number(v) })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{WEEKDAYS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Start date</Label>
-                <Input type="date" required value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
-              </div>
-              <div>
-                <Label>End date</Label>
-                <Input type="date" required value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
-              </div>
+              {draft.kind !== "one_time" && (
+                <div>
+                  <Label>Day of week {draft.kind === "date_range" && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
+                  <Select value={String(draft.day_of_week)} onValueChange={(v) => setDraft({ ...draft, day_of_week: Number(v) })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{WEEKDAYS.map((d, i) => <SelectItem key={i} value={String(i)}>{d}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              )}
+              {draft.kind === "one_time" ? (
+                <div>
+                  <Label>Date</Label>
+                  <Input type="date" required value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value, end_date: e.target.value })} />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <Label>Start date</Label>
+                    <Input type="date" required value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>End date</Label>
+                    <Input type="date" required value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
+                  </div>
+                </>
+              )}
               <div><Label>Start time</Label><Input type="time" value={draft.start_time} onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} /></div>
               <div><Label>End time</Label><Input type="time" value={draft.end_time} onChange={(e) => setDraft({ ...draft, end_time: e.target.value })} /></div>
               <div><Label>Slot minutes</Label><Input type="number" min={15} step={5} value={draft.slot_minutes} onChange={(e) => setDraft({ ...draft, slot_minutes: Number(e.target.value) })} /></div>
@@ -212,7 +323,7 @@ export default function PrivateLessonsAdmin() {
                 <Switch checked={draft.is_blackout} onCheckedChange={(v) => setDraft({ ...draft, is_blackout: v })} />
                 <Label>Blackout (block off, not bookable)</Label>
               </div>
-              <div className="sm:col-span-3"><Button onClick={addBlock} disabled={!draft.start_date || !draft.end_date}><Plus className="w-4 h-4 mr-1" />Add block</Button></div>
+              <div className="sm:col-span-3"><Button onClick={addBlock} disabled={!draft.start_date || (draft.kind !== "one_time" && !draft.end_date)}><Plus className="w-4 h-4 mr-1" />Add block</Button></div>
             </CardContent>
           </Card>
 
@@ -221,26 +332,84 @@ export default function PrivateLessonsAdmin() {
             <CardContent>
               <Table>
                 <TableHeader><TableRow>
+                  <TableHead className="w-8"></TableHead>
                   <TableHead>Instructor</TableHead><TableHead>Type</TableHead><TableHead>When</TableHead>
                   <TableHead>Time</TableHead><TableHead>Slot</TableHead><TableHead>Pool</TableHead><TableHead></TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {blocks.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No availability set</TableCell></TableRow>}
-                  {blocks.map((b) => (
-                    <TableRow key={b.id} className={b.is_blackout ? "opacity-60" : ""}>
-                      <TableCell>{instructorName(b.instructor_id)}</TableCell>
-                      <TableCell>{b.is_blackout ? "Blackout" : b.kind === "weekly" ? "Weekly" : "Date range"}</TableCell>
-                      <TableCell>
-                        {b.kind === "weekly"
-                          ? `${WEEKDAYS[b.day_of_week ?? 0]}${b.start_date || b.end_date ? ` (${b.start_date || "…"} → ${b.end_date || "…"})` : ""}`
-                          : `${b.start_date || ""} → ${b.end_date || ""}${b.day_of_week !== null ? ` (${WEEKDAYS[b.day_of_week]})` : ""}`}
-                      </TableCell>
-                      <TableCell>{b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}</TableCell>
-                      <TableCell>{b.slot_minutes}m</TableCell>
-                      <TableCell>{b.pool_area}</TableCell>
-                      <TableCell><Button variant="ghost" size="icon" onClick={() => remove(b.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
-                    </TableRow>
-                  ))}
+                  {blocks.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No availability set</TableCell></TableRow>}
+                  {blocks.map((b) => {
+                    const isOneTime = b.kind === "date_range" && b.start_date && b.start_date === b.end_date && b.day_of_week === null;
+                    const typeLabel = b.is_blackout ? "Blackout" : b.kind === "weekly" ? "Weekly" : isOneTime ? "One-time" : "Date range";
+                    const whenLabel = b.kind === "weekly"
+                      ? `${WEEKDAYS[b.day_of_week ?? 0]}${b.start_date || b.end_date ? ` (${b.start_date || "…"} → ${b.end_date || "…"})` : ""}`
+                      : isOneTime
+                        ? fmtDate(b.start_date!)
+                        : `${b.start_date || ""} → ${b.end_date || ""}${b.day_of_week !== null ? ` (${WEEKDAYS[b.day_of_week]})` : ""}`;
+                    const isExpanded = expandedBlocks.has(b.id);
+                    const slots = isExpanded ? computeBlockSlots(b) : [];
+                    const booked = slots.filter((s) => s.booking).length;
+                    return (
+                      <>
+                        <TableRow key={b.id} className={b.is_blackout ? "opacity-60" : ""}>
+                          <TableCell>
+                            {!b.is_blackout && (
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleBlockExpanded(b.id)} aria-label="Toggle slots">
+                                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                              </Button>
+                            )}
+                          </TableCell>
+                          <TableCell>{instructorName(b.instructor_id)}</TableCell>
+                          <TableCell>{typeLabel}</TableCell>
+                          <TableCell>{whenLabel}</TableCell>
+                          <TableCell>{b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}</TableCell>
+                          <TableCell>{b.slot_minutes}m</TableCell>
+                          <TableCell>{b.pool_area}</TableCell>
+                          <TableCell><Button variant="ghost" size="icon" onClick={() => remove(b.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow key={b.id + "-slots"} className="bg-muted/30">
+                            <TableCell></TableCell>
+                            <TableCell colSpan={7} className="py-3">
+                              <div className="text-xs text-muted-foreground mb-2">
+                                {slots.length === 0
+                                  ? "No upcoming slots in this block."
+                                  : `${slots.length} slot${slots.length === 1 ? "" : "s"} · ${booked} booked · ${slots.length - booked} open${b.kind === "weekly" ? ` (next ${SLOT_WINDOW_DAYS} days)` : ""}`}
+                              </div>
+                              {slots.length > 0 && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+                                  {slots.map((s) => (
+                                    <div
+                                      key={`${s.date}-${s.start}`}
+                                      className={`flex items-center justify-between rounded border px-2 py-1.5 text-xs ${
+                                        s.booking ? "bg-primary/5 border-primary/30" : "bg-background border-border"
+                                      }`}
+                                    >
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{fmtDate(s.date)}</span>
+                                        <span className="text-muted-foreground">{fmtTime(s.start)} – {fmtTime(s.end)}</span>
+                                      </div>
+                                      {s.booking ? (
+                                        <div className="flex flex-col items-end gap-0.5">
+                                          <Badge variant="default" className="text-[10px]">Booked</Badge>
+                                          <span className="text-[11px] font-medium truncate max-w-[140px]">{s.booking.child_name}</span>
+                                          <span className="text-[10px] text-muted-foreground capitalize">
+                                            {s.booking.auto_charge_status === "succeeded" ? "paid" : (s.booking.payment_status || "unpaid")}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <Badge variant="outline" className="text-[10px]">Open</Badge>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
