@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Phone, Send, MailCheck, CalendarPlus } from "lucide-react";
+import { Mail, Phone, Send, MailCheck, CalendarPlus, UserCog } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
 import { formatPhone, phoneHref } from "@/lib/phone";
@@ -29,6 +30,7 @@ export interface LessonRequest {
   created_at: string;
   last_replied_at?: string | null;
   last_reply_message?: string | null;
+  is_adult_swimmer?: boolean | null;
 }
 
 interface Props {
@@ -62,6 +64,16 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
     await supabase.from("lesson_requests").update({ status: newStatus }).eq("id", request.id);
     onUpdated({ ...request, status: newStatus });
   };
+
+  const toggleAdult = async (next: boolean) => {
+    await supabase.from("lesson_requests").update({ is_adult_swimmer: next }).eq("id", request.id);
+    onUpdated({ ...request, is_adult_swimmer: next });
+    toast({
+      title: next ? "Marked as adult swimmer" : "Marked as kid swimmer",
+      description: next ? "This request will be excluded from kid-focused outreach." : "",
+    });
+  };
+
 
   const handleSendReply = async () => {
     if (!body.trim()) {
@@ -105,11 +117,16 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             Lesson Request — {request.child_name}
             <Badge variant="outline" className={request.lesson_type === "private" ? "bg-purple-50 text-purple-700 border-purple-300" : "bg-blue-50 text-blue-700 border-blue-300"}>
               {request.lesson_type === "private" ? "Private" : "Semi-Private"}
             </Badge>
+            {request.is_adult_swimmer && (
+              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300">
+                Adult swimmer
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -173,6 +190,23 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
           <div>
             <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Notes</div>
             <div className="bg-muted/50 rounded p-2 whitespace-pre-wrap">{request.notes || "—"}</div>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
+            <div className="flex items-start gap-2 min-w-0">
+              <UserCog className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-foreground">Adult swimmer</div>
+                <div className="text-xs text-muted-foreground">
+                  Excluded from kid-focused outreach lists.
+                </div>
+              </div>
+            </div>
+            <Switch
+              checked={!!request.is_adult_swimmer}
+              onCheckedChange={toggleAdult}
+              aria-label="Mark as adult swimmer"
+            />
           </div>
 
           {request.last_replied_at && (

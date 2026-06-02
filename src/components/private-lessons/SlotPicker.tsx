@@ -111,10 +111,11 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
     onContinue(selectedList);
   };
 
-  // For weekly helper: derive available recurring options from currently filtered slots
-  const weeklyOptions = useMemo(() => {
+  // For weekly helper: derive available recurring options grouped by instructor.
+  // Show every instructor that has at least one recurring pattern (>=2 dates same DOW/time).
+  const weeklyGroups = useMemo(() => {
     const seen = new Set<string>();
-    const opts: { key: string; label: string; instructorId: string; startTime: string; dow: number; count: number }[] = [];
+    const byInstructor = new Map<string, { instructorId: string; instructorName: string; opts: { key: string; label: string; instructorId: string; startTime: string; dow: number; count: number }[] }>();
     for (const s of filteredSlots) {
       const dow = new Date(s.slot_date + "T00:00").getDay();
       const key = `${s.instructor_id}|${dow}|${s.start_time}`;
@@ -124,11 +125,24 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
         x.instructor_id === s.instructor_id && x.start_time === s.start_time &&
         new Date(x.slot_date + "T00:00").getDay() === dow).length;
       if (count < 2) continue;
-      opts.push({ key, instructorId: s.instructor_id, startTime: s.start_time, dow, count,
-        label: `${s.instructor_name} — ${WEEKDAYS[dow]}s at ${formatTime(s.start_time)} (${count} dates)` });
+      if (!byInstructor.has(s.instructor_id)) {
+        byInstructor.set(s.instructor_id, { instructorId: s.instructor_id, instructorName: s.instructor_name, opts: [] });
+      }
+      byInstructor.get(s.instructor_id)!.opts.push({
+        key, instructorId: s.instructor_id, startTime: s.start_time, dow, count,
+        label: `${WEEKDAYS[dow]}s at ${formatTime(s.start_time)} (${count} dates)`,
+      });
     }
-    return opts.slice(0, 12);
+    // Sort each instructor's options by day-of-week then time; cap at 20 per instructor
+    const groups = [...byInstructor.values()].map((g) => ({
+      ...g,
+      opts: g.opts.sort((a, b) => a.dow - b.dow || a.startTime.localeCompare(b.startTime)).slice(0, 20),
+    }));
+    // Sort instructors alphabetically
+    groups.sort((a, b) => a.instructorName.localeCompare(b.instructorName));
+    return groups;
   }, [filteredSlots]);
+
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -193,15 +207,22 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
       {weeklyMode && (
         <div className="border border-border rounded-lg p-4 mb-6 bg-muted/30">
           <p className="text-sm font-semibold mb-3">Recurring slot quick-picks</p>
-          {weeklyOptions.length === 0 ? (
+          {weeklyGroups.length === 0 ? (
             <p className="text-xs text-muted-foreground">No recurring patterns available.</p>
           ) : (
-            <div className="grid gap-2">
-              {weeklyOptions.map((o) => (
-                <Button key={o.key} variant="outline" size="sm" className="justify-start"
-                  onClick={() => applyWeekly(o.instructorId, o.startTime, o.dow)}>
-                  {o.label}
-                </Button>
+            <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-1">
+              {weeklyGroups.map((g) => (
+                <div key={g.instructorId}>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{g.instructorName}</p>
+                  <div className="grid gap-2">
+                    {g.opts.map((o) => (
+                      <Button key={o.key} variant="outline" size="sm" className="justify-start"
+                        onClick={() => applyWeekly(o.instructorId, o.startTime, o.dow)}>
+                        {o.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}

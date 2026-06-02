@@ -1,31 +1,39 @@
-## Update june-lesson-email.html to match standard email branding
+## 1. Email template (`/mnt/documents/june-lesson-email.html`)
 
-Rebuild `/mnt/documents/june-lesson-email.html` so its header and footer match the existing transactional email templates (e.g. `lesson-booking-confirmation.tsx`) used for all booking/payment emails.
+No changes — the rebranded version stays as-is. Nothing will be sent automatically; the file is just a draft you'll forward manually. When you do send it, exclude any contacts flagged as adult swimmers (see #2).
 
-### Header (match standard)
-- Centered Aquatic Dreams logo image: `https://jilrijklnehbfuulykty.supabase.co/storage/v1/object/public/email-assets/aqd-email-logo.jpg` (80×80)
-- "Aquatic Dreams" wordmark in Playfair Display 24px, color `#0f2343`
-- Horizontal rule in `#5badcb`, 2px
+## 2. Adult-swimmer flag on lesson requests
 
-### Body (keep current content)
-- June schedule live announcement
-- Lesson details ($65, 30-min, recurring option, schedule window)
-- Coral "Book Your Lessons" CTA → `https://aquaticdreamsswim.com/book-private-lesson`
-- Payment / cancellation policy block (use `policyBox` light-gray styling)
-- Small-group classes mention
-- Parent Information block styled as the orange `parentInfoBox` used in transactional emails
+**Schema migration** — add column to `public.lesson_requests`:
+- `is_adult_swimmer boolean not null default false`
 
-### Footer (match standard)
-- `#5badcb` 2px hr divider
-- "Questions? Reach us at info@aquaticdreamsswim.com or (209) 577-3483."
-- 1212 Kansas Ave, Modesto, CA line
-- Sign-off: "See you at the pool! — The Aquatic Dreams Team" in muted gray (`#888`, 13px)
+**Auto-flag existing rows** during the migration when any of these are true:
+- `child_age >= 16`
+- `lower(notes)` or `lower(child_name)` contains `adult`, `myself`, `for me`, `i want`, or `im an adult`
 
-### Typography & color tokens (from standard template)
-- Body font: Plus Jakarta Sans
-- Heading font: Playfair Display
-- Primary blue: `#5badcb` (links, CTA, dividers)
-- Deep navy: `#0f2343` (headings)
-- Coral accent retained only for the primary CTA button to keep visual identity, all other accents use the standard palette
+**Admin UI** — `src/pages/admin/LessonRequestsAdmin.tsx` + `LessonRequestDetailDialog.tsx`:
+- New "Adult swimmer" badge on request rows (amber pill) when `is_adult_swimmer = true`
+- Toggle in the detail dialog to mark/unmark adult swimmer
+- New filter chip in the page header: **All / Kids only / Adults only** (defaults to **Kids only** so the list you'd email from naturally excludes adults)
+- Badge count in `useAdminBadgeCounts` continues to count all "new" requests (unchanged)
 
-No code changes — only the artifact file is updated. Same filename so the open preview refreshes.
+No outreach/email-sending code is added — this is purely a flag + filter so you can hand-pick recipients.
+
+## 3. Recurring slot quick-picks (`src/components/private-lessons/SlotPicker.tsx`)
+
+Current bugs:
+- `weeklyOptions.slice(0, 12)` caps the list at 12, which is why you only see Sophia's 6 (cap hides others further down)
+- With "Any available instructor" selected, options end up sorted by insertion order, so the first instructor dominates the visible 12
+
+Fixes:
+- Remove the 12-cap; show every recurring pattern with ≥2 dates
+- Group quick-picks by instructor with a small instructor sub-heading so all instructors are visible
+- Sort within each instructor by day-of-week, then time
+- Keep the existing day/time filter chips functional (they already filter `weeklyOptions`)
+- Cap each instructor at 20 patterns max as a sanity guard (still way more than 6)
+
+## Technical notes
+
+- Migration uses `ALTER TABLE` + `UPDATE` for the backfill heuristic; no new tables or RLS changes needed (existing admin policies cover the new column)
+- `src/integrations/supabase/types.ts` will regenerate automatically after the migration
+- No edge functions, no email infrastructure changes

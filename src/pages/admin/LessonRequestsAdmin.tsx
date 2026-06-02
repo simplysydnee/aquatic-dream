@@ -18,6 +18,7 @@ const LessonRequestsAdmin = () => {
   const [selected, setSelected] = useState<LessonRequest | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [audienceFilter, setAudienceFilter] = useState<"kids" | "adults" | "all">("kids");
 
   const bookingUrl = `${window.location.origin}/book-private-lesson`;
 
@@ -53,8 +54,16 @@ const LessonRequestsAdmin = () => {
     setDialogOpen(true);
   };
 
-  const requestIds = useMemo(() => requests.map((r) => r.id), [requests]);
+  const filteredRequests = useMemo(() => {
+    if (audienceFilter === "all") return requests;
+    if (audienceFilter === "adults") return requests.filter((r) => r.is_adult_swimmer);
+    return requests.filter((r) => !r.is_adult_swimmer);
+  }, [requests, audienceFilter]);
+
+  const requestIds = useMemo(() => filteredRequests.map((r) => r.id), [filteredRequests]);
   const commentCounts = useCommentCounts("lesson_request", requestIds);
+
+  const adultCount = useMemo(() => requests.filter((r) => r.is_adult_swimmer).length, [requests]);
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
 
@@ -74,6 +83,24 @@ const LessonRequestsAdmin = () => {
         Share with families: <span className="font-mono">{bookingUrl}</span>
       </p>
 
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-xs font-semibold text-muted-foreground mr-1">Show:</span>
+        {(["kids", "adults", "all"] as const).map((opt) => {
+          const active = audienceFilter === opt;
+          const label = opt === "kids" ? `Kids only (${requests.length - adultCount})` : opt === "adults" ? `Adults only (${adultCount})` : `All (${requests.length})`;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setAudienceFilter(opt)}
+              className={`px-2.5 py-1 text-xs rounded-md border transition ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {["new", "contacted", "scheduled"].map((status) => {
           const count = requests.filter((r) => r.status === status).length;
@@ -92,7 +119,7 @@ const LessonRequestsAdmin = () => {
 
       {/* Mobile cards */}
       <div className="grid grid-cols-1 gap-2 md:hidden">
-        {requests.map((r) => (
+        {filteredRequests.map((r) => (
           <Card key={r.id} className="p-3 cursor-pointer" onClick={() => openRequest(r)}>
             <div className="flex items-start justify-between gap-2 min-w-0">
               <div className="min-w-0 flex-1">
@@ -115,6 +142,9 @@ const LessonRequestsAdmin = () => {
               <Badge variant="outline" className={`text-[10px] ${r.lesson_type === "private" ? "bg-purple-50 text-purple-700 border-purple-300" : "bg-blue-50 text-blue-700 border-blue-300"}`}>
                 {r.lesson_type === "private" ? "Private" : "Semi-Private"}
               </Badge>
+              {r.is_adult_swimmer && (
+                <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-300">Adult</Badge>
+              )}
               <Badge variant={r.status === "new" ? "destructive" : "secondary"} className="capitalize text-[10px]">{r.status}</Badge>
               {r.last_replied_at && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-green-700">
@@ -125,7 +155,7 @@ const LessonRequestsAdmin = () => {
             </div>
           </Card>
         ))}
-        {requests.length === 0 && <p className="text-center py-8 text-sm text-muted-foreground">No lesson requests yet</p>}
+        {filteredRequests.length === 0 && <p className="text-center py-8 text-sm text-muted-foreground">No lesson requests match this filter</p>}
       </div>
 
       <Card className="hidden md:block">
@@ -144,7 +174,7 @@ const LessonRequestsAdmin = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.map((r) => (
+              {filteredRequests.map((r) => (
                 <TableRow
                   key={r.id}
                   className="cursor-pointer hover:bg-muted/40"
@@ -163,9 +193,14 @@ const LessonRequestsAdmin = () => {
                   </TableCell>
                   <TableCell>{r.child_age}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={r.lesson_type === "private" ? "bg-purple-50 text-purple-700 border-purple-300" : "bg-blue-50 text-blue-700 border-blue-300"}>
-                      {r.lesson_type === "private" ? "Private" : "Semi-Private"}
-                    </Badge>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <Badge variant="outline" className={r.lesson_type === "private" ? "bg-purple-50 text-purple-700 border-purple-300" : "bg-blue-50 text-blue-700 border-blue-300"}>
+                        {r.lesson_type === "private" ? "Private" : "Semi-Private"}
+                      </Badge>
+                      {r.is_adult_swimmer && (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300">Adult</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div>{r.parent_name}</div>
@@ -208,7 +243,7 @@ const LessonRequestsAdmin = () => {
                   </TableCell>
                 </TableRow>
               ))}
-              {requests.length === 0 && (
+              {filteredRequests.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No lesson requests yet
