@@ -431,15 +431,17 @@ export default function PrivateLessonsAdmin() {
     }
   };
 
-  const blockSlot = async (slot: SlotRow) => {
-    setSlotBusy(true);
+  const blockSlot = async (slot: SlotRow, opts?: { silent?: boolean; skipReload?: boolean }) => {
+    if (!opts?.silent) setSlotBusy(true);
     try {
       // Guard against duplicates: if a matching blackout already exists, treat as success.
       const existing = findBlackoutForSlot(slot.instructor_id, slot.date, slot.start, slot.end);
       if (existing) {
-        toast({ title: "Slot already blocked" });
-        setActiveSlot(null);
-        await load();
+        if (!opts?.silent) {
+          toast({ title: "Slot already closed" });
+          setActiveSlot(null);
+          await load();
+        }
         return;
       }
       const parent = blocks.find((b) => b.id === slot.parentBlockId);
@@ -454,14 +456,45 @@ export default function PrivateLessonsAdmin() {
         slot_minutes: parent?.slot_minutes || 30,
         pool_area: parent?.pool_area || "shallow",
         is_blackout: true,
-        notes: "Blocked from slot grid",
+        notes: "Closed from slot grid",
       });
       if (error) throw error;
-      toast({ title: "Slot blocked" });
+      if (!opts?.silent) {
+        toast({ title: "Slot closed" });
+        setActiveSlot(null);
+      }
+      if (!opts?.skipReload) await load();
+    } catch (e: any) {
+      toast({ title: "Could not close slot", description: e?.message || "Unknown error", variant: "destructive" });
+      throw e;
+    } finally {
+      if (!opts?.silent) setSlotBusy(false);
+    }
+  };
+
+  const cancelAndCloseSlot = async (slot: SlotRow) => {
+    if (!slot.booking) return;
+    setSlotBusy(true);
+    try {
+      const { error } = await supabase
+        .from("lesson_booking_occurrences")
+        .update({
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+          cancel_reason: "Cancelled by admin",
+          auto_charge_status: "skipped",
+        })
+        .eq("id", slot.booking.occurrence_id);
+      if (error) throw error;
+      try {
+        await blockSlot(slot, { silent: true, skipReload: true });
+      } catch {}
+      toast({ title: "Lesson cancelled and slot closed" });
+      setConfirmSlotCancel(null);
       setActiveSlot(null);
       await load();
     } catch (e: any) {
-      toast({ title: "Could not block", description: e?.message || "Unknown error", variant: "destructive" });
+      toast({ title: "Could not cancel & close", description: e?.message, variant: "destructive" });
     } finally {
       setSlotBusy(false);
     }
