@@ -16,7 +16,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2, ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getStripeEnvironment } from "@/lib/stripe";
 
@@ -71,6 +71,15 @@ export default function PrivateLessonsAdmin() {
   const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
   const [detailBooking, setDetailBooking] = useState<any | null>(null);
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
+  const [editingBlock, setEditingBlock] = useState<Block | null>(null);
+  const [editDraft, setEditDraft] = useState({
+    kind: "weekly" as UiKind,
+    day_of_week: 1, start_date: "", end_date: "",
+    start_time: "15:00", end_time: "18:00", slot_minutes: 30,
+    pool_area: "shallow", is_blackout: false, notes: "",
+    has_break: false, break_start_time: "", break_end_time: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
   const [draft, setDraft] = useState({
     instructor_id: "", kind: "weekly" as UiKind,
     day_of_week: 1, start_date: "", end_date: "",
@@ -164,6 +173,81 @@ export default function PrivateLessonsAdmin() {
     await supabase.from("instructor_booking_blocks").delete().eq("id", id);
     load();
   };
+
+  const openEdit = (b: Block) => {
+    const isOneTime = b.kind === "date_range" && b.start_date && b.start_date === b.end_date && b.day_of_week === null;
+    const uiKind: UiKind = b.kind === "weekly" ? "weekly" : isOneTime ? "one_time" : "date_range";
+    setEditDraft({
+      kind: uiKind,
+      day_of_week: b.day_of_week ?? 1,
+      start_date: b.start_date || "",
+      end_date: b.end_date || "",
+      start_time: b.start_time.slice(0, 5),
+      end_time: b.end_time.slice(0, 5),
+      slot_minutes: b.slot_minutes,
+      pool_area: b.pool_area,
+      is_blackout: b.is_blackout,
+      notes: b.notes || "",
+      has_break: !!(b.break_start_time && b.break_end_time),
+      break_start_time: b.break_start_time ? b.break_start_time.slice(0, 5) : "",
+      break_end_time: b.break_end_time ? b.break_end_time.slice(0, 5) : "",
+    });
+    setEditingBlock(b);
+  };
+
+  const saveEdit = async () => {
+    if (!editingBlock) return;
+    const d = editDraft;
+    if (!d.start_date || (d.kind !== "one_time" && !d.end_date)) {
+      toast({ title: "Dates required", variant: "destructive" });
+      return;
+    }
+    const endDate = d.kind === "one_time" ? d.start_date : d.end_date;
+    if (endDate < d.start_date) {
+      toast({ title: "Invalid range", description: "End date must be on or after start date.", variant: "destructive" });
+      return;
+    }
+    if (d.has_break) {
+      if (!d.break_start_time || !d.break_end_time) {
+        toast({ title: "Break times required", variant: "destructive" });
+        return;
+      }
+      if (d.break_end_time <= d.break_start_time) {
+        toast({ title: "Invalid break", description: "Break end must be after break start.", variant: "destructive" });
+        return;
+      }
+      if (d.break_start_time < d.start_time || d.break_end_time > d.end_time) {
+        toast({ title: "Break outside block", variant: "destructive" });
+        return;
+      }
+    }
+    const derivedDow = d.kind === "weekly" && d.start_date
+      ? new Date(d.start_date + "T00:00").getDay()
+      : d.day_of_week;
+    const dbKind: "weekly" | "date_range" = d.kind === "weekly" ? "weekly" : "date_range";
+    const payload: any = {
+      kind: dbKind,
+      start_time: d.start_time, end_time: d.end_time,
+      slot_minutes: d.slot_minutes, pool_area: d.pool_area,
+      is_blackout: d.is_blackout, notes: d.notes || null,
+      day_of_week: d.kind === "weekly" ? derivedDow : (d.kind === "one_time" ? null : (editingBlock.day_of_week)),
+      start_date: d.start_date,
+      end_date: endDate,
+      break_start_time: d.has_break ? d.break_start_time : null,
+      break_end_time: d.has_break ? d.break_end_time : null,
+    };
+    setSavingEdit(true);
+    const { error } = await supabase.from("instructor_booking_blocks").update(payload).eq("id", editingBlock.id);
+    setSavingEdit(false);
+    if (error) {
+      toast({ title: "Could not save", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Block updated" });
+    setEditingBlock(null);
+    load();
+  };
+
 
   // Map of `${instructor_id}|${date}|${HH:MM}` -> booking info
   const bookingMap = useMemo(() => {
@@ -433,7 +517,10 @@ export default function PrivateLessonsAdmin() {
                           </TableCell>
                           <TableCell>{b.slot_minutes}m</TableCell>
                           <TableCell>{b.pool_area}</TableCell>
-                          <TableCell><Button variant="ghost" size="icon" onClick={() => remove(b.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
+                          <TableCell className="text-right whitespace-nowrap">
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(b)} aria-label="Edit block"><Pencil className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => remove(b.id)} aria-label="Delete block"><Trash2 className="w-4 h-4" /></Button>
+                          </TableCell>
                         </TableRow>
                         {isExpanded && (
                           <TableRow key={b.id + "-slots"} className="bg-muted/30">
@@ -601,6 +688,101 @@ export default function PrivateLessonsAdmin() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit availability block */}
+      <Dialog open={!!editingBlock} onOpenChange={(o) => !o && setEditingBlock(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit availability block</DialogTitle>
+          </DialogHeader>
+          {editingBlock && (
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2 text-sm text-muted-foreground">
+                Instructor: <span className="font-medium text-foreground">{instructorName(editingBlock.instructor_id)}</span>
+              </div>
+              <div>
+                <Label>Type</Label>
+                <Select value={editDraft.kind} onValueChange={(v: any) => setEditDraft({ ...editDraft, kind: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly recurring</SelectItem>
+                    <SelectItem value="date_range">Date range</SelectItem>
+                    <SelectItem value="one_time">One-time (single day)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {editDraft.kind === "weekly" && editDraft.start_date && (
+                <div>
+                  <Label>Day of week</Label>
+                  <div className="mt-2 px-3 py-2 text-sm rounded-md border border-border bg-muted/40 text-muted-foreground">
+                    {WEEKDAYS[new Date(editDraft.start_date + "T00:00").getDay()]} (auto from start date)
+                  </div>
+                </div>
+              )}
+              {editDraft.kind === "one_time" ? (
+                <div className="sm:col-span-2">
+                  <Label>Date</Label>
+                  <Input type="date" value={editDraft.start_date} onChange={(e) => setEditDraft({ ...editDraft, start_date: e.target.value, end_date: e.target.value })} />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <Label>Start date</Label>
+                    <Input type="date" value={editDraft.start_date} onChange={(e) => setEditDraft({ ...editDraft, start_date: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>End date</Label>
+                    <Input type="date" value={editDraft.end_date} onChange={(e) => setEditDraft({ ...editDraft, end_date: e.target.value })} />
+                  </div>
+                </>
+              )}
+              <div><Label>Start time</Label><Input type="time" value={editDraft.start_time} onChange={(e) => setEditDraft({ ...editDraft, start_time: e.target.value })} /></div>
+              <div><Label>End time</Label><Input type="time" value={editDraft.end_time} onChange={(e) => setEditDraft({ ...editDraft, end_time: e.target.value })} /></div>
+              <div><Label>Slot minutes</Label><Input type="number" min={15} step={5} value={editDraft.slot_minutes} onChange={(e) => setEditDraft({ ...editDraft, slot_minutes: Number(e.target.value) })} /></div>
+              <div>
+                <Label>Pool area</Label>
+                <Select value={editDraft.pool_area} onValueChange={(v) => setEditDraft({ ...editDraft, pool_area: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="shallow">Shallow</SelectItem>
+                    <SelectItem value="deep">Deep</SelectItem>
+                    <SelectItem value="full">Full</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Switch checked={editDraft.is_blackout} onCheckedChange={(v) => setEditDraft({ ...editDraft, is_blackout: v })} />
+                <Label>Blackout</Label>
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Switch checked={editDraft.has_break} onCheckedChange={(v) => setEditDraft({ ...editDraft, has_break: v })} />
+                <Label>Add a break</Label>
+              </div>
+              {editDraft.has_break && (
+                <>
+                  <div>
+                    <Label>Break start</Label>
+                    <Input type="time" value={editDraft.break_start_time} onChange={(e) => setEditDraft({ ...editDraft, break_start_time: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Break end</Label>
+                    <Input type="time" value={editDraft.break_end_time} onChange={(e) => setEditDraft({ ...editDraft, break_end_time: e.target.value })} />
+                  </div>
+                </>
+              )}
+              <div className="sm:col-span-2 flex justify-end gap-2 pt-2 border-t border-border">
+                <Button variant="outline" onClick={() => setEditingBlock(null)}>Cancel</Button>
+                <Button onClick={saveEdit} disabled={savingEdit}>
+                  {savingEdit && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+
 
       <AlertDialog open={!!confirmCancel} onOpenChange={(o) => !o && setConfirmCancel(null)}>
         <AlertDialogContent>
