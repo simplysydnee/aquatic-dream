@@ -60,10 +60,19 @@ const LessonRequestsAdmin = () => {
 
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">Lesson Requests</h2>
-        <Badge variant="outline" className="text-xs sm:text-sm shrink-0">{requests.length} total</Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={copyBookingLink} className="gap-1.5">
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            {copied ? "Copied!" : "Copy private-booking link"}
+          </Button>
+          <Badge variant="outline" className="text-xs sm:text-sm shrink-0">{requests.length} total</Badge>
+        </div>
       </div>
+      <p className="text-xs text-muted-foreground -mt-3 break-all">
+        Share with families: <span className="font-mono">{bookingUrl}</span>
+      </p>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {["new", "contacted", "scheduled"].map((status) => {
