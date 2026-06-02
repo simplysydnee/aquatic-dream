@@ -517,7 +517,10 @@ export default function PrivateLessonsAdmin() {
                           </TableCell>
                           <TableCell>{b.slot_minutes}m</TableCell>
                           <TableCell>{b.pool_area}</TableCell>
-                          <TableCell><Button variant="ghost" size="icon" onClick={() => remove(b.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
+                          <TableCell className="text-right whitespace-nowrap">
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(b)} aria-label="Edit block"><Pencil className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => remove(b.id)} aria-label="Delete block"><Trash2 className="w-4 h-4" /></Button>
+                          </TableCell>
                         </TableRow>
                         {isExpanded && (
                           <TableRow key={b.id + "-slots"} className="bg-muted/30">
