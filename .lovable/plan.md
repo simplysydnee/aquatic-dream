@@ -1,35 +1,43 @@
-## Make every individual slot actionable on /admin/private-lessons
+## Goal
+Make individual private lesson slots reliably actionable from `/admin/private-lessons`: booked lessons can be cancelled/deleted, and open spots can be closed/reopened.
 
-Right now the expanded slot grid under each availability block only shows status badges — you can't click a slot to do anything. That's why Jaclyn's 12:30–1:00 PM lesson on June 13 isn't deletable from this page: the booking exists, but the grid just renders a label. We'll make every tile a real action.
+## Root causes found
+- The slot grid matches bookings by `instructor_id`, but several existing admin-created private bookings have `instructor_id: null` and only store `instructor_name` (for example Sutton Lucas). Those booked slots do not attach to the slot tile, so the UI treats them as open.
+- Closing a slot only inserts a blackout, but the UI does not strongly protect against duplicate/overlapping blackout inserts or show a clear failure path if the insert fails.
+- Cancelling a slot uses a direct table update instead of the admin backend function, so it is less reliable for owner/manager workflows and does not centralize admin checks/audit behavior.
 
-### Behavior per slot
+## Implementation plan
+1. **Fix booking-to-slot matching**
+   - Build an instructor name → id lookup from the active instructors list.
+   - When a booking has no `instructor_id`, derive it from `instructor_name` so admin-created bookings still appear as `Booked` in the slot grid.
+   - Keep matching by date + start time, but normalize times consistently.
 
-**Booked slot (e.g. Jaclyn 12:30–1:00):** click opens a slot action dialog showing parent/swimmer/payment status with three buttons:
-- **Cancel this lesson** — cancels just that occurrence (via existing `cancel-private-lesson-occurrence` edge function, which also auto-refunds if paid, per project rules).
-- **Open booking** — pops the existing booking detail dialog (where you can cancel the whole series, charge, delete).
-- **Close** — dismiss.
+2. **Make “Cancel/Delete this lesson” reliable**
+   - Update the slot action dialog for booked slots to show a clear destructive action for the single occurrence.
+   - Route single-occurrence cancellation through the existing admin backend function pattern, extending `admin-manage-private-booking` if needed with a `cancel_occurrence` action.
+   - The action will update only that occurrence to `cancelled`, set `cancelled_at`, `cancelled_by`, `cancel_reason`, and skip future auto-charge.
+   - After success, refresh the grid so the time immediately becomes available/open unless separately blocked.
 
-**Open slot:** click opens the same dialog with:
-- **Block this slot** — inserts a one-time blackout entry in `instructor_booking_blocks` covering exactly that date + time window, so the public booker can no longer take it.
-- **Close** — dismiss.
+3. **Make “Close this spot” reliable**
+   - Before inserting a blackout, check whether an overlapping blackout already exists for that instructor/date/time.
+   - If one exists, treat the slot as already blocked instead of failing silently or duplicating rows.
+   - Insert a one-time blackout with exact date/time and inherited pool area/slot length.
+   - Refresh the grid so it immediately shows `Blocked`.
 
-**Blocked/closed slot:** show a "Blocked" badge and allow **Unblock** (deletes the matching one-time blackout row).
+4. **Make reopening reliable**
+   - Ensure blocked tiles carry the exact blackout block id.
+   - Unblock deletes only that one-time blackout row and refreshes the grid.
 
-### Visual changes
+5. **Improve feedback and validation**
+   - Surface failed cancel/block/unblock responses with specific toast messages.
+   - Add missing dialog descriptions to remove the current accessibility warnings.
+   - Keep existing block edit/delete controls unchanged.
 
-- Slot tiles become buttons with hover state + cursor pointer; keyboard accessible.
-- Add a third visual state ("Blocked" — muted/strikethrough) alongside the existing Booked / Open states.
-- Tiny "cancel" (✕) icon on booked tiles and "block" (🚫) icon on open tiles as an affordance, but the whole tile is clickable.
+## Files to change
+- `src/pages/admin/PrivateLessonsAdmin.tsx`
+- `supabase/functions/admin-manage-private-booking/index.ts` only if adding the centralized `cancel_occurrence` action is required.
 
-### Technical notes
-
-- New `SlotActionDialog` component used inside `PrivateLessonsAdmin.tsx`.
-- Cancel of a single booked occurrence: call existing `supabase.functions.invoke('cancel-private-lesson-occurrence', { body: { occurrence_id, reason } })`. Confirm with an AlertDialog first; surface refund outcome in the toast.
-- Block-a-slot: insert into `instructor_booking_blocks` with `kind='date_range'`, `start_date=end_date=slot.date`, `start_time/end_time` = slot bounds, `slot_minutes` = block length, `is_blackout=true`, `day_of_week=null`, `pool_area` inherited from parent block. `SlotPicker` already filters out times overlapping blackouts, so this immediately removes the slot from public booking.
-- Detect a "blocked" slot in `computeBlockSlots` by checking any blackout block from the same instructor that overlaps the slot window; tag the SlotRow with `blocked: { block_id }` so Unblock can target the right row.
-- After any mutation, call `load()` to refresh state.
-
-### Out of scope
-
-- No backend schema changes.
-- No changes to the public booking flow, email templates, or the existing block edit/delete buttons.
+## Out of scope
+- No changes to public booking flow.
+- No schema changes.
+- No changes to email templates or payment/refund behavior unless already handled by existing admin cancellation logic.
