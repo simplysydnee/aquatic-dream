@@ -54,8 +54,16 @@ const LessonRequestsAdmin = () => {
     setDialogOpen(true);
   };
 
-  const requestIds = useMemo(() => requests.map((r) => r.id), [requests]);
+  const filteredRequests = useMemo(() => {
+    if (audienceFilter === "all") return requests;
+    if (audienceFilter === "adults") return requests.filter((r) => r.is_adult_swimmer);
+    return requests.filter((r) => !r.is_adult_swimmer);
+  }, [requests, audienceFilter]);
+
+  const requestIds = useMemo(() => filteredRequests.map((r) => r.id), [filteredRequests]);
   const commentCounts = useCommentCounts("lesson_request", requestIds);
+
+  const adultCount = useMemo(() => requests.filter((r) => r.is_adult_swimmer).length, [requests]);
 
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
 
