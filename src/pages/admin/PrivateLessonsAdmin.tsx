@@ -71,6 +71,15 @@ export default function PrivateLessonsAdmin() {
   const [confirmDelete, setConfirmDelete] = useState<any | null>(null);
   const [detailBooking, setDetailBooking] = useState<any | null>(null);
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
+  const [editingBlock, setEditingBlock] = useState<Block | null>(null);
+  const [editDraft, setEditDraft] = useState({
+    kind: "weekly" as UiKind,
+    day_of_week: 1, start_date: "", end_date: "",
+    start_time: "15:00", end_time: "18:00", slot_minutes: 30,
+    pool_area: "shallow", is_blackout: false, notes: "",
+    has_break: false, break_start_time: "", break_end_time: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
   const [draft, setDraft] = useState({
     instructor_id: "", kind: "weekly" as UiKind,
     day_of_week: 1, start_date: "", end_date: "",
