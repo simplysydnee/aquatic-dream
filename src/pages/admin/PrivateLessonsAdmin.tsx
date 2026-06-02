@@ -639,17 +639,25 @@ export default function PrivateLessonsAdmin() {
                               {slots.length > 0 && (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
                                   {slots.map((s) => (
-                                    <div
+                                    <button
                                       key={`${s.date}-${s.start}`}
-                                      className={`flex items-center justify-between rounded border px-2 py-1.5 text-xs ${
-                                        s.booking ? "bg-primary/5 border-primary/30" : "bg-background border-border"
+                                      type="button"
+                                      onClick={() => setActiveSlot(s)}
+                                      className={`flex items-center justify-between rounded border px-2 py-1.5 text-xs text-left transition-colors hover:ring-1 hover:ring-primary/40 cursor-pointer ${
+                                        s.blocked
+                                          ? "bg-muted/50 border-border opacity-70"
+                                          : s.booking
+                                            ? "bg-primary/5 border-primary/30 hover:bg-primary/10"
+                                            : "bg-background border-border hover:bg-muted/50"
                                       }`}
                                     >
                                       <div className="flex flex-col">
-                                        <span className="font-medium">{fmtDate(s.date)}</span>
+                                        <span className={`font-medium ${s.blocked ? "line-through" : ""}`}>{fmtDate(s.date)}</span>
                                         <span className="text-muted-foreground">{fmtTime(s.start)} – {fmtTime(s.end)}</span>
                                       </div>
-                                      {s.booking ? (
+                                      {s.blocked ? (
+                                        <Badge variant="secondary" className="text-[10px]">Blocked</Badge>
+                                      ) : s.booking ? (
                                         <div className="flex flex-col items-end gap-0.5">
                                           <Badge variant="default" className="text-[10px]">Booked</Badge>
                                           <span className="text-[11px] font-medium truncate max-w-[140px]">{s.booking.child_name}</span>
@@ -660,7 +668,7 @@ export default function PrivateLessonsAdmin() {
                                       ) : (
                                         <Badge variant="outline" className="text-[10px]">Open</Badge>
                                       )}
-                                    </div>
+                                    </button>
                                   ))}
                                 </div>
                               )}
