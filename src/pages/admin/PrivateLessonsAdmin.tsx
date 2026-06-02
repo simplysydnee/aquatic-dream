@@ -262,6 +262,7 @@ export default function PrivateLessonsAdmin() {
         if (o.status === "cancelled") continue;
         m.set(`${b.instructor_id}|${o.occurrence_date}|${t}`, {
           booking_id: b.id,
+          occurrence_id: o.id,
           child_name: b.child_name || "—",
           parent_name: b.parent_name || "",
           payment_status: o.payment_status,
@@ -272,6 +273,23 @@ export default function PrivateLessonsAdmin() {
     }
     return m;
   }, [allPrivateBookings]);
+
+  // Find a one-time blackout block that exactly covers a slot
+  const findBlackoutForSlot = (instructorId: string, dateStr: string, start: string, end: string) => {
+    const dow = new Date(dateStr + "T00:00").getDay();
+    return blocks.find((bl) => {
+      if (!bl.is_blackout) return false;
+      if (bl.instructor_id !== instructorId) return false;
+      const inDate = bl.kind === "weekly"
+        ? bl.day_of_week === dow && (!bl.start_date || bl.start_date <= dateStr) && (!bl.end_date || bl.end_date >= dateStr)
+        : (bl.start_date && bl.start_date <= dateStr) && (bl.end_date && bl.end_date >= dateStr) && (bl.day_of_week === null || bl.day_of_week === dow);
+      if (!inDate) return false;
+      const bs = normTime(bl.start_time);
+      const be = normTime(bl.end_time);
+      // overlap
+      return bs < end && be > start;
+    });
+  };
 
   const computeBlockSlots = (b: Block): SlotRow[] => {
     if (b.is_blackout) return [];
@@ -295,13 +313,21 @@ export default function PrivateLessonsAdmin() {
         const brkEnd = b.break_end_time ? normTime(b.break_end_time) : null;
         while (addMinutes(t, b.slot_minutes) <= end) {
           const slotEnd = addMinutes(t, b.slot_minutes);
-          // If this slot overlaps the break, skip to break end.
           if (brkStart && brkEnd && t < brkEnd && slotEnd > brkStart) {
             t = brkEnd;
             continue;
           }
           const key = `${b.instructor_id}|${dateStr}|${t}`;
-          slots.push({ date: dateStr, start: t, end: slotEnd, booking: bookingMap.get(key) });
+          const blackoutBlock = findBlackoutForSlot(b.instructor_id, dateStr, t, slotEnd);
+          slots.push({
+            date: dateStr,
+            start: t,
+            end: slotEnd,
+            parentBlockId: b.id,
+            instructor_id: b.instructor_id,
+            booking: bookingMap.get(key),
+            blocked: blackoutBlock ? { block_id: blackoutBlock.id } : undefined,
+          });
           t = slotEnd;
         }
       }
