@@ -1008,13 +1008,17 @@ export default function PrivateLessonsAdmin() {
                 </div>
               ) : activeSlot.blocked ? (
                 <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
-                  This slot is currently blocked off and not bookable.
+                  This slot is currently closed and not bookable on this date.
                 </div>
               ) : (
                 <div className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
                   This slot is open and available for booking.
                 </div>
               )}
+
+              <p className="text-xs text-muted-foreground">
+                These actions affect only {fmtDate(activeSlot.date)}. Other dates in any recurring booking are not changed.
+              </p>
 
               <div className="flex flex-col gap-2">
                 {activeSlot.booking && (
@@ -1025,6 +1029,14 @@ export default function PrivateLessonsAdmin() {
                       onClick={() => setConfirmSlotCancel(activeSlot)}
                     >
                       <XCircle className="w-4 h-4 mr-1" /> Cancel this lesson
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      disabled={slotBusy}
+                      onClick={() => cancelAndCloseSlot(activeSlot)}
+                    >
+                      {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1" />}
+                      Cancel & close this slot
                     </Button>
                     <Button
                       variant="outline"
@@ -1055,7 +1067,7 @@ export default function PrivateLessonsAdmin() {
                     onClick={() => blockSlot(activeSlot)}
                   >
                     {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
-                    Block this slot
+                    Close this slot
                   </Button>
                 )}
                 {activeSlot.blocked && (
@@ -1065,7 +1077,7 @@ export default function PrivateLessonsAdmin() {
                     onClick={() => unblockSlot(activeSlot)}
                   >
                     {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
-                    Unblock / reopen slot
+                    Reopen this slot
                   </Button>
                 )}
                 <Button variant="ghost" disabled={slotBusy} onClick={() => setActiveSlot(null)}>
