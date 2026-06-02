@@ -1,20 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import LessonRequestDetailDialog, { LessonRequest } from "@/components/admin/LessonRequestDetailDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CheckCircle2, MessageSquare } from "lucide-react";
+import { CheckCircle2, MessageSquare, Copy, Check } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
 import { useCommentCounts } from "@/hooks/useInternalComments";
 import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
+import { toast } from "@/hooks/use-toast";
 
 const LessonRequestsAdmin = () => {
   const [requests, setRequests] = useState<LessonRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<LessonRequest | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const bookingUrl = `${window.location.origin}/book-private-lesson`;
+
+  const copyBookingLink = async () => {
+    try {
+      await navigator.clipboard.writeText(bookingUrl);
+      setCopied(true);
+      toast({ title: "Link copied", description: "Private booking link copied to clipboard." });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "Couldn't copy", description: bookingUrl, variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     supabase
@@ -44,10 +60,19 @@ const LessonRequestsAdmin = () => {
 
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">Lesson Requests</h2>
-        <Badge variant="outline" className="text-xs sm:text-sm shrink-0">{requests.length} total</Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={copyBookingLink} className="gap-1.5">
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            {copied ? "Copied!" : "Copy private-booking link"}
+          </Button>
+          <Badge variant="outline" className="text-xs sm:text-sm shrink-0">{requests.length} total</Badge>
+        </div>
       </div>
+      <p className="text-xs text-muted-foreground -mt-3 break-all">
+        Share with families: <span className="font-mono">{bookingUrl}</span>
+      </p>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {["new", "contacted", "scheduled"].map((status) => {

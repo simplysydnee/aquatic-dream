@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Careers from "./pages/Careers";
 import SwimLessons from "./pages/SwimLessons";
 import SwimEnrollment from "./pages/SwimEnrollment";
+import BookPrivateLesson from "./pages/BookPrivateLesson";
 import LessonWaiver from "./pages/LessonWaiver";
 import EnrollmentWaiver from "./pages/EnrollmentWaiver";
 import AdminLogin from "./pages/AdminLogin";
@@ -118,6 +119,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/swim-lessons" element={<SwimLessons />} />
               <Route path="/swim-enrollment" element={<SwimEnrollment />} />
+              <Route path="/book-private-lesson" element={<BookPrivateLesson />} />
               <Route path="/waivers" element={<Waivers />} />
               <Route path="/careers" element={<Careers />} />
               <Route path="*" element={<NotFound />} />
