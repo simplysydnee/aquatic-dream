@@ -17,6 +17,20 @@ const LessonRequestsAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<LessonRequest | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const bookingUrl = `${window.location.origin}/book-private-lesson`;
+
+  const copyBookingLink = async () => {
+    try {
+      await navigator.clipboard.writeText(bookingUrl);
+      setCopied(true);
+      toast({ title: "Link copied", description: "Private booking link copied to clipboard." });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "Couldn't copy", description: bookingUrl, variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     supabase
