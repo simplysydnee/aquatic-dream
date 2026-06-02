@@ -663,9 +663,9 @@ export default function PrivateLessonsAdmin() {
                           <TableCell>{typeLabel}</TableCell>
                           <TableCell>{whenLabel}</TableCell>
                           <TableCell>
-                            {b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}
+                            {fmtTime(b.start_time.slice(0,5))} – {fmtTime(b.end_time.slice(0,5))}
                             {b.break_start_time && b.break_end_time && (
-                              <div className="text-[10px] text-muted-foreground">Break {b.break_start_time.slice(0,5)}–{b.break_end_time.slice(0,5)}</div>
+                              <div className="text-[10px] text-muted-foreground">Break {fmtTime(b.break_start_time.slice(0,5))} – {fmtTime(b.break_end_time.slice(0,5))}</div>
                             )}
                           </TableCell>
                           <TableCell>{b.slot_minutes}m</TableCell>
