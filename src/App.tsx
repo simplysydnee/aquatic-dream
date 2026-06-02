@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Careers from "./pages/Careers";
 import SwimLessons from "./pages/SwimLessons";
 import SwimEnrollment from "./pages/SwimEnrollment";
+import BookPrivateLesson from "./pages/BookPrivateLesson";
 import LessonWaiver from "./pages/LessonWaiver";
 import EnrollmentWaiver from "./pages/EnrollmentWaiver";
 import AdminLogin from "./pages/AdminLogin";
