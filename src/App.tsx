@@ -119,6 +119,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/swim-lessons" element={<SwimLessons />} />
               <Route path="/swim-enrollment" element={<SwimEnrollment />} />
+              <Route path="/book-private-lesson" element={<BookPrivateLesson />} />
               <Route path="/waivers" element={<Waivers />} />
               <Route path="/careers" element={<Careers />} />
               <Route path="*" element={<NotFound />} />
