@@ -434,6 +434,14 @@ export default function PrivateLessonsAdmin() {
   const blockSlot = async (slot: SlotRow) => {
     setSlotBusy(true);
     try {
+      // Guard against duplicates: if a matching blackout already exists, treat as success.
+      const existing = findBlackoutForSlot(slot.instructor_id, slot.date, slot.start, slot.end);
+      if (existing) {
+        toast({ title: "Slot already blocked" });
+        setActiveSlot(null);
+        await load();
+        return;
+      }
       const parent = blocks.find((b) => b.id === slot.parentBlockId);
       const { error } = await supabase.from("instructor_booking_blocks").insert({
         instructor_id: slot.instructor_id,
@@ -453,7 +461,7 @@ export default function PrivateLessonsAdmin() {
       setActiveSlot(null);
       await load();
     } catch (e: any) {
-      toast({ title: "Could not block", description: e?.message, variant: "destructive" });
+      toast({ title: "Could not block", description: e?.message || "Unknown error", variant: "destructive" });
     } finally {
       setSlotBusy(false);
     }
