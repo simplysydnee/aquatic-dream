@@ -59,9 +59,12 @@ const HeroSection = () => (
           From your child's first splash to confident, independent swimming —
           the only place in Modesto with max 3 students per instructor.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
           <Button asChild size="lg" className="bg-coral hover:bg-coral/90 text-coral-foreground text-base px-8 py-6 rounded-xl shadow-lg">
             <Link to="/swim-enrollment">Enroll in Swim Lessons</Link>
+          </Button>
+          <Button asChild size="lg" variant="secondary" className="text-base px-8 py-6 rounded-xl shadow-lg">
+            <Link to="/book-private-lesson">Book a Private Lesson</Link>
           </Button>
           <Button asChild variant="outline" size="lg" className="border-primary text-primary hover:bg-primary/10 text-base px-8 py-6 rounded-xl">
             <Link to="/swim-lessons">View Levels & Pricing <ChevronRight className="ml-1 w-4 h-4" /></Link>
