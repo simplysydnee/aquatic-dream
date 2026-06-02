@@ -142,6 +142,9 @@ const LessonRequestsAdmin = () => {
               <Badge variant="outline" className={`text-[10px] ${r.lesson_type === "private" ? "bg-purple-50 text-purple-700 border-purple-300" : "bg-blue-50 text-blue-700 border-blue-300"}`}>
                 {r.lesson_type === "private" ? "Private" : "Semi-Private"}
               </Badge>
+              {r.is_adult_swimmer && (
+                <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-300">Adult</Badge>
+              )}
               <Badge variant={r.status === "new" ? "destructive" : "secondary"} className="capitalize text-[10px]">{r.status}</Badge>
               {r.last_replied_at && (
                 <span className="inline-flex items-center gap-1 text-[10px] text-green-700">
