@@ -18,6 +18,7 @@ const LessonRequestsAdmin = () => {
   const [selected, setSelected] = useState<LessonRequest | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [audienceFilter, setAudienceFilter] = useState<"kids" | "adults" | "all">("kids");
 
   const bookingUrl = `${window.location.origin}/book-private-lesson`;
 
