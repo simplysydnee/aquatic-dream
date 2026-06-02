@@ -71,12 +71,33 @@ Deno.serve(async (req) => {
 
     if (booking) {
       const b: any = booking;
-      const schedule = ((occs as any[]) || []).map((o) => ({
+      const occList = ((occs as any[]) || []);
+      const schedule = occList.map((o) => ({
         date: new Date(o.occurrence_date + "T00:00:00").toLocaleDateString("en-US", {
           weekday: "long", month: "long", day: "numeric", year: "numeric",
         }),
         time: `${formatTime(b.start_time)} – ${formatTime(b.end_time)}`,
       }));
+
+      let icsLink: string | undefined;
+      let googleCalendarLink: string | undefined;
+      if (occList.length > 0 && b.start_time && b.end_time) {
+        const titleParts = [
+          b.child_first_name || b.child_name ? `${b.child_first_name || b.child_name}'s Private Lesson` : "Private Lesson",
+          "— Aquatic Dreams",
+        ];
+        const links = buildSessionCalendarLinks({
+          uid: `private-booking-${booking_id}`,
+          title: titleParts.join(" "),
+          dates: occList.map((o) => o.occurrence_date),
+          start: b.start_time,
+          end: b.end_time,
+          location: "1212 Kansas Ave, Modesto, CA 95351",
+          description: `Private swim lesson with ${b.instructor_name || "your instructor"}. Questions: info@aquaticdreamsswim.com / (209) 577-3483`,
+        });
+        icsLink = links.icsUrl;
+        googleCalendarLink = links.googleUrl;
+      }
 
       try {
         await supabase.functions.invoke("send-transactional-email", {
@@ -97,6 +118,8 @@ Deno.serve(async (req) => {
               lessonTime: schedule[0]?.time,
               amountDue: `$${Number(b.price_per_session).toFixed(0)}`,
               waiverSigned: true,
+              icsLink,
+              googleCalendarLink,
             },
           },
         });
@@ -104,6 +127,7 @@ Deno.serve(async (req) => {
         console.error("confirmation email failed", e);
       }
     }
+
 
 
     return j({ success: true, booking_id });
