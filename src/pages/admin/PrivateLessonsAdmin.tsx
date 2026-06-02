@@ -255,15 +255,22 @@ export default function PrivateLessonsAdmin() {
   };
 
 
-  // Map of `${instructor_id}|${date}|${HH:MM}` -> booking info
+  // Map of `${instructor_id}|${date}|${HH:MM}` -> booking info.
+  // Some admin-created bookings store only instructor_name (instructor_id is null),
+  // so we resolve the id via the active instructors list before keying.
   const bookingMap = useMemo(() => {
+    const nameToId = new Map<string, string>();
+    for (const i of instructors) nameToId.set(i.name.trim().toLowerCase(), i.id);
     const m = new Map<string, SlotRow["booking"]>();
     for (const b of allPrivateBookings) {
-      if (!b.instructor_id || !b.start_time) continue;
+      const instructorId: string | null =
+        b.instructor_id ||
+        (b.instructor_name ? nameToId.get(String(b.instructor_name).trim().toLowerCase()) || null : null);
+      if (!instructorId || !b.start_time) continue;
       const t = normTime(b.start_time);
       for (const o of (b.lesson_booking_occurrences || [])) {
         if (o.status === "cancelled") continue;
-        m.set(`${b.instructor_id}|${o.occurrence_date}|${t}`, {
+        m.set(`${instructorId}|${o.occurrence_date}|${t}`, {
           booking_id: b.id,
           occurrence_id: o.id,
           child_name: b.child_name || "—",
@@ -275,7 +282,7 @@ export default function PrivateLessonsAdmin() {
       }
     }
     return m;
-  }, [allPrivateBookings]);
+  }, [allPrivateBookings, instructors]);
 
   // Find a one-time blackout block that exactly covers a slot
   const findBlackoutForSlot = (instructorId: string, dateStr: string, start: string, end: string) => {
