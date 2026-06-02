@@ -16,7 +16,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2, ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getStripeEnvironment } from "@/lib/stripe";
 
