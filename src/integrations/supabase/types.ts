@@ -936,6 +936,7 @@ export type Database = {
           child_name: string
           created_at: string
           id: string
+          is_adult_swimmer: boolean
           last_replied_at: string | null
           last_reply_message: string | null
           lesson_type: string
@@ -957,6 +958,7 @@ export type Database = {
           child_name: string
           created_at?: string
           id?: string
+          is_adult_swimmer?: boolean
           last_replied_at?: string | null
           last_reply_message?: string | null
           lesson_type?: string
@@ -978,6 +980,7 @@ export type Database = {
           child_name?: string
           created_at?: string
           id?: string
+          is_adult_swimmer?: boolean
           last_replied_at?: string | null
           last_reply_message?: string | null
           lesson_type?: string
