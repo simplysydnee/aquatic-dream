@@ -83,6 +83,24 @@ const LessonRequestsAdmin = () => {
         Share with families: <span className="font-mono">{bookingUrl}</span>
       </p>
 
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-xs font-semibold text-muted-foreground mr-1">Show:</span>
+        {(["kids", "adults", "all"] as const).map((opt) => {
+          const active = audienceFilter === opt;
+          const label = opt === "kids" ? `Kids only (${requests.length - adultCount})` : opt === "adults" ? `Adults only (${adultCount})` : `All (${requests.length})`;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setAudienceFilter(opt)}
+              className={`px-2.5 py-1 text-xs rounded-md border transition ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {["new", "contacted", "scheduled"].map((status) => {
           const count = requests.filter((r) => r.status === status).length;
