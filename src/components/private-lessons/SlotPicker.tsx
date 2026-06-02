@@ -207,15 +207,22 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
       {weeklyMode && (
         <div className="border border-border rounded-lg p-4 mb-6 bg-muted/30">
           <p className="text-sm font-semibold mb-3">Recurring slot quick-picks</p>
-          {weeklyOptions.length === 0 ? (
+          {weeklyGroups.length === 0 ? (
             <p className="text-xs text-muted-foreground">No recurring patterns available.</p>
           ) : (
-            <div className="grid gap-2">
-              {weeklyOptions.map((o) => (
-                <Button key={o.key} variant="outline" size="sm" className="justify-start"
-                  onClick={() => applyWeekly(o.instructorId, o.startTime, o.dow)}>
-                  {o.label}
-                </Button>
+            <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-1">
+              {weeklyGroups.map((g) => (
+                <div key={g.instructorId}>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{g.instructorName}</p>
+                  <div className="grid gap-2">
+                    {g.opts.map((o) => (
+                      <Button key={o.key} variant="outline" size="sm" className="justify-start"
+                        onClick={() => applyWeekly(o.instructorId, o.startTime, o.dow)}>
+                        {o.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
