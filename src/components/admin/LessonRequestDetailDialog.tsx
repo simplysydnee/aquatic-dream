@@ -192,6 +192,23 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
             <div className="bg-muted/50 rounded p-2 whitespace-pre-wrap">{request.notes || "—"}</div>
           </div>
 
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
+            <div className="flex items-start gap-2 min-w-0">
+              <UserCog className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-foreground">Adult swimmer</div>
+                <div className="text-xs text-muted-foreground">
+                  Excluded from kid-focused outreach lists.
+                </div>
+              </div>
+            </div>
+            <Switch
+              checked={!!request.is_adult_swimmer}
+              onCheckedChange={toggleAdult}
+              aria-label="Mark as adult swimmer"
+            />
+          </div>
+
           {request.last_replied_at && (
             <div className="border-l-2 border-primary/50 pl-3 py-1 bg-primary/5 rounded-r">
               <div className="text-xs text-muted-foreground">Last reply sent {new Date(request.last_replied_at).toLocaleString()}</div>
