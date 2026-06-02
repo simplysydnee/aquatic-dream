@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import LessonRequestDetailDialog, { LessonRequest } from "@/components/admin/LessonRequestDetailDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CheckCircle2, MessageSquare } from "lucide-react";
+import { CheckCircle2, MessageSquare, Copy, Check } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
 import { useCommentCounts } from "@/hooks/useInternalComments";
 import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
+import { toast } from "@/hooks/use-toast";
 
 const LessonRequestsAdmin = () => {
   const [requests, setRequests] = useState<LessonRequest[]>([]);
