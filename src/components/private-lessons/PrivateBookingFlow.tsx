@@ -160,18 +160,39 @@ export default function PrivateBookingFlow() {
 
 
   if (step === "done") {
+    const sortedSlots = [...slots].sort((a, b) =>
+      a.slot_date === b.slot_date
+        ? a.start_time.localeCompare(b.start_time)
+        : a.slot_date.localeCompare(b.slot_date)
+    );
     return (
       <div className="max-w-lg mx-auto text-center py-10">
         <CheckCircle className="w-14 h-14 text-primary mx-auto mb-4" />
         <h3 className="font-display text-2xl font-bold mb-2">You're booked!</h3>
         <p className="text-muted-foreground mb-6">
-          A confirmation email is on the way to <strong>{form.parentEmail}</strong> with your full schedule.
+          A confirmation email is on the way to <strong>{form.parentEmail}</strong> with calendar links and your full schedule.
           We'll charge $65 to your card on the day of each lesson. No-shows and cancellations within 24 hours are charged in full.
         </p>
+        {sortedSlots.length > 0 && (
+          <div className="mb-6 p-4 border border-border rounded-lg bg-muted/30 text-left">
+            <p className="text-sm font-semibold mb-2 text-center">
+              {sortedSlots.length} lesson{sortedSlots.length === 1 ? "" : "s"} booked
+            </p>
+            <ul className="text-sm space-y-1">
+              {sortedSlots.map((s, i) => (
+                <li key={i} className="text-foreground">
+                  {new Date(s.slot_date + "T00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  {" · "}{formatTime(s.start_time)} · {s.instructor_name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <Button asChild><a href="/">Back to home</a></Button>
       </div>
     );
   }
+
 
   if (step === "card" && setup) {
     return (
