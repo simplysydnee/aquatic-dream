@@ -119,7 +119,7 @@ const LessonRequestsAdmin = () => {
 
       {/* Mobile cards */}
       <div className="grid grid-cols-1 gap-2 md:hidden">
-        {requests.map((r) => (
+        {filteredRequests.map((r) => (
           <Card key={r.id} className="p-3 cursor-pointer" onClick={() => openRequest(r)}>
             <div className="flex items-start justify-between gap-2 min-w-0">
               <div className="min-w-0 flex-1">
@@ -152,7 +152,7 @@ const LessonRequestsAdmin = () => {
             </div>
           </Card>
         ))}
-        {requests.length === 0 && <p className="text-center py-8 text-sm text-muted-foreground">No lesson requests yet</p>}
+        {filteredRequests.length === 0 && <p className="text-center py-8 text-sm text-muted-foreground">No lesson requests match this filter</p>}
       </div>
 
       <Card className="hidden md:block">
@@ -171,7 +171,7 @@ const LessonRequestsAdmin = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.map((r) => (
+              {filteredRequests.map((r) => (
                 <TableRow
                   key={r.id}
                   className="cursor-pointer hover:bg-muted/40"
@@ -235,7 +235,7 @@ const LessonRequestsAdmin = () => {
                   </TableCell>
                 </TableRow>
               ))}
-              {requests.length === 0 && (
+              {filteredRequests.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No lesson requests yet
