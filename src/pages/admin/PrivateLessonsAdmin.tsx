@@ -689,6 +689,101 @@ export default function PrivateLessonsAdmin() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit availability block */}
+      <Dialog open={!!editingBlock} onOpenChange={(o) => !o && setEditingBlock(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit availability block</DialogTitle>
+          </DialogHeader>
+          {editingBlock && (
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2 text-sm text-muted-foreground">
+                Instructor: <span className="font-medium text-foreground">{instructorName(editingBlock.instructor_id)}</span>
+              </div>
+              <div>
+                <Label>Type</Label>
+                <Select value={editDraft.kind} onValueChange={(v: any) => setEditDraft({ ...editDraft, kind: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly recurring</SelectItem>
+                    <SelectItem value="date_range">Date range</SelectItem>
+                    <SelectItem value="one_time">One-time (single day)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {editDraft.kind === "weekly" && editDraft.start_date && (
+                <div>
+                  <Label>Day of week</Label>
+                  <div className="mt-2 px-3 py-2 text-sm rounded-md border border-border bg-muted/40 text-muted-foreground">
+                    {WEEKDAYS[new Date(editDraft.start_date + "T00:00").getDay()]} (auto from start date)
+                  </div>
+                </div>
+              )}
+              {editDraft.kind === "one_time" ? (
+                <div className="sm:col-span-2">
+                  <Label>Date</Label>
+                  <Input type="date" value={editDraft.start_date} onChange={(e) => setEditDraft({ ...editDraft, start_date: e.target.value, end_date: e.target.value })} />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <Label>Start date</Label>
+                    <Input type="date" value={editDraft.start_date} onChange={(e) => setEditDraft({ ...editDraft, start_date: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>End date</Label>
+                    <Input type="date" value={editDraft.end_date} onChange={(e) => setEditDraft({ ...editDraft, end_date: e.target.value })} />
+                  </div>
+                </>
+              )}
+              <div><Label>Start time</Label><Input type="time" value={editDraft.start_time} onChange={(e) => setEditDraft({ ...editDraft, start_time: e.target.value })} /></div>
+              <div><Label>End time</Label><Input type="time" value={editDraft.end_time} onChange={(e) => setEditDraft({ ...editDraft, end_time: e.target.value })} /></div>
+              <div><Label>Slot minutes</Label><Input type="number" min={15} step={5} value={editDraft.slot_minutes} onChange={(e) => setEditDraft({ ...editDraft, slot_minutes: Number(e.target.value) })} /></div>
+              <div>
+                <Label>Pool area</Label>
+                <Select value={editDraft.pool_area} onValueChange={(v) => setEditDraft({ ...editDraft, pool_area: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="shallow">Shallow</SelectItem>
+                    <SelectItem value="deep">Deep</SelectItem>
+                    <SelectItem value="full">Full</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Switch checked={editDraft.is_blackout} onCheckedChange={(v) => setEditDraft({ ...editDraft, is_blackout: v })} />
+                <Label>Blackout</Label>
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Switch checked={editDraft.has_break} onCheckedChange={(v) => setEditDraft({ ...editDraft, has_break: v })} />
+                <Label>Add a break</Label>
+              </div>
+              {editDraft.has_break && (
+                <>
+                  <div>
+                    <Label>Break start</Label>
+                    <Input type="time" value={editDraft.break_start_time} onChange={(e) => setEditDraft({ ...editDraft, break_start_time: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Break end</Label>
+                    <Input type="time" value={editDraft.break_end_time} onChange={(e) => setEditDraft({ ...editDraft, break_end_time: e.target.value })} />
+                  </div>
+                </>
+              )}
+              <div className="sm:col-span-2 flex justify-end gap-2 pt-2 border-t border-border">
+                <Button variant="outline" onClick={() => setEditingBlock(null)}>Cancel</Button>
+                <Button onClick={saveEdit} disabled={savingEdit}>
+                  {savingEdit && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+
+
       <AlertDialog open={!!confirmCancel} onOpenChange={(o) => !o && setConfirmCancel(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
