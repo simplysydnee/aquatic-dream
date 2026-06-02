@@ -83,6 +83,9 @@ export default function PrivateLessonsAdmin() {
     has_break: false, break_start_time: "", break_end_time: "",
   });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [activeSlot, setActiveSlot] = useState<SlotRow | null>(null);
+  const [slotBusy, setSlotBusy] = useState(false);
+  const [confirmSlotCancel, setConfirmSlotCancel] = useState<SlotRow | null>(null);
   const [draft, setDraft] = useState({
     instructor_id: "", kind: "weekly" as UiKind,
     day_of_week: 1, start_date: "", end_date: "",
