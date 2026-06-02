@@ -935,6 +935,125 @@ export default function PrivateLessonsAdmin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Slot action dialog */}
+      <Dialog open={!!activeSlot} onOpenChange={(o) => !o && !slotBusy && setActiveSlot(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {activeSlot && `${fmtDate(activeSlot.date)} · ${fmtTime(activeSlot.start)} – ${fmtTime(activeSlot.end)}`}
+            </DialogTitle>
+          </DialogHeader>
+          {activeSlot && (
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                Instructor: <span className="font-medium text-foreground">{instructorName(activeSlot.instructor_id)}</span>
+              </div>
+
+              {activeSlot.booking ? (
+                <div className="rounded-md border border-border p-3 text-sm space-y-1">
+                  <div className="font-medium">{activeSlot.booking.child_name}</div>
+                  <div className="text-muted-foreground">{activeSlot.booking.parent_name}</div>
+                  <div className="text-xs capitalize">
+                    Payment: {activeSlot.booking.auto_charge_status === "succeeded" ? "paid" : (activeSlot.booking.payment_status || "unpaid")}
+                  </div>
+                </div>
+              ) : activeSlot.blocked ? (
+                <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+                  This slot is currently blocked off and not bookable.
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
+                  This slot is open and available for booking.
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                {activeSlot.booking && (
+                  <>
+                    <Button
+                      variant="destructive"
+                      disabled={slotBusy}
+                      onClick={() => setConfirmSlotCancel(activeSlot)}
+                    >
+                      <XCircle className="w-4 h-4 mr-1" /> Cancel this lesson
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={slotBusy}
+                      onClick={() => {
+                        const full = allPrivateBookings.find((b) => b.id === activeSlot.booking!.booking_id)
+                          || bookings.find((b) => b.id === activeSlot.booking!.booking_id);
+                        if (full) {
+                          setActiveSlot(null);
+                          setDetailBooking(full);
+                        } else {
+                          toast({ title: "Booking details unavailable", variant: "destructive" });
+                        }
+                      }}
+                    >
+                      Open full booking
+                    </Button>
+                  </>
+                )}
+                {!activeSlot.booking && !activeSlot.blocked && (
+                  <Button
+                    variant="destructive"
+                    disabled={slotBusy}
+                    onClick={() => blockSlot(activeSlot)}
+                  >
+                    {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
+                    Block this slot
+                  </Button>
+                )}
+                {activeSlot.blocked && (
+                  <Button
+                    variant="default"
+                    disabled={slotBusy}
+                    onClick={() => unblockSlot(activeSlot)}
+                  >
+                    {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+                    Unblock / reopen slot
+                  </Button>
+                )}
+                <Button variant="ghost" disabled={slotBusy} onClick={() => setActiveSlot(null)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!confirmSlotCancel} onOpenChange={(o) => !o && !slotBusy && setConfirmSlotCancel(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this lesson?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmSlotCancel?.booking && (
+                <>
+                  {confirmSlotCancel.booking.child_name} · {fmtDate(confirmSlotCancel.date)} ·{" "}
+                  {fmtTime(confirmSlotCancel.start)} – {fmtTime(confirmSlotCancel.end)}.
+                  {" "}This cancels just this one occurrence and skips the auto-charge.
+                  Already-charged lessons are not refunded automatically.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={slotBusy}>Keep lesson</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={slotBusy}
+              onClick={() => confirmSlotCancel && cancelSlotOccurrence(confirmSlotCancel)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+              Cancel lesson
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
