@@ -174,6 +174,81 @@ export default function PrivateLessonsAdmin() {
     load();
   };
 
+  const openEdit = (b: Block) => {
+    const isOneTime = b.kind === "date_range" && b.start_date && b.start_date === b.end_date && b.day_of_week === null;
+    const uiKind: UiKind = b.kind === "weekly" ? "weekly" : isOneTime ? "one_time" : "date_range";
+    setEditDraft({
+      kind: uiKind,
+      day_of_week: b.day_of_week ?? 1,
+      start_date: b.start_date || "",
+      end_date: b.end_date || "",
+      start_time: b.start_time.slice(0, 5),
+      end_time: b.end_time.slice(0, 5),
+      slot_minutes: b.slot_minutes,
+      pool_area: b.pool_area,
+      is_blackout: b.is_blackout,
+      notes: b.notes || "",
+      has_break: !!(b.break_start_time && b.break_end_time),
+      break_start_time: b.break_start_time ? b.break_start_time.slice(0, 5) : "",
+      break_end_time: b.break_end_time ? b.break_end_time.slice(0, 5) : "",
+    });
+    setEditingBlock(b);
+  };
+
+  const saveEdit = async () => {
+    if (!editingBlock) return;
+    const d = editDraft;
+    if (!d.start_date || (d.kind !== "one_time" && !d.end_date)) {
+      toast({ title: "Dates required", variant: "destructive" });
+      return;
+    }
+    const endDate = d.kind === "one_time" ? d.start_date : d.end_date;
+    if (endDate < d.start_date) {
+      toast({ title: "Invalid range", description: "End date must be on or after start date.", variant: "destructive" });
+      return;
+    }
+    if (d.has_break) {
+      if (!d.break_start_time || !d.break_end_time) {
+        toast({ title: "Break times required", variant: "destructive" });
+        return;
+      }
+      if (d.break_end_time <= d.break_start_time) {
+        toast({ title: "Invalid break", description: "Break end must be after break start.", variant: "destructive" });
+        return;
+      }
+      if (d.break_start_time < d.start_time || d.break_end_time > d.end_time) {
+        toast({ title: "Break outside block", variant: "destructive" });
+        return;
+      }
+    }
+    const derivedDow = d.kind === "weekly" && d.start_date
+      ? new Date(d.start_date + "T00:00").getDay()
+      : d.day_of_week;
+    const dbKind: "weekly" | "date_range" = d.kind === "weekly" ? "weekly" : "date_range";
+    const payload: any = {
+      kind: dbKind,
+      start_time: d.start_time, end_time: d.end_time,
+      slot_minutes: d.slot_minutes, pool_area: d.pool_area,
+      is_blackout: d.is_blackout, notes: d.notes || null,
+      day_of_week: d.kind === "weekly" ? derivedDow : (d.kind === "one_time" ? null : (editingBlock.day_of_week)),
+      start_date: d.start_date,
+      end_date: endDate,
+      break_start_time: d.has_break ? d.break_start_time : null,
+      break_end_time: d.has_break ? d.break_end_time : null,
+    };
+    setSavingEdit(true);
+    const { error } = await supabase.from("instructor_booking_blocks").update(payload).eq("id", editingBlock.id);
+    setSavingEdit(false);
+    if (error) {
+      toast({ title: "Could not save", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Block updated" });
+    setEditingBlock(null);
+    load();
+  };
+
+
   // Map of `${instructor_id}|${date}|${HH:MM}` -> booking info
   const bookingMap = useMemo(() => {
     const m = new Map<string, SlotRow["booking"]>();
