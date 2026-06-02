@@ -58,7 +58,10 @@ interface SlotRow {
   date: string;
   start: string;
   end: string;
-  booking?: { booking_id: string; child_name: string; parent_name: string; payment_status: string; auto_charge_status: string; status: string };
+  parentBlockId: string;
+  instructor_id: string;
+  booking?: { booking_id: string; occurrence_id: string; child_name: string; parent_name: string; payment_status: string; auto_charge_status: string; status: string };
+  blocked?: { block_id: string };
 }
 
 export default function PrivateLessonsAdmin() {
