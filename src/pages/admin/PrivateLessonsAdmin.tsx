@@ -1081,7 +1081,7 @@ export default function PrivateLessonsAdmin() {
                   </Button>
                 )}
                 <Button variant="ghost" disabled={slotBusy} onClick={() => setActiveSlot(null)}>
-                  Close
+                  Dismiss
                 </Button>
               </div>
             </div>
