@@ -981,15 +981,19 @@ export default function PrivateLessonsAdmin() {
                     <Button
                       variant="outline"
                       disabled={slotBusy}
-                      onClick={() => {
-                        const full = allPrivateBookings.find((b) => b.id === activeSlot.booking!.booking_id)
-                          || bookings.find((b) => b.id === activeSlot.booking!.booking_id);
-                        if (full) {
-                          setActiveSlot(null);
-                          setDetailBooking(full);
-                        } else {
+                      onClick={async () => {
+                        const bookingId = activeSlot.booking!.booking_id;
+                        const { data, error } = await supabase
+                          .from("lesson_bookings")
+                          .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error)")
+                          .eq("id", bookingId)
+                          .maybeSingle();
+                        if (error || !data) {
                           toast({ title: "Booking details unavailable", variant: "destructive" });
+                          return;
                         }
+                        setActiveSlot(null);
+                        setDetailBooking(data);
                       }}
                     >
                       Open full booking
