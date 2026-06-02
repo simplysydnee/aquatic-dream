@@ -117,11 +117,16 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             Lesson Request — {request.child_name}
             <Badge variant="outline" className={request.lesson_type === "private" ? "bg-purple-50 text-purple-700 border-purple-300" : "bg-blue-50 text-blue-700 border-blue-300"}>
               {request.lesson_type === "private" ? "Private" : "Semi-Private"}
             </Badge>
+            {request.is_adult_swimmer && (
+              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300">
+                Adult swimmer
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
