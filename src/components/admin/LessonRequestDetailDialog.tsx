@@ -65,6 +65,16 @@ export default function LessonRequestDetailDialog({ request, open, onOpenChange,
     onUpdated({ ...request, status: newStatus });
   };
 
+  const toggleAdult = async (next: boolean) => {
+    await supabase.from("lesson_requests").update({ is_adult_swimmer: next }).eq("id", request.id);
+    onUpdated({ ...request, is_adult_swimmer: next });
+    toast({
+      title: next ? "Marked as adult swimmer" : "Marked as kid swimmer",
+      description: next ? "This request will be excluded from kid-focused outreach." : "",
+    });
+  };
+
+
   const handleSendReply = async () => {
     if (!body.trim()) {
       toast({ title: "Message is empty", description: "Add a message before sending.", variant: "destructive" });
