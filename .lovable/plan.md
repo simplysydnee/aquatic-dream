@@ -1,25 +1,41 @@
-## Fix private lesson booking email + add parent info
+## Goal
+1. Give you one clean, shareable URL you can text/email to private-pay families.
+2. Surface that same booking flow directly on the public website (no more burying it inside the combined `/swim-enrollment?type=request` page).
 
-### Why the email didn't trigger
+## Public URL
+`https://aquaticdreamsswim.com/book-private-lesson`
 
-Looking at `supabase/functions/confirm-private-booking/index.ts`, the call to `send-transactional-email` is **fire-and-forget** (`.catch(...)` with no `await`). When the handler returns its JSON response, the Edge Function isolate shuts down before the queued invoke actually fires. Edge logs confirm the function booted at 21:04 and shut down immediately at 21:07:36, and `email_send_log` has zero rows for the 21:02 booking by Sydnee.
+(Also works on preview + custom domain.)
 
-**Fix**: `await` the `supabase.functions.invoke('send-transactional-email', ...)` call (wrapped in try/catch so a send failure still returns success to the client). The booking is already marked active before the await, so the user experience is unchanged.
+## What the page shows
+Focused, single-column page wrapped in the standard public layout (Navbar + Footer):
+- Header: "Book a Private Lesson"
+- Subhead: "Pick your instructor, day, and time. Save a card on file — $65 is charged the day of each lesson."
+- `<PaymentTestModeBanner />` at the top
+- Renders the existing `<PrivateBookingFlow />` component (instructor → slot → parent/child details → card-on-file → confirmation). The confirmation + parent-info + cancellation emails we wired up earlier already fire from this flow.
+- SEO title/description set for the page.
+- Small link at the bottom: "Looking for group classes or semi-private? → /swim-enrollment"
 
-### Add Parent Information section to the template
+No code changes to the booking flow itself.
 
-Update `supabase/functions/_shared/transactional-email-templates/lesson-booking-confirmation.tsx` to append a "Parent Information" section near the bottom (before the closing "Questions?" line) with:
+## Embedding on the website
+1. **Navbar**: Add "Book Private Lesson" as a primary nav item (desktop + mobile menu) so visitors can reach it from anywhere.
+2. **Swim Lessons page** (`/swim-lessons`): Add a "Book a Private Lesson" CTA card in the Private section that links to `/book-private-lesson` (currently the page only describes private lessons — there's no direct "book now" CTA).
+3. **Home page**: Add a secondary CTA button "Book a Private Lesson" next to the existing "Enroll Now" CTA in the hero so private-pay families land in the right flow on the first click.
+4. **`/swim-enrollment?type=request`**: Keep working as-is, but the "Private lessons" card on that page now also links out to the dedicated page for anyone who landed there first.
 
-- All swimmers who might have an accident in the pool MUST wear a swim diaper.
-- Please have all swimmers use the restroom before lessons start.
-- Please do not have your child eat 30 minutes prior to swim lessons.
-- Please only bring required family with you to the pool — pool deck space is limited.
-- Children not in the pool with an instructor may NOT touch the water at any time.
+## Admin convenience
+Add a "Copy private-booking link" button on the Lesson Requests admin page (`/admin/lesson-requests`) so when you reply to a family you can grab the URL with one click.
 
-Styled as a bordered info section consistent with existing `policyBox` / `infoBox` styling. This shows on every booking confirmation (public flow + admin-sent), so no changes needed at the call sites.
+## Implementation
+1. New page: `src/pages/BookPrivateLesson.tsx` — wraps `PrivateBookingFlow` in `PublicLayout` with SEO + banner.
+2. Add route in `src/App.tsx`: `<Route path="/book-private-lesson" element={<BookPrivateLesson />} />`.
+3. Update `src/components/Navbar.tsx` — add the nav item (desktop + mobile).
+4. Update `src/pages/SwimLessons.tsx` — add the "Book a Private Lesson" CTA in the Private section.
+5. Update `src/pages/Index.tsx` — add the secondary hero CTA.
+6. Update `src/pages/admin/LessonRequestsAdmin.tsx` — add the copy-link button.
 
-### Files
-
-- `supabase/functions/confirm-private-booking/index.ts` — await the email invoke
-- `supabase/functions/_shared/transactional-email-templates/lesson-booking-confirmation.tsx` — add Parent Information section
-- Redeploy both edge functions after edits
+## Out of scope
+- No new database tables, no new edge functions.
+- No change to pricing, payment timing, or the private-booking UX itself.
+- No change to how semi-private requests are handled.
