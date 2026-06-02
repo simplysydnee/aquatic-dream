@@ -704,7 +704,7 @@ export default function PrivateLessonsAdmin() {
                                         <span className="text-muted-foreground">{fmtTime(s.start)} – {fmtTime(s.end)}</span>
                                       </div>
                                       {s.blocked ? (
-                                        <Badge variant="secondary" className="text-[10px]">Blocked</Badge>
+                                        <Badge variant="secondary" className="text-[10px]">Closed</Badge>
                                       ) : s.booking ? (
                                         <div className="flex flex-col items-end gap-0.5">
                                           <Badge variant="default" className="text-[10px]">Booked</Badge>
