@@ -399,6 +399,79 @@ export default function PrivateLessonsAdmin() {
     } catch {}
   };
 
+  const cancelSlotOccurrence = async (slot: SlotRow) => {
+    if (!slot.booking) return;
+    setSlotBusy(true);
+    try {
+      const { error } = await supabase
+        .from("lesson_booking_occurrences")
+        .update({
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+          cancel_reason: "Cancelled by admin",
+          auto_charge_status: "skipped",
+        })
+        .eq("id", slot.booking.occurrence_id);
+      if (error) throw error;
+      toast({ title: "Lesson cancelled" });
+      setConfirmSlotCancel(null);
+      setActiveSlot(null);
+      await load();
+    } catch (e: any) {
+      toast({ title: "Could not cancel", description: e?.message, variant: "destructive" });
+    } finally {
+      setSlotBusy(false);
+    }
+  };
+
+  const blockSlot = async (slot: SlotRow) => {
+    setSlotBusy(true);
+    try {
+      const parent = blocks.find((b) => b.id === slot.parentBlockId);
+      const { error } = await supabase.from("instructor_booking_blocks").insert({
+        instructor_id: slot.instructor_id,
+        kind: "date_range",
+        start_date: slot.date,
+        end_date: slot.date,
+        day_of_week: null,
+        start_time: slot.start,
+        end_time: slot.end,
+        slot_minutes: parent?.slot_minutes || 30,
+        pool_area: parent?.pool_area || "shallow",
+        is_blackout: true,
+        notes: "Blocked from slot grid",
+      });
+      if (error) throw error;
+      toast({ title: "Slot blocked" });
+      setActiveSlot(null);
+      await load();
+    } catch (e: any) {
+      toast({ title: "Could not block", description: e?.message, variant: "destructive" });
+    } finally {
+      setSlotBusy(false);
+    }
+  };
+
+  const unblockSlot = async (slot: SlotRow) => {
+    if (!slot.blocked) return;
+    setSlotBusy(true);
+    try {
+      const { error } = await supabase
+        .from("instructor_booking_blocks")
+        .delete()
+        .eq("id", slot.blocked.block_id);
+      if (error) throw error;
+      toast({ title: "Slot reopened" });
+      setActiveSlot(null);
+      await load();
+    } catch (e: any) {
+      toast({ title: "Could not unblock", description: e?.message, variant: "destructive" });
+    } finally {
+      setSlotBusy(false);
+    }
+  };
+
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
       <h1 className="font-display text-2xl font-bold mb-4">Private Lessons</h1>
