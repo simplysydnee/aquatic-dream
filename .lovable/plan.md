@@ -1,41 +1,20 @@
-# Private Lessons admin — clearer slot actions
+# Two small fixes
 
-## Goals
-1. Rename the confusing "Block this slot" wording so it matches the "Close" language used elsewhere.
-2. Let an owner act on **a single date** of a slot — never the whole recurring series — with two distinct actions: **Cancel booking** and **Delete slot**.
+## 1. Close the Jun 13, 12:00–12:30 PM slot for Jaclyn Vaughan
+That slot is currently open (no booking exists for it). I'll insert a one-date blackout in `instructor_booking_blocks` so it no longer appears as bookable:
+- instructor_id: Jaclyn (`31408e2f-…aa42e7aac458`)
+- kind: `date_range`, start_date = end_date = `2026-06-13`
+- start_time `12:00`, end_time `12:30`
+- is_blackout: true
+- notes: "Closed by admin"
 
-## What changes in the UI (`src/pages/admin/PrivateLessonsAdmin.tsx`)
+This is identical to what the "Close this slot" button does, just executed directly so it's done.
 
-### Renames (labels only)
-- "Block this slot" → **Close slot**
-- "Unblock" → **Reopen slot**
-- Badge "Blocked" → **Closed**
-- Toast copy updated to match.
+## 2. Show 12-hour times in availability block headers
+In `src/pages/admin/PrivateLessonsAdmin.tsx`, the block summary row currently renders raw 24-hour strings:
+- Line 666: `{b.start_time.slice(0,5)}–{b.end_time.slice(0,5)}` → use `fmtTime(...)`
+- Line 668: same for the optional break range
 
-### Slot action dialog — actions per state
+Result: "10:00–13:00" becomes "10:00 AM – 1:00 PM", matching the rest of the page.
 
-**Open slot** (no booking, not closed)
-- `Close slot` — makes this exact date/time unavailable on the public booking page. One-date blackout only.
-
-**Booked slot** (e.g. Jaclyn 12:30 on Jun 13)
-- `Cancel this booking` — cancels only that single occurrence. Skips the auto-charge for that date. Leaves the rest of the recurring series untouched. Slot returns to Open afterward.
-- `Cancel & close slot` — same as above, then immediately closes the slot so it can't be re-booked.
-- A clear note in the dialog: "This affects only {date}. Other dates in the recurring booking are not changed."
-
-**Closed slot**
-- `Reopen slot` — deletes that one blackout row.
-
-### Per-date safety
-- Every action passes the specific `occurrence_date` (and `occurrence_id` when present).
-- The recurring `lesson_bookings` row is never modified — only the matching `lesson_booking_occurrences` row for that date.
-- Closing/reopening operates on a single-date `instructor_booking_blocks` row (`kind='date_range'`, start=end=that date, exact start/end time), so no other dates are ever affected.
-
-## Technical notes
-- `cancelSlotOccurrence` continues to update only `lesson_booking_occurrences` (status='cancelled', skip auto_charge) for the one `occurrence_id`.
-- "Cancel & close slot" runs cancel first, then `blockSlot()` (with the existing duplicate guard).
-- "Reopen slot" deletes only the blackout row whose id is attached to the tile.
-- No edge function or schema changes required.
-
-## Out of scope
-- No changes to the recurring-series management UI or to public booking flow.
-- No changes to refund logic (existing auto-charge skip already handles the financial side for cancelled occurrences).
+No other files or behavior change.
