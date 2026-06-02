@@ -502,13 +502,18 @@ const SwimLessons = () => {
       <section className="bg-secondary text-secondary-foreground py-16">
         <div className="container text-center">
           <h2 className="font-display text-3xl font-bold mb-4">Private & Semi-Private Lessons</h2>
-          <p className="text-secondary-foreground/70 max-w-xl mx-auto mb-4">
-            Want one-on-one or small group attention? Request a private ($65/lesson)
-            or semi-private ($45/lesson) lesson tailored to your child's needs.
+          <p className="text-secondary-foreground/70 max-w-xl mx-auto mb-6">
+            Want one-on-one or small group attention? Book a private lesson online
+            ($65/lesson) or request a semi-private ($45/lesson) match.
           </p>
-          <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground rounded-xl">
-            <Link to="/swim-enrollment?type=request">Request a Lesson <ChevronRight className="ml-1 w-4 h-4" /></Link>
-          </Button>
+          <div className="flex flex-wrap gap-3 justify-center">
+            <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl">
+              <Link to="/book-private-lesson">Book a Private Lesson <ChevronRight className="ml-1 w-4 h-4" /></Link>
+            </Button>
+            <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground rounded-xl">
+              <Link to="/swim-enrollment?type=request">Request Semi-Private <ChevronRight className="ml-1 w-4 h-4" /></Link>
+            </Button>
+          </div>
         </div>
       </section>
 
