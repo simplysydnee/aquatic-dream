@@ -145,6 +145,7 @@ Deno.serve(async (req) => {
         unsubscribeUrl,
         companyName: "Aquatic Dreams",
         companyAddress: "Aquatic Dreams, Modesto, CA",
+        logoUrl: `${SUPABASE_URL}/storage/v1/object/public/email-assets/aqd-email-logo.jpg`,
       });
       const text = renderPlainText({
         subject, preheader: campaign.preheader || undefined, blocks, unsubscribeUrl,

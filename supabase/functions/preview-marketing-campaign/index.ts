@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
       unsubscribeUrl: "#preview-unsubscribe",
       companyName: body.companyName,
       companyAddress: body.companyAddress,
-      logoUrl: body.logoUrl,
+      logoUrl: body.logoUrl || `https://jilrijklnehbfuulykty.supabase.co/storage/v1/object/public/email-assets/aqd-email-logo.jpg`,
     });
     return new Response(JSON.stringify({ html }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
