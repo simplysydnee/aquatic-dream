@@ -1,39 +1,35 @@
-## 1. Email template (`/mnt/documents/june-lesson-email.html`)
+## Make every individual slot actionable on /admin/private-lessons
 
-No changes — the rebranded version stays as-is. Nothing will be sent automatically; the file is just a draft you'll forward manually. When you do send it, exclude any contacts flagged as adult swimmers (see #2).
+Right now the expanded slot grid under each availability block only shows status badges — you can't click a slot to do anything. That's why Jaclyn's 12:30–1:00 PM lesson on June 13 isn't deletable from this page: the booking exists, but the grid just renders a label. We'll make every tile a real action.
 
-## 2. Adult-swimmer flag on lesson requests
+### Behavior per slot
 
-**Schema migration** — add column to `public.lesson_requests`:
-- `is_adult_swimmer boolean not null default false`
+**Booked slot (e.g. Jaclyn 12:30–1:00):** click opens a slot action dialog showing parent/swimmer/payment status with three buttons:
+- **Cancel this lesson** — cancels just that occurrence (via existing `cancel-private-lesson-occurrence` edge function, which also auto-refunds if paid, per project rules).
+- **Open booking** — pops the existing booking detail dialog (where you can cancel the whole series, charge, delete).
+- **Close** — dismiss.
 
-**Auto-flag existing rows** during the migration when any of these are true:
-- `child_age >= 16`
-- `lower(notes)` or `lower(child_name)` contains `adult`, `myself`, `for me`, `i want`, or `im an adult`
+**Open slot:** click opens the same dialog with:
+- **Block this slot** — inserts a one-time blackout entry in `instructor_booking_blocks` covering exactly that date + time window, so the public booker can no longer take it.
+- **Close** — dismiss.
 
-**Admin UI** — `src/pages/admin/LessonRequestsAdmin.tsx` + `LessonRequestDetailDialog.tsx`:
-- New "Adult swimmer" badge on request rows (amber pill) when `is_adult_swimmer = true`
-- Toggle in the detail dialog to mark/unmark adult swimmer
-- New filter chip in the page header: **All / Kids only / Adults only** (defaults to **Kids only** so the list you'd email from naturally excludes adults)
-- Badge count in `useAdminBadgeCounts` continues to count all "new" requests (unchanged)
+**Blocked/closed slot:** show a "Blocked" badge and allow **Unblock** (deletes the matching one-time blackout row).
 
-No outreach/email-sending code is added — this is purely a flag + filter so you can hand-pick recipients.
+### Visual changes
 
-## 3. Recurring slot quick-picks (`src/components/private-lessons/SlotPicker.tsx`)
+- Slot tiles become buttons with hover state + cursor pointer; keyboard accessible.
+- Add a third visual state ("Blocked" — muted/strikethrough) alongside the existing Booked / Open states.
+- Tiny "cancel" (✕) icon on booked tiles and "block" (🚫) icon on open tiles as an affordance, but the whole tile is clickable.
 
-Current bugs:
-- `weeklyOptions.slice(0, 12)` caps the list at 12, which is why you only see Sophia's 6 (cap hides others further down)
-- With "Any available instructor" selected, options end up sorted by insertion order, so the first instructor dominates the visible 12
+### Technical notes
 
-Fixes:
-- Remove the 12-cap; show every recurring pattern with ≥2 dates
-- Group quick-picks by instructor with a small instructor sub-heading so all instructors are visible
-- Sort within each instructor by day-of-week, then time
-- Keep the existing day/time filter chips functional (they already filter `weeklyOptions`)
-- Cap each instructor at 20 patterns max as a sanity guard (still way more than 6)
+- New `SlotActionDialog` component used inside `PrivateLessonsAdmin.tsx`.
+- Cancel of a single booked occurrence: call existing `supabase.functions.invoke('cancel-private-lesson-occurrence', { body: { occurrence_id, reason } })`. Confirm with an AlertDialog first; surface refund outcome in the toast.
+- Block-a-slot: insert into `instructor_booking_blocks` with `kind='date_range'`, `start_date=end_date=slot.date`, `start_time/end_time` = slot bounds, `slot_minutes` = block length, `is_blackout=true`, `day_of_week=null`, `pool_area` inherited from parent block. `SlotPicker` already filters out times overlapping blackouts, so this immediately removes the slot from public booking.
+- Detect a "blocked" slot in `computeBlockSlots` by checking any blackout block from the same instructor that overlaps the slot window; tag the SlotRow with `blocked: { block_id }` so Unblock can target the right row.
+- After any mutation, call `load()` to refresh state.
 
-## Technical notes
+### Out of scope
 
-- Migration uses `ALTER TABLE` + `UPDATE` for the backfill heuristic; no new tables or RLS changes needed (existing admin policies cover the new column)
-- `src/integrations/supabase/types.ts` will regenerate automatically after the migration
-- No edge functions, no email infrastructure changes
+- No backend schema changes.
+- No changes to the public booking flow, email templates, or the existing block edit/delete buttons.

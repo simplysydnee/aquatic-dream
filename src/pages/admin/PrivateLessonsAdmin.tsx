@@ -58,7 +58,10 @@ interface SlotRow {
   date: string;
   start: string;
   end: string;
-  booking?: { booking_id: string; child_name: string; parent_name: string; payment_status: string; auto_charge_status: string; status: string };
+  parentBlockId: string;
+  instructor_id: string;
+  booking?: { booking_id: string; occurrence_id: string; child_name: string; parent_name: string; payment_status: string; auto_charge_status: string; status: string };
+  blocked?: { block_id: string };
 }
 
 export default function PrivateLessonsAdmin() {
@@ -80,6 +83,9 @@ export default function PrivateLessonsAdmin() {
     has_break: false, break_start_time: "", break_end_time: "",
   });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [activeSlot, setActiveSlot] = useState<SlotRow | null>(null);
+  const [slotBusy, setSlotBusy] = useState(false);
+  const [confirmSlotCancel, setConfirmSlotCancel] = useState<SlotRow | null>(null);
   const [draft, setDraft] = useState({
     instructor_id: "", kind: "weekly" as UiKind,
     day_of_week: 1, start_date: "", end_date: "",
@@ -259,6 +265,7 @@ export default function PrivateLessonsAdmin() {
         if (o.status === "cancelled") continue;
         m.set(`${b.instructor_id}|${o.occurrence_date}|${t}`, {
           booking_id: b.id,
+          occurrence_id: o.id,
           child_name: b.child_name || "—",
           parent_name: b.parent_name || "",
           payment_status: o.payment_status,
@@ -269,6 +276,23 @@ export default function PrivateLessonsAdmin() {
     }
     return m;
   }, [allPrivateBookings]);
+
+  // Find a one-time blackout block that exactly covers a slot
+  const findBlackoutForSlot = (instructorId: string, dateStr: string, start: string, end: string) => {
+    const dow = new Date(dateStr + "T00:00").getDay();
+    return blocks.find((bl) => {
+      if (!bl.is_blackout) return false;
+      if (bl.instructor_id !== instructorId) return false;
+      const inDate = bl.kind === "weekly"
+        ? bl.day_of_week === dow && (!bl.start_date || bl.start_date <= dateStr) && (!bl.end_date || bl.end_date >= dateStr)
+        : (bl.start_date && bl.start_date <= dateStr) && (bl.end_date && bl.end_date >= dateStr) && (bl.day_of_week === null || bl.day_of_week === dow);
+      if (!inDate) return false;
+      const bs = normTime(bl.start_time);
+      const be = normTime(bl.end_time);
+      // overlap
+      return bs < end && be > start;
+    });
+  };
 
   const computeBlockSlots = (b: Block): SlotRow[] => {
     if (b.is_blackout) return [];
@@ -292,13 +316,21 @@ export default function PrivateLessonsAdmin() {
         const brkEnd = b.break_end_time ? normTime(b.break_end_time) : null;
         while (addMinutes(t, b.slot_minutes) <= end) {
           const slotEnd = addMinutes(t, b.slot_minutes);
-          // If this slot overlaps the break, skip to break end.
           if (brkStart && brkEnd && t < brkEnd && slotEnd > brkStart) {
             t = brkEnd;
             continue;
           }
           const key = `${b.instructor_id}|${dateStr}|${t}`;
-          slots.push({ date: dateStr, start: t, end: slotEnd, booking: bookingMap.get(key) });
+          const blackoutBlock = findBlackoutForSlot(b.instructor_id, dateStr, t, slotEnd);
+          slots.push({
+            date: dateStr,
+            start: t,
+            end: slotEnd,
+            parentBlockId: b.id,
+            instructor_id: b.instructor_id,
+            booking: bookingMap.get(key),
+            blocked: blackoutBlock ? { block_id: blackoutBlock.id } : undefined,
+          });
           t = slotEnd;
         }
       }
@@ -366,6 +398,79 @@ export default function PrivateLessonsAdmin() {
       await load();
     } catch {}
   };
+
+  const cancelSlotOccurrence = async (slot: SlotRow) => {
+    if (!slot.booking) return;
+    setSlotBusy(true);
+    try {
+      const { error } = await supabase
+        .from("lesson_booking_occurrences")
+        .update({
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+          cancel_reason: "Cancelled by admin",
+          auto_charge_status: "skipped",
+        })
+        .eq("id", slot.booking.occurrence_id);
+      if (error) throw error;
+      toast({ title: "Lesson cancelled" });
+      setConfirmSlotCancel(null);
+      setActiveSlot(null);
+      await load();
+    } catch (e: any) {
+      toast({ title: "Could not cancel", description: e?.message, variant: "destructive" });
+    } finally {
+      setSlotBusy(false);
+    }
+  };
+
+  const blockSlot = async (slot: SlotRow) => {
+    setSlotBusy(true);
+    try {
+      const parent = blocks.find((b) => b.id === slot.parentBlockId);
+      const { error } = await supabase.from("instructor_booking_blocks").insert({
+        instructor_id: slot.instructor_id,
+        kind: "date_range",
+        start_date: slot.date,
+        end_date: slot.date,
+        day_of_week: null,
+        start_time: slot.start,
+        end_time: slot.end,
+        slot_minutes: parent?.slot_minutes || 30,
+        pool_area: parent?.pool_area || "shallow",
+        is_blackout: true,
+        notes: "Blocked from slot grid",
+      });
+      if (error) throw error;
+      toast({ title: "Slot blocked" });
+      setActiveSlot(null);
+      await load();
+    } catch (e: any) {
+      toast({ title: "Could not block", description: e?.message, variant: "destructive" });
+    } finally {
+      setSlotBusy(false);
+    }
+  };
+
+  const unblockSlot = async (slot: SlotRow) => {
+    if (!slot.blocked) return;
+    setSlotBusy(true);
+    try {
+      const { error } = await supabase
+        .from("instructor_booking_blocks")
+        .delete()
+        .eq("id", slot.blocked.block_id);
+      if (error) throw error;
+      toast({ title: "Slot reopened" });
+      setActiveSlot(null);
+      await load();
+    } catch (e: any) {
+      toast({ title: "Could not unblock", description: e?.message, variant: "destructive" });
+    } finally {
+      setSlotBusy(false);
+    }
+  };
+
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
@@ -534,17 +639,25 @@ export default function PrivateLessonsAdmin() {
                               {slots.length > 0 && (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
                                   {slots.map((s) => (
-                                    <div
+                                    <button
                                       key={`${s.date}-${s.start}`}
-                                      className={`flex items-center justify-between rounded border px-2 py-1.5 text-xs ${
-                                        s.booking ? "bg-primary/5 border-primary/30" : "bg-background border-border"
+                                      type="button"
+                                      onClick={() => setActiveSlot(s)}
+                                      className={`flex items-center justify-between rounded border px-2 py-1.5 text-xs text-left transition-colors hover:ring-1 hover:ring-primary/40 cursor-pointer ${
+                                        s.blocked
+                                          ? "bg-muted/50 border-border opacity-70"
+                                          : s.booking
+                                            ? "bg-primary/5 border-primary/30 hover:bg-primary/10"
+                                            : "bg-background border-border hover:bg-muted/50"
                                       }`}
                                     >
                                       <div className="flex flex-col">
-                                        <span className="font-medium">{fmtDate(s.date)}</span>
+                                        <span className={`font-medium ${s.blocked ? "line-through" : ""}`}>{fmtDate(s.date)}</span>
                                         <span className="text-muted-foreground">{fmtTime(s.start)} – {fmtTime(s.end)}</span>
                                       </div>
-                                      {s.booking ? (
+                                      {s.blocked ? (
+                                        <Badge variant="secondary" className="text-[10px]">Blocked</Badge>
+                                      ) : s.booking ? (
                                         <div className="flex flex-col items-end gap-0.5">
                                           <Badge variant="default" className="text-[10px]">Booked</Badge>
                                           <span className="text-[11px] font-medium truncate max-w-[140px]">{s.booking.child_name}</span>
@@ -555,7 +668,7 @@ export default function PrivateLessonsAdmin() {
                                       ) : (
                                         <Badge variant="outline" className="text-[10px]">Open</Badge>
                                       )}
-                                    </div>
+                                    </button>
                                   ))}
                                 </div>
                               )}
@@ -822,6 +935,129 @@ export default function PrivateLessonsAdmin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Slot action dialog */}
+      <Dialog open={!!activeSlot} onOpenChange={(o) => !o && !slotBusy && setActiveSlot(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {activeSlot && `${fmtDate(activeSlot.date)} · ${fmtTime(activeSlot.start)} – ${fmtTime(activeSlot.end)}`}
+            </DialogTitle>
+          </DialogHeader>
+          {activeSlot && (
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                Instructor: <span className="font-medium text-foreground">{instructorName(activeSlot.instructor_id)}</span>
+              </div>
+
+              {activeSlot.booking ? (
+                <div className="rounded-md border border-border p-3 text-sm space-y-1">
+                  <div className="font-medium">{activeSlot.booking.child_name}</div>
+                  <div className="text-muted-foreground">{activeSlot.booking.parent_name}</div>
+                  <div className="text-xs capitalize">
+                    Payment: {activeSlot.booking.auto_charge_status === "succeeded" ? "paid" : (activeSlot.booking.payment_status || "unpaid")}
+                  </div>
+                </div>
+              ) : activeSlot.blocked ? (
+                <div className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+                  This slot is currently blocked off and not bookable.
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">
+                  This slot is open and available for booking.
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                {activeSlot.booking && (
+                  <>
+                    <Button
+                      variant="destructive"
+                      disabled={slotBusy}
+                      onClick={() => setConfirmSlotCancel(activeSlot)}
+                    >
+                      <XCircle className="w-4 h-4 mr-1" /> Cancel this lesson
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={slotBusy}
+                      onClick={async () => {
+                        const bookingId = activeSlot.booking!.booking_id;
+                        const { data, error } = await supabase
+                          .from("lesson_bookings")
+                          .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error)")
+                          .eq("id", bookingId)
+                          .maybeSingle();
+                        if (error || !data) {
+                          toast({ title: "Booking details unavailable", variant: "destructive" });
+                          return;
+                        }
+                        setActiveSlot(null);
+                        setDetailBooking(data);
+                      }}
+                    >
+                      Open full booking
+                    </Button>
+                  </>
+                )}
+                {!activeSlot.booking && !activeSlot.blocked && (
+                  <Button
+                    variant="destructive"
+                    disabled={slotBusy}
+                    onClick={() => blockSlot(activeSlot)}
+                  >
+                    {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
+                    Block this slot
+                  </Button>
+                )}
+                {activeSlot.blocked && (
+                  <Button
+                    variant="default"
+                    disabled={slotBusy}
+                    onClick={() => unblockSlot(activeSlot)}
+                  >
+                    {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+                    Unblock / reopen slot
+                  </Button>
+                )}
+                <Button variant="ghost" disabled={slotBusy} onClick={() => setActiveSlot(null)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!confirmSlotCancel} onOpenChange={(o) => !o && !slotBusy && setConfirmSlotCancel(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this lesson?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmSlotCancel?.booking && (
+                <>
+                  {confirmSlotCancel.booking.child_name} · {fmtDate(confirmSlotCancel.date)} ·{" "}
+                  {fmtTime(confirmSlotCancel.start)} – {fmtTime(confirmSlotCancel.end)}.
+                  {" "}This cancels just this one occurrence and skips the auto-charge.
+                  Already-charged lessons are not refunded automatically.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={slotBusy}>Keep lesson</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={slotBusy}
+              onClick={() => confirmSlotCancel && cancelSlotOccurrence(confirmSlotCancel)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+              Cancel lesson
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
