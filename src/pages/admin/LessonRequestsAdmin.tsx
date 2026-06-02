@@ -193,9 +193,14 @@ const LessonRequestsAdmin = () => {
                   </TableCell>
                   <TableCell>{r.child_age}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={r.lesson_type === "private" ? "bg-purple-50 text-purple-700 border-purple-300" : "bg-blue-50 text-blue-700 border-blue-300"}>
-                      {r.lesson_type === "private" ? "Private" : "Semi-Private"}
-                    </Badge>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <Badge variant="outline" className={r.lesson_type === "private" ? "bg-purple-50 text-purple-700 border-purple-300" : "bg-blue-50 text-blue-700 border-blue-300"}>
+                        {r.lesson_type === "private" ? "Private" : "Semi-Private"}
+                      </Badge>
+                      {r.is_adult_swimmer && (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300">Adult</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div>{r.parent_name}</div>
