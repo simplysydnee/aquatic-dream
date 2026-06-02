@@ -35,21 +35,36 @@ async function isAdmin(req: Request): Promise<boolean> {
 }
 
 async function resolveAudience(audience: any): Promise<Array<{ id: string; email: string; first_name: string | null }>> {
-  let q = supabase
-    .from("marketing_contacts")
-    .select("id, email, first_name, tags, source")
-    .eq("subscribed", true);
-  const rows = (await q).data || [];
   const tags: string[] = audience?.tags ?? [];
   const sources: string[] = audience?.sources ?? [];
   const includeAll: boolean = audience?.include_all !== false;
-  return rows.filter((r: any) => {
+
+  // Page through marketing_contacts to bypass the 1000-row default limit.
+  const PAGE = 1000;
+  const all: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("marketing_contacts")
+      .select("id, email, first_name, tags, source")
+      .eq("subscribed", true)
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  console.log(`resolveAudience: scanned ${all.length} subscribed contacts; tags=${JSON.stringify(tags)} sources=${JSON.stringify(sources)} includeAll=${includeAll}`);
+
+  const matched = all.filter((r: any) => {
     if (includeAll && tags.length === 0 && sources.length === 0) return true;
     if (sources.length && sources.includes(r.source)) return true;
     if (tags.length && (r.tags || []).some((t: string) => tags.includes(t))) return true;
     return false;
   });
+  console.log(`resolveAudience: matched ${matched.length} recipients`);
+  return matched;
 }
+
 
 async function getSuppressed(): Promise<Set<string>> {
   const out = new Set<string>();
@@ -145,6 +160,7 @@ Deno.serve(async (req) => {
         unsubscribeUrl,
         companyName: "Aquatic Dreams",
         companyAddress: "Aquatic Dreams, Modesto, CA",
+        logoUrl: `${SUPABASE_URL}/storage/v1/object/public/email-assets/aqd-email-logo.jpg`,
       });
       const text = renderPlainText({
         subject, preheader: campaign.preheader || undefined, blocks, unsubscribeUrl,
