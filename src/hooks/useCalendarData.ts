@@ -12,6 +12,7 @@ export interface CalendarSwimSession {
   session_name: string | null;
   day_of_week: string;
   instructor_id: string | null;
+  registration_status: string;
   instructors: { name: string } | null;
 }
 
@@ -35,6 +36,7 @@ export interface CalendarEnrollment {
   reg_fee_link_sent_at: string | null;
   payment_method: string | null;
 }
+
 
 export interface CalendarPoolEvent {
   id: string;
