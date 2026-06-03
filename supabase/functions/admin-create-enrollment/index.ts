@@ -161,6 +161,11 @@ serve(async (req) => {
       });
     }
 
+    // Sync parent contact into the matching Resend audiences (fire-and-forget)
+    supabaseAdmin.functions.invoke("resend-sync-enrollment-contact", {
+      body: { enrollmentId: enrollment.id },
+    }).catch((err) => console.error("resend-sync-enrollment-contact failed:", err));
+
     return json({ success: true, enrollmentId: enrollment.id }, 200);
   } catch (e) {
     console.error("admin-create-enrollment error:", e);
