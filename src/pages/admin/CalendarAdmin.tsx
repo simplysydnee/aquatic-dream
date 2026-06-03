@@ -262,6 +262,12 @@ const CalendarAdmin = () => {
         editEvent={editingEvent}
         prefillStartTime={prefillStartTime}
       />
+
+      <PrintDayScheduleDialog
+        open={showPrintDialog}
+        onOpenChange={setShowPrintDialog}
+        defaultDate={currentDate}
+      />
     </div>
   );
 };
