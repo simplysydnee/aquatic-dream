@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { renderMarketingHtml, renderPlainText, type MarketingBlock } from "../_shared/marketing-template.ts";
+import { resolveAudience } from "../_shared/resolve-audience.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,36 +35,7 @@ async function isAdmin(req: Request): Promise<boolean> {
   return !!data;
 }
 
-async function resolveAudience(audience: any): Promise<Array<{ id: string; email: string; first_name: string | null }>> {
-  const tags: string[] = audience?.tags ?? [];
-  const sources: string[] = audience?.sources ?? [];
-  const includeAll: boolean = audience?.include_all !== false;
-
-  // Page through marketing_contacts to bypass the 1000-row default limit.
-  const PAGE = 1000;
-  const all: any[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
-      .from("marketing_contacts")
-      .select("id, email, first_name, tags, source")
-      .eq("subscribed", true)
-      .range(from, from + PAGE - 1);
-    if (error) throw error;
-    const rows = data || [];
-    all.push(...rows);
-    if (rows.length < PAGE) break;
-  }
-  console.log(`resolveAudience: scanned ${all.length} subscribed contacts; tags=${JSON.stringify(tags)} sources=${JSON.stringify(sources)} includeAll=${includeAll}`);
-
-  const matched = all.filter((r: any) => {
-    if (includeAll && tags.length === 0 && sources.length === 0) return true;
-    if (sources.length && sources.includes(r.source)) return true;
-    if (tags.length && (r.tags || []).some((t: string) => tags.includes(t))) return true;
-    return false;
-  });
-  console.log(`resolveAudience: matched ${matched.length} recipients`);
-  return matched;
-}
+// resolveAudience moved to ../_shared/resolve-audience.ts
 
 
 async function getSuppressed(): Promise<Set<string>> {
@@ -130,7 +102,7 @@ Deno.serve(async (req) => {
     if (testEmail) {
       recipients = [{ id: null, email: testEmail, first_name: null }];
     } else {
-      recipients = await resolveAudience(campaign.audience);
+      recipients = await resolveAudience(supabase, campaign.audience);
     }
     const suppressed = await getSuppressed();
     recipients = recipients.filter((r) => !suppressed.has(r.email.toLowerCase()));

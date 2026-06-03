@@ -22,6 +22,17 @@ type Block =
   | { type: "divider" }
   | { type: "spacer"; size?: "sm" | "md" | "lg" };
 
+type Audience = {
+  tags: string[];
+  sources: string[];
+  include_all: boolean;
+  session_period_ids?: string[];
+  swim_session_ids?: string[];
+  swim_levels?: string[];
+  lesson_interests?: string[];
+  lesson_interest_age?: "all" | "u14" | "14plus";
+};
+
 type Campaign = {
   id: string;
   name: string;
@@ -30,7 +41,7 @@ type Campaign = {
   from_address: string | null;
   reply_to: string | null;
   body_blocks: Block[];
-  audience: { tags: string[]; sources: string[]; include_all: boolean };
+  audience: Audience;
   status: string;
   scheduled_for: string | null;
   sent_at: string | null;
@@ -41,6 +52,8 @@ type Campaign = {
 
 const SOURCE_OPTIONS = ["swim", "lessons", "scuba", "inquiry", "import", "manual"];
 const COMMON_TAGS = ["swim", "private-lessons", "scuba", "inquiry", "level:white", "level:red", "level:yellow", "level:blue", "level:green"];
+const SWIM_LEVELS = ["white", "red", "yellow", "blue", "green"];
+const LESSON_INTERESTS = ["private", "semi-private", "adult"];
 
 function newBlock(type: Block["type"]): Block {
   switch (type) {
@@ -328,16 +341,27 @@ function CampaignEditor({
   const [scheduleAt, setScheduleAt] = useState("");
   const [testTo, setTestTo] = useState("");
 
-  const audienceCount = useMemo(() => {
-    const a = c.audience || { tags: [], sources: [], include_all: true };
-    return contacts.filter((x) => {
-      if (!x.subscribed) return false;
-      if (a.include_all && a.tags.length === 0 && a.sources.length === 0) return true;
-      if (a.sources.includes(x.source)) return true;
-      if (a.tags.some((t: string) => (x.tags || []).includes(t))) return true;
-      return false;
-    }).length;
-  }, [c.audience, contacts]);
+  const [audienceCount, setAudienceCount] = useState<number>(0);
+  const [audienceSample, setAudienceSample] = useState<string[]>([]);
+  const [audienceLoading, setAudienceLoading] = useState(false);
+
+  // Server-side audience resolution (debounced)
+  useEffect(() => {
+    let cancelled = false;
+    setAudienceLoading(true);
+    const t = setTimeout(async () => {
+      const { data, error } = await supabase.functions.invoke("preview-marketing-campaign", {
+        body: { audience: c.audience },
+      });
+      if (cancelled) return;
+      if (!error && data) {
+        setAudienceCount(data.count ?? 0);
+        setAudienceSample(data.sample ?? []);
+      }
+      setAudienceLoading(false);
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [c.audience]);
 
   useEffect(() => {
     let cancelled = false;
@@ -402,14 +426,6 @@ function CampaignEditor({
     setC({ ...c, body_blocks: next });
   };
 
-  const toggleTag = (tag: string) => {
-    const tags = c.audience.tags.includes(tag) ? c.audience.tags.filter((t) => t !== tag) : [...c.audience.tags, tag];
-    setC({ ...c, audience: { ...c.audience, tags, include_all: tags.length === 0 && c.audience.sources.length === 0 } });
-  };
-  const toggleSource = (s: string) => {
-    const sources = c.audience.sources.includes(s) ? c.audience.sources.filter((x) => x !== s) : [...c.audience.sources, s];
-    setC({ ...c, audience: { ...c.audience, sources, include_all: sources.length === 0 && c.audience.tags.length === 0 } });
-  };
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -438,32 +454,14 @@ function CampaignEditor({
               </div>
             </div>
 
-            <div>
-              <Label>Audience ({audienceCount} subscribed contacts)</Label>
-              <div className="border rounded-md p-3 mt-1 space-y-2 text-sm">
-                <div>
-                  <div className="text-xs font-semibold text-muted-foreground mb-1">Sources</div>
-                  <div className="flex flex-wrap gap-1">
-                    {SOURCE_OPTIONS.map((s) => (
-                      <button key={s} type="button"
-                        onClick={() => toggleSource(s)}
-                        className={`px-2 py-1 rounded-full text-xs border ${c.audience.sources.includes(s) ? "bg-primary text-primary-foreground" : "bg-background"}`}>{s}</button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-muted-foreground mb-1">Tags</div>
-                  <div className="flex flex-wrap gap-1">
-                    {COMMON_TAGS.map((t) => (
-                      <button key={t} type="button"
-                        onClick={() => toggleTag(t)}
-                        className={`px-2 py-1 rounded-full text-xs border ${c.audience.tags.includes(t) ? "bg-primary text-primary-foreground" : "bg-background"}`}>{t}</button>
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">No filters = everyone subscribed.</p>
-              </div>
-            </div>
+            <AudienceBuilder
+              audience={c.audience}
+              onChange={(a) => setC({ ...c, audience: a })}
+              count={audienceCount}
+              sample={audienceSample}
+              loading={audienceLoading}
+            />
+
 
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -554,6 +552,198 @@ function BlockEditor({ block, onChange, onRemove, onMoveUp, onMoveDown }:
           </SelectContent>
         </Select>
       )}
+    </div>
+  );
+}
+
+// ----------------------- Audience builder -----------------------
+function AudienceBuilder({
+  audience, onChange, count, sample, loading,
+}: {
+  audience: Audience;
+  onChange: (a: Audience) => void;
+  count: number;
+  sample: string[];
+  loading: boolean;
+}) {
+  const [periods, setPeriods] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessionSearch, setSessionSearch] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const [p, s] = await Promise.all([
+        supabase.from("session_periods").select("id, name, start_date, end_date, is_active").order("start_date", { ascending: false }),
+        supabase.from("swim_sessions")
+          .select("id, swim_level, day_of_week, start_time, end_time, session_name, session_period_id, instructors(name)")
+          .eq("is_active", true)
+          .order("day_of_week"),
+      ]);
+      setPeriods(p.data || []);
+      setSessions(s.data || []);
+    })();
+  }, []);
+
+  const a: Audience = {
+    tags: audience.tags || [],
+    sources: audience.sources || [],
+    include_all: audience.include_all ?? true,
+    session_period_ids: audience.session_period_ids || [],
+    swim_session_ids: audience.swim_session_ids || [],
+    swim_levels: audience.swim_levels || [],
+    lesson_interests: audience.lesson_interests || [],
+    lesson_interest_age: audience.lesson_interest_age || "all",
+  };
+
+  const update = (patch: Partial<Audience>) => {
+    const next = { ...a, ...patch };
+    const anyFilter =
+      (next.tags?.length || 0) > 0 ||
+      (next.sources?.length || 0) > 0 ||
+      (next.session_period_ids?.length || 0) > 0 ||
+      (next.swim_session_ids?.length || 0) > 0 ||
+      (next.swim_levels?.length || 0) > 0 ||
+      (next.lesson_interests?.length || 0) > 0;
+    next.include_all = !anyFilter;
+    onChange(next);
+  };
+
+  const toggle = (key: keyof Audience, value: string) => {
+    const arr = (a[key] as string[]) || [];
+    update({ [key]: arr.includes(value) ? arr.filter((x) => x !== value) : [...arr, value] } as any);
+  };
+
+  const periodById = new Map(periods.map((p) => [p.id, p]));
+  const filteredSessions = sessions.filter((s) => {
+    if (!sessionSearch) return true;
+    const q = sessionSearch.toLowerCase();
+    return (
+      (s.session_name || "").toLowerCase().includes(q) ||
+      (s.swim_level || "").toLowerCase().includes(q) ||
+      (s.day_of_week || "").toLowerCase().includes(q) ||
+      (s.instructors?.name || "").toLowerCase().includes(q)
+    );
+  });
+
+  const chipCls = (active: boolean) =>
+    `px-2 py-1 rounded-full text-xs border transition ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`;
+
+  return (
+    <div>
+      <Label>
+        Audience — {loading ? "…" : `${count} recipient${count === 1 ? "" : "s"}`}
+      </Label>
+      <div className="border rounded-md p-3 mt-1 space-y-3 text-sm">
+        {/* Session periods */}
+        <div>
+          <div className="text-xs font-semibold text-muted-foreground mb-1">Session period</div>
+          <div className="flex flex-wrap gap-1">
+            {periods.map((p) => (
+              <button key={p.id} type="button" onClick={() => toggle("session_period_ids", p.id)}
+                className={chipCls(a.session_period_ids!.includes(p.id))}>
+                {p.name}
+              </button>
+            ))}
+            {periods.length === 0 && <span className="text-xs text-muted-foreground">No session periods.</span>}
+          </div>
+        </div>
+
+        {/* Classes */}
+        <div>
+          <div className="text-xs font-semibold text-muted-foreground mb-1">Specific class(es)</div>
+          <Input
+            placeholder="Search by level, day, name, instructor…"
+            value={sessionSearch}
+            onChange={(e) => setSessionSearch(e.target.value)}
+            className="mb-2 h-8 text-xs"
+          />
+          <div className="max-h-40 overflow-y-auto border rounded p-2 space-y-1">
+            {filteredSessions.map((s) => {
+              const active = a.swim_session_ids!.includes(s.id);
+              const label = `${(s.swim_level || "").toUpperCase()} · ${s.day_of_week} ${String(s.start_time).slice(0, 5)} · ${s.instructors?.name || "—"}${s.session_name ? ` · ${s.session_name}` : ""}${periodById.get(s.session_period_id) ? ` · ${periodById.get(s.session_period_id).name}` : ""}`;
+              return (
+                <label key={s.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted rounded px-1 py-0.5">
+                  <Checkbox checked={active} onCheckedChange={() => toggle("swim_session_ids", s.id)} />
+                  <span>{label}</span>
+                </label>
+              );
+            })}
+            {filteredSessions.length === 0 && <span className="text-xs text-muted-foreground">No classes match.</span>}
+          </div>
+        </div>
+
+        {/* Swim level */}
+        <div>
+          <div className="text-xs font-semibold text-muted-foreground mb-1">Swim level (currently enrolled)</div>
+          <div className="flex flex-wrap gap-1">
+            {SWIM_LEVELS.map((lv) => (
+              <button key={lv} type="button" onClick={() => toggle("swim_levels", lv)}
+                className={chipCls(a.swim_levels!.includes(lv))}>
+                {lv}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Lesson interests */}
+        <div>
+          <div className="text-xs font-semibold text-muted-foreground mb-1">Lesson inquiry interest</div>
+          <div className="flex flex-wrap gap-1 mb-2">
+            {LESSON_INTERESTS.map((t) => (
+              <button key={t} type="button" onClick={() => toggle("lesson_interests", t)}
+                className={chipCls(a.lesson_interests!.includes(t))}>
+                {t}
+              </button>
+            ))}
+          </div>
+          {a.lesson_interests!.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Age:</span>
+              {(["all", "u14", "14plus"] as const).map((age) => (
+                <button key={age} type="button" onClick={() => update({ lesson_interest_age: age })}
+                  className={chipCls(a.lesson_interest_age === age)}>
+                  {age === "all" ? "All ages" : age === "u14" ? "Under 14" : "14 and up"}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Existing tag/source filters */}
+        <details className="text-xs">
+          <summary className="cursor-pointer text-muted-foreground font-semibold">Advanced: tag &amp; source filters</summary>
+          <div className="pt-2 space-y-2">
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1">Sources</div>
+              <div className="flex flex-wrap gap-1">
+                {SOURCE_OPTIONS.map((s) => (
+                  <button key={s} type="button" onClick={() => toggle("sources", s)}
+                    className={chipCls(a.sources.includes(s))}>{s}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1">Tags</div>
+              <div className="flex flex-wrap gap-1">
+                {COMMON_TAGS.map((t) => (
+                  <button key={t} type="button" onClick={() => toggle("tags", t)}
+                    className={chipCls(a.tags.includes(t))}>{t}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <p className="text-xs text-muted-foreground">
+          {a.include_all ? "No filters → everyone subscribed." : "Filters are combined (OR) and de-duplicated."}
+        </p>
+
+        {sample.length > 0 && (
+          <div className="text-xs text-muted-foreground border-t pt-2">
+            <span className="font-semibold">Sample:</span> {sample.slice(0, 5).join(", ")}{count > 5 ? `, +${count - 5} more` : ""}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
