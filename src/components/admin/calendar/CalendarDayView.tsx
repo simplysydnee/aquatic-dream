@@ -271,6 +271,46 @@ const CalendarDayView = ({
     return [...seen.values()];
   }, [todaySessions]);
 
+  // ── Lane assignment per AD column for overlapping sessions ──
+  // Map: session.id -> { lane, laneCount }
+  const sessionLanes = useMemo(() => {
+    const result = new Map<string, { lane: number; laneCount: number }>();
+    // Group by column key (session_name || swim_level)
+    const byCol = new Map<string, typeof todaySessions>();
+    for (const s of todaySessions) {
+      const key = s.session_name || s.swim_level;
+      if (!byCol.has(key)) byCol.set(key, [] as any);
+      byCol.get(key)!.push(s);
+    }
+    for (const [, list] of byCol) {
+      const sorted = [...list].sort(
+        (a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
+      );
+      // sweep-line lane assignment, grouped into overlap clusters
+      let cluster: { id: string; start: number; end: number; lane: number }[] = [];
+      let clusterEnd = -1;
+      const flush = () => {
+        const count = cluster.reduce((m, c) => Math.max(m, c.lane + 1), 0);
+        for (const c of cluster) result.set(c.id, { lane: c.lane, laneCount: count });
+        cluster = [];
+        clusterEnd = -1;
+      };
+      for (const s of sorted) {
+        const start = timeToMinutes(s.start_time);
+        const end = timeToMinutes(s.end_time);
+        if (cluster.length && start >= clusterEnd) flush();
+        // find first free lane
+        const usedLanes = new Set(cluster.filter((c) => c.end > start).map((c) => c.lane));
+        let lane = 0;
+        while (usedLanes.has(lane)) lane++;
+        cluster.push({ id: s.id, start, end, lane });
+        clusterEnd = Math.max(clusterEnd, end);
+      }
+      if (cluster.length) flush();
+    }
+    return result;
+  }, [todaySessions]);
+
   // ── Build columns ──
   const columns = useMemo<ColumnDef[]>(() => {
     const cols: ColumnDef[] = [];
