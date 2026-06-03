@@ -119,7 +119,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     const [sessionsRes, enrollmentsRes, eventsRes, attendanceRes, agreementsRes, lessonDatesRes] = await Promise.all([
       supabase
         .from("swim_sessions")
-        .select("id, swim_level, age_group, start_time, end_time, max_students, session_name, day_of_week, instructor_id, instructors(name)")
+        .select("id, swim_level, age_group, start_time, end_time, max_students, session_name, day_of_week, instructor_id, registration_status, instructors(name)")
         .eq("is_active", true),
       supabase
         .from("swim_enrollments")
