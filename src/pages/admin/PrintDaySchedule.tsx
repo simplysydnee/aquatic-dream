@@ -51,7 +51,11 @@ function fmtTime(t: string) {
   const hour = parseInt(h);
   const ampm = hour >= 12 ? "PM" : "AM";
   const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-  return `${display}:${m} ${ampm}`;
+  return `${display}:${m}${ampm}`;
+}
+
+function firstName(full: string) {
+  return (full || "").trim().split(/\s+/)[0] || full;
 }
 
 export default function PrintDaySchedule() {
@@ -66,7 +70,7 @@ export default function PrintDaySchedule() {
   const [loading, setLoading] = useState(true);
 
   const dayName = format(new Date(date + "T12:00:00"), "EEEE");
-  const dateLabel = format(new Date(date + "T12:00:00"), "EEEE, MMMM d, yyyy");
+  const dateLabel = format(new Date(date + "T12:00:00"), "EEE · MMM d, yyyy");
 
   useEffect(() => {
     (async () => {
@@ -115,7 +119,13 @@ export default function PrintDaySchedule() {
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [sessions, activeIds, dayName, instructorId]);
 
-  // group by instructor when "all"
+  const agreementByEnrollment = useMemo(() => {
+    const m = new Map<string, Agreement>();
+    for (const a of agreements) if (a.enrollment_id) m.set(a.enrollment_id, a);
+    return m;
+  }, [agreements]);
+
+  // Group by instructor; hide instructors with zero enrolled swimmers across the day
   const grouped = useMemo(() => {
     const m = new Map<string, { name: string; sessions: Session[] }>();
     for (const s of todaySessions) {
@@ -124,21 +134,24 @@ export default function PrintDaySchedule() {
       if (!m.has(key)) m.set(key, { name, sessions: [] });
       m.get(key)!.sessions.push(s);
     }
-    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [todaySessions]);
-
-  const agreementByEnrollment = useMemo(() => {
-    const m = new Map<string, Agreement>();
-    for (const a of agreements) if (a.enrollment_id) m.set(a.enrollment_id, a);
-    return m;
-  }, [agreements]);
+    return [...m.values()]
+      .map((g) => {
+        const totalSwimmers = g.sessions.reduce(
+          (sum, s) => sum + enrollments.filter((e) => e.session_id === s.id).length,
+          0
+        );
+        return { ...g, totalSwimmers };
+      })
+      .filter((g) => g.totalSwimmers > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [todaySessions, enrollments]);
 
   useEffect(() => {
-    if (!loading && todaySessions.length > 0) {
+    if (!loading && grouped.length > 0) {
       const t = setTimeout(() => window.print(), 600);
       return () => clearTimeout(t);
     }
-  }, [loading, todaySessions.length]);
+  }, [loading, grouped.length]);
 
   if (loading) {
     return <div style={{ padding: 40, fontFamily: "system-ui" }}>Loading schedule…</div>;
@@ -147,151 +160,185 @@ export default function PrintDaySchedule() {
   return (
     <div className="print-root">
       <style>{`
-        @page { size: letter portrait; margin: 0.5in; }
+        @page { size: letter portrait; margin: 0.35in; }
         body { background: white !important; }
         .print-root {
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           color: #1a1a1a;
-          max-width: 7.5in;
-          margin: 0 auto;
-          padding: 24px;
           background: white;
+          font-size: 9pt;
+          line-height: 1.25;
         }
-        .header {
-          border-bottom: 3px solid #2a5e84;
-          padding-bottom: 12px;
-          margin-bottom: 20px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
+        .tip {
+          background: #fff8e1; border: 1px solid #f0d27a; color: #6b5800;
+          padding: 10px 14px; border-radius: 6px; font-size: 12px;
+          margin: 0 auto 14px; max-width: 7.5in;
         }
-        .header h1 {
-          font-size: 22px; font-weight: 700; color: #1a3a8a; margin: 0;
-          letter-spacing: -0.01em;
+        .instructor-page {
+          page-break-before: always;
+          padding: 0;
         }
-        .header .sub { font-size: 13px; color: #555; margin-top: 2px; }
-        .header .logo { font-size: 11px; color: #2a5e84; font-weight: 600; text-align: right; }
-        .instructor-group { margin-bottom: 28px; page-break-inside: avoid; }
-        .instructor-group h2 {
-          font-size: 16px; font-weight: 700; color: #1a3a8a;
-          margin: 0 0 10px; padding: 6px 10px;
-          background: #eef3fa; border-radius: 4px;
+        .instructor-page:first-of-type { page-break-before: auto; }
+        .ipage-head {
+          display: flex; justify-content: space-between; align-items: flex-end;
+          border-bottom: 2.5px solid #1a3a8a; padding-bottom: 6px; margin-bottom: 8px;
         }
-        .class-card {
-          margin-bottom: 14px;
-          border: 1px solid #d1d5db;
-          border-left: 5px solid #999;
-          border-radius: 6px;
-          overflow: hidden;
-          page-break-inside: avoid;
+        .ipage-head .iname {
+          font-size: 20pt; font-weight: 800; color: #1a3a8a;
+          letter-spacing: -0.01em; line-height: 1; text-transform: uppercase;
         }
-        .class-head {
-          padding: 8px 12px;
-          background: #fafafa;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-bottom: 1px solid #e5e7eb;
+        .ipage-head .isub { font-size: 9pt; color: #555; margin-top: 4px; }
+        .ipage-head .idate {
+          text-align: right; font-size: 11pt; font-weight: 700; color: #2a5e84;
         }
-        .class-title { font-weight: 700; font-size: 14px; color: #1a1a1a; }
-        .class-meta { font-size: 11px; color: #555; margin-top: 2px; }
-        .class-cap {
-          font-size: 11px; font-weight: 700;
-          background: #1a3a8a; color: white;
-          padding: 3px 8px; border-radius: 999px;
+        .ipage-head .ibrand { font-size: 8pt; color: #888; margin-top: 2px; }
+        table.sched { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        table.sched th {
+          font-size: 7.5pt; font-weight: 700; color: #fff; background: #1a3a8a;
+          text-transform: uppercase; letter-spacing: 0.04em;
+          padding: 4px 6px; text-align: left; border: 1px solid #1a3a8a;
         }
-        .class-cap.full { background: #c53030; }
-        table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        th, td {
-          padding: 6px 8px; text-align: left; vertical-align: top;
-          border-bottom: 1px solid #f0f0f0;
+        table.sched td {
+          padding: 3px 6px; border: 1px solid #d8dee6;
+          vertical-align: top; font-size: 9pt;
         }
-        th { font-size: 10px; font-weight: 700; color: #555; text-transform: uppercase; background: #fafafa; }
-        td.swimmer { font-weight: 600; color: #1a1a1a; }
-        td.medical { color: #c53030; font-style: italic; }
-        .empty { padding: 14px; text-align: center; color: #888; font-size: 12px; font-style: italic; }
-        .footer {
-          margin-top: 30px; padding-top: 10px; border-top: 1px solid #e5e7eb;
-          font-size: 10px; color: #888; text-align: center;
+        table.sched col.c-time   { width: 11%; }
+        table.sched col.c-class  { width: 18%; }
+        table.sched col.c-swim   { width: 19%; }
+        table.sched col.c-parent { width: 17%; }
+        table.sched col.c-emerg  { width: 19%; }
+        table.sched col.c-notes  { width: 16%; }
+        td.time-cell {
+          font-weight: 700; font-size: 9pt; color: #1a1a1a;
+          border-left-width: 5px !important; border-left-style: solid !important;
+        }
+        td.time-cell .cap {
+          display: inline-block; font-size: 7.5pt; font-weight: 700;
+          background: #1a3a8a; color: #fff; padding: 1px 5px; border-radius: 8px;
+          margin-top: 2px;
+        }
+        td.time-cell .cap.full { background: #c53030; }
+        td.class-cell .lvl { font-weight: 700; }
+        td.class-cell .ag { font-size: 7.5pt; color: #666; }
+        td.swimmer-cell { font-weight: 700; }
+        td.swimmer-cell .age { font-weight: 400; color: #666; }
+        td.medical { color: #c53030; font-weight: 600; }
+        .class-group-first td { border-top: 2px solid #b0b8c4 !important; }
+        .ifoot {
+          margin-top: 8px; padding-top: 4px; border-top: 1px solid #e5e7eb;
+          font-size: 7.5pt; color: #888; display: flex; justify-content: space-between;
         }
         @media print {
           .no-print { display: none !important; }
-          .class-card { break-inside: avoid; }
-          .instructor-group { break-inside: avoid; }
+          .instructor-page { break-before: page; }
+          .instructor-page:first-of-type { break-before: auto; }
+          table.sched thead { display: table-header-group; }
+          tr { page-break-inside: avoid; }
         }
       `}</style>
 
-      <div className="header">
-        <div>
-          <h1>Daily Class Schedule</h1>
-          <div className="sub">{dateLabel}</div>
-        </div>
-        <div className="logo">
-          Aquatic Dreams<br />
-          <span style={{ color: "#888", fontWeight: 400 }}>aquaticdreamsswim.com</span>
-        </div>
+      <div className="no-print tip">
+        <strong>Tip:</strong> In the print dialog, open <em>More settings</em> and turn off
+        <em> Headers and footers</em> so the URL/date strip doesn't print. Each instructor prints on its own page.
       </div>
 
-      {todaySessions.length === 0 ? (
-        <div className="empty">No classes scheduled for this day.</div>
+      {grouped.length === 0 ? (
+        <div style={{ padding: 40, textAlign: "center", color: "#888" }}>
+          No classes with enrolled swimmers for {dateLabel}.
+        </div>
       ) : (
-        grouped.map((g) => (
-          <div key={g.name} className="instructor-group">
-            <h2>👤 {g.name}</h2>
-            {g.sessions.map((s) => {
-              const sEnr = enrollments.filter((e) => e.session_id === s.id);
-              const level = LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level;
-              const stripe = LEVEL_STRIPE[s.swim_level] || "#999";
-              const isFull = sEnr.length >= s.max_students;
-              return (
-                <div key={s.id} className="class-card" style={{ borderLeftColor: stripe }}>
-                  <div className="class-head">
-                    <div>
-                      <div className="class-title">
-                        {level}
-                        {s.session_name ? ` · ${s.session_name}` : ""}
-                        <span style={{ fontWeight: 400, color: "#555" }}>
-                          {" "}· {fmtTime(s.start_time)} – {fmtTime(s.end_time)}
-                        </span>
-                      </div>
-                      <div className="class-meta">
-                        {s.age_group === "preschool-3-5"
-                          ? "Preschool 3–5"
-                          : s.age_group === "school-age-6-12"
-                          ? "School-Age 6–12"
-                          : s.age_group || ""}
-                      </div>
-                    </div>
-                    <div className={`class-cap ${isFull ? "full" : ""}`}>
-                      {sEnr.length}/{s.max_students}
-                    </div>
+        grouped.map((g) => {
+          const classCount = g.sessions.length;
+          return (
+            <section key={g.name} className="instructor-page">
+              <div className="ipage-head">
+                <div>
+                  <div className="iname">{g.name}</div>
+                  <div className="isub">
+                    {classCount} class{classCount === 1 ? "" : "es"} · {g.totalSwimmers} swimmer
+                    {g.totalSwimmers === 1 ? "" : "s"}
                   </div>
-                  {sEnr.length === 0 ? (
-                    <div className="empty">No swimmers enrolled.</div>
-                  ) : (
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Swimmer</th>
-                          <th>Age</th>
-                          <th>Parent</th>
-                          <th>Parent Phone</th>
-                          <th>Emergency Contact</th>
-                          <th>Notes</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sEnr.map((e) => {
-                          const ag = agreementByEnrollment.get(e.id);
-                          return (
-                            <tr key={e.id}>
-                              <td className="swimmer">{e.child_name}</td>
-                              <td>{e.child_age}</td>
-                              <td>
-                                {e.parent_name}
-                                <div style={{ color: "#666", fontSize: 10 }}>{e.parent_email}</div>
+                </div>
+                <div>
+                  <div className="idate">{dateLabel}</div>
+                  <div className="ibrand">Aquatic Dreams Swim · aquaticdreamsswim.com</div>
+                </div>
+              </div>
+
+              <table className="sched">
+                <colgroup>
+                  <col className="c-time" />
+                  <col className="c-class" />
+                  <col className="c-swim" />
+                  <col className="c-parent" />
+                  <col className="c-emerg" />
+                  <col className="c-notes" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Class</th>
+                    <th>Swimmer</th>
+                    <th>Parent</th>
+                    <th>Emergency</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {g.sessions.flatMap((s) => {
+                    const sEnr = enrollments.filter((e) => e.session_id === s.id);
+                    const level = LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level;
+                    const stripe = LEVEL_STRIPE[s.swim_level] || "#999";
+                    const isFull = sEnr.length >= s.max_students;
+                    const ageLabel =
+                      s.age_group === "preschool-3-5"
+                        ? "Preschool 3–5"
+                        : s.age_group === "school-age-6-12"
+                        ? "School-Age 6–12"
+                        : s.age_group || "";
+                    const rowCount = Math.max(sEnr.length, 1);
+
+                    const rows: JSX.Element[] = [];
+                    for (let i = 0; i < rowCount; i++) {
+                      const e = sEnr[i];
+                      const ag = e ? agreementByEnrollment.get(e.id) : undefined;
+                      rows.push(
+                        <tr key={`${s.id}-${i}`} className={i === 0 ? "class-group-first" : ""}>
+                          {i === 0 && (
+                            <>
+                              <td
+                                className="time-cell"
+                                rowSpan={rowCount}
+                                style={{ borderLeftColor: stripe }}
+                              >
+                                {fmtTime(s.start_time)}<br />
+                                <span style={{ fontWeight: 400, color: "#666" }}>
+                                  {fmtTime(s.end_time)}
+                                </span>
+                                <div>
+                                  <span className={`cap ${isFull ? "full" : ""}`}>
+                                    {sEnr.length}/{s.max_students}
+                                  </span>
+                                </div>
                               </td>
-                              <td>{e.parent_phone || "—"}</td>
+                              <td className="class-cell" rowSpan={rowCount}>
+                                <div className="lvl">{level}</div>
+                                {s.session_name && (
+                                  <div style={{ fontSize: "7.5pt", color: "#555" }}>{s.session_name}</div>
+                                )}
+                                <div className="ag">{ageLabel}</div>
+                              </td>
+                            </>
+                          )}
+                          {e ? (
+                            <>
+                              <td className="swimmer-cell">
+                                {e.child_name} <span className="age">({e.child_age})</span>
+                              </td>
+                              <td>
+                                {firstName(e.parent_name)}
+                                <div style={{ color: "#555" }}>{e.parent_phone || "—"}</div>
+                              </td>
                               <td>
                                 {ag ? (
                                   <>
@@ -299,9 +346,7 @@ export default function PrintDaySchedule() {
                                     {ag.emergency_contact_relationship
                                       ? ` (${ag.emergency_contact_relationship})`
                                       : ""}
-                                    <div style={{ color: "#666", fontSize: 10 }}>
-                                      {ag.emergency_contact_phone}
-                                    </div>
+                                    <div style={{ color: "#555" }}>{ag.emergency_contact_phone}</div>
                                   </>
                                 ) : (
                                   <span style={{ color: "#aaa" }}>Not on file</span>
@@ -310,22 +355,28 @@ export default function PrintDaySchedule() {
                               <td className={e.medical_notes ? "medical" : ""}>
                                 {e.medical_notes || "—"}
                               </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))
-      )}
+                            </>
+                          ) : (
+                            <td colSpan={4} style={{ color: "#aaa", fontStyle: "italic" }}>
+                              No swimmers enrolled
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    }
+                    return rows;
+                  })}
+                </tbody>
+              </table>
 
-      <div className="footer">
-        Printed {format(new Date(), "MMM d, yyyy h:mm a")} · Aquatic Dreams Swim School
-      </div>
+              <div className="ifoot">
+                <span>Printed {format(new Date(), "MMM d, yyyy h:mm a")}</span>
+                <span>Aquatic Dreams Swim School</span>
+              </div>
+            </section>
+          );
+        })
+      )}
 
       <div className="no-print" style={{ marginTop: 20, textAlign: "center" }}>
         <button
