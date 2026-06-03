@@ -316,6 +316,13 @@ async function handleCheckoutCompleted(session: any) {
   for (const e of insertedEnrollments) {
     await sendEnrollmentConfirmation(e.id);
   }
+
+  // 9. Sync parent contact into the matching Resend audiences (fire-and-forget)
+  for (const e of insertedEnrollments) {
+    supabase.functions.invoke("resend-sync-enrollment-contact", {
+      body: { enrollmentId: e.id },
+    }).catch((err) => console.error("resend-sync-enrollment-contact failed:", err));
+  }
 }
 
 async function handleRegistrationFeePaid(checkoutSession: any) {

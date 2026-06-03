@@ -133,6 +133,7 @@ export default function MarketingAdmin() {
         <TabsList>
           <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
           <TabsTrigger value="contacts">Contacts ({contacts.length})</TabsTrigger>
+          <TabsTrigger value="audiences">Resend Audiences</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -177,6 +178,10 @@ export default function MarketingAdmin() {
 
         <TabsContent value="contacts" className="mt-4">
           <ContactsTab contacts={contacts} onChange={loadAll} />
+        </TabsContent>
+
+        <TabsContent value="audiences" className="mt-4">
+          <ResendAudiencesTab />
         </TabsContent>
 
         <TabsContent value="settings" className="mt-4">
@@ -744,6 +749,132 @@ function AudienceBuilder({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ResendAudiencesTab() {
+  const [syncing, setSyncing] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [periods, setPeriods] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [levels, setLevels] = useState<any[]>([]);
+
+  async function load() {
+    const [p, s, l] = await Promise.all([
+      supabase.from("session_periods").select("id, name, is_active, resend_audience_id").order("start_date", { ascending: false }),
+      supabase.from("swim_sessions").select("id, session_name, swim_level, day_of_week, start_time, is_active, resend_audience_id").eq("is_active", true).order("swim_level"),
+      supabase.from("resend_level_audiences").select("level, resend_audience_id"),
+    ]);
+    setPeriods(p.data || []);
+    setSessions(s.data || []);
+    setLevels(l.data || []);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function sync() {
+    setSyncing(true);
+    setResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("resend-sync-audiences", { body: {} });
+      if (error) throw error;
+      setResult(data);
+      toast.success("Resend audiences synced");
+      load();
+    } catch (e: any) {
+      toast.error(e.message || "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  const periodsMissing = periods.filter((p) => p.is_active && !p.resend_audience_id).length;
+  const sessionsMissing = sessions.filter((s) => !s.resend_audience_id).length;
+  const levelsHave = new Set(levels.map((l) => l.level));
+  const levelsMissing = ["white", "red", "yellow", "blue", "green"].filter((l) => !levelsHave.has(l)).length;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Resend Audiences</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Each active session period, class, and swim level is mirrored to a Resend Audience.
+            New enrollments are auto-added to the matching audiences. Use this if you want to send
+            email blasts directly from the Resend dashboard in addition to the in-app campaign builder.
+          </p>
+          <div className="flex flex-wrap gap-2 text-sm">
+            <Badge variant={periodsMissing ? "outline" : "default"}>Periods: {periods.filter(p => p.is_active).length - periodsMissing}/{periods.filter(p => p.is_active).length} synced</Badge>
+            <Badge variant={sessionsMissing ? "outline" : "default"}>Classes: {sessions.length - sessionsMissing}/{sessions.length} synced</Badge>
+            <Badge variant={levelsMissing ? "outline" : "default"}>Levels: {5 - levelsMissing}/5 synced</Badge>
+          </div>
+          <Button onClick={sync} disabled={syncing}>
+            {syncing ? "Syncing…" : "Sync now (create missing + backfill enrollments)"}
+          </Button>
+          {result && (
+            <div className="text-sm bg-muted p-3 rounded space-y-1">
+              <div>Periods created: <span className="font-semibold">{result.periods_created}</span></div>
+              <div>Classes created: <span className="font-semibold">{result.sessions_created}</span></div>
+              <div>Levels created: <span className="font-semibold">{result.levels_created}</span></div>
+              <div>Contacts added/updated: <span className="font-semibold">{result.contacts_added}</span></div>
+              {result.contact_errors > 0 && (
+                <div className="text-destructive">Contact errors: {result.contact_errors}</div>
+              )}
+              {result.errors?.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer">Errors ({result.errors.length})</summary>
+                  <pre className="text-xs mt-2 whitespace-pre-wrap">{result.errors.join("\n")}</pre>
+                </details>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Synced groups</CardTitle></CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <div className="text-sm font-semibold mb-2">Session Periods</div>
+            <div className="space-y-1">
+              {periods.filter(p => p.is_active).map((p) => (
+                <div key={p.id} className="flex items-center justify-between text-sm border-b py-1">
+                  <span>{p.name}</span>
+                  <code className="text-xs text-muted-foreground">{p.resend_audience_id || "— not synced —"}</code>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-semibold mb-2">Swim Levels</div>
+            <div className="space-y-1">
+              {["white", "red", "yellow", "blue", "green"].map((lvl) => {
+                const row = levels.find((l) => l.level === lvl);
+                return (
+                  <div key={lvl} className="flex items-center justify-between text-sm border-b py-1">
+                    <span className="capitalize">{lvl}</span>
+                    <code className="text-xs text-muted-foreground">{row?.resend_audience_id || "— not synced —"}</code>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-semibold mb-2">Classes</div>
+            <div className="space-y-1 max-h-96 overflow-auto">
+              {sessions.map((s) => (
+                <div key={s.id} className="flex items-center justify-between text-sm border-b py-1">
+                  <span>{s.session_name || `${s.swim_level} • ${s.day_of_week} ${String(s.start_time).slice(0,5)}`}</span>
+                  <code className="text-xs text-muted-foreground">{s.resend_audience_id || "— not synced —"}</code>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

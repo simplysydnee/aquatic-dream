@@ -1341,6 +1341,27 @@ export type Database = {
         }
         Relationships: []
       }
+      resend_level_audiences: {
+        Row: {
+          created_at: string
+          level: string
+          resend_audience_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          level: string
+          resend_audience_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          level?: string
+          resend_audience_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       schedule_publications: {
         Row: {
           id: string
@@ -1413,6 +1434,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          resend_audience_id: string | null
           start_date: string
           updated_at: string
         }
@@ -1422,6 +1444,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          resend_audience_id?: string | null
           start_date: string
           updated_at?: string
         }
@@ -1431,6 +1454,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          resend_audience_id?: string | null
           start_date?: string
           updated_at?: string
         }
@@ -1786,6 +1810,7 @@ export type Database = {
           max_students: number
           price_per_lesson: number | null
           registration_status: string
+          resend_audience_id: string | null
           session_end_date: string | null
           session_name: string | null
           session_period_id: string | null
@@ -1807,6 +1832,7 @@ export type Database = {
           max_students?: number
           price_per_lesson?: number | null
           registration_status?: string
+          resend_audience_id?: string | null
           session_end_date?: string | null
           session_name?: string | null
           session_period_id?: string | null
@@ -1828,6 +1854,7 @@ export type Database = {
           max_students?: number
           price_per_lesson?: number | null
           registration_status?: string
+          resend_audience_id?: string | null
           session_end_date?: string | null
           session_name?: string | null
           session_period_id?: string | null
