@@ -157,7 +157,7 @@ export async function fetchOpenSlots(opts: {
 }
 
 export async function holdSlots(slots: Slot[], sessionToken: string): Promise<void> {
-  await supabase.from("slot_holds").delete().eq("session_token", sessionToken);
+  await supabase.rpc("release_slot_holds", { p_session_token: sessionToken });
   if (!slots.length) return;
   await supabase.from("slot_holds").insert(slots.map((s) => ({
     session_token: sessionToken,
@@ -169,5 +169,6 @@ export async function holdSlots(slots: Slot[], sessionToken: string): Promise<vo
 }
 
 export async function releaseHolds(sessionToken: string): Promise<void> {
-  await supabase.from("slot_holds").delete().eq("session_token", sessionToken);
+  await supabase.rpc("release_slot_holds", { p_session_token: sessionToken });
 }
+
