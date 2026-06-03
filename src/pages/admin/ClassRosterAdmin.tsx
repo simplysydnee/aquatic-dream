@@ -162,13 +162,15 @@ const ClassRosterAdmin = () => {
     return true;
   });
 
-  // Group by session_name + start_time + age_group + session_period_id
+  // One card per scheduled class (do not merge duplicate same-name/time/period sessions —
+  // they are split intentionally in Enrollments because they're separate groups).
   const grouped = filteredSessions.reduce<Record<string, Session[]>>((acc, s) => {
-    const key = `${s.session_name}|${s.start_time}|${s.age_group}|${s.session_period_id}`;
+    const key = `${s.session_name}|${s.start_time}|${s.age_group}|${s.session_period_id}|${s.instructor_id ?? "none"}|${s.id}`;
     if (!acc[key]) acc[key] = [];
     acc[key].push(s);
     return acc;
   }, {});
+
 
   const getPeriodName = (periodId: string | null) => {
     if (!periodId) return "Unlinked";

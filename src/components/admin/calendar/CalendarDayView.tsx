@@ -855,6 +855,12 @@ const CalendarDayView = ({
                 const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
                 const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
                 const levelColor = LEVEL_COLORS[s.swim_level] || BLOCK_COLORS["swim"];
+                const isClosed = s.registration_status === "closed";
+                const isFull = sessionEnrollments.length >= s.max_students;
+
+                const blockBg = isClosed ? "#e5e7eb" : levelColor.bg;
+                const blockBorder = isClosed ? "#9ca3af" : levelColor.border;
+                const blockText = isClosed ? "#4b5563" : levelColor.text;
 
                 return (
                   <Tooltip key={s.id} delayDuration={150}>
@@ -865,9 +871,10 @@ const CalendarDayView = ({
                         style={{
                           top: `${top}px`,
                           height: `${height}px`,
-                          backgroundColor: levelColor.bg,
-                          borderLeftColor: levelColor.border,
-                          color: levelColor.text,
+                          backgroundColor: blockBg,
+                          borderLeftColor: blockBorder,
+                          color: blockText,
+                          opacity: isClosed ? 0.85 : 1,
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -881,17 +888,30 @@ const CalendarDayView = ({
                           });
                         }}
                       >
-                        <p className="text-xs font-semibold truncate leading-tight">
-                          {levelInfo?.name || s.swim_level}
-                        </p>
+                        <div className="flex items-start justify-between gap-1">
+                          <p className="text-xs font-semibold truncate leading-tight flex-1 min-w-0">
+                            {levelInfo?.name || s.swim_level}
+                          </p>
+                          {isClosed ? (
+                            <span className="shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-gray-500/80 text-white tracking-wide">
+                              Closed
+                            </span>
+                          ) : isFull ? (
+                            <span className="shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-600 text-white tracking-wide">
+                              Full {sessionEnrollments.length}/{s.max_students}
+                            </span>
+                          ) : (
+                            <span
+                              className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded leading-none"
+                              style={{ backgroundColor: blockBorder, color: blockBg }}
+                            >
+                              {sessionEnrollments.length}/{s.max_students}
+                            </span>
+                          )}
+                        </div>
                         {height > 28 && s.session_name && (
                           <p className="text-[10px] opacity-70 truncate leading-tight">
                             {s.session_name}
-                          </p>
-                        )}
-                        {height > 40 && (
-                          <p className="text-[10px] truncate leading-tight mt-0.5 opacity-60">
-                            {sessionEnrollments.length}/{s.max_students} swimmers
                           </p>
                         )}
                         {height > 56 && sessionEnrollments.length > 0 && (
@@ -913,7 +933,10 @@ const CalendarDayView = ({
                     </TooltipTrigger>
                     <TooltipContent side="right" className="max-w-xs">
                       <div className="space-y-1 text-xs">
-                        <p className="font-semibold">{levelInfo?.name || s.swim_level}{s.session_name ? ` · ${s.session_name}` : ""}</p>
+                        <p className="font-semibold">
+                          {levelInfo?.name || s.swim_level}{s.session_name ? ` · ${s.session_name}` : ""}
+                          {isClosed && <span className="ml-1 text-muted-foreground">(Closed)</span>}
+                        </p>
                         <p>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</p>
                         {s.instructors?.name && <p>Instructor: {s.instructors.name}</p>}
                         <p>{sessionEnrollments.length}/{s.max_students} swimmers</p>
@@ -930,6 +953,7 @@ const CalendarDayView = ({
                   </Tooltip>
                 );
               })}
+
 
             {/* ── AD pool events (private, semi-private) — only in first AD column ── */}
             {col.group === "ad" && col.id === columns.find(c => c.group === "ad")?.id &&

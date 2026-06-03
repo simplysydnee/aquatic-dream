@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { format, addDays, startOfWeek, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft, Printer } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
 import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
+import PrintDayScheduleDialog from "@/components/admin/calendar/PrintDayScheduleDialog";
 import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
 import type { ActivityType } from "@/components/admin/calendar/CalendarFilterBar";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ const CalendarAdmin = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week">("day");
   const [showAddEvent, setShowAddEvent] = useState(false);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
   const [prefillStartTime, setPrefillStartTime] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<Set<ActivityType>>(new Set(ALL_FILTERS));
@@ -94,6 +96,9 @@ const CalendarAdmin = () => {
           </Button>
           <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
             Today
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)} className="gap-1">
+            <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print Schedule</span>
           </Button>
           <Button size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
             <Plus className="w-4 h-4 mr-1" /> Add Event
@@ -256,6 +261,12 @@ const CalendarAdmin = () => {
         onSaved={refetch}
         editEvent={editingEvent}
         prefillStartTime={prefillStartTime}
+      />
+
+      <PrintDayScheduleDialog
+        open={showPrintDialog}
+        onOpenChange={setShowPrintDialog}
+        defaultDate={currentDate}
       />
     </div>
   );
