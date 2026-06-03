@@ -133,6 +133,7 @@ export default function MarketingAdmin() {
         <TabsList>
           <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
           <TabsTrigger value="contacts">Contacts ({contacts.length})</TabsTrigger>
+          <TabsTrigger value="audiences">Resend Audiences</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
