@@ -97,6 +97,9 @@ const CalendarAdmin = () => {
           <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
             Today
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)} className="gap-1">
+            <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print Schedule</span>
+          </Button>
           <Button size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
             <Plus className="w-4 h-4 mr-1" /> Add Event
           </Button>
