@@ -1,54 +1,65 @@
 ## Goal
-Make Campaigns able to target real enrollment groups and inquiry types so admins can send reminders, schedule changes, and program announcements to the exact parents that need them.
 
-## New audience selectors (added to the existing tag/source picker)
+Make the printed daily schedule (`/admin/print-day-schedule`) fit one instructor per page (front, with overflow to back if needed) so each laminated sheet sits at the pool deck for that instructor's shift.
 
-In the campaign editor's Audience panel, add four new sections. Any combination is OR'd together with current tag/source filters, then de-duped by email.
+## Issues in current print
 
-1. **Session period** — multi-select of all `session_periods` (e.g. "Session 1 — Fall 2026"). Resolves to every parent_email on `swim_enrollments` whose `session_id` belongs to a `swim_sessions` row in that period, status in (pending, confirmed, enrolled, pending_payment).
+Looking at the PDF you sent:
+- Each instructor spans 2–3 pages because cards have heavy chrome (borders, badges, two-line headers, per-class tables with thead repeated).
+- Browser headers/footers ("6/3/26, 1:40 PM ... lovableproject.com ... 4/10") eat ~1 inch top + bottom.
+- The "Unassigned" instructor with 0/3 empty classes still gets a full page.
+- Tables repeat column headers for every class; column widths waste space.
 
-2. **Class(es)** — searchable multi-select of `swim_sessions` (active), grouped by period and labeled `Level · Day · Time · Instructor`. Resolves to enrolled parent_emails for the chosen sessions. Lets you message a single class (e.g. "Monday 3:15 Little Fins") or several at once.
+## New layout (one page per instructor)
 
-3. **Swim level** — multi-select of the 5 levels (White, Red, Yellow, Blue, Green). Resolves to currently-enrolled parents at that level (across all active periods). Useful for "all Yellow families this session".
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ GRACE CAVANAUGH                       Mon · Jun 8, 2026     │
+│ 6 classes · 8 swimmers                Aquatic Dreams Swim   │
+├─────────────────────────────────────────────────────────────┤
+│ TIME       │ CLASS              │ SWIMMER (age)  │ PARENT  │ EMERGENCY │ NOTES │
+│ 2:45–3:15  │ ■ Red · Reef Expl. │ Kaira Kang (5) │ Amanda  │ Gursharan │       │
+│   2/3      │ Preschool 3–5      │ Leilani G. (5) │ Imani   │ Jorge G.  │       │
+│ ───────────┼────────────────────┼────────────────┼─────────┼───────────┼───────│
+│ 3:45–4:15  │ ■ Red · Reef Expl. │ Anahi M. (4)   │ Blanca  │ Maria R.  │       │
+│   1/3      │                    │                │         │           │       │
+│ ...                                                                              │
+├─────────────────────────────────────────────────────────────┤
+│ Printed Jun 3, 2026 · Page 1 of 1                                                │
+└─────────────────────────────────────────────────────────────┘
+```
 
-4. **Lesson interest** — multi-select chips for `private`, `semi-private`, `adult`, derived from `lesson_requests.lesson_type` / `is_adult_swimmer`, plus an age toggle (under 14 / 14+). Resolves to parent_emails from `lesson_requests`.
+Single dense table per instructor, one header row at top, color stripe per class on the time column, rows grouped visually by class (top row of each class shows time + level + capacity badge with row-span; following rows just show swimmer info).
 
-The existing Tags and Sources sections stay (for broad blasts and ad-hoc tags like `private-lesson-inquiry-u14`). A live "Audience: N subscribed contacts" count updates as selectors change.
+### Density rules
+- Body font 9pt (down from 11pt)
+- Row padding 3px (down from 6px)
+- Drop email column from the table; keep parent first name + phone instead (email is rarely needed pool-side)
+- Drop separate "Age Group" line; tuck into the class cell
+- Emergency contact = name + phone only; relationship in parens
+- Medical notes stay in their own column, bold red when present
 
-## Backend changes
+### Page rules
+- `@page { size: letter portrait; margin: 0.4in }` (browser headers/footers still appear by default; add an on-screen tip telling staff to toggle them off in the print dialog — "More settings → Headers and footers → off")
+- `.instructor-page { page-break-before: always }` (first one no break)
+- If one instructor overflows to a 2nd page, the table header repeats via `<thead>` so the back of the sheet is still readable
+- Hide instructors with zero classes for the day (so "Unassigned" with empty classes doesn't waste a page); still show Unassigned if it has at least one class with enrollments OR keep an admin toggle (default: hide empty)
 
-- **`marketing_campaigns.audience` (jsonb)** — extend the shape (no schema change needed, it's jsonb):
-  ```
-  {
-    tags: [], sources: [], include_all: false,
-    session_period_ids: [uuid],
-    swim_session_ids: [uuid],
-    swim_levels: ["yellow", ...],
-    lesson_interests: ["private","semi-private","adult"],
-    lesson_interest_age: "u14" | "14plus" | "all"
-  }
-  ```
+### Header band per instructor
+- Big name (18pt) left, day + date right
+- One-line summary under name: `N classes · M swimmers · pool: <ranges if available>`
 
-- **`send-marketing-campaign` edge function (`resolveAudience`)** — after pulling tag/source matches from `marketing_contacts`, run additional queries:
-  - `swim_enrollments` joined to `swim_sessions` for period/session/level filters
-  - `lesson_requests` for interest filters
-  Collect every parent_email, lower-case + dedupe, then look up (or upsert) matching `marketing_contacts` rows so suppression, unsubscribe tokens, and recipient logging keep working. Skip anyone in `suppressed_emails` or with `subscribed = false`.
+### Single-instructor mode
+When `?instructor=<id>` is set (not "all"), behaves identically — just one page (or 2 if overflow). No leading page break.
 
-- **`preview-marketing-campaign`** — accept the same audience shape so the editor can show an accurate count + first-10 sample recipients.
+## Files to change
 
-## Frontend changes
+- `src/pages/admin/PrintDaySchedule.tsx` — replace the card layout with the dense per-instructor table, update CSS for forced page breaks, drop empty instructors, repeat thead on overflow.
 
-- `src/pages/admin/MarketingAdmin.tsx` — new `AudienceBuilder` component replacing the current tag/source block. Loads `session_periods`, `swim_sessions` (with instructor + period), and distinct lesson_request interests on mount.
-- Count + sample preview pulled from `preview-marketing-campaign`.
-- "Send now" confirmation shows resolved recipient count + a short breakdown ("12 from Session 1 · 4 from Yellow level · 3 private-lesson inquirers").
-
-## Files to touch
-- `src/pages/admin/MarketingAdmin.tsx` — new audience UI, types, preview count call
-- `supabase/functions/send-marketing-campaign/index.ts` — extended `resolveAudience`
-- `supabase/functions/preview-marketing-campaign/index.ts` — return audience count + sample
-
-No DB migration required (audience is jsonb; recipients table already supports null `contact_id` for ad-hoc emails, and we'll upsert into `marketing_contacts` so tokens work).
+No DB or other component changes needed. The "Print Schedule" dialog and route stay the same.
 
 ## Out of scope
-- Per-recipient personalization tokens (e.g. {{child_name}}) — can be a follow-up.
-- SMS reminders.
+
+- Removing the browser's auto-printed URL/timestamp header (browsers control this; we'll show a one-line on-screen tip)
+- Landscape orientation (portrait fits the pool-deck laminate format you already use)
+- Per-class instructor-overrides via `session_lesson_dates.instructor_override_id` (currently not surfaced; can be added later if you use overrides regularly)
