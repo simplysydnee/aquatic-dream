@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { format, addDays, startOfWeek, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft, Printer } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
 import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
+import PrintDayScheduleDialog from "@/components/admin/calendar/PrintDayScheduleDialog";
 import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
 import type { ActivityType } from "@/components/admin/calendar/CalendarFilterBar";
 import { Badge } from "@/components/ui/badge";
