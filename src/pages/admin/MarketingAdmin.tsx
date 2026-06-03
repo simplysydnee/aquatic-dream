@@ -341,16 +341,27 @@ function CampaignEditor({
   const [scheduleAt, setScheduleAt] = useState("");
   const [testTo, setTestTo] = useState("");
 
-  const audienceCount = useMemo(() => {
-    const a = c.audience || { tags: [], sources: [], include_all: true };
-    return contacts.filter((x) => {
-      if (!x.subscribed) return false;
-      if (a.include_all && a.tags.length === 0 && a.sources.length === 0) return true;
-      if (a.sources.includes(x.source)) return true;
-      if (a.tags.some((t: string) => (x.tags || []).includes(t))) return true;
-      return false;
-    }).length;
-  }, [c.audience, contacts]);
+  const [audienceCount, setAudienceCount] = useState<number>(0);
+  const [audienceSample, setAudienceSample] = useState<string[]>([]);
+  const [audienceLoading, setAudienceLoading] = useState(false);
+
+  // Server-side audience resolution (debounced)
+  useEffect(() => {
+    let cancelled = false;
+    setAudienceLoading(true);
+    const t = setTimeout(async () => {
+      const { data, error } = await supabase.functions.invoke("preview-marketing-campaign", {
+        body: { audience: c.audience },
+      });
+      if (cancelled) return;
+      if (!error && data) {
+        setAudienceCount(data.count ?? 0);
+        setAudienceSample(data.sample ?? []);
+      }
+      setAudienceLoading(false);
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [c.audience]);
 
   useEffect(() => {
     let cancelled = false;
