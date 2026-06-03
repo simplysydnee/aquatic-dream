@@ -902,15 +902,21 @@ const CalendarDayView = ({
                 const blockBorder = isClosed ? "#9ca3af" : levelColor.border;
                 const blockText = isClosed ? "#4b5563" : levelColor.text;
 
+                const laneInfo = sessionLanes.get(s.id) || { lane: 0, laneCount: 1 };
+                const laneWidthPct = 100 / laneInfo.laneCount;
+                const laneLeftPct = laneInfo.lane * laneWidthPct;
+
                 return (
                   <Tooltip key={s.id} delayDuration={150}>
                     <TooltipTrigger asChild>
                       <div
-                        className="absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden cursor-pointer hover:shadow-md z-10"
+                        className="absolute rounded-md border-l-[3px] px-2 py-1 overflow-hidden cursor-pointer hover:shadow-md z-10"
                         onMouseMove={(e) => e.stopPropagation()}
                         style={{
                           top: `${top}px`,
                           height: `${height}px`,
+                          left: `calc(${laneLeftPct}% + 4px)`,
+                          width: `calc(${laneWidthPct}% - 6px)`,
                           backgroundColor: blockBg,
                           borderLeftColor: blockBorder,
                           color: blockText,
