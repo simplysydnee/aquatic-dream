@@ -22,6 +22,17 @@ type Block =
   | { type: "divider" }
   | { type: "spacer"; size?: "sm" | "md" | "lg" };
 
+type Audience = {
+  tags: string[];
+  sources: string[];
+  include_all: boolean;
+  session_period_ids?: string[];
+  swim_session_ids?: string[];
+  swim_levels?: string[];
+  lesson_interests?: string[];
+  lesson_interest_age?: "all" | "u14" | "14plus";
+};
+
 type Campaign = {
   id: string;
   name: string;
@@ -30,7 +41,7 @@ type Campaign = {
   from_address: string | null;
   reply_to: string | null;
   body_blocks: Block[];
-  audience: { tags: string[]; sources: string[]; include_all: boolean };
+  audience: Audience;
   status: string;
   scheduled_for: string | null;
   sent_at: string | null;
@@ -41,6 +52,8 @@ type Campaign = {
 
 const SOURCE_OPTIONS = ["swim", "lessons", "scuba", "inquiry", "import", "manual"];
 const COMMON_TAGS = ["swim", "private-lessons", "scuba", "inquiry", "level:white", "level:red", "level:yellow", "level:blue", "level:green"];
+const SWIM_LEVELS = ["white", "red", "yellow", "blue", "green"];
+const LESSON_INTERESTS = ["private", "semi-private", "adult"];
 
 function newBlock(type: Block["type"]): Block {
   switch (type) {
