@@ -2381,6 +2381,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      release_slot_holds: { Args: { p_session_token: string }; Returns: number }
       swimmer_has_active_waiver: {
         Args: { _dob: string; _first: string; _last: string }
         Returns: boolean
