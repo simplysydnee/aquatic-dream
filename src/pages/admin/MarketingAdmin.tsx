@@ -426,14 +426,6 @@ function CampaignEditor({
     setC({ ...c, body_blocks: next });
   };
 
-  const toggleTag = (tag: string) => {
-    const tags = c.audience.tags.includes(tag) ? c.audience.tags.filter((t) => t !== tag) : [...c.audience.tags, tag];
-    setC({ ...c, audience: { ...c.audience, tags, include_all: tags.length === 0 && c.audience.sources.length === 0 } });
-  };
-  const toggleSource = (s: string) => {
-    const sources = c.audience.sources.includes(s) ? c.audience.sources.filter((x) => x !== s) : [...c.audience.sources, s];
-    setC({ ...c, audience: { ...c.audience, sources, include_all: sources.length === 0 && c.audience.tags.length === 0 } });
-  };
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
