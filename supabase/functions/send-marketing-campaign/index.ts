@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { renderMarketingHtml, renderPlainText, type MarketingBlock } from "../_shared/marketing-template.ts";
+import { resolveAudience } from "../_shared/resolve-audience.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
