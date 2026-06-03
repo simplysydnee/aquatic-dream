@@ -28,6 +28,7 @@ const CalendarAdmin = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week">("day");
   const [showAddEvent, setShowAddEvent] = useState(false);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
   const [prefillStartTime, setPrefillStartTime] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<Set<ActivityType>>(new Set(ALL_FILTERS));
