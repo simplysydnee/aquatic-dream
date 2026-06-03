@@ -180,6 +180,10 @@ export default function MarketingAdmin() {
           <ContactsTab contacts={contacts} onChange={loadAll} />
         </TabsContent>
 
+        <TabsContent value="audiences" className="mt-4">
+          <ResendAudiencesTab />
+        </TabsContent>
+
         <TabsContent value="settings" className="mt-4">
           <SettingsTab />
         </TabsContent>
