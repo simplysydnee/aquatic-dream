@@ -1,77 +1,54 @@
-# Calendar improvements + roster split + print-day-schedule
+## Goal
+Make Campaigns able to target real enrollment groups and inquiry types so admins can send reminders, schedule changes, and program announcements to the exact parents that need them.
 
-Four changes, all scoped to the admin calendar and class roster.
+## New audience selectors (added to the existing tag/source picker)
 
-## 1. Grey out closed classes on the calendar
+In the campaign editor's Audience panel, add four new sections. Any combination is OR'd together with current tag/source filters, then de-duped by email.
 
-In `useCalendarData.ts`, fetch `registration_status` on `swim_sessions` (column already exists, default `'open'`). Keep filtering `is_active`, but no longer hide classes where `registration_status = 'closed'` from the day view.
+1. **Session period** — multi-select of all `session_periods` (e.g. "Session 1 — Fall 2026"). Resolves to every parent_email on `swim_enrollments` whose `session_id` belongs to a `swim_sessions` row in that period, status in (pending, confirmed, enrolled, pending_payment).
 
-In `CalendarDayView.tsx`, when rendering a session block whose `registration_status === 'closed'`:
-- replace the level-colored background with a muted grey (`bg-muted/60`, `border-muted-foreground/30`)
-- desaturate text (`text-muted-foreground`)
-- add a small "Closed" pill in the top-right of the block
+2. **Class(es)** — searchable multi-select of `swim_sessions` (active), grouped by period and labeled `Level · Day · Time · Instructor`. Resolves to enrolled parent_emails for the chosen sessions. Lets you message a single class (e.g. "Monday 3:15 Little Fins") or several at once.
 
-No change to underlying data or behavior — purely visual.
+3. **Swim level** — multi-select of the 5 levels (White, Red, Yellow, Blue, Green). Resolves to currently-enrolled parents at that level (across all active periods). Useful for "all Yellow families this session".
 
-## 2. Show class capacity at a glance on the calendar
+4. **Lesson interest** — multi-select chips for `private`, `semi-private`, `adult`, derived from `lesson_requests.lesson_type` / `is_adult_swimmer`, plus an age toggle (under 14 / 14+). Resolves to parent_emails from `lesson_requests`.
 
-Today the day view block shows `White / Little Fins`. Add a second line:
+The existing Tags and Sources sections stay (for broad blasts and ad-hoc tags like `private-lesson-inquiry-u14`). A live "Audience: N subscribed contacts" count updates as selectors change.
 
-```text
-White
-Little Fins
-2/3
-```
+## Backend changes
 
-- Compute `enrolled_count` per `session_id` from the already-fetched `enrollments` array (status in `pending|confirmed|enrolled|pending_payment`).
-- Render `enrolled/max_students` in the bottom-right of the block.
-- When `enrolled >= max_students`, render it as a red "FULL" pill; otherwise muted text.
+- **`marketing_campaigns.audience` (jsonb)** — extend the shape (no schema change needed, it's jsonb):
+  ```
+  {
+    tags: [], sources: [], include_all: false,
+    session_period_ids: [uuid],
+    swim_session_ids: [uuid],
+    swim_levels: ["yellow", ...],
+    lesson_interests: ["private","semi-private","adult"],
+    lesson_interest_age: "u14" | "14plus" | "all"
+  }
+  ```
 
-No new fetches — uses the data already in `useCalendarData`.
+- **`send-marketing-campaign` edge function (`resolveAudience`)** — after pulling tag/source matches from `marketing_contacts`, run additional queries:
+  - `swim_enrollments` joined to `swim_sessions` for period/session/level filters
+  - `lesson_requests` for interest filters
+  Collect every parent_email, lower-case + dedupe, then look up (or upsert) matching `marketing_contacts` rows so suppression, unsubscribe tokens, and recipient logging keep working. Skip anyone in `suppressed_emails` or with `subscribed = false`.
 
-## 3. Split same-time/level duplicate groups on Class Roster
+- **`preview-marketing-campaign`** — accept the same audience shape so the editor can show an accurate count + first-10 sample recipients.
 
-`ClassRosterAdmin.tsx` currently groups by `session_name|start_time|age_group|session_period_id`. Two Little Fins Mon&Wed 3:15–3:45 sessions collapse into one card even though they are two separate classes (different `session_id` / instructor).
+## Frontend changes
 
-Change the grouping key to also include `instructor_id` (and as a final tiebreaker, `session_id`) so each scheduled class card is rendered separately, matching the Enrollments page behavior.
-
-Card header keeps the same look but appends the instructor name (already shown elsewhere) so admins can tell the two cards apart at a glance.
-
-## 4. Print Daily Schedule (per instructor) from the calendar
-
-Add a "Print schedule" button to `CalendarAdmin.tsx` header (next to "Add Event"). Opens a small dialog:
-
-- Date — defaults to the currently selected day, editable
-- Instructor — dropdown of instructors who have classes that day, plus "All instructors"
-- Print button
-
-On Print, open a new tab with a print-optimized HTML page rendered from existing in-memory data (no new edge function needed). The page lists, for the chosen instructor and day, each class in time order with:
-
-- Time, level pill, age group, session name
-- Capacity `enrolled/max`
-- Roster table per class:
-  - Child name, age, level
-  - Parent name, parent phone, parent email
-  - Emergency contact name + phone
-  - Medical notes (if any)
-
-Layout: clean letter-size print stylesheet, Aquatic Dreams header with logo, level color stripe per class section, generous line height, page-breaks between instructors when "All" is chosen. Calls `window.print()` on load.
-
-### Data sources
-- Classes + enrollments: already in `useCalendarData` for the selected day.
-- Emergency contact fields: query `swim_enrollments` columns `emergency_contact_*` (already present on the table) at print time, scoped to the day's enrollment ids. Add these columns to the existing enrollment select in `useCalendarData` so the print page can use the cached data without an extra round-trip.
+- `src/pages/admin/MarketingAdmin.tsx` — new `AudienceBuilder` component replacing the current tag/source block. Loads `session_periods`, `swim_sessions` (with instructor + period), and distinct lesson_request interests on mount.
+- Count + sample preview pulled from `preview-marketing-campaign`.
+- "Send now" confirmation shows resolved recipient count + a short breakdown ("12 from Session 1 · 4 from Yellow level · 3 private-lesson inquirers").
 
 ## Files to touch
+- `src/pages/admin/MarketingAdmin.tsx` — new audience UI, types, preview count call
+- `supabase/functions/send-marketing-campaign/index.ts` — extended `resolveAudience`
+- `supabase/functions/preview-marketing-campaign/index.ts` — return audience count + sample
 
-- `src/hooks/useCalendarData.ts` — add `registration_status`, emergency contact fields, do not exclude closed
-- `src/components/admin/calendar/CalendarDayView.tsx` — grey-out closed, capacity pill
-- `src/pages/admin/CalendarAdmin.tsx` — "Print schedule" button + dialog
-- `src/components/admin/calendar/PrintDayScheduleDialog.tsx` *(new)* — instructor/date picker, opens print window
-- `src/pages/admin/PrintDaySchedule.tsx` *(new)* — print-formatted route, reads params from URL, fetches data, auto-prints
-- `src/App.tsx` — route for `/admin/print-day-schedule`
-- `src/pages/admin/ClassRosterAdmin.tsx` — include `instructor_id` (+ `session_id`) in grouping key, show instructor on card
+No DB migration required (audience is jsonb; recipients table already supports null `contact_id` for ad-hoc emails, and we'll upsert into `marketing_contacts` so tokens work).
 
 ## Out of scope
-- No DB migrations.
-- No changes to enrollment, payment, or email flows.
-- Week view styling for closed classes can be a follow-up if you want it; this plan covers the day view where the issue is visible.
+- Per-recipient personalization tokens (e.g. {{child_name}}) — can be a follow-up.
+- SMS reminders.
