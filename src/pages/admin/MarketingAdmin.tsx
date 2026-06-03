@@ -462,32 +462,14 @@ function CampaignEditor({
               </div>
             </div>
 
-            <div>
-              <Label>Audience ({audienceCount} subscribed contacts)</Label>
-              <div className="border rounded-md p-3 mt-1 space-y-2 text-sm">
-                <div>
-                  <div className="text-xs font-semibold text-muted-foreground mb-1">Sources</div>
-                  <div className="flex flex-wrap gap-1">
-                    {SOURCE_OPTIONS.map((s) => (
-                      <button key={s} type="button"
-                        onClick={() => toggleSource(s)}
-                        className={`px-2 py-1 rounded-full text-xs border ${c.audience.sources.includes(s) ? "bg-primary text-primary-foreground" : "bg-background"}`}>{s}</button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-muted-foreground mb-1">Tags</div>
-                  <div className="flex flex-wrap gap-1">
-                    {COMMON_TAGS.map((t) => (
-                      <button key={t} type="button"
-                        onClick={() => toggleTag(t)}
-                        className={`px-2 py-1 rounded-full text-xs border ${c.audience.tags.includes(t) ? "bg-primary text-primary-foreground" : "bg-background"}`}>{t}</button>
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">No filters = everyone subscribed.</p>
-              </div>
-            </div>
+            <AudienceBuilder
+              audience={c.audience}
+              onChange={(a) => setC({ ...c, audience: a })}
+              count={audienceCount}
+              sample={audienceSample}
+              loading={audienceLoading}
+            />
+
 
             <div>
               <div className="flex items-center justify-between mb-2">
