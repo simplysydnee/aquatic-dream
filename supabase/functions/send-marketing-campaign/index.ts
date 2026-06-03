@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
     if (testEmail) {
       recipients = [{ id: null, email: testEmail, first_name: null }];
     } else {
-      recipients = await resolveAudience(campaign.audience);
+      recipients = await resolveAudience(supabase, campaign.audience);
     }
     const suppressed = await getSuppressed();
     recipients = recipients.filter((r) => !suppressed.has(r.email.toLowerCase()));
