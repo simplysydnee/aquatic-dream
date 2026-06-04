@@ -605,6 +605,40 @@ const SwimEnrollmentsAdmin = () => {
                 ))}
               </SelectContent>
             </Select>
+            {periodFilter !== "all" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  const periodName = sessionPeriods.find(p => p.id === periodFilter)?.name || "this session";
+                  const { data: preview, error: previewErr } = await supabase.functions.invoke(
+                    "send-session-welcome-email",
+                    { body: { sessionPeriodId: periodFilter, dryRun: true } },
+                  );
+                  if (previewErr) {
+                    toast({ title: "Preview failed", description: previewErr.message, variant: "destructive" });
+                    return;
+                  }
+                  const count = preview?.count ?? 0;
+                  if (!count) {
+                    toast({ title: "No recipients", description: `No active enrollments found for ${periodName}.` });
+                    return;
+                  }
+                  if (!confirm(`Send welcome email + Stripe payment link to ${count} ${periodName} families?`)) return;
+                  const { data, error } = await supabase.functions.invoke(
+                    "send-session-welcome-email",
+                    { body: { sessionPeriodId: periodFilter } },
+                  );
+                  if (error) {
+                    toast({ title: "Send failed", description: error.message, variant: "destructive" });
+                  } else {
+                    toast({ title: "Welcome emails queued", description: `${data?.sent ?? 0} of ${data?.total ?? 0} sent.` });
+                  }
+                }}
+              >
+                Send {sessionPeriods.find(p => p.id === periodFilter)?.name || "session"} welcome
+              </Button>
+            )}
             <Select value={ageFilter} onValueChange={setAgeFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="All Ages" />
