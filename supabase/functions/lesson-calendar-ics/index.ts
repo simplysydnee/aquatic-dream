@@ -52,6 +52,32 @@ function escapeIcs(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;')
 }
 
+interface MultiEvent {
+  uid?: string
+  title?: string
+  date: string
+  start: string
+  end: string
+  location?: string
+  desc?: string
+}
+
+function decodeEventsParam(raw: string): MultiEvent[] | null {
+  try {
+    const b64 = raw.replace(/-/g, '+').replace(/_/g, '/')
+    const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4))
+    const binary = atob(b64 + pad)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    const json = new TextDecoder().decode(bytes)
+    const parsed = JSON.parse(json)
+    if (!Array.isArray(parsed)) return null
+    return parsed.filter((e) => e && e.date && e.start && e.end)
+  } catch {
+    return null
+  }
+}
+
 Deno.serve((req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
@@ -61,45 +87,74 @@ Deno.serve((req) => {
     const title = url.searchParams.get('title') || 'Swim Lesson — Aquatic Dreams'
     const date = url.searchParams.get('date')
     const datesParam = url.searchParams.get('dates')
+    const eventsParam = url.searchParams.get('events')
     const start = url.searchParams.get('start')
     const end = url.searchParams.get('end')
-    const location = url.searchParams.get('location') || '1212 Kansas Ave, Modesto, CA 95351'
-    const desc = url.searchParams.get('desc') || ''
-
-    if (!start || !end) {
-      return new Response('Missing required params: start, end', { status: 400, headers: corsHeaders })
-    }
-
-    const dates: string[] = datesParam
-      ? datesParam.split(',').map(d => d.trim()).filter(Boolean)
-      : (date ? [date] : [])
-
-    if (dates.length === 0) {
-      return new Response('Missing required params: date or dates', { status: 400, headers: corsHeaders })
-    }
+    const defaultLocation =
+      url.searchParams.get('location') || '1212 Kansas Ave, Modesto, CA 95351'
+    const defaultDesc = url.searchParams.get('desc') || ''
 
     const dtStamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
-    const isMulti = dates.length > 1
-
     const events: string[] = []
-    for (const d of dates) {
-      const dtStart = ptWallClockToUtc(d, start)
-      const dtEnd = ptWallClockToUtc(d, end)
-      const eventUid = isMulti ? `${uid}-${d}` : uid
-      events.push(
-        [
-          'BEGIN:VEVENT',
-          `UID:${escapeIcs(eventUid)}@aquaticdreamsswim.com`,
-          `DTSTAMP:${dtStamp}`,
-          `DTSTART:${dtStart}`,
-          `DTEND:${dtEnd}`,
-          `SUMMARY:${escapeIcs(title)}`,
-          `LOCATION:${escapeIcs(location)}`,
-          `DESCRIPTION:${escapeIcs(desc)}`,
-          'STATUS:CONFIRMED',
-          'END:VEVENT',
-        ].join('\r\n')
-      )
+    let isMulti = false
+
+    if (eventsParam) {
+      // Multi-event mode: each event has its own title/date/start/end.
+      const decoded = decodeEventsParam(eventsParam)
+      if (!decoded || decoded.length === 0) {
+        return new Response('Invalid events param', { status: 400, headers: corsHeaders })
+      }
+      isMulti = decoded.length > 1
+      for (let i = 0; i < decoded.length; i++) {
+        const ev = decoded[i]
+        const dtStart = ptWallClockToUtc(ev.date, ev.start)
+        const dtEnd = ptWallClockToUtc(ev.date, ev.end)
+        const eventUid = ev.uid || `${uid}-${i}-${ev.date}`
+        events.push(
+          [
+            'BEGIN:VEVENT',
+            `UID:${escapeIcs(eventUid)}@aquaticdreamsswim.com`,
+            `DTSTAMP:${dtStamp}`,
+            `DTSTART:${dtStart}`,
+            `DTEND:${dtEnd}`,
+            `SUMMARY:${escapeIcs(ev.title || title)}`,
+            `LOCATION:${escapeIcs(ev.location || defaultLocation)}`,
+            `DESCRIPTION:${escapeIcs(ev.desc || defaultDesc)}`,
+            'STATUS:CONFIRMED',
+            'END:VEVENT',
+          ].join('\r\n')
+        )
+      }
+    } else {
+      if (!start || !end) {
+        return new Response('Missing required params: start, end', { status: 400, headers: corsHeaders })
+      }
+      const dates: string[] = datesParam
+        ? datesParam.split(',').map(d => d.trim()).filter(Boolean)
+        : (date ? [date] : [])
+      if (dates.length === 0) {
+        return new Response('Missing required params: date or dates', { status: 400, headers: corsHeaders })
+      }
+      isMulti = dates.length > 1
+      for (const d of dates) {
+        const dtStart = ptWallClockToUtc(d, start)
+        const dtEnd = ptWallClockToUtc(d, end)
+        const eventUid = isMulti ? `${uid}-${d}` : uid
+        events.push(
+          [
+            'BEGIN:VEVENT',
+            `UID:${escapeIcs(eventUid)}@aquaticdreamsswim.com`,
+            `DTSTAMP:${dtStamp}`,
+            `DTSTART:${dtStart}`,
+            `DTEND:${dtEnd}`,
+            `SUMMARY:${escapeIcs(title)}`,
+            `LOCATION:${escapeIcs(defaultLocation)}`,
+            `DESCRIPTION:${escapeIcs(defaultDesc)}`,
+            'STATUS:CONFIRMED',
+            'END:VEVENT',
+          ].join('\r\n')
+        )
+      }
     }
 
     const ics = [
