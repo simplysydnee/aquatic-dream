@@ -64,10 +64,12 @@ interface MultiEvent {
 
 function decodeEventsParam(raw: string): MultiEvent[] | null {
   try {
-    // url-safe base64 -> standard base64
     const b64 = raw.replace(/-/g, '+').replace(/_/g, '/')
     const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4))
-    const json = atob(b64 + pad)
+    const binary = atob(b64 + pad)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    const json = new TextDecoder().decode(bytes)
     const parsed = JSON.parse(json)
     if (!Array.isArray(parsed)) return null
     return parsed.filter((e) => e && e.date && e.start && e.end)
