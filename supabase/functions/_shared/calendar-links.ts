@@ -141,8 +141,12 @@ export function buildMultiEventCalendarLinks(
     desc: e.description,
   }))
   const json = JSON.stringify(payload)
-  // url-safe base64 encode (no padding)
-  const b64 = btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  // UTF-8 safe base64 encode (handles em-dashes, emoji, etc.)
+  const bytes = new TextEncoder().encode(json)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  // url-safe base64, no padding
+  const b64 = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   const icsUrl = `${ICS_BASE}?uid=${encodeURIComponent(baseUid)}&events=${b64}`
 
   const first = events[0]
