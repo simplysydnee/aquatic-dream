@@ -1,23 +1,34 @@
-## Send welcome emails to all Session 1 parents
+## Problem
 
-Invoke the existing `send-session-welcome-email` edge function with Session 1's `sessionPeriodId` (`a1111111-1111-1111-1111-111111111111`). The function already:
+On `/book-private-lesson` → Pick times step, two confusing behaviors:
 
-- Loads every confirmed/enrolled/pending enrollment in that session period
-- Groups by `parent_email` (one combined email per parent, all their swimmers)
-- Builds the combined `.ics` + Google Calendar links for every lesson date
-- Resolves the payment link for any parent who still owes the session fee
-- Uses idempotency key `session-welcome-{periodId}-{parent_email}` so re-sends are safe
-- Stamps `session_welcome_sent_at` on every enrollment after a successful send
+1. **Recurring + day chip = empty.** Toggling "Show weekly options" and clicking a day (e.g. Wed) shows "No recurring patterns available" — even when the instructor *does* have recurring patterns on other days.
+2. **Recurring + AM/PM = empty / wrong.** Same root cause: the recurring panel is filtered by every day/time chip, so narrowing the day grid also hides recurring options for other days.
+3. **Empty-state message is misleading.** When filters hide all slots, the page says *"No availability in the next 8 weeks. Try a different instructor"* — even though slots exist, they're just filtered out.
 
-### Steps
+### Root cause
 
-1. **Dry run first** — call the function with `{ sessionPeriodId: "a1111111-…", dryRun: true }` to print the parent groups and swimmer counts so we can sanity-check before sending.
-2. **Confirm with you** the dry-run looks right (number of parents, no surprise recipients).
-3. **Live send** — call the function with `{ sessionPeriodId: "a1111111-…" }`. Returns `{ sent, total, results[] }`.
-4. **Spot-check** `email_send_log` for any `failed` rows and report back.
+In `src/components/private-lessons/SlotPicker.tsx`:
 
-### Out of scope
+- `weeklyGroups` is derived from `filteredSlots` (day + time chips applied). The recurring picker is meant to *choose* a day, so filtering it by the day chip defeats its purpose. With current DB data (Tue/Thu/Sat blocks only), picking Wed wipes out the recurring panel entirely.
+- The no-availability empty state only checks `byDate.length === 0` and doesn't distinguish "no data" from "filtered out".
 
-- No template changes (already fixed July 1 issue in the last turn).
-- No schema changes.
-- No new triggers — this is a one-shot manual send.
+## Fix
+
+Edit only `src/components/private-lessons/SlotPicker.tsx`:
+
+1. **Recurring panel ignores the day chip.**
+   - Build `weeklyGroups` from `slots` with only the **time** filter applied (AM/PM), not the day filter. The whole point of the recurring quick-pick is to pick a day, so the day chip shouldn't gate it.
+   - Time filter still applies so AM/PM narrows recurring patterns correctly.
+
+2. **Better empty state for the day grid.**
+   - If `slots.length > 0 && byDate.length === 0` → show *"No slots match your filters."* with an inline **Clear filters** button (resets `dayFilter` and `timeFilter`).
+   - Keep the original *"No availability in the next 8 weeks…"* message only when `slots.length === 0`.
+
+3. **Sanity-check AM/PM logic** (already correct: `hour >= 12` = PM). No change needed; the perceived bug is just the day-chip filtering described in #1.
+
+## Out of scope
+
+- No backend / RPC / schema changes.
+- No changes to `fetchOpenSlots` or `instructor_booking_blocks` data.
+- No redesign of the chip UI — only behavior.
