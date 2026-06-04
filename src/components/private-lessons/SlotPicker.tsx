@@ -334,7 +334,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
                   {WEEKDAYS_PLURAL[p.dow]} at {formatTime(p.startTime)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {p.instructorName} · {p.slots.length} of {WEEKS} weeks
+                  {p.instructorName} · {p.slots.length} {p.slots.length === 1 ? "session" : "sessions"} available
                 </p>
               </button>
             ))}
