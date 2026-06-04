@@ -10,6 +10,7 @@ export interface TemplateEntry {
 }
 
 import { template as sessionPaymentLink } from './session-payment-link.tsx'
+import { template as sessionWelcome } from './session-welcome.tsx'
 import { template as registrationFeePaymentLink } from './registration-fee-payment-link.tsx'
 import { template as enrollmentConfirmation } from './enrollment-confirmation.tsx'
 import { template as lessonReminder } from './lesson-reminder.tsx'
@@ -27,6 +28,7 @@ import { template as visitorWaiverCopy } from './visitor-waiver-copy.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'session-payment-link': sessionPaymentLink,
+  'session-welcome': sessionWelcome,
   'registration-fee-payment-link': registrationFeePaymentLink,
   'enrollment-confirmation': enrollmentConfirmation,
   'lesson-reminder': lessonReminder,
