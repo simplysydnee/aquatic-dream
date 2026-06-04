@@ -54,9 +54,9 @@ Deno.serve(async (req) => {
     const stripe = createStripeClient(env)
 
     // Resolve the session fee Stripe price by lookup_key
-    const prices = await stripe.prices.list({ lookup_keys: ['swim_session_fee'] })
+    const prices = await stripe.prices.list({ lookup_keys: ['swim_session_fee_240'] })
     if (!prices.data.length) {
-      return new Response(JSON.stringify({ error: 'swim_session_fee price not configured in Stripe' }), {
+      return new Response(JSON.stringify({ error: 'swim_session_fee_240 price not configured in Stripe' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
