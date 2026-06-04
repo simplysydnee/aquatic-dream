@@ -53,18 +53,42 @@ Deno.serve(async (req) => {
     const env = (environment || 'live') as StripeEnv
     const stripe = createStripeClient(env)
 
-    // Resolve the session fee Stripe price by lookup_key
-    const prices = await stripe.prices.list({ lookup_keys: ['swim_session_fee_240'] })
-    if (!prices.data.length) {
-      return new Response(JSON.stringify({ error: 'swim_session_fee_240 price not configured in Stripe' }), {
+    // Use the session's actual price from our DB as the source of truth.
+    const sessionPrice = Number((enrollment as any).swim_sessions?.session_price)
+    if (!sessionPrice || sessionPrice <= 0) {
+      return new Response(JSON.stringify({ error: 'Session price not configured for this enrollment' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    const stripePrice = prices.data[0]
+    const unitAmount = Math.round(sessionPrice * 100)
+
+    // Find-or-create the "Swim Session Fee" product (per Stripe env).
+    let productId: string | undefined
+    const existingProducts = await stripe.products.search({
+      query: "active:'true' AND metadata['lovable_external_id']:'swim_session_fee_product'",
+      limit: 1,
+    })
+    if (existingProducts.data.length) {
+      productId = existingProducts.data[0].id
+    } else {
+      const product = await stripe.products.create({
+        name: 'Swim Session Fee',
+        metadata: { lovable_external_id: 'swim_session_fee_product' },
+      })
+      productId = product.id
+    }
+
+    // Create a fresh price for this exact amount (Stripe prices are immutable).
+    const stripePrice = await stripe.prices.create({
+      product: productId!,
+      unit_amount: unitAmount,
+      currency: 'usd',
+      metadata: { enrollmentId, source: 'session_fee' },
+    })
 
     const link = await stripe.paymentLinks.create({
       line_items: [{ price: stripePrice.id, quantity: 1 }],
-      metadata: { enrollmentId, type: 'session_fee' },
+      metadata: { enrollmentId, type: 'session_fee', amount_usd: String(sessionPrice) },
       payment_intent_data: { metadata: { enrollmentId, type: 'session_fee' } },
       after_completion: {
         type: 'redirect',
