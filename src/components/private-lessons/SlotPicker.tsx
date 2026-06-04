@@ -112,16 +112,24 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
   };
 
   // For weekly helper: derive available recurring options grouped by instructor.
-  // Show every instructor that has at least one recurring pattern (>=2 dates same DOW/time).
+  // Intentionally ignores the day chip (the whole point is to PICK a day) but
+  // respects the AM/PM time filter.
   const weeklyGroups = useMemo(() => {
+    const timeFilteredSlots = slots.filter((s) => {
+      if (timeFilter === "all") return true;
+      const hour = Number(s.start_time.split(":")[0]);
+      if (timeFilter === "am" && hour >= 12) return false;
+      if (timeFilter === "pm" && hour < 12) return false;
+      return true;
+    });
     const seen = new Set<string>();
     const byInstructor = new Map<string, { instructorId: string; instructorName: string; opts: { key: string; label: string; instructorId: string; startTime: string; dow: number; count: number }[] }>();
-    for (const s of filteredSlots) {
+    for (const s of timeFilteredSlots) {
       const dow = new Date(s.slot_date + "T00:00").getDay();
       const key = `${s.instructor_id}|${dow}|${s.start_time}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const count = filteredSlots.filter((x) =>
+      const count = timeFilteredSlots.filter((x) =>
         x.instructor_id === s.instructor_id && x.start_time === s.start_time &&
         new Date(x.slot_date + "T00:00").getDay() === dow).length;
       if (count < 2) continue;
@@ -133,15 +141,13 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
         label: `${WEEKDAYS[dow]}s at ${formatTime(s.start_time)} (${count} dates)`,
       });
     }
-    // Sort each instructor's options by day-of-week then time; cap at 20 per instructor
     const groups = [...byInstructor.values()].map((g) => ({
       ...g,
       opts: g.opts.sort((a, b) => a.dow - b.dow || a.startTime.localeCompare(b.startTime)).slice(0, 20),
     }));
-    // Sort instructors alphabetically
     groups.sort((a, b) => a.instructorName.localeCompare(b.instructorName));
     return groups;
-  }, [filteredSlots]);
+  }, [slots, timeFilter]);
 
 
   return (
@@ -235,7 +241,20 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
         </div>
       ) : byDate.length === 0 ? (
         <div className="border border-border rounded-lg p-8 text-center bg-muted/30">
-          <p className="text-sm text-muted-foreground">No availability in the next {WEEKS} weeks. Try a different instructor.</p>
+          {slots.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No availability in the next {WEEKS} weeks. Try a different instructor.</p>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground mb-2">No slots match your filters.</p>
+              <button
+                type="button"
+                onClick={() => { setDayFilter(new Set()); setTimeFilter("all"); }}
+                className="text-xs text-primary underline"
+              >
+                Clear filters
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
