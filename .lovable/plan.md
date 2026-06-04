@@ -1,34 +1,48 @@
 ## Problem
 
-On `/book-private-lesson` → Pick times step, two confusing behaviors:
+When "Show weekly options" is on, the recurring panel currently lists every individual time/day combo an instructor has open, even if it only repeats once or twice. The parent can't really see a true recurring weekly slot, and the per-day grid below clutters the view.
 
-1. **Recurring + day chip = empty.** Toggling "Show weekly options" and clicking a day (e.g. Wed) shows "No recurring patterns available" — even when the instructor *does* have recurring patterns on other days.
-2. **Recurring + AM/PM = empty / wrong.** Same root cause: the recurring panel is filtered by every day/time chip, so narrowing the day grid also hides recurring options for other days.
-3. **Empty-state message is misleading.** When filters hide all slots, the page says *"No availability in the next 8 weeks. Try a different instructor"* — even though slots exist, they're just filtered out.
+## Fix (frontend-only, `src/components/private-lessons/SlotPicker.tsx`)
 
-### Root cause
+### 1. True recurring patterns
 
-In `src/components/private-lessons/SlotPicker.tsx`:
+Build `weeklyGroups` so each option represents an `(instructor, day-of-week, start_time)` triple that is open **at least 6 of the 8 weeks** in the window (respecting the AM/PM filter). Patterns open <6 weeks are hidden.
 
-- `weeklyGroups` is derived from `filteredSlots` (day + time chips applied). The recurring picker is meant to *choose* a day, so filtering it by the day chip defeats its purpose. With current DB data (Tue/Thu/Sat blocks only), picking Wed wipes out the recurring panel entirely.
-- The no-availability empty state only checks `byDate.length === 0` and doesn't distinguish "no data" from "filtered out".
+Each pattern stores its full list of matching dates (the open ones). The label shows e.g. *"Wednesdays at 4:00 PM with Sophia Cheney — 7 of 8 weeks"*.
 
-## Fix
+### 2. Hide the per-day grid in weekly mode
 
-Edit only `src/components/private-lessons/SlotPicker.tsx`:
+When `weeklyMode` is on, render only the recurring quick-picks (and the selected pattern's date list). The per-date browse grid is hidden. Day chip is also hidden (irrelevant); only the AM/PM filter remains.
 
-1. **Recurring panel ignores the day chip.**
-   - Build `weeklyGroups` from `slots` with only the **time** filter applied (AM/PM), not the day filter. The whole point of the recurring quick-pick is to pick a day, so the day chip shouldn't gate it.
-   - Time filter still applies so AM/PM narrows recurring patterns correctly.
+### 3. Expand pattern → date list with skip
 
-2. **Better empty state for the day grid.**
-   - If `slots.length > 0 && byDate.length === 0` → show *"No slots match your filters."* with an inline **Clear filters** button (resets `dayFilter` and `timeFilter`).
-   - Keep the original *"No availability in the next 8 weeks…"* message only when `slots.length === 0`.
+Clicking a pattern card "selects" it (one pattern at a time in v1). The card expands inline to show every date in the series:
 
-3. **Sanity-check AM/PM logic** (already correct: `hour >= 12` = PM). No change needed; the perceived bug is just the day-chip filtering described in #1.
+```
+Wednesdays at 4:00 PM · Sophia Cheney        [Change pattern]
+  Jun 17  ✓                                                      ×
+  Jun 24  ✓                                                      ×
+  Jul 1   — unavailable (auto-skipped)
+  Jul 8   ✓                                                      ×
+  …
+7 lessons selected · $455 total
+```
+
+- Each available date is selected by default. The tiny `×` in the corner removes that single week from the booking.
+- Auto-skipped weeks (where the slot wasn't open) are shown greyed out with an "unavailable" note and cannot be toggled on.
+- "Change pattern" deselects and returns to the pattern list.
+
+### 4. Pricing reflects kept weeks
+
+The sticky footer total stays `selectedList.length × $65`. Removing a week via `×` drops it from `selected`, so the count and total update immediately. ("Subtract from total" behavior.)
+
+### 5. Switching modes
+
+Toggling `weeklyMode` off clears any recurring selection (avoids confusion with the per-day grid). Toggling on clears prior single-slot selections for the same reason.
 
 ## Out of scope
 
-- No backend / RPC / schema changes.
-- No changes to `fetchOpenSlots` or `instructor_booking_blocks` data.
-- No redesign of the chip UI — only behavior.
+- No backend, RPC, schema, or `fetchOpenSlots` changes.
+- No change to slot holds / checkout flow — the picker still emits a flat `Slot[]` to `onContinue`.
+- Only one recurring pattern at a time (multi-pattern booking can be a follow-up).
+- No change to the day-grid (non-weekly) mode behavior beyond what was shipped last turn.
