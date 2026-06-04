@@ -216,31 +216,27 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        {!weeklyMode && (
-          <>
-            <span className="text-xs font-semibold text-muted-foreground mr-1">Days:</span>
-            {WEEKDAYS.map((label, idx) => {
-              const active = dayFilter.has(idx);
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => toggleDay(idx)}
-                  className={`px-2.5 py-1 text-xs rounded-md border transition ${active
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background hover:bg-muted border-border"}`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-            {dayFilter.size > 0 && (
-              <button type="button" onClick={() => setDayFilter(new Set())}
-                className="text-xs text-muted-foreground underline ml-1">Clear</button>
-            )}
-          </>
+        <span className="text-xs font-semibold text-muted-foreground mr-1">Days:</span>
+        {WEEKDAYS.map((label, idx) => {
+          const active = dayFilter.has(idx);
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => toggleDay(idx)}
+              className={`px-2.5 py-1 text-xs rounded-md border transition ${active
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background hover:bg-muted border-border"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+        {dayFilter.size > 0 && (
+          <button type="button" onClick={() => setDayFilter(new Set())}
+            className="text-xs text-muted-foreground underline ml-1">Clear</button>
         )}
-        <span className={`text-xs font-semibold text-muted-foreground mr-1 ${weeklyMode ? "" : "ml-3"}`}>Time:</span>
+        <span className="text-xs font-semibold text-muted-foreground mr-1 ml-3">Time:</span>
         {(["all", "am", "pm"] as const).map((v) => (
           <button
             key={v}
