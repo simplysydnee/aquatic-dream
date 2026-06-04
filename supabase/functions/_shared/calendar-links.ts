@@ -114,3 +114,49 @@ export function buildSessionCalendarLinks(
   return { icsUrl, googleUrl }
 }
 
+export interface MultiCalendarEventInput {
+  uid?: string
+  title: string
+  date: string
+  start: string
+  end: string
+  location?: string
+  description?: string
+}
+
+// Multi-event variant: each event can have its own title/time/date.
+// Used to combine multiple swimmers' lessons into one .ics download.
+// googleUrl falls back to the first event only.
+export function buildMultiEventCalendarLinks(
+  events: MultiCalendarEventInput[],
+  baseUid: string,
+): { icsUrl: string; googleUrl: string } {
+  const payload = events.map((e, i) => ({
+    uid: e.uid || `${baseUid}-${i}`,
+    title: e.title,
+    date: e.date,
+    start: e.start,
+    end: e.end,
+    location: e.location,
+    desc: e.description,
+  }))
+  const json = JSON.stringify(payload)
+  // url-safe base64 encode (no padding)
+  const b64 = btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const icsUrl = `${ICS_BASE}?uid=${encodeURIComponent(baseUid)}&events=${b64}`
+
+  const first = events[0]
+  const gStart = ptWallClockToUtc(first.date, first.start)
+  const gEnd = ptWallClockToUtc(first.date, first.end)
+  const g = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: first.title,
+    dates: `${gStart}/${gEnd}`,
+  })
+  if (first.location) g.set('location', first.location)
+  if (first.description) g.set('details', first.description)
+  const googleUrl = `https://calendar.google.com/calendar/render?${g.toString()}`
+
+  return { icsUrl, googleUrl }
+}
+
