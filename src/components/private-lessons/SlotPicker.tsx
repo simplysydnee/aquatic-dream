@@ -120,7 +120,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
 
   // ----- Recurring patterns -----
   // Group all open slots by (instructor, dow, startTime); keep patterns with
-  // >= MIN_RECURRING_WEEKS open weeks. Honor AM/PM filter.
+  // >= MIN_RECURRING_WEEKS open weeks. Honor AM/PM and day-of-week filters.
   const recurringPatterns = useMemo<RecurringPattern[]>(() => {
     const timeOk = (start: string) => {
       if (timeFilter === "all") return true;
@@ -132,6 +132,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
     for (const s of slots) {
       if (!timeOk(s.start_time)) continue;
       const dow = new Date(s.slot_date + "T00:00").getDay();
+      if (dayFilter.size > 0 && !dayFilter.has(dow)) continue;
       const key = `${s.instructor_id}|${dow}|${s.start_time}`;
       if (!buckets.has(key)) {
         buckets.set(key, {
@@ -153,7 +154,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
       a.startTime.localeCompare(b.startTime)
     );
     return list;
-  }, [slots, timeFilter]);
+  }, [slots, timeFilter, dayFilter]);
 
   const activePattern = useMemo(
     () => recurringPatterns.find((p) => p.key === activePatternKey) || null,
