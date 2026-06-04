@@ -257,6 +257,9 @@ const rowValue = { fontSize: '14px', color: '#1a2e3b', fontWeight: '500' as cons
 const rowValueHighlight = { fontSize: '15px', color: '#0d4f7c', fontWeight: '700' as const, margin: '2px 0 0' }
 
 const cta = { background: '#0d4f7c', color: '#ffffff', textDecoration: 'none', fontSize: '15px', fontWeight: '600' as const, padding: '14px 32px', borderRadius: '50px', display: 'inline-block' as const }
+const calBtn = { background: '#0d4f7c', color: '#ffffff', textDecoration: 'none', fontSize: '14px', fontWeight: '600' as const, padding: '12px 22px', borderRadius: '50px', display: 'inline-block' as const, margin: '0 6px 8px 0' }
+const calBtnAlt = { background: '#1a7fad', color: '#ffffff', textDecoration: 'none', fontSize: '14px', fontWeight: '600' as const, padding: '12px 22px', borderRadius: '50px', display: 'inline-block' as const, margin: '0 0 8px 6px' }
+const addrText = { fontSize: '13px', color: '#5a7f94', textAlign: 'center' as const, margin: '4px 0 0' }
 const smallMuted = { fontSize: '11px', color: '#88a0b0', margin: '14px 0 0', wordBreak: 'break-all' as const }
 const linkStyle = { color: '#1a7fad', textDecoration: 'underline' }
 
