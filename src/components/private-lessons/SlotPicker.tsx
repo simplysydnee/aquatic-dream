@@ -13,7 +13,7 @@ interface Props {
 }
 
 const WEEKS = 8;
-const MIN_RECURRING_WEEKS = 6;
+const MIN_RECURRING_WEEKS = 2;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_PLURAL = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
 
