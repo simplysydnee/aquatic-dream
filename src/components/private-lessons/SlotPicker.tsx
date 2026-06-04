@@ -120,7 +120,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
 
   // ----- Recurring patterns -----
   // Group all open slots by (instructor, dow, startTime); keep patterns with
-  // >= MIN_RECURRING_WEEKS open weeks. Honor AM/PM filter.
+  // >= MIN_RECURRING_WEEKS open weeks. Honor AM/PM and day-of-week filters.
   const recurringPatterns = useMemo<RecurringPattern[]>(() => {
     const timeOk = (start: string) => {
       if (timeFilter === "all") return true;
@@ -132,6 +132,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
     for (const s of slots) {
       if (!timeOk(s.start_time)) continue;
       const dow = new Date(s.slot_date + "T00:00").getDay();
+      if (dayFilter.size > 0 && !dayFilter.has(dow)) continue;
       const key = `${s.instructor_id}|${dow}|${s.start_time}`;
       if (!buckets.has(key)) {
         buckets.set(key, {
@@ -153,7 +154,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
       a.startTime.localeCompare(b.startTime)
     );
     return list;
-  }, [slots, timeFilter]);
+  }, [slots, timeFilter, dayFilter]);
 
   const activePattern = useMemo(
     () => recurringPatterns.find((p) => p.key === activePatternKey) || null,
@@ -215,31 +216,27 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        {!weeklyMode && (
-          <>
-            <span className="text-xs font-semibold text-muted-foreground mr-1">Days:</span>
-            {WEEKDAYS.map((label, idx) => {
-              const active = dayFilter.has(idx);
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => toggleDay(idx)}
-                  className={`px-2.5 py-1 text-xs rounded-md border transition ${active
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background hover:bg-muted border-border"}`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-            {dayFilter.size > 0 && (
-              <button type="button" onClick={() => setDayFilter(new Set())}
-                className="text-xs text-muted-foreground underline ml-1">Clear</button>
-            )}
-          </>
+        <span className="text-xs font-semibold text-muted-foreground mr-1">Days:</span>
+        {WEEKDAYS.map((label, idx) => {
+          const active = dayFilter.has(idx);
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => toggleDay(idx)}
+              className={`px-2.5 py-1 text-xs rounded-md border transition ${active
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background hover:bg-muted border-border"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+        {dayFilter.size > 0 && (
+          <button type="button" onClick={() => setDayFilter(new Set())}
+            className="text-xs text-muted-foreground underline ml-1">Clear</button>
         )}
-        <span className={`text-xs font-semibold text-muted-foreground mr-1 ${weeklyMode ? "" : "ml-3"}`}>Time:</span>
+        <span className="text-xs font-semibold text-muted-foreground mr-1 ml-3">Time:</span>
         {(["all", "am", "pm"] as const).map((v) => (
           <button
             key={v}
