@@ -241,7 +241,20 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
         </div>
       ) : byDate.length === 0 ? (
         <div className="border border-border rounded-lg p-8 text-center bg-muted/30">
-          <p className="text-sm text-muted-foreground">No availability in the next {WEEKS} weeks. Try a different instructor.</p>
+          {slots.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No availability in the next {WEEKS} weeks. Try a different instructor.</p>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground mb-2">No slots match your filters.</p>
+              <button
+                type="button"
+                onClick={() => { setDayFilter(new Set()); setTimeFilter("all"); }}
+                className="text-xs text-primary underline"
+              >
+                Clear filters
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
