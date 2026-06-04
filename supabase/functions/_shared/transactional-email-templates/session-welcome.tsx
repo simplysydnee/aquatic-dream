@@ -204,7 +204,8 @@ const SessionWelcomeEmail = ({
       </Container>
     </Body>
   </Html>
-)
+  )
+}
 
 const Row = ({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) => (
   <Section style={row}>
