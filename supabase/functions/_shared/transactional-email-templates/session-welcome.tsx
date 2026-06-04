@@ -6,19 +6,36 @@ import type { TemplateEntry } from './registry.ts'
 
 const SITE_NAME = 'Aquatic Dreams'
 
-interface Props {
-  familyName?: string
+interface SwimmerEntry {
   swimmerName?: string
   className?: string
   classDays?: string
   classTime?: string
+  alreadyPaid?: boolean
+}
+
+interface Props {
+  familyName?: string
+  // Single-swimmer fallback fields (used when swimmers[] is not provided)
+  swimmerName?: string
+  className?: string
+  classDays?: string
+  classTime?: string
+  // Multi-swimmer mode
+  swimmers?: SwimmerEntry[]
   sessionDates?: string
   sessionLabel?: string
   totalClasses?: string
   paymentLink?: string
   amountDue?: string
   alreadyPaid?: boolean
+  // Calendar links
+  icsLink?: string
+  googleCalendarLink?: string
+  facilityAddress?: string
 }
+
+const DEFAULT_ADDRESS = '1212 Kansas Ave, Modesto, CA 95351'
 
 const SessionWelcomeEmail = ({
   familyName,
@@ -26,13 +43,30 @@ const SessionWelcomeEmail = ({
   className,
   classDays,
   classTime,
+  swimmers,
   sessionDates,
   sessionLabel,
   totalClasses,
   paymentLink,
   amountDue,
   alreadyPaid,
-}: Props) => (
+  icsLink,
+  googleCalendarLink,
+  facilityAddress,
+}: Props) => {
+  const address = facilityAddress || DEFAULT_ADDRESS
+  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+  const swimmerList: SwimmerEntry[] =
+    swimmers && swimmers.length > 0
+      ? swimmers
+      : (swimmerName || className || classDays || classTime
+          ? [{ swimmerName, className, classDays, classTime, alreadyPaid }]
+          : [])
+  const allPaid =
+    swimmerList.length > 0
+      ? swimmerList.every((s) => s.alreadyPaid)
+      : !!alreadyPaid
+  return (
   <Html lang="en" dir="ltr">
     <Head />
     <Preview>Welcome to Summer Swim — {sessionLabel || 'Session 1'} starts soon</Preview>
@@ -53,7 +87,7 @@ const SessionWelcomeEmail = ({
           </Text>
           <Text style={text}>
             We are thrilled to welcome you to our Summer Swim Program! Our team
-            can't wait to help your swimmer build confidence, learn water safety,
+            can't wait to help your {swimmerList.length > 1 ? 'swimmers' : 'swimmer'} build confidence, learn water safety,
             and have a blast this season.
           </Text>
           <Text style={text}>
@@ -61,16 +95,44 @@ const SessionWelcomeEmail = ({
             successful first week.
           </Text>
 
-          {/* Enrollment card */}
-          <Section style={card}>
-            <Text style={cardTitle}>📋 Your Enrollment Details</Text>
-            {swimmerName && <Row label="Swimmer" value={swimmerName} />}
-            {className && <Row label="Class" value={className} />}
-            {classDays && <Row label="Day(s)" value={classDays} />}
-            {classTime && <Row label="Time Slot" value={classTime} highlight />}
-            {sessionDates && <Row label="Session Dates" value={sessionDates} />}
-            {totalClasses && <Row label="Total Classes" value={totalClasses} />}
-          </Section>
+          {/* Enrollment card — one block per swimmer */}
+          {swimmerList.map((s, idx) => (
+            <Section key={idx} style={card}>
+              <Text style={cardTitle}>
+                📋 {s.swimmerName ? `${s.swimmerName}'s Enrollment` : 'Your Enrollment'}
+              </Text>
+              {s.className && <Row label="Class" value={s.className} />}
+              {s.classDays && <Row label="Day(s)" value={s.classDays} />}
+              {s.classTime && <Row label="Time Slot" value={s.classTime} highlight />}
+              {idx === 0 && sessionDates && <Row label="Session Dates" value={sessionDates} />}
+              {idx === 0 && totalClasses && <Row label="Total Classes" value={totalClasses} />}
+            </Section>
+          ))}
+
+          {/* Add to Calendar */}
+          {(icsLink || googleCalendarLink) && (
+            <>
+              <Heading as="h2" style={sectionH}>📅 Add to Your Calendar</Heading>
+              <Text style={text}>
+                Save every lesson date{swimmerList.length > 1 ? ' for all your swimmers' : ''} to your calendar in one click.
+              </Text>
+              <Section style={{ textAlign: 'center' as const, margin: '16px 0 8px' }}>
+                {icsLink && (
+                  <Button style={calBtn} href={icsLink}>
+                    Apple / Outlook (.ics)
+                  </Button>
+                )}
+                {googleCalendarLink && (
+                  <Button style={calBtnAlt} href={googleCalendarLink}>
+                    Google Calendar
+                  </Button>
+                )}
+              </Section>
+              <Text style={addrText}>
+                📍 <Link href={mapsLink} style={linkStyle}>{address}</Link>
+              </Text>
+            </>
+          )}
 
           {/* Tuition CTA */}
           <Heading as="h2" style={sectionH}>💳 Tuition & Registration Bag</Heading>
@@ -83,7 +145,7 @@ const SessionWelcomeEmail = ({
             official registration bag on the very first day of class!
           </Text>
 
-          {alreadyPaid ? (
+          {allPaid ? (
             <Section style={paidBox}>
               <Text style={paidText}>✓ Tuition is paid in full — thank you!</Text>
             </Section>
