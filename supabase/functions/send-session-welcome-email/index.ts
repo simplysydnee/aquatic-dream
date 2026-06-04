@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     // Load ALL enrollments for that session period
     const { data: enrollments, error: enrErr } = await supabase
       .from('swim_enrollments')
-      .select('id, parent_name, parent_first_name, parent_last_name, parent_email, child_name, child_first_name, session_id, session_fee_status, status, swim_sessions!inner(session_name, swim_level, day_of_week, start_time, end_time, session_start_date, session_end_date, session_price, session_period_id, session_periods(name))')
+      .select('id, parent_name, parent_first_name, parent_last_name, parent_email, child_name, child_first_name, session_id, session_fee_status, status, swim_sessions!inner(session_name, swim_level, day_of_week, start_time, end_time, session_start_date, session_end_date, session_price, session_period_id, session_periods(name, start_date, end_date))')
       .in('status', ['confirmed','enrolled','pending_payment','pending'])
       .eq('swim_sessions.session_period_id', targetPeriodId)
 
@@ -118,8 +118,9 @@ Deno.serve(async (req) => {
         const events: any[] = []
         const period = (list[0] as any).swim_sessions?.session_periods
         const periodName = period?.name || 'Session 1'
-        let firstStart: string | null = null
-        let firstEnd: string | null = null
+        // Prefer the session_period's authoritative date range; fall back to the session's own dates.
+        let firstStart: string | null = period?.start_date || null
+        let firstEnd: string | null = period?.end_date || null
 
         for (const e of list) {
           const s: any = e.swim_sessions
@@ -131,10 +132,8 @@ Deno.serve(async (req) => {
           const classTime = fmtTime(s?.start_time)
           swimmers.push({ swimmerName, className, classDays, classTime, alreadyPaid })
 
-          if (!firstStart) {
-            firstStart = s?.session_start_date
-            firstEnd = s?.session_end_date
-          }
+          if (!firstStart) firstStart = s?.session_start_date
+          if (!firstEnd) firstEnd = s?.session_end_date
 
           // Fetch lesson dates for this enrollment's session
           const { data: dates } = await supabase
