@@ -221,15 +221,18 @@ export const template = {
   displayName: 'Session welcome (with payment link)',
   previewData: {
     familyName: 'Smith',
-    swimmerName: 'Tommy Smith',
-    className: 'Little Fins (White)',
-    classDays: 'Mondays & Wednesdays',
-    classTime: '3:15 PM',
-    sessionDates: 'June 8 – July 2, 2025',
+    swimmers: [
+      { swimmerName: 'Tommy Smith', className: 'Little Fins (White)', classDays: 'Mondays', classTime: '3:15 PM', alreadyPaid: false },
+      { swimmerName: 'Ava Smith', className: 'Reef Explorers (Red)', classDays: 'Mondays', classTime: '4:00 PM', alreadyPaid: true },
+    ],
+    sessionDates: 'June 8 – July 2, 2026',
     sessionLabel: 'Session 1',
     totalClasses: '8 classes',
     paymentLink: 'https://buy.stripe.com/example',
     amountDue: '$240',
+    icsLink: 'https://example.supabase.co/functions/v1/lesson-calendar-ics?events=abc',
+    googleCalendarLink: 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Swim',
+    facilityAddress: '1212 Kansas Ave, Modesto, CA 95351',
   },
 } satisfies TemplateEntry
 
