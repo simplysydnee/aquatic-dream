@@ -321,7 +321,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
         ) : (
           <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
             <p className="text-xs text-muted-foreground mb-1">
-              Each option below is open at least {MIN_RECURRING_WEEKS} of {WEEKS} weeks. Pick one to see all dates.
+              Each option is a recurring day and time that repeats weekly. Pick one to see all available dates.
             </p>
             {recurringPatterns.map((p) => (
               <button
