@@ -268,10 +268,10 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
                   {WEEKDAYS_PLURAL[activePattern.dow]} at {formatTime(activePattern.startTime)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  with {activePattern.instructorName} · {activePattern.slots.length} of {WEEKS} weeks available
+                  with {activePattern.instructorName} · {activePattern.slots.length} weekly {activePattern.slots.length === 1 ? "date" : "dates"} available
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={clearPattern}>Change pattern</Button>
+              <Button variant="outline" size="sm" onClick={clearPattern}>Pick a different time</Button>
             </div>
             <p className="text-xs text-muted-foreground mb-2">
               All weeks are included by default. Tap × on any week you want to skip.
@@ -321,7 +321,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
         ) : (
           <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
             <p className="text-xs text-muted-foreground mb-1">
-              Each option below is open at least {MIN_RECURRING_WEEKS} of {WEEKS} weeks. Pick one to see all dates.
+              Each option is a recurring day and time that repeats weekly. Pick one to see all available dates.
             </p>
             {recurringPatterns.map((p) => (
               <button
