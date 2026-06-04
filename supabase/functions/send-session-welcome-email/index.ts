@@ -215,7 +215,9 @@ Deno.serve(async (req) => {
           facilityAddress: FACILITY_ADDRESS,
         }
 
-        const anonKey = Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY')!
+        // Public anon JWT — required because send-transactional-email verifies JWT format.
+        // The sb_secret_... service-role key is not a JWT and is rejected by the gateway.
+        const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImppbHJpamtsbmVoYmZ1dWx5a3R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NTA1OTQsImV4cCI6MjA4ODEyNjU5NH0.Y6CyBlFSOwKdqC9qFIux4WwUFCn3sz3c6putcANnQ44'
         const sendRes = await fetch(
           `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-email`,
           {
