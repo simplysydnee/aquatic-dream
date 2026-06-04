@@ -215,14 +215,15 @@ Deno.serve(async (req) => {
           facilityAddress: FACILITY_ADDRESS,
         }
 
+        const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
         const sendRes = await fetch(
           `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-email`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+              'Authorization': `Bearer ${anonKey}`,
+              'apikey': anonKey,
             },
             body: JSON.stringify({
               templateName: 'session-welcome',
