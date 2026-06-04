@@ -215,7 +215,7 @@ Deno.serve(async (req) => {
           facilityAddress: FACILITY_ADDRESS,
         }
 
-        const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+        const anonKey = Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY')!
         const sendRes = await fetch(
           `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-email`,
           {
