@@ -215,15 +215,27 @@ Deno.serve(async (req) => {
           facilityAddress: FACILITY_ADDRESS,
         }
 
-        const { error: sendErr } = await supabase.functions.invoke('send-transactional-email', {
-          body: {
-            templateName: 'session-welcome',
-            recipientEmail: parentEmail,
-            idempotencyKey: `session-welcome-${targetPeriodId}-${parentEmail}`,
-            templateData,
+        const sendRes = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-email`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+            },
+            body: JSON.stringify({
+              templateName: 'session-welcome',
+              recipientEmail: parentEmail,
+              idempotencyKey: `session-welcome-${targetPeriodId}-${parentEmail}`,
+              templateData,
+            }),
           },
-        })
-        if (sendErr) throw sendErr
+        )
+        if (!sendRes.ok) {
+          const errText = await sendRes.text()
+          throw new Error(`send-transactional-email ${sendRes.status}: ${errText}`)
+        }
 
         await supabase
           .from('swim_enrollments')
