@@ -1,34 +1,55 @@
 ## Goal
-Make the session-fee payment link always reflect the enrollment's `session_price` from our DB ($240), instead of depending on a Stripe lookup_key that may resolve to a stale/wrong-environment price.
 
-## Root cause
-`get-or-create-session-payment-link` resolves the price via `stripe.prices.list({ lookup_keys: ['swim_session_fee_240'] })`. The new $240 price was created in Stripe **test** mode only (the `create_product` tool syncs to live only on publish). When called with `environment: 'live'`, Stripe returned a different/old price object → the link shows $280.
+Welcome email gets an **Add to Calendar** section (Apple/Outlook .ics + Google Calendar) that includes every lesson date for every one of that parent's swimmers in the current session period, plus the facility address. Each parent gets one combined email instead of one per child.
 
-## Fix
-Stop using a hard-coded lookup_key. Instead, on each call where no link is cached yet:
+## What changes
 
-1. Read the enrollment's `swim_sessions.session_price` (already selected in the query).
-2. Find-or-create a Stripe **Product** named "Swim Session Fee" (cached by lookup via `lookup_key` on a one-time price, or by storing the product id in a small `app_settings` row keyed by env).
-3. Call `stripe.prices.create({ unit_amount: session_price * 100, currency: 'usd', product, tax_behavior: 'inclusive' })` to mint a one-shot price for this enrollment.
-4. Create the Payment Link with that price id (existing logic).
-5. Cache the link URL/id on the enrollment as today.
+### 1. Multi-event calendar support
 
-This guarantees the amount = `session_price` from our DB, regardless of which Stripe env or what lookup_keys exist.
+`supabase/functions/lesson-calendar-ics/index.ts`
+- Add a new `events` query param (base64-encoded JSON of `[{uid,title,date,start,end,location?,desc?}]`).
+- When present, emit one VEVENT per entry (each with its own title/time). Existing single/multi-date modes stay unchanged so other emails keep working.
 
-## Cleanup of the broken test link
-- Clear `session_fee_payment_link_id` / `session_fee_payment_link_url` on enrollment `efd9d55c-5b35-48d2-b595-e71dcebe6b0c` so the next call regenerates with the correct $240 amount.
-- Optionally deactivate the wrong Payment Link in Stripe (not required — we just stop referencing it).
+`supabase/functions/_shared/calendar-links.ts`
+- Add `buildMultiEventCalendarLinks(events[])` returning `{icsUrl, googleUrl}`.
+  - `icsUrl` → new endpoint with base64 `events` param.
+  - `googleUrl` → pre-fills only the very first event (Google's render endpoint is one-event-only); the .ics covers everything.
 
-## Verification
-- Re-invoke `get-or-create-session-payment-link` for the test enrollment in both `sandbox` and `live`.
-- Open the returned URL and confirm Stripe checkout shows **$240.00**.
-- Spot-check a second Session 1 enrollment to confirm the same behavior.
+### 2. Welcome email orchestrator
 
-## Files touched
-- `supabase/functions/get-or-create-session-payment-link/index.ts` — replace lookup_key path with dynamic product/price creation from `session_price`.
-- One-row DB update to clear the stale cached link on the test enrollment.
+`supabase/functions/send-session-welcome-email/index.ts`
+- Resolve the target `sessionPeriodId`. If invoked with a single `enrollmentId`, look up its session's `session_period_id`.
+- Group enrollments by `lower(parent_email)` within that session period (`status in confirmed/enrolled/pending_payment/pending`).
+- For each parent group:
+  - Pick one Stripe payment link: keep current per-enrollment logic but only attach a link if at least one enrollment still owes the session fee (use the first unpaid enrollment).
+  - Build the combined event list: for each enrollment, pull `session_lesson_dates` (non-cancelled), one VEVENT per date with title `"<swimmer first name> — <className> (<time>)"` and location `1212 Kansas Ave, Modesto, CA 95351`.
+  - Build a `swimmers[]` array for the template: `{swimmerName, className, classDays, classTime, alreadyPaid}`.
+  - Send one email per parent. Idempotency key: `session-welcome-${sessionPeriodId}-${lower(parent_email)}`.
+  - Stamp `session_welcome_sent_at = now()` on every enrollment in the group.
+
+### 3. Email template
+
+`supabase/functions/_shared/transactional-email-templates/session-welcome.tsx`
+- Replace single-swimmer fields with an optional `swimmers[]` array. Keep the existing single-swimmer fields as a fallback so other callers don't break.
+- New "📅 Add to Your Calendar" section with two buttons: **Apple / Outlook (.ics)** and **Google Calendar**, plus the studio address as a Google Maps link.
+- Tuition card adapts: if every swimmer is paid, show the paid banner; otherwise show one "Complete Tuition Payment" button using the orchestrator-supplied link.
+- Update `previewData` to show two swimmers + sample calendar links.
+
+### 4. Registry / deploy
+
+- No registry change (template name stays `session-welcome`).
+- Deploy `lesson-calendar-ics`, `send-session-welcome-email`, and `send-transactional-email` after edits.
 
 ## Out of scope
-- No schema changes.
-- No UI changes.
-- No changes to the welcome email send flow.
+
+- No DB schema changes.
+- No changes to enrollment confirmation email, payment-link generation, or other email flows.
+- No changes to the admin UI that triggers welcome sends (it just keeps calling the same edge function; behavior under the hood now dedupes per parent).
+
+## Test plan
+
+1. Re-trigger the welcome email for enrollment `efd9d55c-…` (sydneesmerchant@gmail.com).
+2. Confirm one email arrives, lists Weston's class, has both calendar buttons.
+3. Click .ics → opens calendar with all 8 lesson dates at the correct PT times and the Modesto address.
+4. Click Google → opens Google Calendar prefilled for the first lesson.
+5. Add a second test enrollment for the same parent_email + same session period → re-send → verify a single email lists both swimmers and the .ics now has both kids' dates.
