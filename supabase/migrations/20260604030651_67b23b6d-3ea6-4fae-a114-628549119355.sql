@@ -1,0 +1,1 @@
+UPDATE public.swim_enrollments SET session_fee_payment_link_id = NULL, session_fee_payment_link_url = NULL WHERE id = 'efd9d55c-5b35-48d2-b595-e71dcebe6b0c';
