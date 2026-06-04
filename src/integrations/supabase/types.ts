@@ -1694,6 +1694,8 @@ export type Database = {
           reg_fee_link_sent_at: string | null
           registration_fee: number | null
           session_fee_paid_at: string | null
+          session_fee_payment_link_id: string | null
+          session_fee_payment_link_url: string | null
           session_fee_refund_amount: number | null
           session_fee_refund_at: string | null
           session_fee_refund_reason: string | null
@@ -1701,6 +1703,7 @@ export type Database = {
           session_fee_status: string
           session_fee_stripe_id: string | null
           session_id: string | null
+          session_welcome_sent_at: string | null
           status: string
           stripe_payment_id: string | null
           swim_level: string
@@ -1734,6 +1737,8 @@ export type Database = {
           reg_fee_link_sent_at?: string | null
           registration_fee?: number | null
           session_fee_paid_at?: string | null
+          session_fee_payment_link_id?: string | null
+          session_fee_payment_link_url?: string | null
           session_fee_refund_amount?: number | null
           session_fee_refund_at?: string | null
           session_fee_refund_reason?: string | null
@@ -1741,6 +1746,7 @@ export type Database = {
           session_fee_status?: string
           session_fee_stripe_id?: string | null
           session_id?: string | null
+          session_welcome_sent_at?: string | null
           status?: string
           stripe_payment_id?: string | null
           swim_level: string
@@ -1774,6 +1780,8 @@ export type Database = {
           reg_fee_link_sent_at?: string | null
           registration_fee?: number | null
           session_fee_paid_at?: string | null
+          session_fee_payment_link_id?: string | null
+          session_fee_payment_link_url?: string | null
           session_fee_refund_amount?: number | null
           session_fee_refund_at?: string | null
           session_fee_refund_reason?: string | null
@@ -1781,6 +1789,7 @@ export type Database = {
           session_fee_status?: string
           session_fee_stripe_id?: string | null
           session_id?: string | null
+          session_welcome_sent_at?: string | null
           status?: string
           stripe_payment_id?: string | null
           swim_level?: string
