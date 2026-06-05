@@ -132,6 +132,7 @@ export default function MarketingAdmin() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+          <TabsTrigger value="welcome">Welcome Emails</TabsTrigger>
           <TabsTrigger value="contacts">Contacts ({contacts.length})</TabsTrigger>
           <TabsTrigger value="audiences">Resend Audiences</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -174,6 +175,10 @@ export default function MarketingAdmin() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="welcome" className="mt-4">
+          <WelcomeEmailsTab />
         </TabsContent>
 
         <TabsContent value="contacts" className="mt-4">
@@ -873,6 +878,211 @@ function ResendAudiencesTab() {
               ))}
             </div>
           </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ----------------------- Welcome Emails tab -----------------------
+function WelcomeEmailsTab() {
+  const [periods, setPeriods] = useState<any[]>([]);
+  const [periodId, setPeriodId] = useState<string>("");
+  const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [q, setQ] = useState("");
+  const [sendingAll, setSendingAll] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [onlyUnsent, setOnlyUnsent] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("session_periods")
+        .select("id, name, start_date, end_date, is_active")
+        .order("start_date", { ascending: false });
+      setPeriods(data || []);
+      const firstActive = (data || []).find((p: any) => p.is_active);
+      if (firstActive) setPeriodId(firstActive.id);
+    })();
+  }, []);
+
+  const loadEnrollments = async (pid: string) => {
+    if (!pid) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("swim_enrollments")
+      .select("id, parent_name, parent_email, child_name, swim_level, status, session_welcome_sent_at, swim_sessions!inner(session_period_id, session_name, swim_level, day_of_week, start_time)")
+      .eq("swim_sessions.session_period_id", pid)
+      .in("status", ["confirmed", "enrolled", "pending_payment", "pending"])
+      .order("parent_name");
+    if (error) toast.error(error.message);
+    setEnrollments(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadEnrollments(periodId); }, [periodId]);
+
+  // Group by parent_email so we send once per family
+  const families = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const e of enrollments) {
+      const key = (e.parent_email || "").toLowerCase().trim();
+      if (!key) continue;
+      if (!map.has(key)) {
+        map.set(key, {
+          parent_email: e.parent_email,
+          parent_name: e.parent_name,
+          children: [],
+          enrollment_ids: [],
+          sent_at: e.session_welcome_sent_at as string | null,
+        });
+      }
+      const f = map.get(key);
+      f.children.push(e.child_name);
+      f.enrollment_ids.push(e.id);
+      if (e.session_welcome_sent_at && (!f.sent_at || e.session_welcome_sent_at > f.sent_at)) {
+        f.sent_at = e.session_welcome_sent_at;
+      }
+    }
+    return Array.from(map.values());
+  }, [enrollments]);
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return families.filter((f) => {
+      if (onlyUnsent && f.sent_at) return false;
+      if (!term) return true;
+      return (
+        f.parent_email.toLowerCase().includes(term) ||
+        (f.parent_name || "").toLowerCase().includes(term) ||
+        f.children.some((c: string) => (c || "").toLowerCase().includes(term))
+      );
+    });
+  }, [families, q, onlyUnsent]);
+
+  const sendOne = async (enrollmentId: string, email: string) => {
+    setSendingId(enrollmentId);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-session-welcome-email", {
+        body: { enrollmentId, environment: "live" },
+      });
+      if (error) throw error;
+      if (data?.sent > 0) toast.success(`Welcome email sent to ${email}`);
+      else toast.error(data?.results?.[0]?.error || "Failed to send");
+      loadEnrollments(periodId);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to send");
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  const sendAll = async () => {
+    if (!periodId) return;
+    const period = periods.find((p) => p.id === periodId);
+    if (!confirm(`Send welcome email to ALL ${families.length} families enrolled in "${period?.name}"?`)) return;
+    setSendingAll(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-session-welcome-email", {
+        body: { sessionPeriodId: periodId, environment: "live" },
+      });
+      if (error) throw error;
+      toast.success(`Sent ${data?.sent ?? 0} of ${data?.total ?? 0} welcome emails`);
+      loadEnrollments(periodId);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to send");
+    } finally {
+      setSendingAll(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Send Session Welcome Email</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Sends the branded welcome email (class details, calendar invite, payment link if owed) to families in a session period.
+            One email per family covers all their enrolled children.
+          </p>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="flex-1 min-w-[260px]">
+              <Label>Session period</Label>
+              <Select value={periodId} onValueChange={setPeriodId}>
+                <SelectTrigger><SelectValue placeholder="Choose a session…" /></SelectTrigger>
+                <SelectContent>
+                  {periods.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.is_active ? "" : "(inactive)"} — {new Date(p.start_date + "T00:00:00").toLocaleDateString()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={sendAll} disabled={!periodId || sendingAll || families.length === 0}>
+              <Send className="w-4 h-4 mr-2" />
+              {sendingAll ? "Sending…" : `Send to all ${families.length} families`}
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Search parent name, email, or child…" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={onlyUnsent} onCheckedChange={(v) => setOnlyUnsent(!!v)} />
+              Only show not-yet-sent
+            </label>
+          </div>
+
+          <Card><CardContent className="p-0">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Parent</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Children</TableHead>
+                <TableHead>Welcome sent</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
+                ) : filtered.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No matching families.</TableCell></TableRow>
+                ) : filtered.map((f) => (
+                  <TableRow key={f.parent_email}>
+                    <TableCell className="font-medium">{f.parent_name}</TableCell>
+                    <TableCell className="font-mono text-xs">{f.parent_email}</TableCell>
+                    <TableCell className="text-sm">{f.children.join(", ")}</TableCell>
+                    <TableCell className="text-xs">
+                      {f.sent_at ? (
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                          {new Date(f.sent_at).toLocaleDateString()}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">Not sent</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant={f.sent_at ? "outline" : "default"}
+                        disabled={sendingId === f.enrollment_ids[0]}
+                        onClick={() => sendOne(f.enrollment_ids[0], f.parent_email)}
+                      >
+                        <Send className="w-3 h-3 mr-1.5" />
+                        {sendingId === f.enrollment_ids[0] ? "Sending…" : f.sent_at ? "Resend" : "Send"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent></Card>
         </CardContent>
       </Card>
     </div>
