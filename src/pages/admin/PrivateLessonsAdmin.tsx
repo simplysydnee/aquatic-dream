@@ -19,6 +19,7 @@ import {
 import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2, ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getStripeEnvironment } from "@/lib/stripe";
+import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SLOT_WINDOW_DAYS = 56; // show ~8 weeks of upcoming slots per block
@@ -937,7 +938,7 @@ export default function PrivateLessonsAdmin() {
                                   onClick={() => chargeNow(detailBooking, o)}
                                 >
                                   {busy === `charge-${o.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3 mr-1" />}
-                                  Charge $65
+                                  Charge ${getPrivateLessonPrice(detailBooking.lesson_type, o.occurrence_date)}
                                 </Button>
                               )}
                             </TableCell>
@@ -1280,10 +1281,15 @@ export default function PrivateLessonsAdmin() {
                 <Select value={bookForm.lesson_type} onValueChange={(v: any) => setBookForm({ ...bookForm, lesson_type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="private">Private ($65)</SelectItem>
+                    <SelectItem value="private">
+                      Private (${getPrivateLessonPrice("private", bookingSlot.date)}{isJunePromoDate(bookingSlot.date) ? " · June Special" : ""})
+                    </SelectItem>
                     <SelectItem value="semi_private">Semi-Private ($45)</SelectItem>
                   </SelectContent>
                 </Select>
+                {bookForm.lesson_type === "private" && isJunePromoDate(bookingSlot.date) && (
+                  <p className="text-xs text-coral font-semibold mt-1">June promo — $50 per lesson (normally $65)</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
