@@ -798,14 +798,16 @@ export default function PrivateLessonsAdmin() {
                                         <Badge variant="secondary" className="text-[10px]">Closed</Badge>
                                       ) : s.booking ? (
                                         <div className="flex flex-col items-end gap-0.5">
-                                          <Badge variant="default" className="text-[10px]">Booked</Badge>
+                                          <Badge variant="default" className="text-[10px]">
+                                            {s.booking.lesson_type === "semi_private" ? "Semi" : "Private"}
+                                          </Badge>
                                           <span className="text-[11px] font-medium truncate max-w-[140px]">{s.booking.child_name}</span>
                                           <span className="text-[10px] text-muted-foreground capitalize">
                                             {s.booking.auto_charge_status === "succeeded" ? "paid" : (s.booking.payment_status || "unpaid")}
                                           </span>
                                         </div>
                                       ) : (
-                                        <Badge variant="outline" className="text-[10px]">Open</Badge>
+                                        <Badge variant="outline" className="text-[10px]">Open · {s.defaultLessonType === "semi_private" ? "Semi" : "Private"}</Badge>
                                       )}
                                     </button>
                                   ))}
