@@ -280,6 +280,7 @@ export default function PrivateLessonsAdmin() {
           payment_status: o.payment_status,
           auto_charge_status: o.auto_charge_status,
           status: o.status,
+          lesson_type: b.lesson_type || "private",
         });
       }
     }
