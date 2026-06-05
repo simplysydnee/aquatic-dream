@@ -64,7 +64,7 @@ export default function InstructorOpenShifts() {
       supabase.from("shifts").select("*").is("instructor_id", null).eq("status","published").gte("shift_date", today).order("shift_date").order("start_time"),
       id ? supabase.from("shifts").select("*").eq("instructor_id", id).gte("shift_date", today).order("shift_date").order("start_time") : Promise.resolve({ data: [] as any }),
       supabase.from("shift_positions").select("*"),
-      supabase.from("instructors").select("id,name").eq("is_active", true),
+      supabase.rpc("get_active_instructors_public"),
       id ? supabase.from("shift_trade_requests").select("*").or(`from_instructor_id.eq.${id},to_instructor_id.eq.${id}`).order("created_at",{ascending:false}) : Promise.resolve({ data: [] as any }),
     ]);
     setOpenShifts((openData ?? []) as Shift[]);

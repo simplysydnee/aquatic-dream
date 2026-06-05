@@ -2243,6 +2243,14 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_active_instructors_public: {
+        Args: never
+        Returns: {
+          id: string
+          is_active: boolean
+          name: string
+        }[]
+      }
       get_active_waiver_for_swimmer: {
         Args: { _dob: string; _first: string; _last: string }
         Returns: {
