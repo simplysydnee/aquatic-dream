@@ -597,11 +597,11 @@ export default function PrivateLessonsAdmin() {
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
-      <h1 className="font-display text-2xl font-bold mb-4">Private Lessons</h1>
+      <h1 className="font-display text-2xl font-bold mb-4">Private & Semi-Private Lessons</h1>
       <Tabs defaultValue="availability">
         <TabsList>
           <TabsTrigger value="availability">Availability</TabsTrigger>
-          <TabsTrigger value="bookings">Bookings ({bookings.length})</TabsTrigger>
+          <TabsTrigger value="bookings">Bookings ({upcomingBookings.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="availability" className="space-y-6 mt-4">
