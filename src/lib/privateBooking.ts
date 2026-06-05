@@ -87,13 +87,13 @@ export async function fetchOpenSlots(opts: {
     takenSet.add(`${b.instructor_id}|${o.occurrence_date}|${normTime(b.start_time)}`);
   }
 
-  // Active holds (excluding mine)
-  const { data: holds } = await supabase.from("slot_holds")
-    .select("instructor_id, slot_date, start_time, session_token, held_until")
-    .gte("slot_date", fromIso).lte("slot_date", toIso)
-    .gt("held_until", new Date().toISOString());
+  // Active holds (excluding mine) — via SECURITY DEFINER RPC; slot_holds is not publicly readable.
+  const { data: holds } = await supabase.rpc("get_active_slot_holds", {
+    p_from_date: fromIso,
+    p_to_date: toIso,
+    p_session_token: opts.sessionToken ?? null,
+  });
   for (const h of (holds as any[]) || []) {
-    if (h.session_token === opts.sessionToken) continue;
     takenSet.add(`${h.instructor_id}|${h.slot_date}|${normTime(h.start_time)}`);
   }
 
