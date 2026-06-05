@@ -474,6 +474,7 @@ export type Database = {
           break_start_time: string | null
           created_at: string
           day_of_week: number | null
+          default_lesson_type: string
           end_date: string | null
           end_time: string
           id: string
@@ -492,6 +493,7 @@ export type Database = {
           break_start_time?: string | null
           created_at?: string
           day_of_week?: number | null
+          default_lesson_type?: string
           end_date?: string | null
           end_time: string
           id?: string
@@ -510,6 +512,7 @@ export type Database = {
           break_start_time?: string | null
           created_at?: string
           day_of_week?: number | null
+          default_lesson_type?: string
           end_date?: string | null
           end_time?: string
           id?: string
