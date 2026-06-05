@@ -1262,6 +1262,80 @@ export default function PrivateLessonsAdmin() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Manual book lesson dialog */}
+      <Dialog open={!!bookingSlot} onOpenChange={(o) => !o && !bookBusy && setBookingSlot(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Book a lesson
+            </DialogTitle>
+          </DialogHeader>
+          {bookingSlot && (
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                {instructorName(bookingSlot.instructor_id)} · {fmtDate(bookingSlot.date)} · {fmtTime(bookingSlot.start)} – {fmtTime(bookingSlot.end)}
+              </div>
+              <div>
+                <Label>Lesson type</Label>
+                <Select value={bookForm.lesson_type} onValueChange={(v: any) => setBookForm({ ...bookForm, lesson_type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">Private ($65)</SelectItem>
+                    <SelectItem value="semi_private">Semi-Private ($45)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Parent name *</Label>
+                  <Input value={bookForm.parent_name} onChange={(e) => setBookForm({ ...bookForm, parent_name: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Parent email *</Label>
+                  <Input type="email" value={bookForm.parent_email} onChange={(e) => setBookForm({ ...bookForm, parent_email: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Parent phone</Label>
+                  <Input value={bookForm.parent_phone} onChange={(e) => setBookForm({ ...bookForm, parent_phone: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Child name</Label>
+                  <Input value={bookForm.child_name} onChange={(e) => setBookForm({ ...bookForm, child_name: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Child age</Label>
+                  <Input type="number" min={0} value={bookForm.child_age} onChange={(e) => setBookForm({ ...bookForm, child_age: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <Label>Notes</Label>
+                <Input value={bookForm.notes} onChange={(e) => setBookForm({ ...bookForm, notes: e.target.value })} />
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <Switch checked={bookForm.recurring} onCheckedChange={(v) => setBookForm({ ...bookForm, recurring: v })} />
+                <Label>Repeat weekly</Label>
+              </div>
+              {bookForm.recurring && (
+                <div>
+                  <Label>Repeat until</Label>
+                  <Input type="date" value={bookForm.series_end} min={bookingSlot.date} onChange={(e) => setBookForm({ ...bookForm, series_end: e.target.value })} />
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                No card is collected — this is a manual booking. You can charge later from the booking detail view if a card is added.
+              </p>
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button variant="outline" disabled={bookBusy} onClick={() => setBookingSlot(null)}>Cancel</Button>
+                <Button disabled={bookBusy} onClick={submitManualBooking}>
+                  {bookBusy && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                  Create booking
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
