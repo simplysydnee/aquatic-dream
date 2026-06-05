@@ -102,13 +102,12 @@ export default function PrivateLessonsAdmin() {
       supabase.from("instructor_booking_blocks").select("*").order("created_at", { ascending: false }),
       supabase.from("lesson_bookings")
         .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error)")
-        .eq("lesson_type", "private")
-        .eq("booking_source", "self_serve")
+        .in("lesson_type", ["private", "semi_private"])
         .neq("status", "pending_card")
-        .order("created_at", { ascending: false }).limit(100),
+        .order("created_at", { ascending: false }).limit(200),
       supabase.from("lesson_bookings")
-        .select("id, instructor_id, start_time, parent_name, child_name, status, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status)")
-        .eq("lesson_type", "private")
+        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status)")
+        .in("lesson_type", ["private", "semi_private"])
         .neq("status", "pending_card")
         .neq("status", "cancelled"),
     ]);
