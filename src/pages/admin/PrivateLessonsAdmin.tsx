@@ -616,6 +616,16 @@ export default function PrivateLessonsAdmin() {
                 </Select>
               </div>
               <div>
+                <Label>Lesson type</Label>
+                <Select value={draft.default_lesson_type} onValueChange={(v) => setDraft({ ...draft, default_lesson_type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">Private ($65)</SelectItem>
+                    <SelectItem value="semi_private">Semi-Private ($45)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Type</Label>
                 <Select value={draft.kind} onValueChange={(v: any) => setDraft({ ...draft, kind: v, start_date: "", end_date: "", day_of_week: 1 })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
