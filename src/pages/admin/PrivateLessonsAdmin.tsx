@@ -32,6 +32,7 @@ interface Block {
   start_time: string; end_time: string; slot_minutes: number; pool_area: string;
   is_blackout: boolean; notes: string | null;
   break_start_time: string | null; break_end_time: string | null;
+  default_lesson_type?: string | null;
 }
 
 function normTime(t: string) { return t.length >= 5 ? t.substring(0, 5) : t; }
@@ -60,7 +61,8 @@ interface SlotRow {
   end: string;
   parentBlockId: string;
   instructor_id: string;
-  booking?: { booking_id: string; occurrence_id: string; child_name: string; parent_name: string; payment_status: string; auto_charge_status: string; status: string };
+  defaultLessonType: string;
+  booking?: { booking_id: string; occurrence_id: string; child_name: string; parent_name: string; payment_status: string; auto_charge_status: string; status: string; lesson_type: string };
   blocked?: { block_id: string };
 }
 
@@ -81,17 +83,28 @@ export default function PrivateLessonsAdmin() {
     start_time: "15:00", end_time: "18:00", slot_minutes: 30,
     pool_area: "shallow", is_blackout: false, notes: "",
     has_break: false, break_start_time: "", break_end_time: "",
+    default_lesson_type: "private",
   });
   const [savingEdit, setSavingEdit] = useState(false);
   const [activeSlot, setActiveSlot] = useState<SlotRow | null>(null);
   const [slotBusy, setSlotBusy] = useState(false);
   const [confirmSlotCancel, setConfirmSlotCancel] = useState<SlotRow | null>(null);
+  const [showPast, setShowPast] = useState(false);
+  const [bookingSlot, setBookingSlot] = useState<SlotRow | null>(null);
+  const [bookForm, setBookForm] = useState({
+    lesson_type: "private" as "private" | "semi_private",
+    parent_name: "", parent_email: "", parent_phone: "",
+    child_name: "", child_age: "",
+    notes: "", recurring: false, series_end: "",
+  });
+  const [bookBusy, setBookBusy] = useState(false);
   const [draft, setDraft] = useState({
     instructor_id: "", kind: "weekly" as UiKind,
     day_of_week: 1, start_date: "", end_date: "",
     start_time: "15:00", end_time: "18:00", slot_minutes: 30,
     pool_area: "shallow", is_blackout: false, notes: "",
     has_break: false, break_start_time: "", break_end_time: "",
+    default_lesson_type: "private",
   });
 
   const load = async () => {
@@ -100,13 +113,12 @@ export default function PrivateLessonsAdmin() {
       supabase.from("instructor_booking_blocks").select("*").order("created_at", { ascending: false }),
       supabase.from("lesson_bookings")
         .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error)")
-        .eq("lesson_type", "private")
-        .eq("booking_source", "self_serve")
+        .in("lesson_type", ["private", "semi_private"])
         .neq("status", "pending_card")
-        .order("created_at", { ascending: false }).limit(100),
+        .order("created_at", { ascending: false }).limit(200),
       supabase.from("lesson_bookings")
-        .select("id, instructor_id, start_time, parent_name, child_name, status, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status)")
-        .eq("lesson_type", "private")
+        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status)")
+        .in("lesson_type", ["private", "semi_private"])
         .neq("status", "pending_card")
         .neq("status", "cancelled"),
     ]);
@@ -166,6 +178,7 @@ export default function PrivateLessonsAdmin() {
       end_date: endDate,
       break_start_time: draft.has_break ? draft.break_start_time : null,
       break_end_time: draft.has_break ? draft.break_end_time : null,
+      default_lesson_type: draft.default_lesson_type,
     };
 
     const { error } = await supabase.from("instructor_booking_blocks").insert(payload);
@@ -197,6 +210,7 @@ export default function PrivateLessonsAdmin() {
       has_break: !!(b.break_start_time && b.break_end_time),
       break_start_time: b.break_start_time ? b.break_start_time.slice(0, 5) : "",
       break_end_time: b.break_end_time ? b.break_end_time.slice(0, 5) : "",
+      default_lesson_type: b.default_lesson_type || "private",
     });
     setEditingBlock(b);
   };
@@ -241,6 +255,7 @@ export default function PrivateLessonsAdmin() {
       end_date: endDate,
       break_start_time: d.has_break ? d.break_start_time : null,
       break_end_time: d.has_break ? d.break_end_time : null,
+      default_lesson_type: d.default_lesson_type,
     };
     setSavingEdit(true);
     const { error } = await supabase.from("instructor_booking_blocks").update(payload).eq("id", editingBlock.id);
@@ -278,6 +293,7 @@ export default function PrivateLessonsAdmin() {
           payment_status: o.payment_status,
           auto_charge_status: o.auto_charge_status,
           status: o.status,
+          lesson_type: b.lesson_type || "private",
         });
       }
     }
@@ -335,6 +351,7 @@ export default function PrivateLessonsAdmin() {
             end: slotEnd,
             parentBlockId: b.id,
             instructor_id: b.instructor_id,
+            defaultLessonType: b.default_lesson_type || "private",
             booking: bookingMap.get(key),
             blocked: blackoutBlock ? { block_id: blackoutBlock.id } : undefined,
           });
@@ -519,14 +536,72 @@ export default function PrivateLessonsAdmin() {
     }
   };
 
+  const { upcomingBookings, pastBookings } = useMemo(() => {
+    const todayStr = isoDate(new Date());
+    const upcoming: any[] = [];
+    const past: any[] = [];
+    for (const b of bookings) {
+      const occs = b.lesson_booking_occurrences || [];
+      const hasFuture = occs.some(
+        (o: any) => o.status !== "cancelled" && o.occurrence_date >= todayStr,
+      );
+      if (hasFuture) upcoming.push(b);
+      else past.push(b);
+    }
+    return { upcomingBookings: upcoming, pastBookings: past };
+  }, [bookings]);
+
+  const submitManualBooking = async () => {
+    if (!bookingSlot) return;
+    if (!bookForm.parent_name || !bookForm.parent_email) {
+      toast({ title: "Parent name and email required", variant: "destructive" });
+      return;
+    }
+    setBookBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-create-private-booking", {
+        body: {
+          instructor_id: bookingSlot.instructor_id,
+          lesson_type: bookForm.lesson_type,
+          start_date: bookingSlot.date,
+          start_time: bookingSlot.start,
+          end_time: bookingSlot.end,
+          pool_area: blocks.find((b) => b.id === bookingSlot.parentBlockId)?.pool_area || "shallow",
+          parent_name: bookForm.parent_name,
+          parent_email: bookForm.parent_email,
+          parent_phone: bookForm.parent_phone || null,
+          child_name: bookForm.child_name || null,
+          child_age: bookForm.child_age ? Number(bookForm.child_age) : null,
+          notes: bookForm.notes || null,
+          recurring: bookForm.recurring,
+          series_end: bookForm.recurring && bookForm.series_end ? bookForm.series_end : null,
+        },
+      });
+      if (error || (data as any)?.error) {
+        throw new Error(error?.message || (data as any)?.error || "Failed to create");
+      }
+      toast({ title: "Lesson booked" });
+      setBookingSlot(null);
+      setActiveSlot(null);
+      setBookForm({
+        lesson_type: "private", parent_name: "", parent_email: "", parent_phone: "",
+        child_name: "", child_age: "", notes: "", recurring: false, series_end: "",
+      });
+      await load();
+    } catch (e: any) {
+      toast({ title: "Could not book", description: e?.message, variant: "destructive" });
+    } finally {
+      setBookBusy(false);
+    }
+  };
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
-      <h1 className="font-display text-2xl font-bold mb-4">Private Lessons</h1>
+      <h1 className="font-display text-2xl font-bold mb-4">Private & Semi-Private Lessons</h1>
       <Tabs defaultValue="availability">
         <TabsList>
           <TabsTrigger value="availability">Availability</TabsTrigger>
-          <TabsTrigger value="bookings">Bookings ({bookings.length})</TabsTrigger>
+          <TabsTrigger value="bookings">Bookings ({upcomingBookings.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="availability" className="space-y-6 mt-4">
@@ -538,6 +613,16 @@ export default function PrivateLessonsAdmin() {
                 <Select value={draft.instructor_id} onValueChange={(v) => setDraft({ ...draft, instructor_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Pick instructor" /></SelectTrigger>
                   <SelectContent>{instructors.map((i) => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Lesson type</Label>
+                <Select value={draft.default_lesson_type} onValueChange={(v) => setDraft({ ...draft, default_lesson_type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">Private ($65)</SelectItem>
+                    <SelectItem value="semi_private">Semi-Private ($45)</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <div>
@@ -633,14 +718,15 @@ export default function PrivateLessonsAdmin() {
               <Table>
                 <TableHeader><TableRow>
                   <TableHead className="w-8"></TableHead>
-                  <TableHead>Instructor</TableHead><TableHead>Type</TableHead><TableHead>When</TableHead>
+                  <TableHead>Instructor</TableHead><TableHead>Lesson</TableHead><TableHead>Type</TableHead><TableHead>When</TableHead>
                   <TableHead>Time</TableHead><TableHead>Slot</TableHead><TableHead>Pool</TableHead><TableHead></TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {blocks.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No availability set</TableCell></TableRow>}
+                  {blocks.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No availability set</TableCell></TableRow>}
                   {blocks.map((b) => {
                     const isOneTime = b.kind === "date_range" && b.start_date && b.start_date === b.end_date && b.day_of_week === null;
                     const typeLabel = b.is_blackout ? "Blackout" : b.kind === "weekly" ? "Weekly" : isOneTime ? "One-time" : "Date range";
+                    const lessonTypeLabel = b.default_lesson_type === "semi_private" ? "Semi-Private" : "Private";
                     const whenLabel = b.kind === "weekly"
                       ? `${WEEKDAYS[b.day_of_week ?? 0]}${b.start_date || b.end_date ? ` (${b.start_date || "…"} → ${b.end_date || "…"})` : ""}`
                       : isOneTime
@@ -660,6 +746,11 @@ export default function PrivateLessonsAdmin() {
                             )}
                           </TableCell>
                           <TableCell>{instructorName(b.instructor_id)}</TableCell>
+                          <TableCell>
+                            {b.is_blackout
+                              ? <Badge variant="secondary" className="text-[10px]">—</Badge>
+                              : <Badge variant="outline" className="text-[10px]">{lessonTypeLabel}</Badge>}
+                          </TableCell>
                           <TableCell>{typeLabel}</TableCell>
                           <TableCell>{whenLabel}</TableCell>
                           <TableCell>
@@ -678,7 +769,7 @@ export default function PrivateLessonsAdmin() {
                         {isExpanded && (
                           <TableRow key={b.id + "-slots"} className="bg-muted/30">
                             <TableCell></TableCell>
-                            <TableCell colSpan={7} className="py-3">
+                            <TableCell colSpan={8} className="py-3">
                               <div className="text-xs text-muted-foreground mb-2">
                                 {slots.length === 0
                                   ? "No upcoming slots in this block."
@@ -707,14 +798,16 @@ export default function PrivateLessonsAdmin() {
                                         <Badge variant="secondary" className="text-[10px]">Closed</Badge>
                                       ) : s.booking ? (
                                         <div className="flex flex-col items-end gap-0.5">
-                                          <Badge variant="default" className="text-[10px]">Booked</Badge>
+                                          <Badge variant="default" className="text-[10px]">
+                                            {s.booking.lesson_type === "semi_private" ? "Semi" : "Private"}
+                                          </Badge>
                                           <span className="text-[11px] font-medium truncate max-w-[140px]">{s.booking.child_name}</span>
                                           <span className="text-[10px] text-muted-foreground capitalize">
                                             {s.booking.auto_charge_status === "succeeded" ? "paid" : (s.booking.payment_status || "unpaid")}
                                           </span>
                                         </div>
                                       ) : (
-                                        <Badge variant="outline" className="text-[10px]">Open</Badge>
+                                        <Badge variant="outline" className="text-[10px]">Open · {s.defaultLessonType === "semi_private" ? "Semi" : "Private"}</Badge>
                                       )}
                                     </button>
                                   ))}
@@ -732,17 +825,18 @@ export default function PrivateLessonsAdmin() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="bookings" className="mt-4">
-          <Card>
-            <CardContent className="pt-6">
+        <TabsContent value="bookings" className="mt-4 space-y-6">
+          {(() => {
+            const renderTable = (rows: any[], emptyMsg: string) => (
               <Table>
                 <TableHeader><TableRow>
-                  <TableHead>Parent</TableHead><TableHead>Swimmer</TableHead><TableHead>Instructor</TableHead>
-                  <TableHead>Lessons</TableHead><TableHead>Charged</TableHead><TableHead>Card</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+                  <TableHead>Parent</TableHead><TableHead>Swimmer</TableHead><TableHead>Lesson</TableHead>
+                  <TableHead>Instructor</TableHead><TableHead>Lessons</TableHead><TableHead>Charged</TableHead>
+                  <TableHead>Card</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {bookings.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No online private bookings yet</TableCell></TableRow>}
-                  {bookings.map((b) => {
+                  {rows.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">{emptyMsg}</TableCell></TableRow>}
+                  {rows.map((b) => {
                     const occs = b.lesson_booking_occurrences || [];
                     const paid = occs.filter((o: any) => o.auto_charge_status === "succeeded").length;
                     return (
@@ -752,10 +846,15 @@ export default function PrivateLessonsAdmin() {
                           <div className="text-xs text-muted-foreground">{b.parent_email}</div>
                         </TableCell>
                         <TableCell>{b.child_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px]">
+                            {b.lesson_type === "semi_private" ? "Semi-Private" : "Private"}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{b.instructor_name || "—"}</TableCell>
                         <TableCell>{occs.length}</TableCell>
                         <TableCell>{paid} / {occs.length}</TableCell>
-                        <TableCell>{b.stripe_payment_method_id ? "On file" : "Pending"}</TableCell>
+                        <TableCell>{b.stripe_payment_method_id ? "On file" : b.booking_source === "admin" ? "Manual" : "Pending"}</TableCell>
                         <TableCell className="capitalize">{b.status}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => setDetailBooking(b)}>
@@ -767,8 +866,27 @@ export default function PrivateLessonsAdmin() {
                   })}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            );
+            return (
+              <>
+                <Card>
+                  <CardHeader><CardTitle className="text-base">Upcoming bookings ({upcomingBookings.length})</CardTitle></CardHeader>
+                  <CardContent>{renderTable(upcomingBookings, "No upcoming bookings")}</CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="cursor-pointer" onClick={() => setShowPast((v) => !v)}>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      {showPast ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      Past bookings ({pastBookings.length})
+                    </CardTitle>
+                  </CardHeader>
+                  {showPast && (
+                    <CardContent>{renderTable(pastBookings, "No past bookings")}</CardContent>
+                  )}
+                </Card>
+              </>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 
@@ -860,6 +978,16 @@ export default function PrivateLessonsAdmin() {
             <div className="grid sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2 text-sm text-muted-foreground">
                 Instructor: <span className="font-medium text-foreground">{instructorName(editingBlock.instructor_id)}</span>
+              </div>
+              <div>
+                <Label>Lesson type</Label>
+                <Select value={editDraft.default_lesson_type} onValueChange={(v) => setEditDraft({ ...editDraft, default_lesson_type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">Private ($65)</SelectItem>
+                    <SelectItem value="semi_private">Semi-Private ($45)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Type</Label>
@@ -1061,14 +1189,30 @@ export default function PrivateLessonsAdmin() {
                   </>
                 )}
                 {!activeSlot.booking && !activeSlot.blocked && (
-                  <Button
-                    variant="destructive"
-                    disabled={slotBusy}
-                    onClick={() => blockSlot(activeSlot)}
-                  >
-                    {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
-                    Close this slot
-                  </Button>
+                  <>
+                    <Button
+                      variant="default"
+                      disabled={slotBusy}
+                      onClick={() => {
+                        setBookForm((f) => ({
+                          ...f,
+                          lesson_type: (activeSlot.defaultLessonType === "semi_private" ? "semi_private" : "private"),
+                        }));
+                        setBookingSlot(activeSlot);
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Book a lesson here
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      disabled={slotBusy}
+                      onClick={() => blockSlot(activeSlot)}
+                    >
+                      {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
+                      Close this slot
+                    </Button>
+                  </>
                 )}
                 {activeSlot.blocked && (
                   <Button
@@ -1117,6 +1261,80 @@ export default function PrivateLessonsAdmin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manual book lesson dialog */}
+      <Dialog open={!!bookingSlot} onOpenChange={(o) => !o && !bookBusy && setBookingSlot(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Book a lesson
+            </DialogTitle>
+          </DialogHeader>
+          {bookingSlot && (
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                {instructorName(bookingSlot.instructor_id)} · {fmtDate(bookingSlot.date)} · {fmtTime(bookingSlot.start)} – {fmtTime(bookingSlot.end)}
+              </div>
+              <div>
+                <Label>Lesson type</Label>
+                <Select value={bookForm.lesson_type} onValueChange={(v: any) => setBookForm({ ...bookForm, lesson_type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">Private ($65)</SelectItem>
+                    <SelectItem value="semi_private">Semi-Private ($45)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Parent name *</Label>
+                  <Input value={bookForm.parent_name} onChange={(e) => setBookForm({ ...bookForm, parent_name: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Parent email *</Label>
+                  <Input type="email" value={bookForm.parent_email} onChange={(e) => setBookForm({ ...bookForm, parent_email: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Parent phone</Label>
+                  <Input value={bookForm.parent_phone} onChange={(e) => setBookForm({ ...bookForm, parent_phone: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Child name</Label>
+                  <Input value={bookForm.child_name} onChange={(e) => setBookForm({ ...bookForm, child_name: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Child age</Label>
+                  <Input type="number" min={0} value={bookForm.child_age} onChange={(e) => setBookForm({ ...bookForm, child_age: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <Label>Notes</Label>
+                <Input value={bookForm.notes} onChange={(e) => setBookForm({ ...bookForm, notes: e.target.value })} />
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <Switch checked={bookForm.recurring} onCheckedChange={(v) => setBookForm({ ...bookForm, recurring: v })} />
+                <Label>Repeat weekly</Label>
+              </div>
+              {bookForm.recurring && (
+                <div>
+                  <Label>Repeat until</Label>
+                  <Input type="date" value={bookForm.series_end} min={bookingSlot.date} onChange={(e) => setBookForm({ ...bookForm, series_end: e.target.value })} />
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                No card is collected — this is a manual booking. You can charge later from the booking detail view if a card is added.
+              </p>
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button variant="outline" disabled={bookBusy} onClick={() => setBookingSlot(null)}>Cancel</Button>
+                <Button disabled={bookBusy} onClick={submitManualBooking}>
+                  {bookBusy && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                  Create booking
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

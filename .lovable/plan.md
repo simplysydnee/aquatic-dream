@@ -1,48 +1,55 @@
-## Problem
+## Goal
+Expand `/admin/private-lessons` so it covers both private and semi-private lessons, separates past from upcoming bookings, lets an admin re-categorize a recurring block's lesson type, and lets an admin manually book a lesson into any open slot.
 
-When "Show weekly options" is on, the recurring panel currently lists every individual time/day combo an instructor has open, even if it only repeats once or twice. The parent can't really see a true recurring weekly slot, and the per-day grid below clutters the view.
+## Changes
 
-## Fix (frontend-only, `src/components/private-lessons/SlotPicker.tsx`)
+### 1. Include semi-private lessons everywhere
+- Update the two booking queries in `PrivateLessonsAdmin.tsx` (`load()`) to fetch `lesson_type IN ('private','semi_private')` instead of just `private`.
+- Add a "Type" column / badge (Private vs Semi-Private) in the booking list and in the slot popovers.
+- Rename the page header/tab labels from "Private Lessons" to "Private & Semi-Private Lessons" (route stays the same).
 
-### 1. True recurring patterns
+### 2. Split upcoming vs past bookings
+- In the Bookings tab, derive two arrays from `bookings`:
+  - **Upcoming** — bookings with at least one non-cancelled occurrence dated `>= today`.
+  - **Past** — bookings whose occurrences are all in the past or cancelled.
+- Render them in two separate cards: "Upcoming Bookings" (default expanded) and "Past Bookings" (collapsed by default, expandable).
+- Past block is read-only style (no Charge/Cancel buttons, only View Details + Delete).
 
-Build `weeklyGroups` so each option represents an `(instructor, day-of-week, start_time)` triple that is open **at least 6 of the 8 weeks** in the window (respecting the AM/PM filter). Patterns open <6 weeks are hidden.
+### 3. Convert a recurring block's lesson type
+- Add a `default_lesson_type` column to `instructor_booking_blocks` (`text`, default `'private'`, check in `('private','semi_private')`) via migration.
+- In the block list row and edit dialog, add a "Lesson type" selector (Private / Semi-Private). Saving updates the block.
+- The public booking flow keeps showing all open slots, but this value is what an admin's manual booking and the slot's badge default to.
 
-Each pattern stores its full list of matching dates (the open ones). The label shows e.g. *"Wednesdays at 4:00 PM with Sophia Cheney — 7 of 8 weeks"*.
+### 4. Manually book a lesson from any open slot
+- Each open slot (no booking, not blacked out) gets a "Book lesson" action in its popover (next to existing Block Slot).
+- Opens a dialog with: Lesson type (private/semi, prefilled from block), Parent name/email/phone, Child name/age, Notes, optional "Recurring weekly until …" date.
+- Submits via a new edge function `admin-create-private-booking` that:
+  - Inserts a `lesson_bookings` row (`booking_source = 'admin'`, no Stripe customer required, `price_per_session` defaults: 65 private / 45 semi).
+  - Inserts `lesson_booking_occurrences` for the chosen date (or weekly series if recurring chosen).
+  - Marks `payment_status = 'unpaid'`, `auto_charge_status = 'skipped'` (admin can charge later if a card is added).
+- After success, reload and the slot appears as booked.
 
-### 2. Hide the per-day grid in weekly mode
+## Technical notes
+- Files touched:
+  - `src/pages/admin/PrivateLessonsAdmin.tsx` — queries, type column, past/upcoming split, type selector, manual-book dialog, "Book lesson" action.
+  - `src/components/private-lessons/PrivateBookingFlow.tsx` (optional) — show the block's lesson type label, no business change.
+  - New: `supabase/functions/admin-create-private-booking/index.ts` (admin-only, JWT-verified, Zod-validated).
+  - New migration: add `default_lesson_type` to `instructor_booking_blocks`.
+- "Past" cutoff uses the occurrence_date, not booking creation date.
+- No change to the public self-serve booking flow's pricing or Stripe-card-required rule.
 
-When `weeklyMode` is on, render only the recurring quick-picks (and the selected pattern's date list). The per-date browse grid is hidden. Day chip is also hidden (irrelevant); only the AM/PM filter remains.
+```text
+Bookings tab
+├── Filter: All | Private | Semi-Private
+├── Upcoming Bookings (N)
+│   └── rows with Type badge + Charge/Cancel
+└── ▸ Past Bookings (M)   ← collapsible
+    └── rows with Type badge + View/Delete only
 
-### 3. Expand pattern → date list with skip
-
-Clicking a pattern card "selects" it (one pattern at a time in v1). The card expands inline to show every date in the series:
-
+Blocks tab
+└── block row
+    ├── Lesson type: [Private ▾]   ← new
+    ├── Edit / Delete
+    └── ▾ open slots
+        └── slot popover: View booking | Book lesson | Block slot
 ```
-Wednesdays at 4:00 PM · Sophia Cheney        [Change pattern]
-  Jun 17  ✓                                                      ×
-  Jun 24  ✓                                                      ×
-  Jul 1   — unavailable (auto-skipped)
-  Jul 8   ✓                                                      ×
-  …
-7 lessons selected · $455 total
-```
-
-- Each available date is selected by default. The tiny `×` in the corner removes that single week from the booking.
-- Auto-skipped weeks (where the slot wasn't open) are shown greyed out with an "unavailable" note and cannot be toggled on.
-- "Change pattern" deselects and returns to the pattern list.
-
-### 4. Pricing reflects kept weeks
-
-The sticky footer total stays `selectedList.length × $65`. Removing a week via `×` drops it from `selected`, so the count and total update immediately. ("Subtract from total" behavior.)
-
-### 5. Switching modes
-
-Toggling `weeklyMode` off clears any recurring selection (avoids confusion with the per-day grid). Toggling on clears prior single-slot selections for the same reason.
-
-## Out of scope
-
-- No backend, RPC, schema, or `fetchOpenSlots` changes.
-- No change to slot holds / checkout flow — the picker still emits a flat `Slot[]` to `onContinue`.
-- Only one recurring pattern at a time (multi-pattern booking can be a follow-up).
-- No change to the day-grid (non-weekly) mode behavior beyond what was shipped last turn.
