@@ -255,6 +255,7 @@ export default function PrivateLessonsAdmin() {
       end_date: endDate,
       break_start_time: d.has_break ? d.break_start_time : null,
       break_end_time: d.has_break ? d.break_end_time : null,
+      default_lesson_type: d.default_lesson_type,
     };
     setSavingEdit(true);
     const { error } = await supabase.from("instructor_booking_blocks").update(payload).eq("id", editingBlock.id);
