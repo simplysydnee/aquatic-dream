@@ -718,14 +718,15 @@ export default function PrivateLessonsAdmin() {
               <Table>
                 <TableHeader><TableRow>
                   <TableHead className="w-8"></TableHead>
-                  <TableHead>Instructor</TableHead><TableHead>Type</TableHead><TableHead>When</TableHead>
+                  <TableHead>Instructor</TableHead><TableHead>Lesson</TableHead><TableHead>Type</TableHead><TableHead>When</TableHead>
                   <TableHead>Time</TableHead><TableHead>Slot</TableHead><TableHead>Pool</TableHead><TableHead></TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {blocks.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No availability set</TableCell></TableRow>}
+                  {blocks.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">No availability set</TableCell></TableRow>}
                   {blocks.map((b) => {
                     const isOneTime = b.kind === "date_range" && b.start_date && b.start_date === b.end_date && b.day_of_week === null;
                     const typeLabel = b.is_blackout ? "Blackout" : b.kind === "weekly" ? "Weekly" : isOneTime ? "One-time" : "Date range";
+                    const lessonTypeLabel = b.default_lesson_type === "semi_private" ? "Semi-Private" : "Private";
                     const whenLabel = b.kind === "weekly"
                       ? `${WEEKDAYS[b.day_of_week ?? 0]}${b.start_date || b.end_date ? ` (${b.start_date || "…"} → ${b.end_date || "…"})` : ""}`
                       : isOneTime
@@ -745,6 +746,11 @@ export default function PrivateLessonsAdmin() {
                             )}
                           </TableCell>
                           <TableCell>{instructorName(b.instructor_id)}</TableCell>
+                          <TableCell>
+                            {b.is_blackout
+                              ? <Badge variant="secondary" className="text-[10px]">—</Badge>
+                              : <Badge variant="outline" className="text-[10px]">{lessonTypeLabel}</Badge>}
+                          </TableCell>
                           <TableCell>{typeLabel}</TableCell>
                           <TableCell>{whenLabel}</TableCell>
                           <TableCell>
