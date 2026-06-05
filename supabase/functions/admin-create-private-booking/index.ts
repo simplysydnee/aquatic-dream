@@ -2,6 +2,7 @@
 // (single date or recurring weekly series). No Stripe card required.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
+import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -65,7 +66,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const instructorName = (instr as any)?.name || "Instructor";
 
-    const defaultPrice = p.lesson_type === "semi_private" ? 45 : 65;
+    // Snapshot price = price for the first occurrence. Charge-time logic
+    // re-derives per occurrence, so a series straddling June still bills
+    // $50 for June dates and $65 for July dates automatically.
+    const defaultPrice = getPrivateLessonPrice(p.lesson_type, p.start_date);
     const price = p.price_per_session ?? defaultPrice;
 
     // Build occurrence dates
