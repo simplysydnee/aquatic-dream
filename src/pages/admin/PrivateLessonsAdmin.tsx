@@ -83,17 +83,28 @@ export default function PrivateLessonsAdmin() {
     start_time: "15:00", end_time: "18:00", slot_minutes: 30,
     pool_area: "shallow", is_blackout: false, notes: "",
     has_break: false, break_start_time: "", break_end_time: "",
+    default_lesson_type: "private",
   });
   const [savingEdit, setSavingEdit] = useState(false);
   const [activeSlot, setActiveSlot] = useState<SlotRow | null>(null);
   const [slotBusy, setSlotBusy] = useState(false);
   const [confirmSlotCancel, setConfirmSlotCancel] = useState<SlotRow | null>(null);
+  const [showPast, setShowPast] = useState(false);
+  const [bookingSlot, setBookingSlot] = useState<SlotRow | null>(null);
+  const [bookForm, setBookForm] = useState({
+    lesson_type: "private" as "private" | "semi_private",
+    parent_name: "", parent_email: "", parent_phone: "",
+    child_name: "", child_age: "",
+    notes: "", recurring: false, series_end: "",
+  });
+  const [bookBusy, setBookBusy] = useState(false);
   const [draft, setDraft] = useState({
     instructor_id: "", kind: "weekly" as UiKind,
     day_of_week: 1, start_date: "", end_date: "",
     start_time: "15:00", end_time: "18:00", slot_minutes: 30,
     pool_area: "shallow", is_blackout: false, notes: "",
     has_break: false, break_start_time: "", break_end_time: "",
+    default_lesson_type: "private",
   });
 
   const load = async () => {
