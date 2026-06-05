@@ -178,6 +178,7 @@ export default function PrivateLessonsAdmin() {
       end_date: endDate,
       break_start_time: draft.has_break ? draft.break_start_time : null,
       break_end_time: draft.has_break ? draft.break_end_time : null,
+      default_lesson_type: draft.default_lesson_type,
     };
 
     const { error } = await supabase.from("instructor_booking_blocks").insert(payload);
