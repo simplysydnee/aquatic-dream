@@ -1189,14 +1189,30 @@ export default function PrivateLessonsAdmin() {
                   </>
                 )}
                 {!activeSlot.booking && !activeSlot.blocked && (
-                  <Button
-                    variant="destructive"
-                    disabled={slotBusy}
-                    onClick={() => blockSlot(activeSlot)}
-                  >
-                    {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
-                    Close this slot
-                  </Button>
+                  <>
+                    <Button
+                      variant="default"
+                      disabled={slotBusy}
+                      onClick={() => {
+                        setBookForm((f) => ({
+                          ...f,
+                          lesson_type: (activeSlot.defaultLessonType === "semi_private" ? "semi_private" : "private"),
+                        }));
+                        setBookingSlot(activeSlot);
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Book a lesson here
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      disabled={slotBusy}
+                      onClick={() => blockSlot(activeSlot)}
+                    >
+                      {slotBusy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
+                      Close this slot
+                    </Button>
+                  </>
                 )}
                 {activeSlot.blocked && (
                   <Button
