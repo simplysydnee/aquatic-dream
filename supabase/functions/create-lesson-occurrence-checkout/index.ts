@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { createStripeClient, type StripeEnv } from '../_shared/stripe.ts'
+import { getPrivateLessonPrice, isJunePromoDate } from '../_shared/private-lesson-pricing.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,13 +31,18 @@ Deno.serve(async (req) => {
     const booking = (occ as any).lesson_bookings
     if (!booking) return json({ error: 'Parent booking missing' }, 500)
 
-    const price = Number(booking.price_per_session)
+    // Authoritative price: based on lesson_type + occurrence date.
+    // Honors the June 2026 private-lesson promo ($50) regardless of any
+    // snapshot price stored on the booking row.
+    const price = getPrivateLessonPrice(booking.lesson_type, occ.occurrence_date)
     if (!price || price <= 0) return json({ error: 'Invalid price' }, 400)
 
     const env: StripeEnv = environment === 'live' ? 'live' : 'sandbox'
     const stripe = createStripeClient(env)
 
     const lessonTypeLabel = booking.lesson_type === 'private' ? 'Private Lesson' : 'Semi-Private Lesson'
+    const promoSuffix = booking.lesson_type === 'private' && isJunePromoDate(occ.occurrence_date)
+      ? ' (June Special)' : ''
     const occDate = new Date(occ.occurrence_date + 'T00:00:00')
     const lessonDateLabel = occDate.toLocaleDateString('en-US', {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -47,7 +53,7 @@ Deno.serve(async (req) => {
         price_data: {
           currency: 'usd',
           product_data: {
-            name: `${lessonTypeLabel} — ${lessonDateLabel}`,
+            name: `${lessonTypeLabel}${promoSuffix} — ${lessonDateLabel}`,
             description: `${booking.child_name || booking.parent_name}`,
           },
           unit_amount: Math.round(price * 100),
