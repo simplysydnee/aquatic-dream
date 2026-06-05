@@ -62,9 +62,8 @@ export async function fetchOpenSlots(opts: {
   const fromIso = isoDate(opts.fromDate);
   const toIso = isoDate(toDate);
 
-  // Fetch instructors
-  const { data: instData } = await supabase.from("instructors")
-    .select("id, name").eq("is_active", true);
+  // Fetch instructors via public RPC (id/name only)
+  const { data: instData } = await supabase.rpc("get_active_instructors_public");
   const instructors = (instData as Instructor[]) || [];
   const instructorMap = Object.fromEntries(instructors.map((i) => [i.id, i.name]));
   const allowed = new Set(opts.instructorIds && opts.instructorIds.length ? opts.instructorIds : instructors.map((i) => i.id));
