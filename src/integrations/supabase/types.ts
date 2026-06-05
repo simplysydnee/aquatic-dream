@@ -2254,6 +2254,18 @@ export type Database = {
           name: string
         }[]
       }
+      get_active_slot_holds: {
+        Args: {
+          p_from_date: string
+          p_session_token?: string
+          p_to_date: string
+        }
+        Returns: {
+          instructor_id: string
+          slot_date: string
+          start_time: string
+        }[]
+      }
       get_active_waiver_for_swimmer: {
         Args: { _dob: string; _first: string; _last: string }
         Returns: {
