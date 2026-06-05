@@ -47,7 +47,7 @@ function isoDate(d: Date): string {
 }
 
 export async function fetchInstructors(): Promise<Instructor[]> {
-  const { data } = await supabase.from("instructors").select("id, name").eq("is_active", true).order("name");
+  const { data } = await supabase.rpc("get_active_instructors_public");
   return ((data as any[]) || []).map((d) => ({ id: d.id, name: d.name }));
 }
 
