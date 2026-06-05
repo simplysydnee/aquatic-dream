@@ -209,6 +209,7 @@ export default function PrivateLessonsAdmin() {
       has_break: !!(b.break_start_time && b.break_end_time),
       break_start_time: b.break_start_time ? b.break_start_time.slice(0, 5) : "",
       break_end_time: b.break_end_time ? b.break_end_time.slice(0, 5) : "",
+      default_lesson_type: b.default_lesson_type || "private",
     });
     setEditingBlock(b);
   };
