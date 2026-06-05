@@ -980,6 +980,16 @@ export default function PrivateLessonsAdmin() {
                 Instructor: <span className="font-medium text-foreground">{instructorName(editingBlock.instructor_id)}</span>
               </div>
               <div>
+                <Label>Lesson type</Label>
+                <Select value={editDraft.default_lesson_type} onValueChange={(v) => setEditDraft({ ...editDraft, default_lesson_type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">Private ($65)</SelectItem>
+                    <SelectItem value="semi_private">Semi-Private ($45)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Type</Label>
                 <Select value={editDraft.kind} onValueChange={(v: any) => setEditDraft({ ...editDraft, kind: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
