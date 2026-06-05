@@ -338,6 +338,7 @@ export default function PrivateLessonsAdmin() {
             end: slotEnd,
             parentBlockId: b.id,
             instructor_id: b.instructor_id,
+            defaultLessonType: b.default_lesson_type || "private",
             booking: bookingMap.get(key),
             blocked: blackoutBlock ? { block_id: blackoutBlock.id } : undefined,
           });
