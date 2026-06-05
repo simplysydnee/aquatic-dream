@@ -769,7 +769,7 @@ export default function PrivateLessonsAdmin() {
                         {isExpanded && (
                           <TableRow key={b.id + "-slots"} className="bg-muted/30">
                             <TableCell></TableCell>
-                            <TableCell colSpan={7} className="py-3">
+                            <TableCell colSpan={8} className="py-3">
                               <div className="text-xs text-muted-foreground mb-2">
                                 {slots.length === 0
                                   ? "No upcoming slots in this block."
