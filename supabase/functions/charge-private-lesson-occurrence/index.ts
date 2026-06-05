@@ -2,6 +2,7 @@
 // charges $price_per_session off-session via stored payment method.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient } from "../_shared/stripe.ts";
+import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,7 +33,7 @@ Deno.serve(async (req) => {
     // and any missed prior days) and are still pending.
     const { data: due, error } = await supabase
       .from("lesson_booking_occurrences")
-      .select("id, booking_id, occurrence_date, status, lesson_bookings!inner(id, parent_email, parent_first_name, parent_name, child_name, stripe_customer_id, stripe_payment_method_id, price_per_session, instructor_name, start_time, end_time)")
+      .select("id, booking_id, occurrence_date, status, lesson_bookings!inner(id, parent_email, parent_first_name, parent_name, child_name, stripe_customer_id, stripe_payment_method_id, price_per_session, instructor_name, lesson_type, start_time, end_time)")
       .eq("auto_charge_status", "pending")
       .lte("occurrence_date", yyyy_mm_dd)
       .neq("status", "cancelled")
@@ -64,7 +65,11 @@ Deno.serve(async (req) => {
         results.push({ id: row.id, ok: false, reason: "no_pm" });
         continue;
       }
-      const amount = Math.round(Number(b.price_per_session || 65) * 100);
+      // Authoritative: derive from lesson_type + occurrence date. Honors the
+      // June 2026 promo even on bookings created before June with a stale
+      // price_per_session snapshot.
+      const dollars = getPrivateLessonPrice(b.lesson_type, row.occurrence_date);
+      const amount = Math.round(dollars * 100);
       try {
         const pi = await stripe.paymentIntents.create({
           amount,

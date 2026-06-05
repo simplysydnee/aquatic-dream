@@ -3,6 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
+import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -128,7 +129,7 @@ Deno.serve(async (req) => {
       child_first_name: body.child_first_name,
       child_last_name: body.child_last_name,
       child_age: body.child_age,
-      price_per_session: 65,
+      price_per_session: getPrivateLessonPrice("private", first.slot_date),
       instructor_name: instructorName,
       instructor_id: body.slots[0].instructor_id,
       pool_area: "shallow",

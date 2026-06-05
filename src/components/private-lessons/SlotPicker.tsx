@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ChevronLeft, X } from "lucide-react";
 import { fetchInstructors, fetchOpenSlots, holdSlots, Slot } from "@/lib/privateBooking";
+import { getPrivateLessonPrice, isJunePromoDate, PRIVATE_REGULAR_PRICE } from "@/lib/privateLessonPricing";
 
 interface Props {
   sessionToken: string;
@@ -366,12 +367,16 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
                   {daySlots.map((s) => {
                     const k = slotKey(s);
                     const isSel = !!selected[k];
+                    const promo = isJunePromoDate(s.slot_date);
                     return (
                       <button key={k} onClick={() => toggle(s)} type="button"
                         className={`px-3 py-1.5 text-xs rounded-md border transition ${isSel
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-background hover:bg-muted border-border"}`}>
                         {formatTime(s.start_time)} · {s.instructor_name}
+                        {promo && (
+                          <span className={`ml-1.5 font-semibold ${isSel ? "text-primary-foreground" : "text-coral"}`}>$50</span>
+                        )}
                       </button>
                     );
                   })}
@@ -388,14 +393,26 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
             <ChevronLeft className="w-4 h-4 mr-1" /> Back
           </Button>
           <div className="text-sm">
-            {selectedList.length > 0 ? (
-              <span className="font-semibold">
-                {selectedList.length} lesson{selectedList.length === 1 ? "" : "s"} · ${selectedList.length * 65} total
-                <span className="block text-xs text-muted-foreground font-normal">
-                  $65 charged after each lesson
+            {selectedList.length > 0 ? (() => {
+              const perPrices = selectedList.map((s) => getPrivateLessonPrice("private", s.slot_date));
+              const total = perPrices.reduce((a, b) => a + b, 0);
+              const anyPromo = perPrices.some((p) => p < PRIVATE_REGULAR_PRICE);
+              const allPromo = perPrices.every((p) => p < PRIVATE_REGULAR_PRICE);
+              return (
+                <span className="font-semibold">
+                  {selectedList.length} lesson{selectedList.length === 1 ? "" : "s"} ·{" "}
+                  {anyPromo && <span className="line-through text-muted-foreground mr-1 font-normal">${selectedList.length * PRIVATE_REGULAR_PRICE}</span>}
+                  ${total} total
+                  <span className="block text-xs text-muted-foreground font-normal">
+                    {allPromo
+                      ? "$50 June Special — charged after each lesson"
+                      : anyPromo
+                      ? "June lessons $50, others $65 — charged after each lesson"
+                      : "$65 charged after each lesson"}
+                  </span>
                 </span>
-              </span>
-            ) : (
+              );
+            })() : (
               <span className="text-muted-foreground">Select at least one slot</span>
             )}
           </div>

@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
 import { buildSessionCalendarLinks } from "../_shared/calendar-links.ts";
+import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
 
 
 const corsHeaders = {
@@ -112,11 +113,19 @@ Deno.serve(async (req) => {
               instructorName: b.instructor_name,
               seriesMode: schedule.length > 1,
               totalOccurrences: schedule.length,
-              totalAmountDue: `$${(schedule.length * Number(b.price_per_session)).toFixed(2)} (charged $${Number(b.price_per_session).toFixed(0)} the day of each lesson)`,
+              totalAmountDue: (() => {
+                const perPrices = occList.map((o) => getPrivateLessonPrice(b.lesson_type, o.occurrence_date));
+                const total = perPrices.reduce((s, p) => s + p, 0);
+                const allSame = perPrices.every((p) => p === perPrices[0]);
+                if (allSame) {
+                  return `$${total.toFixed(2)} (charged $${perPrices[0].toFixed(0)} the day of each lesson)`;
+                }
+                return `$${total.toFixed(2)} total — June lessons $50 each, other lessons $65 each, charged the day of each lesson`;
+              })(),
               scheduleList: schedule,
               lessonDate: schedule[0]?.date,
               lessonTime: schedule[0]?.time,
-              amountDue: `$${Number(b.price_per_session).toFixed(0)}`,
+              amountDue: `$${getPrivateLessonPrice(b.lesson_type, occList[0]?.occurrence_date || b.series_start).toFixed(0)}`,
               waiverSigned: true,
               icsLink,
               googleCalendarLink,
