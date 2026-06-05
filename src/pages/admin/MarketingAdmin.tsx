@@ -177,6 +177,10 @@ export default function MarketingAdmin() {
           )}
         </TabsContent>
 
+        <TabsContent value="welcome" className="mt-4">
+          <WelcomeEmailsTab />
+        </TabsContent>
+
         <TabsContent value="contacts" className="mt-4">
           <ContactsTab contacts={contacts} onChange={loadAll} />
         </TabsContent>
