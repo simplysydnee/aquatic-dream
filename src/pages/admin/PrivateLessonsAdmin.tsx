@@ -536,6 +536,64 @@ export default function PrivateLessonsAdmin() {
     }
   };
 
+  const { upcomingBookings, pastBookings } = useMemo(() => {
+    const todayStr = isoDate(new Date());
+    const upcoming: any[] = [];
+    const past: any[] = [];
+    for (const b of bookings) {
+      const occs = b.lesson_booking_occurrences || [];
+      const hasFuture = occs.some(
+        (o: any) => o.status !== "cancelled" && o.occurrence_date >= todayStr,
+      );
+      if (hasFuture) upcoming.push(b);
+      else past.push(b);
+    }
+    return { upcomingBookings: upcoming, pastBookings: past };
+  }, [bookings]);
+
+  const submitManualBooking = async () => {
+    if (!bookingSlot) return;
+    if (!bookForm.parent_name || !bookForm.parent_email) {
+      toast({ title: "Parent name and email required", variant: "destructive" });
+      return;
+    }
+    setBookBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-create-private-booking", {
+        body: {
+          instructor_id: bookingSlot.instructor_id,
+          lesson_type: bookForm.lesson_type,
+          start_date: bookingSlot.date,
+          start_time: bookingSlot.start,
+          end_time: bookingSlot.end,
+          pool_area: blocks.find((b) => b.id === bookingSlot.parentBlockId)?.pool_area || "shallow",
+          parent_name: bookForm.parent_name,
+          parent_email: bookForm.parent_email,
+          parent_phone: bookForm.parent_phone || null,
+          child_name: bookForm.child_name || null,
+          child_age: bookForm.child_age ? Number(bookForm.child_age) : null,
+          notes: bookForm.notes || null,
+          recurring: bookForm.recurring,
+          series_end: bookForm.recurring && bookForm.series_end ? bookForm.series_end : null,
+        },
+      });
+      if (error || (data as any)?.error) {
+        throw new Error(error?.message || (data as any)?.error || "Failed to create");
+      }
+      toast({ title: "Lesson booked" });
+      setBookingSlot(null);
+      setActiveSlot(null);
+      setBookForm({
+        lesson_type: "private", parent_name: "", parent_email: "", parent_phone: "",
+        child_name: "", child_age: "", notes: "", recurring: false, series_end: "",
+      });
+      await load();
+    } catch (e: any) {
+      toast({ title: "Could not book", description: e?.message, variant: "destructive" });
+    } finally {
+      setBookBusy(false);
+    }
+  };
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
