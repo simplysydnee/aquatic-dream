@@ -825,17 +825,18 @@ export default function PrivateLessonsAdmin() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="bookings" className="mt-4">
-          <Card>
-            <CardContent className="pt-6">
+        <TabsContent value="bookings" className="mt-4 space-y-6">
+          {(() => {
+            const renderTable = (rows: any[], emptyMsg: string) => (
               <Table>
                 <TableHeader><TableRow>
-                  <TableHead>Parent</TableHead><TableHead>Swimmer</TableHead><TableHead>Instructor</TableHead>
-                  <TableHead>Lessons</TableHead><TableHead>Charged</TableHead><TableHead>Card</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+                  <TableHead>Parent</TableHead><TableHead>Swimmer</TableHead><TableHead>Lesson</TableHead>
+                  <TableHead>Instructor</TableHead><TableHead>Lessons</TableHead><TableHead>Charged</TableHead>
+                  <TableHead>Card</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {bookings.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No online private bookings yet</TableCell></TableRow>}
-                  {bookings.map((b) => {
+                  {rows.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">{emptyMsg}</TableCell></TableRow>}
+                  {rows.map((b) => {
                     const occs = b.lesson_booking_occurrences || [];
                     const paid = occs.filter((o: any) => o.auto_charge_status === "succeeded").length;
                     return (
@@ -845,10 +846,15 @@ export default function PrivateLessonsAdmin() {
                           <div className="text-xs text-muted-foreground">{b.parent_email}</div>
                         </TableCell>
                         <TableCell>{b.child_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px]">
+                            {b.lesson_type === "semi_private" ? "Semi-Private" : "Private"}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{b.instructor_name || "—"}</TableCell>
                         <TableCell>{occs.length}</TableCell>
                         <TableCell>{paid} / {occs.length}</TableCell>
-                        <TableCell>{b.stripe_payment_method_id ? "On file" : "Pending"}</TableCell>
+                        <TableCell>{b.stripe_payment_method_id ? "On file" : b.booking_source === "admin" ? "Manual" : "Pending"}</TableCell>
                         <TableCell className="capitalize">{b.status}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => setDetailBooking(b)}>
@@ -860,8 +866,27 @@ export default function PrivateLessonsAdmin() {
                   })}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            );
+            return (
+              <>
+                <Card>
+                  <CardHeader><CardTitle className="text-base">Upcoming bookings ({upcomingBookings.length})</CardTitle></CardHeader>
+                  <CardContent>{renderTable(upcomingBookings, "No upcoming bookings")}</CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="cursor-pointer" onClick={() => setShowPast((v) => !v)}>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      {showPast ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      Past bookings ({pastBookings.length})
+                    </CardTitle>
+                  </CardHeader>
+                  {showPast && (
+                    <CardContent>{renderTable(pastBookings, "No past bookings")}</CardContent>
+                  )}
+                </Card>
+              </>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 
