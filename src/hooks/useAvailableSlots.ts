@@ -62,10 +62,7 @@ export function useAvailableSlots(
           .from("pool_events")
           .select("start_time, end_time, pool_area")
           .eq("event_date", dateStr),
-        supabase
-          .from("instructors")
-          .select("id, name")
-          .eq("is_active", true),
+        supabase.rpc("get_active_instructors_public"),
       ]);
 
       if (cancelled) return;
