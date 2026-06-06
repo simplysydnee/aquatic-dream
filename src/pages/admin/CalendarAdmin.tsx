@@ -252,6 +252,15 @@ const CalendarAdmin = () => {
         />
       )}
 
+      {/* Private lessons (booked + open slots) for the selected day */}
+      {view === "day" && !loading && (
+        <PrivateLessonsPanel
+          date={currentDate}
+          privateLessons={privateLessons}
+          openSlots={openPrivateSlots}
+          onRefetch={refetch}
+        />
+      )}
 
       <AddPoolEventDialog
         open={showAddEvent}
