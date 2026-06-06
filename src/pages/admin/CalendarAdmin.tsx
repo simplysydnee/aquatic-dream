@@ -56,9 +56,12 @@ const CalendarAdmin = () => {
     agreements,
     icsSessions,
     lessonDates,
+    privateLessons,
+    openPrivateSlots,
     loading,
     refetch,
   } = useCalendarData(currentDate, view);
+
 
   const navigateDate = (dir: number) => {
     setCurrentDate((d) => addDays(d, view === "week" ? dir * 7 : dir));
