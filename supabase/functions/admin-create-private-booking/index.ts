@@ -240,6 +240,31 @@ Deno.serve(async (req) => {
     const waiverToken =
       crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
 
+    // If admin captured a card via Stripe Setup Checkout, resolve the
+    // payment method now and stamp it on the booking. We never want a
+    // "card_on_file" booking row without a real card attached.
+    let stripePaymentMethodId: string | null = null;
+    let stripeCustomerId: string | null = p.stripe_customer_id || null;
+    if (p.collect_card_on_file && p.stripe_checkout_session_id) {
+      const env = (p.stripe_environment || "live") as StripeEnv;
+      const stripe = createStripeClient(env);
+      const cs = await stripe.checkout.sessions.retrieve(p.stripe_checkout_session_id);
+      if (cs.status !== "complete" || !cs.setup_intent) {
+        return j({ error: `Card setup not complete: ${cs.status}` }, 400);
+      }
+      const siId = typeof cs.setup_intent === "string" ? cs.setup_intent : cs.setup_intent.id;
+      const si = await stripe.setupIntents.retrieve(siId);
+      if (si.status !== "succeeded" || !si.payment_method) {
+        return j({ error: `Card setup not ready: ${si.status}` }, 400);
+      }
+      stripePaymentMethodId = typeof si.payment_method === "string" ? si.payment_method : si.payment_method.id;
+      if (!stripeCustomerId) {
+        stripeCustomerId = typeof cs.customer === "string" ? cs.customer : (cs.customer?.id ?? null);
+      }
+    } else if (p.collect_card_on_file && !p.stripe_checkout_session_id) {
+      return j({ error: "Card on file required but no Stripe checkout session was provided" }, 400);
+    }
+
     const { data: booking, error: bErr } = await supabaseAdmin
       .from("lesson_bookings")
       .insert({
@@ -267,6 +292,9 @@ Deno.serve(async (req) => {
         status: "active",
         booking_source: "admin",
         waiver_token: waiverToken,
+        cancellation_policy_hours: 24,
+        stripe_customer_id: stripeCustomerId,
+        stripe_payment_method_id: stripePaymentMethodId,
       })
       .select("id")
       .single();
