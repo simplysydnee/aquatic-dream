@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,9 +9,11 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronLeft } from "lucide-react";
 import { format } from "date-fns";
 import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
+import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
+import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 
 interface Instructor { id: string; name: string }
 
@@ -32,9 +34,12 @@ interface Props {
   onBooked: () => void;
 }
 
+type Step = "form" | "card" | "finalizing";
+
 export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefill, onBooked }: Props) {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState<Step>("form");
   const [lessonType, setLessonType] = useState<"private" | "semi_private">("private");
   const [instructorId, setInstructorId] = useState<string>("");
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -55,6 +60,14 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
   const [collectCardOnFile, setCollectCardOnFile] = useState(true);
   const [priceOverride, setPriceOverride] = useState<string>("");
 
+  // Stripe SetupIntent state
+  const [stripeReady, setStripeReady] = useState<any>(null);
+  const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
+  const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
+  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
+
+  useEffect(() => { getStripe().then(setStripeReady).catch(() => {}); }, []);
+
   useEffect(() => {
     if (!open) return;
     supabase.rpc("get_active_instructors_public").then(({ data }) => {
@@ -64,7 +77,6 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
 
   useEffect(() => {
     if (!open) return;
-    // Apply prefill / defaults
     if (prefill?.instructor_id) setInstructorId(prefill.instructor_id);
     if (prefill?.date) setDate(prefill.date);
     if (prefill?.start_time) setStartTime(prefill.start_time);
@@ -80,6 +92,7 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
   const junePromo = isJunePromoDate(date);
 
   const reset = () => {
+    setStep("form");
     setLessonType("private");
     setInstructorId("");
     setDate(format(new Date(), "yyyy-MM-dd"));
@@ -90,14 +103,11 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
     setChildFirst(""); setChildLast(""); setChildAge("");
     setNotes(""); setRecurring(false); setSeriesEnd("");
     setSendConfirmation(true); setCollectCardOnFile(true); setPriceOverride("");
+    setSetupClientSecret(null); setCheckoutSessionId(null); setStripeCustomerId(null);
   };
 
-  const handleSubmit = async () => {
-    if (!instructorId) { toast.error("Pick an instructor"); return; }
-    if (!parentFirst || !parentLast || !parentEmail) { toast.error("Parent name and email required"); return; }
-    if (recurring && !seriesEnd) { toast.error("Pick a series end date"); return; }
-
-    setSubmitting(true);
+  const finalizeBooking = useCallback(async (sessionId: string | null, customerId: string | null) => {
+    setStep("finalizing");
     try {
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking", {
         body: {
@@ -122,34 +132,100 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
           price_per_session: priceOverride ? Number(priceOverride) : undefined,
           send_confirmation: sendConfirmation,
           collect_card_on_file: collectCardOnFile,
+          stripe_environment: getStripeEnvironment(),
+          stripe_customer_id: customerId,
+          stripe_checkout_session_id: sessionId,
         },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
 
       toast.success(
-        `Booking created${(data as any)?.occurrences ? ` — ${(data as any).occurrences} lesson(s)` : ""}${sendConfirmation ? " — confirmation email sent" : ""}`
+        `Booking created${(data as any)?.occurrences ? ` — ${(data as any).occurrences} lesson(s)` : ""}${collectCardOnFile ? " with card on file" : ""}${sendConfirmation ? " — confirmation email sent" : ""}`
       );
       reset();
       onBooked();
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message || "Failed to create booking");
+      setStep(collectCardOnFile && sessionId ? "card" : "form");
+    }
+  }, [
+    instructorId, lessonType, date, startTime, endTime, poolArea,
+    parentFirst, parentLast, parentEmail, parentPhone,
+    childFirst, childLast, childAge, notes, recurring, seriesEnd,
+    priceOverride, sendConfirmation, collectCardOnFile,
+    onBooked, onOpenChange,
+  ]);
+
+  const handleSubmit = async () => {
+    if (!instructorId) { toast.error("Pick an instructor"); return; }
+    if (!parentFirst || !parentLast || !parentEmail) { toast.error("Parent name and email required"); return; }
+    if (recurring && !seriesEnd) { toast.error("Pick a series end date"); return; }
+
+    // No card requested → create booking directly
+    if (!collectCardOnFile) {
+      setSubmitting(true);
+      await finalizeBooking(null, null);
+      setSubmitting(false);
+      return;
+    }
+
+    // Card requested → open Stripe Setup Checkout first
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-create-private-booking-setup", {
+        body: {
+          environment: getStripeEnvironment(),
+          parent_first_name: parentFirst,
+          parent_last_name: parentLast,
+          parent_email: parentEmail.trim().toLowerCase(),
+          parent_phone: parentPhone || null,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setSetupClientSecret((data as any).client_secret);
+      setCheckoutSessionId((data as any).checkout_session_id);
+      setStripeCustomerId((data as any).customer_id);
+      setStep("card");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not start card setup");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleCardComplete = useCallback(() => {
+    if (!checkoutSessionId) return;
+    finalizeBooking(checkoutSessionId, stripeCustomerId);
+  }, [checkoutSessionId, stripeCustomerId, finalizeBooking]);
+
+  const checkoutOptions = useMemo(
+    () => ({
+      fetchClientSecret: () => Promise.resolve(setupClientSecret || ""),
+      onComplete: handleCardComplete,
+    }),
+    [setupClientSecret, handleCardComplete],
+  );
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Book Private Lesson</DialogTitle>
+          <DialogTitle>
+            {step === "form" && "Book Private Lesson"}
+            {step === "card" && "Save card on file"}
+            {step === "finalizing" && "Finalizing booking…"}
+          </DialogTitle>
           <DialogDescription>
-            Create a private or semi-private lesson booking. Confirmation email includes lesson dates, price, waiver link, and Add to Calendar.
+            {step === "form" && "Create a private or semi-private lesson booking. Confirmation email includes lesson dates, price, waiver link, and Add to Calendar."}
+            {step === "card" && "Stripe will securely save the parent's card. No charge today — we'll charge on the day of each lesson."}
+            {step === "finalizing" && "Saving booking and sending confirmation…"}
           </DialogDescription>
         </DialogHeader>
 
+        {step === "form" && (
         <div className="grid gap-4">
           {/* Lesson type + instructor */}
           <div className="grid grid-cols-2 gap-3">
@@ -280,21 +356,55 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
             <div className="flex items-center gap-2">
               <Switch checked={collectCardOnFile} onCheckedChange={setCollectCardOnFile} id="cof" />
               <Label htmlFor="cof" className="cursor-pointer text-sm">
-                Include "Save card on file" link in the email
+                Collect card on file now (parent enters card in next step)
               </Label>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Parent saves their card via Stripe — we charge per lesson on the day of each session.
+              {collectCardOnFile
+                ? "After saving, Stripe's secure card form will load in this dialog. The card is saved to the parent's Stripe customer and charged the day of each lesson."
+                : "No card will be saved. You can collect payment manually."}
             </p>
           </div>
         </div>
+        )}
+
+        {step === "card" && setupClientSecret && stripeReady && (
+          <div className="grid gap-3">
+            <div className="text-sm text-muted-foreground">
+              Parent: <span className="font-medium text-foreground">{parentFirst} {parentLast}</span> · {parentEmail}
+            </div>
+            <div className="border border-border rounded-lg bg-card overflow-hidden">
+              <EmbeddedCheckoutProvider stripe={stripeReady} options={checkoutOptions}>
+                <EmbeddedCheckout />
+              </EmbeddedCheckoutProvider>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              No charge today. Stripe stores the card on the parent's customer record for future per-lesson charges.
+            </p>
+          </div>
+        )}
+
+        {step === "finalizing" && (
+          <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin" /> Creating booking and sending confirmation…
+          </div>
+        )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Create booking
-          </Button>
+          {step === "form" && (
+            <>
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
+              <Button onClick={handleSubmit} disabled={submitting}>
+                {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {collectCardOnFile ? "Continue to card" : "Create booking"}
+              </Button>
+            </>
+          )}
+          {step === "card" && (
+            <Button variant="ghost" onClick={() => setStep("form")}>
+              <ChevronLeft className="w-4 h-4 mr-1" /> Back
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
