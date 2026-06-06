@@ -1,57 +1,64 @@
-## Goal
-Run a June 2026 promo: every **private** lesson with a session date between June 1–30, 2026 is **$50** instead of the regular $65. Semi-private ($45) is unchanged. The promo is applied **per occurrence date** — a recurring series that straddles June/July charges $50 for June dates and $65 for July dates. The UI shows the promo clearly with strikethrough pricing and a "June Special" badge.
+# Private Lessons on Admin Calendar
 
-## Changes
+## Problem
+- Calendar only renders private lessons that exist as `pool_events` rows. Real `lesson_bookings` / `lesson_booking_occurrences` (created via the public booking flow or `admin-create-private-booking`) never appear.
+- Open `instructor_booking_blocks` slots (bookable but unbooked) are invisible to admins.
+- There's no admin UI to manually book a private/semi-private lesson with a card on file. Existing `admin-create-private-booking` edge function skips Stripe entirely.
+- New manual bookings don't send a confirmation email with price, waiver link, and "Add to Calendar" links.
+- June promo price ($50) needs to be reflected in admin manual bookings and the confirmation.
 
-### 1. Single source of truth for private-lesson pricing
-Add a shared helper `getPrivateLessonPrice(occurrenceDateISO)` in two places (client + edge function), since edge functions can't import from `src/`:
+## Plan
 
-- `src/lib/privateLessonPricing.ts` — used by all React components.
-- `supabase/functions/_shared/private-lesson-pricing.ts` — used by all edge functions.
+### 1. Load private-lesson data into the calendar
+Extend `useCalendarData` to fetch, for the visible date range:
+- `lesson_booking_occurrences` joined to `lesson_bookings` (booked lessons, with parent/child/instructor/time/price/payment + waiver state).
+- `instructor_booking_blocks` (active, non-blackout) to compute **open slots** per day using the same logic in `src/lib/privateBooking.ts` (subtract taken occurrences). Reuse that helper server-side-style in the hook.
 
-Both contain the same rule:
-```text
-if lesson_type == 'private' and date in [2026-06-01, 2026-06-30]: return 50
-else if lesson_type == 'private': return 65
-else if lesson_type == 'semi_private': return 45
-```
+Render in `CalendarDayView`:
+- **Booked private/semi-private** lessons as cards with the same detailed look as swim sessions: instructor, parent/child, time, price, payment status badge, waiver status, notes. Click opens a detail dialog (new `PrivateLessonDetailDialog`) with: cancel, charge now, resend confirmation, resend waiver.
+- **Open slots** rendered as dashed/ghost cards with an inline "Book" button.
 
-Also export `JUNE_PROMO_ACTIVE_FOR_TODAY` (boolean) and `isJunePromoDate(dateISO)` for marketing copy.
+Respect existing `private-lesson` / `semi-private-lesson` filters.
 
-### 2. Charge-time enforcement (authoritative)
-The promo must be applied where money actually moves, so a stale `price_per_session` value can't overcharge a June date.
+### 2. Admin manual booking dialog
+New `AdminBookPrivateLessonDialog` opened from:
+- the "+" on an open slot card, OR
+- a new "Book Private Lesson" button in the calendar header.
 
-- **`supabase/functions/charge-private-lesson-occurrence/index.ts`** — replace `Number(b.price_per_session || 65)` with `getPrivateLessonPrice(b.lesson_type, row.occurrence_date)`. (Add `lesson_type` to the `select()` join.)
-- **`supabase/functions/create-lesson-occurrence-checkout/index.ts`** — when building the line item, use `getPrivateLessonPrice(booking.lesson_type, occurrence.occurrence_date)` instead of reading `price_per_session` directly.
+Fields (mirrors enrollment intake):
+- Lesson type (private / semi-private)
+- Instructor, date, start/end time, pool area (prefilled from slot if launched there)
+- Parent first/last, email, phone
+- Child first/last, age
+- Notes / medical notes
+- **Recurring weekly** toggle + series end date (uses same occurrence-generation logic as today)
+- Price per session — defaulted via shared `getPrivateLessonPrice` (June 2026 = **$50 sale**, otherwise $65 private / standard semi)
+- **Card on file required** checkbox (default on): collects payment method via Stripe SetupIntent before creating the booking.
 
-This guarantees: **no June occurrence is ever charged more than $50, even on bookings created before June.**
+### 3. Card on file capture
+- Reuse existing `create-private-booking-setup` edge function to create a Stripe Customer + SetupIntent and return `client_secret`.
+- Reuse `PrivateCardSetup.tsx` component embedded in the dialog (admin types card on the spot, or sends a "card on file" link to parent).
+- On success, call updated `admin-create-private-booking` edge function with `stripe_customer_id` + `stripe_payment_method_id`, which writes them to `lesson_bookings`. (Existing function already accepts most fields — we'll add these two and trigger the confirmation email.)
 
-### 3. Booking creation
-- **`supabase/functions/create-private-booking-setup/index.ts`** — set `price_per_session` to the price for the **first** occurrence date (so the stored value matches what most lessons in the series will cost). Acceptable because charge-time logic is the real source of truth.
-- **`supabase/functions/admin-create-private-booking/index.ts`** — same: price the booking row by the first occurrence date; remove the hardcoded `defaultPrice = 65`.
+### 4. Confirmation email
+After booking is created, edge function sends a new transactional email via Resend (reuses `_shared/calendar-links.ts`):
+- Subject: "Your Private Swim Lesson is Booked – Aquatic Dreams"
+- Body: instructor, lesson date(s) listed, time, location, price per session (with June $50 callout when applicable), payment method on file note, link to **complete waiver** (uses `lesson_bookings.waiver_token`), and **Add to Calendar** buttons (.ics + Google) built via `buildMultiEventCalendarLinks` for recurring series.
+- New edge function `send-private-booking-confirmation` (or extend `send-lesson-booking-confirmation`) invoked from `admin-create-private-booking`.
 
-### 4. Public booking UI — show promo
-- **`src/pages/BookPrivateLesson.tsx`** — hero copy: when promo is active for today, show "~~$65~~ **$50** per 30-min lesson · June Special". SEO title/description swap to "$50 (June Special)".
-- **`src/components/private-lessons/PrivateBookingFlow.tsx`** — header copy + the "$ total" line in the slots panel use per-slot pricing via the helper (sum each selected slot's date through `getPrivateLessonPrice`). Show strikethrough $65 next to $50 when any selected June slot triggers the promo.
-- **`src/components/private-lessons/SlotPicker.tsx`** — same: the total line at the bottom sums per-slot prices, and each slot tile in June shows a small "June $50" badge.
+### 5. June pricing
+- `_shared/private-lesson-pricing.ts` already returns $50 for June dates — confirm and surface that price in the dialog and the email. The per-occurrence charger already re-derives price so a series straddling July auto-bills $65 for July dates.
 
-### 5. Admin manual booking UI
-- **`src/pages/admin/PrivateLessonsAdmin.tsx`** — in the "Book a lesson here" dialog, prefill the price input with the helper based on the chosen date and lesson type. Show a small "June promo — $50" hint when applicable.
+## Technical Notes
+- New file: `src/components/admin/calendar/AdminBookPrivateLessonDialog.tsx`
+- New file: `src/components/admin/calendar/PrivateLessonDetailDialog.tsx`
+- Edit: `src/hooks/useCalendarData.ts` — add `lessonBookings`, `lessonOccurrences`, `openPrivateSlots`.
+- Edit: `src/components/admin/calendar/CalendarDayView.tsx` — render booked + open private slots, wire onClick.
+- Edit edge fn: `supabase/functions/admin-create-private-booking/index.ts` — accept `stripe_customer_id`, `stripe_payment_method_id`, `send_confirmation`; invoke confirmation function.
+- New edge fn (or extension): `send-private-booking-confirmation` with waiver link + multi-event ICS.
+- No schema changes required — `lesson_bookings` already has `stripe_customer_id`, `stripe_payment_method_id`, `waiver_token`.
 
-### 6. No DB migration
-The promo lives in code, not data. We do not change the `lesson_bookings.price_per_session` default (still 65) — it stays as a snapshot. The charge/checkout helpers override at the moment of payment.
-
-## Technical notes
-- Helper is pure: `(lessonType: 'private' | 'semi_private', occurrenceDateISO: string) => number`. Comparing date strings as `'2026-06-01' <= d && d <= '2026-06-30'` avoids any timezone bugs.
-- We deliberately do not mutate existing `price_per_session` on already-created bookings. Charge code reads the helper, not the column, for private lessons.
-- Semi-private path untouched (still $45) — helper returns 45 when `lesson_type === 'semi_private'` regardless of date.
-- To extend or end the promo later, edit the two helper files only.
-
-```text
-Money flow with this change
-───────────────────────────
-Booking created          price_per_session column = price(first_date)   ← snapshot
-                          ↓
-Day-of auto-charge       amount = price(lesson_type, occurrence_date)   ← authoritative
-Admin "Charge in person" amount = price(lesson_type, occurrence_date)   ← authoritative
-```
+## Open questions before I build
+1. **Card on file** — required for every manual booking, or admin-toggleable per booking (e.g., for cash-only customers)?
+2. **When to charge** — keep current model (charge per occurrence on/after lesson day via `charge-private-lesson-occurrence`), or charge first session immediately at booking time?
+3. **Open slot density** — week view can get crowded if every 30-min open slot renders. Show open slots only in day view, or in both?

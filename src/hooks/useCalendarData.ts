@@ -76,6 +76,44 @@ export interface LessonDate {
   is_cancelled: boolean;
 }
 
+export interface PrivateLessonBooking {
+  occurrence_id: string;
+  booking_id: string;
+  lesson_type: "private" | "semi_private" | string;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  parent_name: string;
+  parent_email: string;
+  parent_phone: string | null;
+  child_name: string | null;
+  child_age: number | null;
+  start_time: string;
+  end_time: string;
+  pool_area: string;
+  occurrence_date: string;
+  price_per_session: number;
+  payment_status: string;
+  status: string;
+  auto_charge_status: string;
+  waiver_token: string | null;
+  waiver_signed_at: string | null;
+  recurring: boolean;
+  notes: string | null;
+  stripe_customer_id: string | null;
+  stripe_payment_method_id: string | null;
+}
+
+export interface OpenPrivateSlot {
+  instructor_id: string;
+  instructor_name: string;
+  slot_date: string;
+  start_time: string;
+  end_time: string;
+  slot_minutes: number;
+  pool_area: string;
+  default_lesson_type: string;
+}
+
 export interface ICSSession {
   id: string;
   start_time: string;
@@ -92,6 +130,7 @@ export interface ICSSession {
   parent_phone?: string | null;
 }
 
+
 export function useCalendarData(currentDate: Date, view: "day" | "week") {
   const [swimSessions, setSwimSessions] = useState<CalendarSwimSession[]>([]);
   const [enrollments, setEnrollments] = useState<CalendarEnrollment[]>([]);
@@ -100,6 +139,8 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
   const [agreements, setAgreements] = useState<EnrollmentAgreement[]>([]);
   const [icsSessions, setIcsSessions] = useState<ICSSession[]>([]);
   const [lessonDates, setLessonDates] = useState<LessonDate[]>([]);
+  const [privateLessons, setPrivateLessons] = useState<PrivateLessonBooking[]>([]);
+  const [openPrivateSlots, setOpenPrivateSlots] = useState<OpenPrivateSlot[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -111,12 +152,10 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     const rangeStart = view === "week" ? format(weekStart, "yyyy-MM-dd") : dateStr;
     const rangeEnd = view === "week" ? format(weekEnd, "yyyy-MM-dd") : dateStr;
 
-    const dayName = format(currentDate, "EEEE");
-    const daysNeeded = view === "week"
-      ? ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-      : [dayName];
-
-    const [sessionsRes, enrollmentsRes, eventsRes, attendanceRes, agreementsRes, lessonDatesRes] = await Promise.all([
+    const [
+      sessionsRes, enrollmentsRes, eventsRes, attendanceRes, agreementsRes, lessonDatesRes,
+      privateOccRes, blocksRes, instructorsRes,
+    ] = await Promise.all([
       supabase
         .from("swim_sessions")
         .select("id, swim_level, age_group, start_time, end_time, max_students, session_name, day_of_week, instructor_id, registration_status, instructors(name)")
@@ -143,6 +182,18 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .select("id, session_id, lesson_date, is_cancelled")
         .gte("lesson_date", rangeStart)
         .lte("lesson_date", rangeEnd),
+      supabase
+        .from("lesson_booking_occurrences")
+        .select("id, booking_id, occurrence_date, status, payment_status, auto_charge_status, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id)")
+        .gte("occurrence_date", rangeStart)
+        .lte("occurrence_date", rangeEnd)
+        .neq("status", "cancelled")
+        .neq("status", "pending_card"),
+      supabase
+        .from("instructor_booking_blocks")
+        .select("*")
+        .eq("is_blackout", false),
+      supabase.rpc("get_active_instructors_public"),
     ]);
 
     if (sessionsRes.data) setSwimSessions(sessionsRes.data);
@@ -151,6 +202,98 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     if (attendanceRes.data) setAttendance(attendanceRes.data);
     if (agreementsRes.data) setAgreements(agreementsRes.data);
     if (lessonDatesRes.data) setLessonDates(lessonDatesRes.data);
+
+    // ── Map private lesson occurrences ──
+    const privates: PrivateLessonBooking[] = ((privateOccRes.data as any[]) || []).map((o) => {
+      const b = o.lesson_bookings;
+      return {
+        occurrence_id: o.id,
+        booking_id: o.booking_id,
+        lesson_type: b?.lesson_type || "private",
+        instructor_id: b?.instructor_id || null,
+        instructor_name: b?.instructor_name || null,
+        parent_name: b?.parent_name || "",
+        parent_email: b?.parent_email || "",
+        parent_phone: b?.parent_phone || null,
+        child_name: b?.child_name || null,
+        child_age: b?.child_age ?? null,
+        start_time: (b?.start_time || "").slice(0, 5),
+        end_time: (b?.end_time || "").slice(0, 5),
+        pool_area: b?.pool_area || "shallow",
+        occurrence_date: o.occurrence_date,
+        price_per_session: Number(b?.price_per_session ?? 0),
+        payment_status: o.payment_status,
+        status: o.status,
+        auto_charge_status: o.auto_charge_status,
+        waiver_token: b?.waiver_token || null,
+        waiver_signed_at: b?.waiver_signed_at || null,
+        recurring: !!b?.recurring,
+        notes: b?.notes || null,
+        stripe_customer_id: b?.stripe_customer_id || null,
+        stripe_payment_method_id: b?.stripe_payment_method_id || null,
+      };
+    });
+    setPrivateLessons(privates);
+
+    // ── Compute open private slots from booking blocks minus taken occurrences ──
+    const instructorMap = new Map<string, string>(
+      ((instructorsRes.data as any[]) || []).map((i) => [i.id, i.name])
+    );
+    const taken = new Set<string>();
+    for (const p of privates) {
+      if (!p.instructor_id) continue;
+      taken.add(`${p.instructor_id}|${p.occurrence_date}|${p.start_time}`);
+    }
+
+    const blocks = (blocksRes.data as any[]) || [];
+    const open: OpenPrivateSlot[] = [];
+    const fromD = new Date(rangeStart + "T00:00:00");
+    const toD = new Date(rangeEnd + "T00:00:00");
+    const addMin = (t: string, m: number): string => {
+      const [h, mm] = t.split(":").map(Number);
+      const total = h * 60 + mm + m;
+      return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+    };
+    for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + 1)) {
+      const ds = format(d, "yyyy-MM-dd");
+      const dow = d.getDay();
+      for (const blk of blocks) {
+        if (blk.kind === "weekly" && blk.day_of_week !== dow) continue;
+        if (blk.start_date && ds < blk.start_date) continue;
+        if (blk.end_date && ds > blk.end_date) continue;
+        if (blk.kind === "date_range" && blk.day_of_week !== null && blk.day_of_week !== dow) continue;
+        let t = (blk.start_time as string).slice(0, 5);
+        const end = (blk.end_time as string).slice(0, 5);
+        const bs = blk.break_start_time ? (blk.break_start_time as string).slice(0, 5) : null;
+        const be = blk.break_end_time ? (blk.break_end_time as string).slice(0, 5) : null;
+        while (addMin(t, blk.slot_minutes) <= end) {
+          const se = addMin(t, blk.slot_minutes);
+          if (bs && be && t < be && se > bs) { t = be; continue; }
+          const key = `${blk.instructor_id}|${ds}|${t}`;
+          if (!taken.has(key)) {
+            open.push({
+              instructor_id: blk.instructor_id,
+              instructor_name: instructorMap.get(blk.instructor_id) || "Instructor",
+              slot_date: ds,
+              start_time: t,
+              end_time: se,
+              slot_minutes: blk.slot_minutes,
+              pool_area: blk.pool_area || "shallow",
+              default_lesson_type: blk.default_lesson_type || "private",
+            });
+          }
+          t = se;
+        }
+      }
+    }
+    // Dedupe overlapping blocks
+    const seen = new Set<string>();
+    setOpenPrivateSlots(open.filter((s) => {
+      const k = `${s.instructor_id}|${s.slot_date}|${s.start_time}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    }));
 
     // Show the calendar immediately — ICS data loads in the background
     setLoading(false);
@@ -170,5 +313,10 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  return { swimSessions, enrollments, poolEvents, attendance, agreements, icsSessions, lessonDates, loading, refetch: fetchData };
+  return {
+    swimSessions, enrollments, poolEvents, attendance, agreements,
+    icsSessions, lessonDates, privateLessons, openPrivateSlots,
+    loading, refetch: fetchData,
+  };
 }
+

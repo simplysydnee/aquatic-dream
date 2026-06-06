@@ -9,7 +9,9 @@ import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
 import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
 import PrintDayScheduleDialog from "@/components/admin/calendar/PrintDayScheduleDialog";
+import PrivateLessonsPanel from "@/components/admin/calendar/PrivateLessonsPanel";
 import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
+
 import type { ActivityType } from "@/components/admin/calendar/CalendarFilterBar";
 import { Badge } from "@/components/ui/badge";
 import { useCalendarData } from "@/hooks/useCalendarData";
@@ -54,9 +56,12 @@ const CalendarAdmin = () => {
     agreements,
     icsSessions,
     lessonDates,
+    privateLessons,
+    openPrivateSlots,
     loading,
     refetch,
   } = useCalendarData(currentDate, view);
+
 
   const navigateDate = (dir: number) => {
     setCurrentDate((d) => addDays(d, view === "week" ? dir * 7 : dir));
@@ -247,6 +252,15 @@ const CalendarAdmin = () => {
         />
       )}
 
+      {/* Private lessons (booked + open slots) for the selected day */}
+      {view === "day" && !loading && (
+        <PrivateLessonsPanel
+          date={currentDate}
+          privateLessons={privateLessons}
+          openSlots={openPrivateSlots}
+          onRefetch={refetch}
+        />
+      )}
 
       <AddPoolEventDialog
         open={showAddEvent}
