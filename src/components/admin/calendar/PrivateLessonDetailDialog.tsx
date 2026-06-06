@@ -50,6 +50,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
       });
       if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
       toast.success("Confirmation email re-sent");
+      onChanged();
     } catch (e: any) {
       toast.error(e?.message || "Failed");
     } finally {
