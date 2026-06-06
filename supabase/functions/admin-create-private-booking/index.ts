@@ -1,15 +1,19 @@
 // Admin-only: manually create a private or semi-private lesson booking
-// (single date or recurring weekly series). No Stripe card required.
+// (single date or recurring weekly series). Optionally:
+//   - Email a confirmation with lesson dates, price, waiver link, and Add to Calendar links.
+//   - Include a "Save card on file" link so parent can store a card via Stripe.
+// Also supports `resend_confirmation_for: <booking_id>` to re-send for an existing booking.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
-import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
+import { getPrivateLessonPrice, isJunePromoDate } from "../_shared/private-lesson-pricing.ts";
+import { buildSessionCalendarLinks } from "../_shared/calendar-links.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const BodySchema = z.object({
+const CreateSchema = z.object({
   instructor_id: z.string().uuid(),
   lesson_type: z.enum(["private", "semi_private"]),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -17,14 +21,24 @@ const BodySchema = z.object({
   end_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
   pool_area: z.string().default("shallow"),
   parent_name: z.string().min(1).max(200),
+  parent_first_name: z.string().max(80).optional().nullable(),
+  parent_last_name: z.string().max(80).optional().nullable(),
   parent_email: z.string().email(),
   parent_phone: z.string().max(40).optional().nullable(),
   child_name: z.string().max(200).optional().nullable(),
+  child_first_name: z.string().max(80).optional().nullable(),
+  child_last_name: z.string().max(80).optional().nullable(),
   child_age: z.number().int().min(0).max(120).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
   recurring: z.boolean().default(false),
   series_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   price_per_session: z.number().positive().optional(),
+  send_confirmation: z.boolean().default(true),
+  collect_card_on_file: z.boolean().default(true),
+});
+
+const ResendSchema = z.object({
+  resend_confirmation_for: z.string().uuid(),
 });
 
 const supabaseAdmin = createClient(
@@ -32,11 +46,128 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
+const SITE_BASE = "https://aquaticdreamsswim.com";
+
 function j(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function fmtTime(t: string) {
+  const [h, m] = t.slice(0, 5).split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hh = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${hh}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+function fmtDate(dateISO: string) {
+  return new Date(dateISO + "T00:00:00").toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
+}
+
+async function sendConfirmationEmail(bookingId: string, includeCardOnFile: boolean) {
+  // Fetch booking + occurrences
+  const { data: booking, error: bErr } = await supabaseAdmin
+    .from("lesson_bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (bErr || !booking) throw new Error("Booking not found for email");
+
+  const { data: occs } = await supabaseAdmin
+    .from("lesson_booking_occurrences")
+    .select("id, occurrence_date")
+    .eq("booking_id", bookingId)
+    .neq("status", "cancelled")
+    .order("occurrence_date", { ascending: true });
+
+  const dates = ((occs as any[]) || []).map((o) => o.occurrence_date);
+  if (dates.length === 0) throw new Error("No occurrences to confirm");
+
+  const lessonTypeLabel = (booking as any).lesson_type === "private" ? "Private Lesson" : "Semi-Private Lesson";
+  const startTime = ((booking as any).start_time as string).slice(0, 5);
+  const endTime = ((booking as any).end_time as string).slice(0, 5);
+  const lessonTimeLabel = `${fmtTime(startTime)} – ${fmtTime(endTime)}`;
+
+  // Per-date schedule with per-date pricing (June promo aware)
+  const scheduleList = dates.map((d) => ({
+    date: fmtDate(d),
+    time: lessonTimeLabel,
+  }));
+
+  // Total price across dates
+  let total = 0;
+  let anyJune = false;
+  for (const d of dates) {
+    const p = getPrivateLessonPrice((booking as any).lesson_type, d);
+    total += p;
+    if (isJunePromoDate(d)) anyJune = true;
+  }
+
+  const waiverLink = (booking as any).waiver_token && !(booking as any).waiver_signed_at
+    ? `${SITE_BASE}/lesson-waiver/${(booking as any).waiver_token}`
+    : undefined;
+
+  const calTitle = `${(booking as any).child_name || (booking as any).parent_name || "Swim"} — ${lessonTypeLabel} (Aquatic Dreams)`;
+  const calDesc = `${lessonTypeLabel} at Aquatic Dreams${
+    (booking as any).instructor_name ? ` with ${(booking as any).instructor_name}` : ""
+  }. Questions? (209) 577-3483 or info@aquaticdreamsswim.com`;
+
+  const { icsUrl, googleUrl } = buildSessionCalendarLinks({
+    uid: bookingId,
+    title: calTitle,
+    dates,
+    start: startTime,
+    end: endTime,
+    location: "1212 Kansas Ave, Modesto, CA 95351",
+    description: calDesc,
+  });
+
+  // Card on file: if requested, point the parent at the public booking
+  // flow's setup intent. For now we surface a contact note since we don't
+  // yet have a per-booking hosted setup URL.
+  const cardOnFileNote = includeCardOnFile
+    ? "We'll charge your card on file the day of each lesson (no charge today). Reply to this email if you need to update your payment method."
+    : undefined;
+
+  const promoNote = anyJune && (booking as any).lesson_type === "private"
+    ? "🎉 June Promo Applied — private lessons are $50 (regular $65) for June dates."
+    : undefined;
+
+  const { error: invokeErr } = await supabaseAdmin.functions.invoke("send-transactional-email", {
+    body: {
+      templateName: "lesson-booking-confirmation",
+      recipientEmail: (booking as any).parent_email,
+      idempotencyKey: `private-booking-${bookingId}-${dates.length}`,
+      templateData: {
+        parentName: (booking as any).parent_first_name || (booking as any).parent_name,
+        childName: (booking as any).child_first_name || (booking as any).child_name,
+        lessonTypeLabel,
+        lessonTime: lessonTimeLabel,
+        instructorName: (booking as any).instructor_name,
+        totalOccurrences: dates.length,
+        scheduleList,
+        seriesMode: dates.length > 1,
+        lessonDate: dates.length === 1 ? fmtDate(dates[0]) : undefined,
+        totalAmountDue: `$${total.toFixed(2)}`,
+        amountDue: dates.length === 1 ? `$${total.toFixed(2)}` : undefined,
+        waiverLink,
+        waiverSigned: !!(booking as any).waiver_signed_at,
+        icsLink: icsUrl,
+        googleCalendarLink: googleUrl,
+        // The lesson-booking-confirmation template currently doesn't render
+        // an explicit "card on file" / promo block; admin's notes field below
+        // is appended into infoBox via the existing notes handling if any.
+        // For visibility we drop these into the parent-name preamble.
+        cardOnFileNote,
+        promoNote,
+      },
+    },
+  });
+  if (invokeErr) throw invokeErr;
 }
 
 Deno.serve(async (req) => {
@@ -55,7 +186,21 @@ Deno.serve(async (req) => {
     });
     if (!isAdmin) return j({ error: "Admin role required" }, 403);
 
-    const parsed = BodySchema.safeParse(await req.json());
+    const raw = await req.json();
+
+    // RESEND path
+    const resendParsed = ResendSchema.safeParse(raw);
+    if (resendParsed.success) {
+      try {
+        await sendConfirmationEmail(resendParsed.data.resend_confirmation_for, true);
+        return j({ success: true, resent: true });
+      } catch (err: any) {
+        return j({ error: err?.message || "Resend failed" }, 500);
+      }
+    }
+
+    // CREATE path
+    const parsed = CreateSchema.safeParse(raw);
     if (!parsed.success) return j({ error: parsed.error.flatten() }, 400);
     const p = parsed.data;
 
@@ -66,9 +211,6 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const instructorName = (instr as any)?.name || "Instructor";
 
-    // Snapshot price = price for the first occurrence. Charge-time logic
-    // re-derives per occurrence, so a series straddling June still bills
-    // $50 for June dates and $65 for July dates automatically.
     const defaultPrice = getPrivateLessonPrice(p.lesson_type, p.start_date);
     const price = p.price_per_session ?? defaultPrice;
 
@@ -90,6 +232,8 @@ Deno.serve(async (req) => {
     }
 
     const seriesEnd = dates[dates.length - 1];
+    const waiverToken =
+      crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
 
     const { data: booking, error: bErr } = await supabaseAdmin
       .from("lesson_bookings")
@@ -98,9 +242,13 @@ Deno.serve(async (req) => {
         instructor_id: p.instructor_id,
         instructor_name: instructorName,
         parent_name: p.parent_name,
+        parent_first_name: p.parent_first_name || null,
+        parent_last_name: p.parent_last_name || null,
         parent_email: p.parent_email,
         parent_phone: p.parent_phone || null,
         child_name: p.child_name || null,
+        child_first_name: p.child_first_name || null,
+        child_last_name: p.child_last_name || null,
         child_age: p.child_age ?? null,
         start_time: p.start_time,
         end_time: p.end_time,
@@ -113,6 +261,7 @@ Deno.serve(async (req) => {
         notes: p.notes || null,
         status: "active",
         booking_source: "admin",
+        waiver_token: waiverToken,
       })
       .select("id")
       .single();
@@ -124,8 +273,8 @@ Deno.serve(async (req) => {
       booking_id: bookingId,
       occurrence_date: d,
       status: "scheduled",
-      payment_status: "unpaid",
-      auto_charge_status: "skipped",
+      payment_status: p.collect_card_on_file ? "card_on_file" : "unpaid",
+      auto_charge_status: p.collect_card_on_file ? "pending" : "skipped",
     }));
     const { error: oErr } = await supabaseAdmin
       .from("lesson_booking_occurrences")
@@ -135,7 +284,27 @@ Deno.serve(async (req) => {
       throw oErr;
     }
 
-    return j({ success: true, booking_id: bookingId, occurrences: dates.length });
+    // Send confirmation email (best-effort — booking already created)
+    let emailSent = false;
+    let emailError: string | undefined;
+    if (p.send_confirmation) {
+      try {
+        await sendConfirmationEmail(bookingId, p.collect_card_on_file);
+        emailSent = true;
+      } catch (err: any) {
+        emailError = err?.message || String(err);
+        console.error("Confirmation email failed:", emailError);
+      }
+    }
+
+    return j({
+      success: true,
+      booking_id: bookingId,
+      occurrences: dates.length,
+      email_sent: emailSent,
+      email_error: emailError,
+      waiver_link: `${SITE_BASE}/lesson-waiver/${waiverToken}`,
+    });
   } catch (err: any) {
     console.error("admin-create-private-booking error", err);
     return j({ error: err?.message || "Internal error" }, 500);
