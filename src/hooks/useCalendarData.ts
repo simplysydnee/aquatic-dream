@@ -101,6 +101,9 @@ export interface PrivateLessonBooking {
   notes: string | null;
   stripe_customer_id: string | null;
   stripe_payment_method_id: string | null;
+  confirmation_email_status: string | null;
+  confirmation_email_sent_at: string | null;
+  confirmation_email_error: string | null;
 }
 
 export interface OpenPrivateSlot {
