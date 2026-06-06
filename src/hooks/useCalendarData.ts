@@ -234,6 +234,9 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         notes: b?.notes || null,
         stripe_customer_id: b?.stripe_customer_id || null,
         stripe_payment_method_id: b?.stripe_payment_method_id || null,
+        confirmation_email_status: b?.confirmation_email_status || null,
+        confirmation_email_sent_at: b?.confirmation_email_sent_at || null,
+        confirmation_email_error: b?.confirmation_email_error || null,
       };
     });
     setPrivateLessons(privates);
