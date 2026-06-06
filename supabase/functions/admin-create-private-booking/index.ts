@@ -36,6 +36,10 @@ const CreateSchema = z.object({
   price_per_session: z.number().positive().optional(),
   send_confirmation: z.boolean().default(true),
   collect_card_on_file: z.boolean().default(true),
+  // Card-on-file resolution (set by client after embedded Setup Checkout completes)
+  stripe_environment: z.enum(["sandbox", "live"]).optional(),
+  stripe_customer_id: z.string().optional().nullable(),
+  stripe_checkout_session_id: z.string().optional().nullable(),
 });
 
 const ResendSchema = z.object({
