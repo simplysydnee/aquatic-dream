@@ -76,6 +76,44 @@ export interface LessonDate {
   is_cancelled: boolean;
 }
 
+export interface PrivateLessonBooking {
+  occurrence_id: string;
+  booking_id: string;
+  lesson_type: "private" | "semi_private" | string;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  parent_name: string;
+  parent_email: string;
+  parent_phone: string | null;
+  child_name: string | null;
+  child_age: number | null;
+  start_time: string;
+  end_time: string;
+  pool_area: string;
+  occurrence_date: string;
+  price_per_session: number;
+  payment_status: string;
+  status: string;
+  auto_charge_status: string;
+  waiver_token: string | null;
+  waiver_signed_at: string | null;
+  recurring: boolean;
+  notes: string | null;
+  stripe_customer_id: string | null;
+  stripe_payment_method_id: string | null;
+}
+
+export interface OpenPrivateSlot {
+  instructor_id: string;
+  instructor_name: string;
+  slot_date: string;
+  start_time: string;
+  end_time: string;
+  slot_minutes: number;
+  pool_area: string;
+  default_lesson_type: string;
+}
+
 export interface ICSSession {
   id: string;
   start_time: string;
@@ -91,6 +129,7 @@ export interface ICSSession {
   parent_email?: string | null;
   parent_phone?: string | null;
 }
+
 
 export function useCalendarData(currentDate: Date, view: "day" | "week") {
   const [swimSessions, setSwimSessions] = useState<CalendarSwimSession[]>([]);
