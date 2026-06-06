@@ -9,7 +9,9 @@ import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
 import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
 import PrintDayScheduleDialog from "@/components/admin/calendar/PrintDayScheduleDialog";
+import PrivateLessonsPanel from "@/components/admin/calendar/PrivateLessonsPanel";
 import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
+
 import type { ActivityType } from "@/components/admin/calendar/CalendarFilterBar";
 import { Badge } from "@/components/ui/badge";
 import { useCalendarData } from "@/hooks/useCalendarData";
