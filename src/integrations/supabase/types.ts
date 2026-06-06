@@ -825,6 +825,9 @@ export type Database = {
           child_first_name: string | null
           child_last_name: string | null
           child_name: string | null
+          confirmation_email_error: string | null
+          confirmation_email_sent_at: string | null
+          confirmation_email_status: string | null
           created_at: string
           end_time: string
           frequency: string | null
@@ -859,6 +862,9 @@ export type Database = {
           child_first_name?: string | null
           child_last_name?: string | null
           child_name?: string | null
+          confirmation_email_error?: string | null
+          confirmation_email_sent_at?: string | null
+          confirmation_email_status?: string | null
           created_at?: string
           end_time: string
           frequency?: string | null
@@ -893,6 +899,9 @@ export type Database = {
           child_first_name?: string | null
           child_last_name?: string | null
           child_name?: string | null
+          confirmation_email_error?: string | null
+          confirmation_email_sent_at?: string | null
+          confirmation_email_status?: string | null
           created_at?: string
           end_time?: string
           frequency?: string | null

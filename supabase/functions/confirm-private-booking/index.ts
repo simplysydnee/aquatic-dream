@@ -100,41 +100,57 @@ Deno.serve(async (req) => {
         googleCalendarLink = links.googleUrl;
       }
 
+      const emailBody = {
+        templateName: "lesson-booking-confirmation",
+        recipientEmail: b.parent_email,
+        idempotencyKey: `private-booking-${booking_id}`,
+        templateData: {
+          parentName: b.parent_first_name || b.parent_name,
+          childName: b.child_first_name || b.child_name,
+          lessonTypeLabel: "Private Lesson",
+          instructorName: b.instructor_name,
+          seriesMode: schedule.length > 1,
+          totalOccurrences: schedule.length,
+          totalAmountDue: (() => {
+            const perPrices = occList.map((o) => getPrivateLessonPrice(b.lesson_type, o.occurrence_date));
+            const total = perPrices.reduce((s, p) => s + p, 0);
+            const allSame = perPrices.every((p) => p === perPrices[0]);
+            if (allSame) {
+              return `$${total.toFixed(2)} (charged $${perPrices[0].toFixed(0)} the day of each lesson)`;
+            }
+            return `$${total.toFixed(2)} total — June lessons $50 each, other lessons $65 each, charged the day of each lesson`;
+          })(),
+          scheduleList: schedule,
+          lessonDate: schedule[0]?.date,
+          lessonTime: schedule[0]?.time,
+          amountDue: `$${getPrivateLessonPrice(b.lesson_type, occList[0]?.occurrence_date || b.series_start).toFixed(0)}`,
+          waiverSigned: true,
+          icsLink,
+          googleCalendarLink,
+        },
+      };
+
+      let emailErrorMsg: string | null = null;
       try {
-        await supabase.functions.invoke("send-transactional-email", {
-          body: {
-            templateName: "lesson-booking-confirmation",
-            recipientEmail: b.parent_email,
-            idempotencyKey: `private-booking-${booking_id}`,
-            templateData: {
-              parentName: b.parent_first_name || b.parent_name,
-              childName: b.child_first_name || b.child_name,
-              lessonTypeLabel: "Private Lesson",
-              instructorName: b.instructor_name,
-              seriesMode: schedule.length > 1,
-              totalOccurrences: schedule.length,
-              totalAmountDue: (() => {
-                const perPrices = occList.map((o) => getPrivateLessonPrice(b.lesson_type, o.occurrence_date));
-                const total = perPrices.reduce((s, p) => s + p, 0);
-                const allSame = perPrices.every((p) => p === perPrices[0]);
-                if (allSame) {
-                  return `$${total.toFixed(2)} (charged $${perPrices[0].toFixed(0)} the day of each lesson)`;
-                }
-                return `$${total.toFixed(2)} total — June lessons $50 each, other lessons $65 each, charged the day of each lesson`;
-              })(),
-              scheduleList: schedule,
-              lessonDate: schedule[0]?.date,
-              lessonTime: schedule[0]?.time,
-              amountDue: `$${getPrivateLessonPrice(b.lesson_type, occList[0]?.occurrence_date || b.series_start).toFixed(0)}`,
-              waiverSigned: true,
-              icsLink,
-              googleCalendarLink,
-            },
-          },
-        });
-      } catch (e) {
-        console.error("confirmation email failed", e);
+        const { data: invokeData, error: invokeErr } = await supabase.functions.invoke(
+          "send-transactional-email",
+          { body: emailBody },
+        );
+        const apiErr = (invokeData as any)?.error;
+        if (invokeErr || apiErr) {
+          emailErrorMsg = String(invokeErr?.message || apiErr || "unknown error");
+          console.error("confirmation email failed", { booking_id, recipient: b.parent_email, invokeErr, apiErr });
+        }
+      } catch (e: any) {
+        emailErrorMsg = e?.message || String(e);
+        console.error("confirmation email threw", { booking_id, error: emailErrorMsg });
       }
+
+      await supabase.from("lesson_bookings").update(
+        emailErrorMsg
+          ? { confirmation_email_status: "failed", confirmation_email_error: emailErrorMsg }
+          : { confirmation_email_status: "sent", confirmation_email_sent_at: new Date().toISOString(), confirmation_email_error: null },
+      ).eq("id", booking_id);
     }
 
 

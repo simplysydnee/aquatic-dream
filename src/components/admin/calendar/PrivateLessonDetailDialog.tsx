@@ -50,6 +50,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
       });
       if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
       toast.success("Confirmation email re-sent");
+      onChanged();
     } catch (e: any) {
       toast.error(e?.message || "Failed");
     } finally {
@@ -115,6 +116,23 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
           </div>
           {waiverUrl && !lesson.waiver_signed_at && (
             <a href={waiverUrl} target="_blank" rel="noreferrer" className="text-xs text-primary break-all">{waiverUrl}</a>
+          )}
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2"><Mail className="w-4 h-4 text-muted-foreground" /> Confirmation email</span>
+            <span>
+              {lesson.confirmation_email_status === "sent" ? (
+                <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                  Sent{lesson.confirmation_email_sent_at ? ` ${format(new Date(lesson.confirmation_email_sent_at), "MMM d, h:mm a")}` : ""}
+                </Badge>
+              ) : lesson.confirmation_email_status === "failed" ? (
+                <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">Failed</Badge>
+              ) : (
+                <Badge variant="outline" className="bg-muted text-muted-foreground border-border">Unknown</Badge>
+              )}
+            </span>
+          </div>
+          {lesson.confirmation_email_status === "failed" && lesson.confirmation_email_error && (
+            <p className="text-xs text-red-700 bg-red-50 p-2 rounded break-words">{lesson.confirmation_email_error}</p>
           )}
           {lesson.notes && (
             <div className="text-xs text-muted-foreground bg-muted/40 p-2 rounded">

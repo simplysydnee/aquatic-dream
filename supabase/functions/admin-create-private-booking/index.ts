@@ -142,37 +142,51 @@ async function sendConfirmationEmail(bookingId: string, includeCardOnFile: boole
     ? "🎉 June Promo Applied — private lessons are $50 (regular $65) for June dates."
     : undefined;
 
-  const { error: invokeErr } = await supabaseAdmin.functions.invoke("send-transactional-email", {
-    body: {
-      templateName: "lesson-booking-confirmation",
-      recipientEmail: (booking as any).parent_email,
-      idempotencyKey: `private-booking-${bookingId}-${dates.length}`,
-      templateData: {
-        parentName: (booking as any).parent_first_name || (booking as any).parent_name,
-        childName: (booking as any).child_first_name || (booking as any).child_name,
-        lessonTypeLabel,
-        lessonTime: lessonTimeLabel,
-        instructorName: (booking as any).instructor_name,
-        totalOccurrences: dates.length,
-        scheduleList,
-        seriesMode: dates.length > 1,
-        lessonDate: dates.length === 1 ? fmtDate(dates[0]) : undefined,
-        totalAmountDue: `$${total.toFixed(2)}`,
-        amountDue: dates.length === 1 ? `$${total.toFixed(2)}` : undefined,
-        waiverLink,
-        waiverSigned: !!(booking as any).waiver_signed_at,
-        icsLink: icsUrl,
-        googleCalendarLink: googleUrl,
-        // The lesson-booking-confirmation template currently doesn't render
-        // an explicit "card on file" / promo block; admin's notes field below
-        // is appended into infoBox via the existing notes handling if any.
-        // For visibility we drop these into the parent-name preamble.
-        cardOnFileNote,
-        promoNote,
+  let invokeFailure: string | null = null;
+  try {
+    const { data: invokeData, error: invokeErr } = await supabaseAdmin.functions.invoke("send-transactional-email", {
+      body: {
+        templateName: "lesson-booking-confirmation",
+        recipientEmail: (booking as any).parent_email,
+        idempotencyKey: `private-booking-${bookingId}-${dates.length}`,
+        templateData: {
+          parentName: (booking as any).parent_first_name || (booking as any).parent_name,
+          childName: (booking as any).child_first_name || (booking as any).child_name,
+          lessonTypeLabel,
+          lessonTime: lessonTimeLabel,
+          instructorName: (booking as any).instructor_name,
+          totalOccurrences: dates.length,
+          scheduleList,
+          seriesMode: dates.length > 1,
+          lessonDate: dates.length === 1 ? fmtDate(dates[0]) : undefined,
+          totalAmountDue: `$${total.toFixed(2)}`,
+          amountDue: dates.length === 1 ? `$${total.toFixed(2)}` : undefined,
+          waiverLink,
+          waiverSigned: !!(booking as any).waiver_signed_at,
+          icsLink: icsUrl,
+          googleCalendarLink: googleUrl,
+          cardOnFileNote,
+          promoNote,
+        },
       },
-    },
-  });
-  if (invokeErr) throw invokeErr;
+    });
+    const apiErr = (invokeData as any)?.error;
+    if (invokeErr || apiErr) {
+      invokeFailure = String(invokeErr?.message || apiErr || "unknown error");
+      console.error("admin send-transactional-email failed", { bookingId, invokeErr, apiErr });
+    }
+  } catch (e: any) {
+    invokeFailure = e?.message || String(e);
+    console.error("admin send-transactional-email threw", { bookingId, error: invokeFailure });
+  }
+
+  await supabaseAdmin.from("lesson_bookings").update(
+    invokeFailure
+      ? { confirmation_email_status: "failed", confirmation_email_error: invokeFailure }
+      : { confirmation_email_status: "sent", confirmation_email_sent_at: new Date().toISOString(), confirmation_email_error: null },
+  ).eq("id", bookingId);
+
+  if (invokeFailure) throw new Error(invokeFailure);
 }
 
 Deno.serve(async (req) => {

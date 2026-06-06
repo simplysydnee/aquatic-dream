@@ -101,6 +101,9 @@ export interface PrivateLessonBooking {
   notes: string | null;
   stripe_customer_id: string | null;
   stripe_payment_method_id: string | null;
+  confirmation_email_status: string | null;
+  confirmation_email_sent_at: string | null;
+  confirmation_email_error: string | null;
 }
 
 export interface OpenPrivateSlot {
@@ -184,7 +187,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .lte("lesson_date", rangeEnd),
       supabase
         .from("lesson_booking_occurrences")
-        .select("id, booking_id, occurrence_date, status, payment_status, auto_charge_status, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id)")
+        .select("id, booking_id, occurrence_date, status, payment_status, auto_charge_status, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id, confirmation_email_status, confirmation_email_sent_at, confirmation_email_error)")
         .gte("occurrence_date", rangeStart)
         .lte("occurrence_date", rangeEnd)
         .neq("status", "cancelled")
@@ -231,6 +234,9 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         notes: b?.notes || null,
         stripe_customer_id: b?.stripe_customer_id || null,
         stripe_payment_method_id: b?.stripe_payment_method_id || null,
+        confirmation_email_status: b?.confirmation_email_status || null,
+        confirmation_email_sent_at: b?.confirmation_email_sent_at || null,
+        confirmation_email_error: b?.confirmation_email_error || null,
       };
     });
     setPrivateLessons(privates);
