@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar, ShoppingBag, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, PRICING } from "./types";
+import LevelFullScreen from "./LevelFullScreen";
 
 interface SlotInfo {
   assignSessionId: string;
@@ -170,45 +171,49 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
     return acc;
   }, {});
 
+  const levelFull = !loading && (slots.length === 0 || slots.every(s => s.spots_left <= 0));
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 30 }}
       animate={{ opacity: 1, x: 0 }}
       className="max-w-2xl mx-auto"
     >
-      <h3 className="font-display text-2xl font-bold text-foreground mb-1">
-        Pick Your Sessions
-      </h3>
-      <p className="text-muted-foreground text-sm mb-2">
-        Choose one or more <strong>{getGroupName(level, ageGroup)}</strong> ({levelInfo.name}) sessions · {AGE_GROUP_LABELS[ageGroup]}
-      </p>
-      {slots.length > 0 && (
-        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-          <span className="flex items-center gap-1">
-            <DollarSign className="w-3.5 h-3.5" />
-            ${PRICING.group}/lesson (group)
-          </span>
-          <span className="flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5" />
-            {formatDayOfWeek(slots[0].day_of_week)}
-          </span>
-        </div>
+      {!levelFull && (
+        <>
+          <h3 className="font-display text-2xl font-bold text-foreground mb-1">
+            Pick Your Sessions
+          </h3>
+          <p className="text-muted-foreground text-sm mb-2">
+            Choose one or more <strong>{getGroupName(level, ageGroup)}</strong> ({levelInfo.name}) sessions · {AGE_GROUP_LABELS[ageGroup]}
+          </p>
+          {slots.length > 0 && (
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
+              <span className="flex items-center gap-1">
+                <DollarSign className="w-3.5 h-3.5" />
+                ${PRICING.group}/lesson (group)
+              </span>
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                {formatDayOfWeek(slots[0].day_of_week)}
+              </span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-sm bg-accent/50 border border-accent rounded-lg p-3 mb-6">
+            <ShoppingBag className="w-4 h-4 text-primary shrink-0" />
+            <span className="text-foreground">
+              <strong>${PRICING.registrationFee} registration fee</strong> — includes swim bag, swim cap & goggles
+            </span>
+          </div>
+        </>
       )}
-      <div className="flex items-center gap-2 text-sm bg-accent/50 border border-accent rounded-lg p-3 mb-6">
-        <ShoppingBag className="w-4 h-4 text-primary shrink-0" />
-        <span className="text-foreground">
-          <strong>${PRICING.registrationFee} registration fee</strong> — includes swim bag, swim cap & goggles
-        </span>
-      </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
-      ) : slots.length === 0 ? (
-        <Card className="p-8 text-center">
-          <p className="text-muted-foreground">No sessions available for this level and age group right now.</p>
-        </Card>
+      ) : slots.length === 0 || slots.every(s => s.spots_left <= 0) ? (
+        <LevelFullScreen level={level} childAge={childAge} ageGroup={ageGroup} onBack={onBack} />
       ) : (
         <div className="space-y-8">
           {Object.entries(grouped).map(([key, groupSlots]) => {
@@ -317,18 +322,20 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         </p>
       )}
 
-      <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 mt-8">
-        <Button variant="ghost" onClick={onBack} className="w-full sm:w-auto">
-          <ChevronLeft className="mr-1 w-4 h-4" /> Back
-        </Button>
-        <Button
-          disabled={selectedIds.size === 0}
-          onClick={() => onSelect(Array.from(selectedIds))}
-          className="w-full sm:w-auto bg-primary text-primary-foreground"
-        >
-          Continue <ChevronRight className="ml-1 w-4 h-4" />
-        </Button>
-      </div>
+      {!levelFull && (
+        <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 mt-8">
+          <Button variant="ghost" onClick={onBack} className="w-full sm:w-auto">
+            <ChevronLeft className="mr-1 w-4 h-4" /> Back
+          </Button>
+          <Button
+            disabled={selectedIds.size === 0}
+            onClick={() => onSelect(Array.from(selectedIds))}
+            className="w-full sm:w-auto bg-primary text-primary-foreground"
+          >
+            Continue <ChevronRight className="ml-1 w-4 h-4" />
+          </Button>
+        </div>
+      )}
     </motion.div>
   );
 };
