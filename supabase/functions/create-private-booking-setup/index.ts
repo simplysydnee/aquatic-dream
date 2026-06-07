@@ -51,26 +51,31 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  let step = "start";
   try {
+    step = "parse_body";
     const parsed = BodySchema.safeParse(await req.json());
-    if (!parsed.success) return j({ error: parsed.error.flatten() }, 400);
+    if (!parsed.success) return j({ error: parsed.error.flatten(), step }, 400);
     const body = parsed.data;
 
+    step = "validate_agreement";
     if (!body.agreement.waiver_accepted || !body.agreement.terms_accepted || !body.agreement.privacy_policy_accepted) {
-      return j({ error: "Required agreements not accepted" }, 400);
+      return j({ error: "Required agreements not accepted", step }, 400);
     }
 
     // Validate slots are still open: no conflicting occurrences or held slots.
+    step = "check_slot_conflicts";
     const slotKeys = body.slots.map((s) => `${s.instructor_id}|${s.slot_date}|${s.start_time}`);
     const uniqInstructors = [...new Set(body.slots.map((s) => s.instructor_id))];
     const uniqDates = [...new Set(body.slots.map((s) => s.slot_date))];
 
-    const { data: existing } = await supabase
+    const { data: existing, error: existingErr } = await supabase
       .from("lesson_booking_occurrences")
       .select("occurrence_date, lesson_bookings!inner(instructor_id, start_time, status)")
       .in("occurrence_date", uniqDates)
       .neq("status", "cancelled")
       .neq("status", "pending_card");
+    if (existingErr) throw existingErr;
 
     const taken = new Set<string>();
     for (const row of (existing as any[] | null) ?? []) {
@@ -79,34 +84,41 @@ Deno.serve(async (req) => {
       taken.add(`${lb.instructor_id}|${row.occurrence_date}|${normalizeTime(lb.start_time)}`);
     }
 
-    const { data: holds } = await supabase
+    step = "check_slot_holds";
+    const { data: holds, error: holdsErr } = await supabase
       .from("slot_holds")
       .select("instructor_id, slot_date, start_time, session_token, held_until")
       .in("instructor_id", uniqInstructors)
       .in("slot_date", uniqDates)
       .gt("held_until", new Date().toISOString());
+    if (holdsErr) throw holdsErr;
     for (const h of (holds as any[] | null) ?? []) {
       if (h.session_token === body.session_token) continue;
       taken.add(`${h.instructor_id}|${h.slot_date}|${normalizeTime(h.start_time)}`);
     }
 
     const conflicts = slotKeys.filter((k) => taken.has(k.replace(/\|(\d{2}:\d{2})$/, (_, t) => `|${normalizeTime(t)}`)));
-    if (conflicts.length) return j({ error: "slots_taken", conflicts }, 409);
+    if (conflicts.length) return j({ error: "slots_taken", conflicts, step }, 409);
 
     // Lookup instructor name (first slot used as primary on the booking row).
+    step = "lookup_instructor";
     const { data: instructor } = await supabase
       .from("instructors").select("id, name").eq("id", body.slots[0].instructor_id).maybeSingle();
     const instructorName = (instructor as any)?.name ?? null;
 
     // Stripe customer
+    step = "stripe_customer_lookup";
     const stripe = createStripeClient(body.environment as StripeEnv);
     const existingCustomers = await stripe.customers.list({ email: body.parent_email, limit: 1 });
-    const customerId = existingCustomers.data[0]?.id
-      ?? (await stripe.customers.create({
-          email: body.parent_email,
-          name: `${body.parent_first_name} ${body.parent_last_name}`,
-          phone: body.parent_phone || undefined,
+    let customerId = existingCustomers.data[0]?.id;
+    if (!customerId) {
+      step = "stripe_customer_create";
+      customerId = (await stripe.customers.create({
+        email: body.parent_email,
+        name: `${body.parent_first_name} ${body.parent_last_name}`,
+        phone: body.parent_phone || undefined,
       })).id;
+    }
 
     // Pick canonical start time = earliest, end = latest? For series we just stamp first slot.
     const sorted = [...body.slots].sort((a, b) => (a.slot_date + a.start_time).localeCompare(b.slot_date + b.start_time));
@@ -117,6 +129,21 @@ Deno.serve(async (req) => {
     const parentName = `${body.parent_first_name} ${body.parent_last_name}`;
     const childName = `${body.child_first_name} ${body.child_last_name}`;
 
+    // Create Stripe Checkout session FIRST so a Stripe failure doesn't leave
+    // orphan pending_card rows in the DB that would later be miscounted as
+    // taken slots.
+    step = "stripe_checkout_session_create";
+    const session = await stripe.checkout.sessions.create({
+      mode: "setup",
+      ui_mode: "embedded_page",
+      customer: customerId,
+      currency: "usd",
+      payment_method_types: ["card"],
+      redirect_on_completion: "never",
+      metadata: { booking_id: bookingId, type: "private_lesson_card_on_file" },
+    });
+
+    step = "insert_lesson_booking";
     const { error: bErr } = await supabase.from("lesson_bookings").insert({
       id: bookingId,
       lesson_type: "private",
@@ -146,6 +173,7 @@ Deno.serve(async (req) => {
     });
     if (bErr) throw bErr;
 
+    step = "insert_occurrences";
     const occurrences = body.slots.map((s) => ({
       id: crypto.randomUUID(),
       booking_id: bookingId,
@@ -158,8 +186,8 @@ Deno.serve(async (req) => {
     const { error: oErr } = await supabase.from("lesson_booking_occurrences").insert(occurrences);
     if (oErr) throw oErr;
 
-    // Insert agreement record
-    await supabase.from("enrollment_agreements").insert({
+    step = "insert_agreement";
+    const { error: aErr } = await supabase.from("enrollment_agreements").insert({
       lesson_booking_id: bookingId,
       signer_first_name: body.parent_first_name,
       signer_last_name: body.parent_last_name,
@@ -177,18 +205,7 @@ Deno.serve(async (req) => {
       emergency_contact_phone: body.agreement.emergency_contact_phone,
       emergency_contact_relationship: body.agreement.emergency_contact_relationship,
     });
-
-    // Embedded Checkout in setup mode — Stripe renders the card form inside an iframe
-    // and stores the resulting payment method on the customer for off-session charges.
-    const session = await stripe.checkout.sessions.create({
-      mode: "setup",
-      ui_mode: "embedded_page",
-      customer: customerId,
-      currency: "usd",
-      payment_method_types: ["card"],
-      redirect_on_completion: "never",
-      metadata: { booking_id: bookingId, type: "private_lesson_card_on_file" },
-    });
+    if (aErr) console.error("agreement insert failed (non-fatal)", aErr?.message);
 
     return j({
       booking_id: bookingId,
@@ -197,8 +214,14 @@ Deno.serve(async (req) => {
       customer_id: customerId,
     });
   } catch (err: any) {
-    console.error("create-private-booking-setup error", err);
-    return j({ error: err?.message || "Internal error" }, 500);
+    console.error("create-private-booking-setup error", {
+      step,
+      message: err?.message,
+      code: err?.code,
+      type: err?.type,
+      stack: err?.stack,
+    });
+    return j({ error: err?.message || "Internal error", step, code: err?.code, type: err?.type }, 500);
   }
 });
 

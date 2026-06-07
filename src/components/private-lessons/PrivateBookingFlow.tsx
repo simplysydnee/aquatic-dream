@@ -134,7 +134,19 @@ export default function PrivateBookingFlow() {
           },
         },
       });
-      if (error) throw new Error(error.message);
+      if (error) {
+        let serverMsg = error.message;
+        let serverStep: string | undefined;
+        try {
+          const body = await (error as any).context?.json?.();
+          if (body?.error) {
+            serverMsg = typeof body.error === "string" ? body.error : JSON.stringify(body.error);
+          }
+          if (body?.step) serverStep = body.step;
+        } catch { /* ignore */ }
+        console.error("create-private-booking-setup failed", { step: serverStep, message: serverMsg });
+        throw new Error(serverStep ? `[${serverStep}] ${serverMsg}` : serverMsg);
+      }
       if ((data as any)?.error === "slots_taken") {
         toast({ title: "Some slots were just taken", description: "Please pick different times.", variant: "destructive" });
         setStep("slots");
