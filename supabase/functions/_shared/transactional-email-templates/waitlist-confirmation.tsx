@@ -81,8 +81,7 @@ const WaitlistConfirmation = ({
 
 export const template = {
   component: WaitlistConfirmation,
-  subject: (d: Record<string, any>) =>
-    `You're on the waitlist${d?.swimLevel ? ` for ${d.swimLevel}` : ''} — Aquatic Dreams`,
+  subject: () => `We got your waitlist request — Aquatic Dreams`,
   displayName: 'Waitlist confirmation (to parent)',
   previewData: {
     parentFirstName: 'Sydnee',
@@ -92,6 +91,7 @@ export const template = {
     privateLessonPriceUsd: 50,
   },
 } satisfies TemplateEntry
+
 
 const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, Helvetica, sans-serif' }
 const container = { padding: '24px', maxWidth: '560px', margin: '0 auto' }
