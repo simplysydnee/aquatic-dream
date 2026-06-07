@@ -9,6 +9,7 @@ import EnrollmentForm, { EnrollmentFormData } from "@/components/swim-enrollment
 import LegalAgreements, { LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import EnrollmentConfirmation from "@/components/swim-enrollment/EnrollmentConfirmation";
 import EnrollmentCheckout from "@/components/swim-enrollment/EnrollmentCheckout";
+import SessionFullFallback from "@/components/swim-enrollment/SessionFullFallback";
 import LessonRequestForm from "@/components/swim-enrollment/LessonRequestForm";
 import PrivateBookingFlow from "@/components/private-lessons/PrivateBookingFlow";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
@@ -19,7 +20,7 @@ import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
-type Step = "assess" | "session" | "info" | "legal" | "payment" | "done";
+type Step = "assess" | "session" | "info" | "legal" | "payment" | "full" | "done";
 
 const ENROLLMENT_STORAGE_KEY = "swim_enrollment_state";
 
@@ -260,9 +261,10 @@ const SwimEnrollment = () => {
 
     const fullSessions = sessions.filter(s => (countMap[s.id] || 0) >= s.max_students);
     if (fullSessions.length > 0) {
-      toast({ title: "Session full", description: `${fullSessions.length} session(s) just filled up. Please go back and choose again.`, variant: "destructive" });
+      // Stash the in-progress child so the fallback screen can pre-fill the waitlist.
+      setConfirmedChildren(allChildren);
       setSubmitting(false);
-      setStep("session");
+      setStep("full");
       return;
     }
 
@@ -495,6 +497,25 @@ const SwimEnrollment = () => {
                 sessionFeeUsd={sessionFeeUsd}
                 sessionFeeCount={sessionFeeCount}
                 onBack={() => setStep("legal")}
+                onSessionFull={() => setStep("full")}
+              />
+            );
+          })()}
+          {step === "full" && (() => {
+            const child = confirmedChildren[0] ?? null;
+            return (
+              <SessionFullFallback
+                swimLevel={(child?.level || level || "") as string}
+                sessionId={child?.sessionIds?.[0] || sessionIds[0] || null}
+                sessionLabel={null}
+                parentFirstName={child?.enrollmentData?.parentFirstName || enrollmentData?.parentFirstName || ""}
+                parentLastName={child?.enrollmentData?.parentLastName || enrollmentData?.parentLastName || ""}
+                parentEmail={child?.enrollmentData?.parentEmail || enrollmentData?.parentEmail || ""}
+                parentPhone={child?.enrollmentData?.parentPhone || enrollmentData?.parentPhone || null}
+                childFirstName={child?.enrollmentData?.childFirstName || enrollmentData?.childFirstName || ""}
+                childLastName={child?.enrollmentData?.childLastName || enrollmentData?.childLastName || ""}
+                childAge={child?.childAge ?? childAge ?? null}
+                onPickDifferentSession={() => setStep("session")}
               />
             );
           })()}

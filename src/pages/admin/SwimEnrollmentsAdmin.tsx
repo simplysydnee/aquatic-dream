@@ -30,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { formatPaymentStatus } from "@/lib/paymentLabels";
 import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
+import WaitlistPanel from "@/components/admin/WaitlistPanel";
 
 interface Enrollment {
   id: string;
@@ -566,12 +567,13 @@ const SwimEnrollmentsAdmin = () => {
       </div>
 
       <Tabs defaultValue="all">
-        <TabsList className="grid w-full grid-cols-3 sm:inline-flex sm:w-auto h-auto">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 sm:inline-flex sm:w-auto h-auto">
           <TabsTrigger value="all" className="text-xs sm:text-sm whitespace-normal">All</TabsTrigger>
           <TabsTrigger value="by-session" className="text-xs sm:text-sm whitespace-normal">By Session</TabsTrigger>
           <TabsTrigger value="cancelled" className="text-xs sm:text-sm whitespace-normal">
             Cancelled{cancelledCount > 0 && <span className="ml-1 opacity-70">({cancelledCount})</span>}
           </TabsTrigger>
+          <TabsTrigger value="waitlist" className="text-xs sm:text-sm whitespace-normal">Waitlist</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -981,6 +983,10 @@ const SwimEnrollmentsAdmin = () => {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="waitlist" className="space-y-4">
+          <WaitlistPanel />
         </TabsContent>
       </Tabs>
 

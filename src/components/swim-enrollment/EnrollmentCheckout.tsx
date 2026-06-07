@@ -21,6 +21,8 @@ interface EnrollmentCheckoutProps {
   /** Number of session-fee charges that pay-ahead would add. */
   sessionFeeCount: number;
   onBack: () => void;
+  /** Called when the server reports a session is full (409). Skip throwing — show fallback. */
+  onSessionFull?: () => void;
 }
 
 export default function EnrollmentCheckout({
@@ -30,6 +32,7 @@ export default function EnrollmentCheckout({
   sessionFeeUsd,
   sessionFeeCount,
   onBack,
+  onSessionFull,
 }: EnrollmentCheckoutProps) {
   // Default = pay reg fee only (current behavior). User can opt to pay ahead.
   const [payAhead, setPayAhead] = useState<"reg_only" | "pay_ahead">("reg_only");
@@ -52,10 +55,19 @@ export default function EnrollmentCheckout({
       },
     });
     if (error || !data?.clientSecret) {
-      throw new Error(error?.message || "Failed to create checkout session");
+      const msg = String(error?.message || data?.error || "Failed to create checkout session");
+      // Server says capacity is gone — show the friendly waitlist screen
+      // instead of letting Stripe surface a generic "merchant" error.
+      if (/is full|sold out|capacity/i.test(msg) && onSessionFull) {
+        onSessionFull();
+        // Throw a benign error so the EmbeddedCheckout provider stops trying
+        // to mount; the parent already navigated away.
+        throw new Error("Session full — redirecting to waitlist");
+      }
+      throw new Error(msg);
     }
     return data.clientSecret;
-  }, [customerEmail, payload]);
+  }, [customerEmail, payload, onSessionFull]);
 
   const sessionTotal = sessionFeeUsd * sessionFeeCount;
 

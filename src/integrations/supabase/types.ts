@@ -2146,6 +2146,60 @@ export type Database = {
         }
         Relationships: []
       }
+      waitlist_requests: {
+        Row: {
+          child_age: number | null
+          child_first_name: string
+          child_last_name: string
+          created_at: string
+          id: string
+          notes: string | null
+          parent_email: string
+          parent_first_name: string
+          parent_last_name: string
+          parent_phone: string | null
+          session_id: string | null
+          source_page: string | null
+          status: string
+          swim_level: string | null
+          updated_at: string
+        }
+        Insert: {
+          child_age?: number | null
+          child_first_name: string
+          child_last_name: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          parent_email: string
+          parent_first_name: string
+          parent_last_name: string
+          parent_phone?: string | null
+          session_id?: string | null
+          source_page?: string | null
+          status?: string
+          swim_level?: string | null
+          updated_at?: string
+        }
+        Update: {
+          child_age?: number | null
+          child_first_name?: string
+          child_last_name?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          parent_email?: string
+          parent_first_name?: string
+          parent_last_name?: string
+          parent_phone?: string | null
+          session_id?: string | null
+          source_page?: string | null
+          status?: string
+          swim_level?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
