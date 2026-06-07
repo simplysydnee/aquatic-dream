@@ -1,38 +1,43 @@
 ## Goal
-When a session is full, the parent gets a waitlist confirmation only — never anything that sounds like they were enrolled in a private lesson. From the fallback screen and the email, they have two clear, self-directed choices:
+When a level (e.g. Sea Divers) has **no bookable group sessions** — either every session for that level/age group is full or none are open — never let the parent advance to the info / legal / payment steps. Show a "this level is full" screen right after the assessment with two clear choices: **join the waitlist** or **book a private lesson**.
 
-1. **Pick a different session** (group)
-2. **Choose to book a private lesson** (parent-initiated, separate checkout)
+## Trigger
+In `SessionPicker.tsx`, right after `fetchSessions()` completes, derive:
 
-## Changes
+- `hasAnySlots` = any sessions returned at all for this level + age group
+- `hasOpenSlots` = at least one slot with `spots_left > 0`
 
-### 1. `waitlist-confirmation.tsx` (parent email) — rewrite copy
-- New H1: **"We got your waitlist request"**
-- Add explicit line up top: **"You have not been enrolled or charged for anything yet."**
-- Reframe the private-lesson block from a promo CTA into an *optional choice*:
-  - Title: **"Want a private lesson instead?"**
-  - Body: "If you'd rather not wait, you can choose to book a private lesson on your own at $50/lesson (June promo). Nothing is booked unless you complete checkout yourself."
-  - Keep the "Book a private lesson" button.
-- Keep the "check other group sessions" link as the second option.
-- Update `Preview` and `subject` to "We got your waitlist request — Aquatic Dreams".
+If `!hasAnySlots || !hasOpenSlots`, render the new full-level screen instead of the current "No sessions available…" card or the disabled grid. (We still show the disabled grid only when *some* sessions are open and others are full — that case is unchanged.)
 
-### 2. `waitlist-owner-alert.tsx` (owner email) — small clarification
-Add one line so the owner sees the parent state matches: "Parent has been told they are on the waitlist only; no enrollment or charge was created."
+## New component: `LevelFullScreen.tsx`
+Lives in `src/components/swim-enrollment/`. Self-contained — no info/legal/payment dependencies.
 
-### 3. `SessionFullFallback.tsx` (in-app screen) — copy tightening
-- Headline stays "This session is full".
-- After the waitlist auto-submit succeeds, show: **"You're on the waitlist. We have not enrolled you or charged you for anything."**
-- Present two equal CTAs side-by-side:
-  - **Pick a different session** (returns to session picker)
-  - **Book a private lesson instead** (links to private booking flow)
-- Remove any wording that frames private as automatic or as a promo we're applying for them.
+Layout:
+1. Headline: "**{Group name} is full for this session**" (e.g. "Sea Divers is full for this session").
+2. Subhead: "We keep classes to 3 swimmers max so every kid gets real attention."
+3. Two equal CTAs:
+   - **Join the waitlist** — opens a compact inline form (parent first/last, email, phone optional, child first/last, child age, optional note). On submit, calls the existing `submit-waitlist-request` edge function with `swimLevel` set and `sessionId: null`. Shows success state ("You're on the waitlist. We have not enrolled you or charged you.").
+   - **Book a private lesson** — `navigate("/book-private-lesson")`.
+4. Footer line: phone + email for help.
 
-### Out of scope
-- No DB schema changes.
-- No changes to `submit-waitlist-request` logic — it still inserts a `waitlist_requests` row and emails parent + owner.
-- No pricing or payment logic changes.
+The form is intentionally minimal so the parent never lands on a credit-card screen. The waitlist row is created with `swim_level` only (no specific session), which the owner sees in the admin Waitlist tab.
 
-## Files touched
-- `supabase/functions/_shared/transactional-email-templates/waitlist-confirmation.tsx`
-- `supabase/functions/_shared/transactional-email-templates/waitlist-owner-alert.tsx`
-- `src/components/swim-enrollment/SessionFullFallback.tsx`
+## SessionPicker wiring
+- Accept new prop `level: SwimLevel`, `childAge: number` (already has both).
+- New local state: `levelFull` derived from fetch results.
+- When `levelFull`, return `<LevelFullScreen level={level} childAge={childAge} ageGroup={ageGroup} onBack={onBack} />` instead of the slot grid.
+- Keep the existing per-slot disabled state for the mixed case (some full, some open).
+
+## `submit-waitlist-request` edge function
+No code change required — it already accepts `swimLevel` with `sessionId: null` and emails parent + owner.
+
+## Admin Waitlist tab
+No change required — already lists rows; level shows up via `swim_level` column.
+
+## Out of scope
+- The existing `SessionFullFallback` (post-checkout race-condition backstop) stays in place but should now rarely fire because the front-door gate catches the common case.
+- No DB schema changes, no pricing changes.
+
+## Files
+- `src/components/swim-enrollment/LevelFullScreen.tsx` (new)
+- `src/components/swim-enrollment/SessionPicker.tsx` (gate + render switch)
