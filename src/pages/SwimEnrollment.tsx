@@ -497,6 +497,25 @@ const SwimEnrollment = () => {
                 sessionFeeUsd={sessionFeeUsd}
                 sessionFeeCount={sessionFeeCount}
                 onBack={() => setStep("legal")}
+                onSessionFull={() => setStep("full")}
+              />
+            );
+          })()}
+          {step === "full" && (() => {
+            const child = confirmedChildren[0] ?? null;
+            return (
+              <SessionFullFallback
+                swimLevel={(child?.level || level || "") as string}
+                sessionId={child?.sessionIds?.[0] || sessionIds[0] || null}
+                sessionLabel={null}
+                parentFirstName={child?.enrollmentData?.parentFirstName || enrollmentData?.parentFirstName || ""}
+                parentLastName={child?.enrollmentData?.parentLastName || enrollmentData?.parentLastName || ""}
+                parentEmail={child?.enrollmentData?.parentEmail || enrollmentData?.parentEmail || ""}
+                parentPhone={child?.enrollmentData?.parentPhone || enrollmentData?.parentPhone || null}
+                childFirstName={child?.enrollmentData?.childFirstName || enrollmentData?.childFirstName || ""}
+                childLastName={child?.enrollmentData?.childLastName || enrollmentData?.childLastName || ""}
+                childAge={child?.childAge ?? childAge ?? null}
+                onPickDifferentSession={() => setStep("session")}
               />
             );
           })()}
