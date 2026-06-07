@@ -322,18 +322,20 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         </p>
       )}
 
-      <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 mt-8">
-        <Button variant="ghost" onClick={onBack} className="w-full sm:w-auto">
-          <ChevronLeft className="mr-1 w-4 h-4" /> Back
-        </Button>
-        <Button
-          disabled={selectedIds.size === 0}
-          onClick={() => onSelect(Array.from(selectedIds))}
-          className="w-full sm:w-auto bg-primary text-primary-foreground"
-        >
-          Continue <ChevronRight className="ml-1 w-4 h-4" />
-        </Button>
-      </div>
+      {!levelFull && (
+        <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 mt-8">
+          <Button variant="ghost" onClick={onBack} className="w-full sm:w-auto">
+            <ChevronLeft className="mr-1 w-4 h-4" /> Back
+          </Button>
+          <Button
+            disabled={selectedIds.size === 0}
+            onClick={() => onSelect(Array.from(selectedIds))}
+            className="w-full sm:w-auto bg-primary text-primary-foreground"
+          >
+            Continue <ChevronRight className="ml-1 w-4 h-4" />
+          </Button>
+        </div>
+      )}
     </motion.div>
   );
 };
