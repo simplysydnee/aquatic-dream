@@ -24,28 +24,34 @@ const WaitlistConfirmation = ({
 }: Props) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>You're on the waitlist — and we have a private-lesson option too</Preview>
+    <Preview>We got your waitlist request — you have not been enrolled or charged</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>You're on the waitlist 🌊</Heading>
+        <Heading style={h1}>We got your waitlist request</Heading>
         <Text style={text}>
-          Hi {parentFirstName || 'there'}, thanks for reaching out about enrolling
-          {childFirstName ? ` ${childFirstName}` : ''} in
+          Hi {parentFirstName || 'there'}, thanks for reaching out about
+          {childFirstName ? ` ${childFirstName}` : ''}{' '}for
           {swimLevel ? ` our ${swimLevel} class` : ' a swim class'}
           {sessionName ? ` (${sessionName})` : ''}.
         </Text>
+        <Text style={notice}>
+          <strong>You have not been enrolled or charged for anything yet.</strong> This email
+          is just to confirm we received your waitlist request.
+        </Text>
         <Text style={text}>
-          That class is currently full. We've added you to the waitlist and the owner has
-          been notified directly — if a seat opens up, we'll email you right away. Most
-          full classes get at least one cancellation, so it's worth holding the spot.
+          That class is currently full. We've added you to the waitlist and notified the
+          owner — if a seat opens, we'll email you right away. Most full classes get at
+          least one cancellation, so it's worth holding the spot.
         </Text>
 
+        <Text style={text}>From here, you have two options:</Text>
+
         <Section style={promoBox}>
-          <Text style={promoTitle}>Don't want to wait?</Text>
+          <Text style={promoTitle}>Option 1 — Want a private lesson instead?</Text>
           <Text style={promoText}>
-            We have <strong>private lessons available now</strong> for just{' '}
-            <strong>${privateLessonPriceUsd}/lesson</strong> through our June promo.
-            Pick your instructor and time — most parents book the same week.
+            If you'd rather not wait, you can choose to book a private lesson on your own
+            at <strong>${privateLessonPriceUsd}/lesson</strong> (June promo). Nothing is
+            booked unless you complete checkout yourself.
           </Text>
           <Section style={{ textAlign: 'center', margin: '16px 0 4px' }}>
             <Button href={PRIVATE_BOOKING_URL} style={button}>
@@ -55,12 +61,13 @@ const WaitlistConfirmation = ({
         </Section>
 
         <Text style={text}>
-          You can also{' '}
+          <strong>Option 2 —</strong> Pick a different group session.{' '}
           <a href={ENROLLMENT_URL} style={link}>
-            check other group sessions
+            Check other group sessions
           </a>{' '}
           — different days, times, or levels may still have openings.
         </Text>
+
 
         <Hr style={hr} />
         <Text style={footer}>
@@ -74,8 +81,7 @@ const WaitlistConfirmation = ({
 
 export const template = {
   component: WaitlistConfirmation,
-  subject: (d: Record<string, any>) =>
-    `You're on the waitlist${d?.swimLevel ? ` for ${d.swimLevel}` : ''} — Aquatic Dreams`,
+  subject: () => `We got your waitlist request — Aquatic Dreams`,
   displayName: 'Waitlist confirmation (to parent)',
   previewData: {
     parentFirstName: 'Sydnee',
@@ -86,10 +92,12 @@ export const template = {
   },
 } satisfies TemplateEntry
 
+
 const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, Helvetica, sans-serif' }
 const container = { padding: '24px', maxWidth: '560px', margin: '0 auto' }
 const h1 = { fontSize: '24px', fontWeight: 'bold', color: '#2a5e84', margin: '0 0 12px' }
 const text = { fontSize: '15px', color: '#222', lineHeight: '1.6', margin: '0 0 14px' }
+const notice = { fontSize: '15px', color: '#1a3a8a', lineHeight: '1.6', margin: '0 0 14px', padding: '12px 14px', backgroundColor: '#eef3fa', borderRadius: '6px' }
 const link = { color: '#2a5e84', textDecoration: 'underline' }
 const promoBox = {
   backgroundColor: '#fff5f2',
