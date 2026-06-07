@@ -97,6 +97,7 @@ const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, Helvetica, sans-s
 const container = { padding: '24px', maxWidth: '560px', margin: '0 auto' }
 const h1 = { fontSize: '24px', fontWeight: 'bold', color: '#2a5e84', margin: '0 0 12px' }
 const text = { fontSize: '15px', color: '#222', lineHeight: '1.6', margin: '0 0 14px' }
+const notice = { fontSize: '15px', color: '#1a3a8a', lineHeight: '1.6', margin: '0 0 14px', padding: '12px 14px', backgroundColor: '#eef3fa', borderRadius: '6px' }
 const link = { color: '#2a5e84', textDecoration: 'underline' }
 const promoBox = {
   backgroundColor: '#fff5f2',
