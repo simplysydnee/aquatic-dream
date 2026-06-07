@@ -102,7 +102,7 @@ export default function SessionFullFallback({
           </div>
           <div>
             <h2 className="font-display text-2xl font-bold text-foreground">
-              That class just filled up
+              This session is full
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
               {swimLevel ? <><span className="font-semibold text-foreground">{swimLevel}</span> · </> : null}
@@ -126,6 +126,7 @@ export default function SessionFullFallback({
               <div>
                 <p className="font-semibold text-foreground">You're on the waitlist.</p>
                 <p className="text-muted-foreground mt-0.5">
+                  <strong className="text-foreground">We have not enrolled you or charged you for anything.</strong>{" "}
                   We emailed <span className="font-medium text-foreground">{parentEmail}</span> a
                   confirmation and notified the owner. If a seat opens, you'll hear from us first.
                 </p>
@@ -139,51 +140,56 @@ export default function SessionFullFallback({
                 <p className="font-semibold text-foreground">We couldn't auto-save your waitlist spot.</p>
                 <p className="text-muted-foreground mt-0.5">
                   Call us at <a href="tel:+12095773483" className="underline">(209) 577-3483</a> and we'll
-                  add you in seconds — or pick a different option below.
+                  add you in seconds — or pick one of the options below.
                 </p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Primary CTA — private lesson */}
-        <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-5 mb-3">
-          <div className="flex items-start gap-3 mb-3">
-            <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-foreground">
-                Don't want to wait? Book a private lesson — <span className="text-primary">$50 for June</span>.
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                One-on-one with an instructor, faster progress, and you pick the day and time.
-                Most parents book within the same week.
-              </p>
+        <p className="text-sm font-semibold text-foreground mb-3">
+          What would you like to do next?
+        </p>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          {/* Option 1 — pick a different session */}
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full h-auto py-4 flex-col items-start text-left whitespace-normal"
+            onClick={onPickDifferentSession}
+          >
+            <div className="flex items-center gap-2 font-semibold">
+              <Calendar className="w-4 h-4" />
+              Pick a different session
             </div>
-          </div>
+            <span className="text-xs text-muted-foreground font-normal mt-1">
+              Try another day, time, or level that still has openings.
+            </span>
+          </Button>
+
+          {/* Option 2 — book a private lesson */}
           <Button
             size="lg"
-            className="w-full"
+            className="w-full h-auto py-4 flex-col items-start text-left whitespace-normal"
             onClick={() => navigate("/book-private-lesson")}
           >
-            Book a private lesson
+            <div className="flex items-center gap-2 font-semibold">
+              <Sparkles className="w-4 h-4" />
+              Book a private lesson instead
+            </div>
+            <span className="text-xs text-primary-foreground/80 font-normal mt-1">
+              One-on-one, $50/lesson for June. You choose the time.
+            </span>
           </Button>
         </div>
 
-        {/* Secondary — pick a different session */}
-        <Button
-          variant="outline"
-          size="lg"
-          className="w-full mb-2"
-          onClick={onPickDifferentSession}
-        >
-          <Calendar className="w-4 h-4 mr-2" />
-          Pick a different session or level
-        </Button>
-
-        <p className="text-xs text-muted-foreground text-center mt-3">
+        <p className="text-xs text-muted-foreground text-center mt-5">
+          Or just wait — we'll email you the moment a seat opens.<br />
           Questions? Call <a href="tel:+12095773483" className="underline">(209) 577-3483</a> or
           email <a href="mailto:info@aquaticdreamsswim.com" className="underline">info@aquaticdreamsswim.com</a>.
         </p>
+
       </div>
     </div>
   );
