@@ -171,36 +171,42 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
     return acc;
   }, {});
 
+  const levelFull = !loading && (slots.length === 0 || slots.every(s => s.spots_left <= 0));
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 30 }}
       animate={{ opacity: 1, x: 0 }}
       className="max-w-2xl mx-auto"
     >
-      <h3 className="font-display text-2xl font-bold text-foreground mb-1">
-        Pick Your Sessions
-      </h3>
-      <p className="text-muted-foreground text-sm mb-2">
-        Choose one or more <strong>{getGroupName(level, ageGroup)}</strong> ({levelInfo.name}) sessions · {AGE_GROUP_LABELS[ageGroup]}
-      </p>
-      {slots.length > 0 && (
-        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-          <span className="flex items-center gap-1">
-            <DollarSign className="w-3.5 h-3.5" />
-            ${PRICING.group}/lesson (group)
-          </span>
-          <span className="flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5" />
-            {formatDayOfWeek(slots[0].day_of_week)}
-          </span>
-        </div>
+      {!levelFull && (
+        <>
+          <h3 className="font-display text-2xl font-bold text-foreground mb-1">
+            Pick Your Sessions
+          </h3>
+          <p className="text-muted-foreground text-sm mb-2">
+            Choose one or more <strong>{getGroupName(level, ageGroup)}</strong> ({levelInfo.name}) sessions · {AGE_GROUP_LABELS[ageGroup]}
+          </p>
+          {slots.length > 0 && (
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
+              <span className="flex items-center gap-1">
+                <DollarSign className="w-3.5 h-3.5" />
+                ${PRICING.group}/lesson (group)
+              </span>
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                {formatDayOfWeek(slots[0].day_of_week)}
+              </span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-sm bg-accent/50 border border-accent rounded-lg p-3 mb-6">
+            <ShoppingBag className="w-4 h-4 text-primary shrink-0" />
+            <span className="text-foreground">
+              <strong>${PRICING.registrationFee} registration fee</strong> — includes swim bag, swim cap & goggles
+            </span>
+          </div>
+        </>
       )}
-      <div className="flex items-center gap-2 text-sm bg-accent/50 border border-accent rounded-lg p-3 mb-6">
-        <ShoppingBag className="w-4 h-4 text-primary shrink-0" />
-        <span className="text-foreground">
-          <strong>${PRICING.registrationFee} registration fee</strong> — includes swim bag, swim cap & goggles
-        </span>
-      </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
