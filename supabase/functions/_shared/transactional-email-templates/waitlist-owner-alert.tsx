@@ -27,8 +27,11 @@ const WaitlistOwnerAlert = (p: Props) => (
         <Heading style={h1}>Waitlist Request</Heading>
         <Text style={subtle}>
           A parent tried to enroll in a class that is currently full. They've been added
-          to the waitlist and sent a friendly note with a private-lesson option.
+          to the waitlist. Parent has been told they are on the waitlist only; no
+          enrollment or charge was created. The parent's email offers them the choice to
+          either pick a different group session or book a private lesson on their own.
         </Text>
+
 
         <Section style={infoBox}>
           <Text style={row}><strong>Level requested:</strong> {p.swimLevel || '—'}</Text>
