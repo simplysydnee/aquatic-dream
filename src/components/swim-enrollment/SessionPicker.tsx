@@ -206,10 +206,8 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         <div className="flex justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
-      ) : slots.length === 0 ? (
-        <Card className="p-8 text-center">
-          <p className="text-muted-foreground">No sessions available for this level and age group right now.</p>
-        </Card>
+      ) : slots.length === 0 || slots.every(s => s.spots_left <= 0) ? (
+        <LevelFullScreen level={level} childAge={childAge} ageGroup={ageGroup} onBack={onBack} />
       ) : (
         <div className="space-y-8">
           {Object.entries(grouped).map(([key, groupSlots]) => {
