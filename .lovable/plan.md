@@ -1,65 +1,40 @@
-## Goal
-1. Add the same SMS opt-in consent to the private-lesson booking flow.
-2. Backfill SMS consent = true for every existing parent currently in the database (group enrollments, private lesson bookings, and lesson requests) so we can text them lesson reminders today. Going forward, opt-in is per the new checkbox.
+## 1. Fix the frozen "Charge card in person" popup
 
-## 1. Private lesson booking — add SMS consent
+**Root cause:** Console shows `Stripe.js api key mismatch detected`. The preview is loading `pk_test_…` from `VITE_PAYMENTS_CLIENT_TOKEN`, but `src/lib/stripe.ts` hard-codes `environment = 'live'`, so the edge function creates the Checkout Session against the **live** Stripe account. Live session + test publishable key → Stripe blocks the iframe, which is why the form never lets you submit.
 
-**`src/components/private-lessons/PrivateBookingFlow.tsx`**
-- Add `smsConsent: z.boolean().default(false)` to the schema.
-- Add a refine: if `smsConsent === true`, `parentPhone` must be present (≥7 chars).
-- Add the same checkbox + disclosure block used on group enrollment, placed right under the phone field, with links to `/sms-terms` and `/waivers`.
-- Pass `sms_consent: form.smsConsent` in the body sent to `create-private-booking-setup`.
+**Fix:** Derive the environment from the token prefix in `src/lib/stripe.ts`:
+- `pk_live_` → `'live'`
+- `pk_test_` → `'sandbox'`
 
-**`supabase/functions/create-private-booking-setup/index.ts`**
-- Extend the Zod body schema with `sms_consent: z.boolean().optional()`.
-- Capture client IP from `x-forwarded-for` / `cf-connecting-ip`.
-- Write the five `sms_consent*` fields onto the `lesson_bookings` insert (matching the swim_enrollments shape: consent + at + ip + version + text).
+That way the preview (test key) talks to sandbox Stripe and the deployed site (live key) talks to live Stripe. No other code changes needed — `PhoneCheckoutPanel`, `LessonOccurrenceCheckoutDialog`, and `EnrollmentCheckout` already pass `getStripeEnvironment()` through.
 
-**DB migration** — add the same columns to `lesson_bookings`:
-- `sms_consent boolean not null default false`
-- `sms_consent_at timestamptz`
-- `sms_consent_ip text`
-- `sms_consent_version text`
-- `sms_consent_text text`
+## 2. Cash / check no longer require a reference — email a receipt instead
 
-(Skipping `lesson_requests` per your instruction; we'll capture consent only on actual bookings/enrollments.)
+In `AddSwimmerDialog.tsx` (and the "Mark paid" path in `SwimEnrollmentsAdmin.tsx`):
+- Remove the hard requirement on `payment_reference` for `cash` / `check` / `comp` / `walk-in`. Field stays optional for internal notes.
+- Add a "Email receipt to parent" checkbox (default **on**) shown whenever payment_method is cash or check and status is paid.
+- New edge function `send-cash-receipt-email`:
+  - Inputs: `enrollment_id`, `amount_cents`, `payment_method`, optional `note`.
+  - Sends a Resend transactional email to `parent_email` using the existing transactional template style (Aquatic Dreams letterhead): "Payment received — $X via cash/check for [child] / [session]", date, internal reference if provided.
+  - Logs to `email_send_log` with `kind='cash_receipt'`.
+- `admin-create-enrollment` and the mark-paid flow trigger the function when the checkbox is on.
 
-## 2. Backfill existing parents as opted-in
+Audit trail is preserved by the email log + the existing `payment_method` / `payment_status` / timestamps on `swim_enrollments`. The Stripe link / Stripe phone paths are untouched.
 
-One-time data update inside the migration (idempotent — only flips rows that haven't already recorded an explicit consent decision):
+## 3. Swimmer check-in
 
-```
-UPDATE public.swim_enrollments
-   SET sms_consent = true,
-       sms_consent_at = now(),
-       sms_consent_version = 'backfill-2026-06-08',
-       sms_consent_text = 'Backfilled at SMS program launch — parent already enrolled before the opt-in checkbox existed. Parents may reply STOP to any text to revoke consent.'
- WHERE sms_consent = false
-   AND parent_phone IS NOT NULL
-   AND length(trim(parent_phone)) >= 7;
+The pieces already exist but are hard to find:
+- `/kiosk` (KioskCheckIn) — tablet self-check-in by tapping a name.
+- `CalendarBlockDetail` — per-class admin check-in inside the calendar.
 
-UPDATE public.lesson_bookings
-   SET sms_consent = true, ...same fields...
- WHERE sms_consent = false
-   AND parent_phone IS NOT NULL
-   AND length(trim(parent_phone)) >= 7;
-```
+Changes:
+- **Admin sidebar entry "Check-in"** under Operations, opening a new `/admin/checkin` page: today's classes grouped by time, each swimmer with a one-tap check-in/undo button, search box, late/no-show buttons. Backed by the same `attendance` upsert the kiosk uses (`checked_in_by='admin:<email>'`).
+- **"Open kiosk" button** on that page that links to `/kiosk` and opens fullscreen — for the tablet at the front desk.
+- Show check-in counts (e.g. "2 / 3 checked in") on the calendar day cards so staff can see at a glance without opening each class.
 
-Rows without a phone number are left as `sms_consent = false` automatically — nothing to send.
-
-**Compliance note (for our records, not user-facing):** TextMagic's policy expects opt-in evidence per recipient. Backfilling existing customers without re-confirmation is a gray area but acceptable for an established business with an existing service relationship, *as long as* every text includes "Reply STOP to opt out" and we honor STOP immediately. We'll enforce this in the SMS sender (next item) and in the message templates.
-
-## 3. SMS sender enforcement (when we build it)
-- The eventual `send-lesson-reminders-sms` function will only target rows where `sms_consent = true` AND `parent_phone IS NOT NULL`.
-- Every outbound message body will end with `Reply STOP to opt out.`
-- TextMagic auto-handles inbound STOP and adds the number to its suppression list; we'll also store STOP events back to `sms_consent = false` via a webhook in a later pass.
-
-## Files touched
-- `src/components/private-lessons/PrivateBookingFlow.tsx`
-- `supabase/functions/create-private-booking-setup/index.ts`
-- one migration: add SMS columns to `lesson_bookings` + backfill both tables
-
-## Out of scope (per your instructions)
-- Lesson request form (`LessonRequestForm.tsx`) — not adding consent there; it's just an inquiry.
-- Waitlist form — same reasoning.
-- Re-confirmation email to backfilled parents.
+## Technical notes
+- `src/lib/stripe.ts`: switch the hard-coded `'live'` to a derived `paymentsEnvironment()` per the prefix.
+- New file: `supabase/functions/send-cash-receipt-email/index.ts` (uses existing Resend setup + transactional template helpers in `_shared/transactional-email-templates/`).
+- New file: `src/pages/admin/CheckInAdmin.tsx` + route in `AdminLayout`.
+- Update: `AddSwimmerDialog.tsx`, `SwimEnrollmentsAdmin.tsx` (cash receipt UI + drop reference requirement), `CalendarDayView.tsx` (checked-in count badge).
+- No schema changes needed.

@@ -54,6 +54,7 @@ const AddSwimmerDialog = ({
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"paid" | "unpaid">("paid");
+  const [emailReceipt, setEmailReceipt] = useState(true);
 
   // Account credit lookup
   const [availableCredits, setAvailableCredits] = useState<{ id: string; amount_cents: number }[]>([]);
@@ -111,6 +112,7 @@ const AddSwimmerDialog = ({
     setPaymentAmount("");
     setPaymentStatus("paid");
     setChargeOverride("");
+    setEmailReceipt(true);
     setPhoneCheckout(null);
     setTab("enroll");
   };
@@ -191,19 +193,40 @@ const AddSwimmerDialog = ({
     return data?.enrollmentId ?? null;
   };
 
+  const sendCashReceipt = async (
+    enrollmentId: string,
+    amountUsd: number,
+    feeLabel: string,
+  ) => {
+    if (!emailReceipt) return;
+    if (!parentEmail || !parentEmail.includes("@")) return;
+    if (paymentStatus !== "paid") return;
+    if (paymentMethod !== "cash" && paymentMethod !== "check") return;
+    try {
+      await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "cash-receipt",
+          recipientEmail: parentEmail.trim(),
+          templateData: {
+            parentName: parentName || undefined,
+            childName,
+            sessionLabel: sessionName,
+            amountUsd,
+            paymentMethod,
+            paymentReference: paymentReference.trim() || null,
+            receivedOn: new Date().toLocaleDateString(),
+            feeLabel,
+          },
+        },
+      });
+    } catch (err) {
+      console.error("cash receipt email failed", err);
+    }
+  };
+
   const handleEnroll = async () => {
     if (!childName || !childAge || !parentName || !parentEmail) {
       toast({ title: "Missing fields", description: "Fill in child name, age, parent name, and email.", variant: "destructive" });
-      return;
-    }
-    const isStripeAsync = paymentMethod === "stripe_link" || paymentMethod === "stripe_phone";
-    if (
-      !isStripeAsync &&
-      paymentStatus === "paid" &&
-      !paymentReference.trim() &&
-      paymentMethod !== "comp"
-    ) {
-      toast({ title: "Payment reference required", description: "Enter a receipt #, check #, or note for the audit log.", variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -215,6 +238,10 @@ const AddSwimmerDialog = ({
         toast({ title: "Enrollment created", description: "Enter the parent's card to charge now." });
         onSaved();
       } else {
+        if (enrollmentId && paymentStatus === "paid" && (paymentMethod === "cash" || paymentMethod === "check")) {
+          const amt = paymentAmount ? parseFloat(paymentAmount) : (isFirstTime ? 45 : 240);
+          await sendCashReceipt(enrollmentId, amt, isFirstTime ? "Registration fee" : "Session fee");
+        }
         toast({ title: "Swimmer enrolled", description: `${childName} added to ${sessionName}` });
         reset();
         onOpenChange(false);
@@ -234,7 +261,11 @@ const AddSwimmerDialog = ({
     }
     setSaving(true);
     try {
-      await callAdminCreate(true);
+      const enrollmentId = await callAdminCreate(true);
+      if (enrollmentId && (paymentMethod === "cash" || paymentMethod === "check") && parentEmail) {
+        const amt = paymentAmount ? parseFloat(paymentAmount) : 30;
+        await sendCashReceipt(enrollmentId, amt, "Walk-in lesson");
+      }
       toast({ title: "Walk-in added", description: `${childName} checked in for today` });
       reset();
       onOpenChange(false);
@@ -427,9 +458,7 @@ const AddSwimmerDialog = ({
                       />
                     </div>
                     <div>
-                      <Label htmlFor="pay-ref" className="text-xs">
-                        Reference {paymentStatus === "paid" && paymentMethod !== "comp" ? "*" : ""}
-                      </Label>
+                      <Label htmlFor="pay-ref" className="text-xs">Reference (optional)</Label>
                       <Input
                         id="pay-ref"
                         value={paymentReference}
@@ -438,13 +467,27 @@ const AddSwimmerDialog = ({
                           paymentMethod === "stripe" ? "ch_xxx" :
                           paymentMethod === "check" ? "Check #1234" :
                           paymentMethod === "comp" ? "Reason" :
-                          "Receipt #"
+                          "Receipt # (optional)"
                         }
                       />
                     </div>
                   </div>
                 )}
+
+                {paymentStatus === "paid" && (paymentMethod === "cash" || paymentMethod === "check") && (
+                  <label className="flex items-center gap-2 text-xs cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={emailReceipt}
+                      onChange={(e) => setEmailReceipt(e.target.checked)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    Email a receipt to the parent
+                  </label>
+                )}
               </div>
+
 
               <Button onClick={handleEnroll} disabled={saving} className="w-full gap-2">
                 {saving ? "Enrolling..." : (
@@ -491,14 +534,27 @@ const AddSwimmerDialog = ({
                   </div>
                 </div>
                 <div>
-                  <Label className="text-xs">Reference / Receipt #</Label>
+                  <Label className="text-xs">Reference / Receipt # (optional)</Label>
                   <Input
                     value={paymentReference}
                     onChange={(e) => setPaymentReference(e.target.value)}
                     placeholder={`Walk-in ${dateStr}`}
                   />
                 </div>
+                {(paymentMethod === "cash" || paymentMethod === "check") && parentEmail && (
+                  <label className="flex items-center gap-2 text-xs cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={emailReceipt}
+                      onChange={(e) => setEmailReceipt(e.target.checked)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    Email a receipt to the parent
+                  </label>
+                )}
               </div>
+
 
               <p className="text-xs text-muted-foreground">
                 Walk-in swimmers are checked in for today only. They will appear on the roster for this date.

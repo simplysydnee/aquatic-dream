@@ -113,6 +113,7 @@ const SwimEnrollmentsAdmin = () => {
   >(null);
   const [markPaidMethod, setMarkPaidMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
   const [markPaidReference, setMarkPaidReference] = useState("");
+  const [markPaidEmailReceipt, setMarkPaidEmailReceipt] = useState(true);
   const [markPaidSaving, setMarkPaidSaving] = useState(false);
 
   const openMarkPaid = (
@@ -123,6 +124,7 @@ const SwimEnrollmentsAdmin = () => {
     setMarkPaidTarget({ enrollment, fee, defaultMethod });
     setMarkPaidMethod(defaultMethod);
     setMarkPaidReference("");
+    setMarkPaidEmailReceipt(true);
   };
 
   const confirmMarkPaid = async () => {
@@ -145,6 +147,40 @@ const SwimEnrollmentsAdmin = () => {
       setEnrollments((prev) =>
         prev.map((e) => (e.id === enrollment.id ? ({ ...e, ...updates } as Enrollment) : e))
       );
+
+      // Email a receipt for cash/check payments when admin opted in.
+      if (
+        markPaidEmailReceipt &&
+        (markPaidMethod === "cash" || markPaidMethod === "check") &&
+        enrollment.parent_email &&
+        enrollment.parent_email.includes("@")
+      ) {
+        try {
+          const sess = enrollment.session_id ? sessions[enrollment.session_id] : null;
+          const sessionLabel = sess
+            ? `${sess.session_name || ""} ${formatDayOfWeek(sess.day_of_week)} ${formatTime12h(sess.start_time)}`.trim()
+            : undefined;
+          await supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "cash-receipt",
+              recipientEmail: enrollment.parent_email,
+              templateData: {
+                parentName: enrollment.parent_name,
+                childName: enrollment.child_name,
+                sessionLabel,
+                amountUsd: fee === "reg" ? 45 : 240,
+                paymentMethod: markPaidMethod,
+                paymentReference: ref,
+                receivedOn: new Date().toLocaleDateString(),
+                feeLabel: fee === "reg" ? "Registration fee" : "Session fee",
+              },
+            },
+          });
+        } catch (e) {
+          console.error("cash receipt send failed", e);
+        }
+      }
+
       toast({
         title: fee === "reg" ? "Reg fee marked paid" : "Session fee recorded",
         description: `${enrollment.child_name} · ${markPaidMethod}`,
@@ -1114,6 +1150,17 @@ const SwimEnrollmentsAdmin = () => {
                 Optional. Stripe payments are recorded automatically.
               </p>
             </div>
+            {(markPaidMethod === "cash" || markPaidMethod === "check") && markPaidTarget?.enrollment.parent_email && (
+              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={markPaidEmailReceipt}
+                  onChange={(e) => setMarkPaidEmailReceipt(e.target.checked)}
+                  className="h-3.5 w-3.5"
+                />
+                Email a receipt to {markPaidTarget.enrollment.parent_email}
+              </label>
+            )}
           </div>
           <DialogFooter>
             <Button size="sm" variant="ghost" onClick={() => setMarkPaidTarget(null)} disabled={markPaidSaving}>Cancel</Button>
