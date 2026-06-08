@@ -453,9 +453,7 @@ const AddSwimmerDialog = ({
                       />
                     </div>
                     <div>
-                      <Label htmlFor="pay-ref" className="text-xs">
-                        Reference {paymentStatus === "paid" && paymentMethod !== "comp" ? "*" : ""}
-                      </Label>
+                      <Label htmlFor="pay-ref" className="text-xs">Reference (optional)</Label>
                       <Input
                         id="pay-ref"
                         value={paymentReference}
@@ -464,13 +462,27 @@ const AddSwimmerDialog = ({
                           paymentMethod === "stripe" ? "ch_xxx" :
                           paymentMethod === "check" ? "Check #1234" :
                           paymentMethod === "comp" ? "Reason" :
-                          "Receipt #"
+                          "Receipt # (optional)"
                         }
                       />
                     </div>
                   </div>
                 )}
+
+                {paymentStatus === "paid" && (paymentMethod === "cash" || paymentMethod === "check") && (
+                  <label className="flex items-center gap-2 text-xs cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={emailReceipt}
+                      onChange={(e) => setEmailReceipt(e.target.checked)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    Email a receipt to the parent
+                  </label>
+                )}
               </div>
+
 
               <Button onClick={handleEnroll} disabled={saving} className="w-full gap-2">
                 {saving ? "Enrolling..." : (
@@ -517,14 +529,27 @@ const AddSwimmerDialog = ({
                   </div>
                 </div>
                 <div>
-                  <Label className="text-xs">Reference / Receipt #</Label>
+                  <Label className="text-xs">Reference / Receipt # (optional)</Label>
                   <Input
                     value={paymentReference}
                     onChange={(e) => setPaymentReference(e.target.value)}
                     placeholder={`Walk-in ${dateStr}`}
                   />
                 </div>
+                {(paymentMethod === "cash" || paymentMethod === "check") && parentEmail && (
+                  <label className="flex items-center gap-2 text-xs cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={emailReceipt}
+                      onChange={(e) => setEmailReceipt(e.target.checked)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    Email a receipt to the parent
+                  </label>
+                )}
               </div>
+
 
               <p className="text-xs text-muted-foreground">
                 Walk-in swimmers are checked in for today only. They will appear on the roster for this date.
