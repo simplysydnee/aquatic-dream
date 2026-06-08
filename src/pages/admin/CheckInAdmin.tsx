@@ -414,17 +414,10 @@ const CheckInAdmin = () => {
               <Mail className="w-4 h-4 mr-2" />
               {emailingFor ? "Sending…" : "Email waiver link to parent"}
             </Button>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                if (waiverPrompt) {
-                  setAttendance(waiverPrompt, { checked_in: true, notes: "checked_in_without_waiver" });
-                  setWaiverPrompt(null);
-                }
-              }}
-            >
-              Check in anyway
-            </Button>
+            <p className="text-xs text-muted-foreground px-1">
+              A signed waiver is required before any swimmer can be checked in.
+            </p>
+
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setWaiverPrompt(null)}>
