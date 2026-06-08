@@ -1931,6 +1931,13 @@ export type Database = {
             referencedRelation: "session_periods"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "swim_sessions_session_period_id_fkey"
+            columns: ["session_period_id"]
+            isOneToOne: false
+            referencedRelation: "session_periods_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       time_clock_entries: {
@@ -2232,7 +2239,36 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      session_periods_public: {
+        Row: {
+          created_at: string | null
+          end_date: string | null
+          id: string | null
+          is_active: boolean | null
+          name: string | null
+          start_date: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          start_date?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          start_date?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       approve_shift_trade: {
