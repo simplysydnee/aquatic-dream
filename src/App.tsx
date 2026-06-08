@@ -36,6 +36,7 @@ import WaiversAdmin from "./pages/admin/WaiversAdmin";
 import PrivateLessonsAdmin from "./pages/admin/PrivateLessonsAdmin";
 import PrintDaySchedule from "./pages/admin/PrintDaySchedule";
 import Waivers from "./pages/Waivers";
+import SmsTerms from "./pages/SmsTerms";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
 import InstructorAnnouncements from "./pages/instructor/InstructorAnnouncements";
 import InstructorMySchedule from "./pages/instructor/InstructorMySchedule";
@@ -130,6 +131,7 @@ const App = () => (
               <Route path="/swim-enrollment" element={<SwimEnrollment />} />
               <Route path="/book-private-lesson" element={<BookPrivateLesson />} />
               <Route path="/waivers" element={<Waivers />} />
+              <Route path="/sms-terms" element={<SmsTerms />} />
               <Route path="/careers" element={<Careers />} />
               <Route path="*" element={<NotFound />} />
             </Route>

@@ -56,9 +56,11 @@ const Footer = () => {
             <p className="text-xs text-secondary-foreground/50">
               © {new Date().getFullYear()} Aquatic Dreams. All rights reserved.
             </p>
-            <p className="text-xs text-secondary-foreground/50 font-display italic">
-              Swim. Dive. Dream.
-            </p>
+            <div className="flex items-center gap-4 text-xs text-secondary-foreground/50">
+              <Link to="/sms-terms" className="hover:text-primary transition-colors">SMS Terms</Link>
+              <Link to="/waivers" className="hover:text-primary transition-colors">Privacy</Link>
+              <span className="font-display italic">Swim. Dive. Dream.</span>
+            </div>
           </div>
         </div>
       </div>

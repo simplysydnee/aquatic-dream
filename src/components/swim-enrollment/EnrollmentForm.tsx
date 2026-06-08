@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { z } from "zod";
 
 const enrollmentSchema = z.object({
@@ -19,9 +21,14 @@ const enrollmentSchema = z.object({
   isFirstTime: z.enum(["yes", "no"], { required_error: "Please select one" }),
   hasMedical: z.enum(["yes", "no"], { required_error: "Please select one" }),
   medicalNotes: z.string().trim().max(1000).optional(),
+  smsConsent: z.boolean().default(false),
 }).refine(
   (data) => data.hasMedical !== "yes" || (data.medicalNotes && data.medicalNotes.length > 0),
   { message: "Please describe the medical conditions or allergies", path: ["medicalNotes"] }
+).refine(
+  // If they checked SMS consent they must have provided a phone number.
+  (data) => !data.smsConsent || (data.parentPhone && data.parentPhone.trim().length >= 7),
+  { message: "Phone number is required to receive text messages", path: ["parentPhone"] }
 );
 
 type ParsedEnrollment = z.infer<typeof enrollmentSchema>;
@@ -55,6 +62,7 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentFirstName, 
     isFirstTime: "" as "" | "yes" | "no",
     hasMedical: "" as "" | "yes" | "no",
     medicalNotes: "",
+    smsConsent: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -78,7 +86,7 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentFirstName, 
     });
   };
 
-  const update = (key: string, value: string) => {
+  const update = (key: string, value: string | boolean) => {
     setForm({ ...form, [key]: value });
     if (errors[key]) setErrors({ ...errors, [key]: "" });
   };
@@ -160,7 +168,7 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentFirstName, 
             {errors.parentEmail && <p className="text-xs text-destructive mt-1">{errors.parentEmail}</p>}
           </div>
           <div>
-            <Label htmlFor="parentPhone">Phone (optional)</Label>
+            <Label htmlFor="parentPhone">Phone (mobile, for text reminders)</Label>
             <Input
               id="parentPhone"
               type="tel"
@@ -168,6 +176,34 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentFirstName, 
               onChange={(e) => update("parentPhone", e.target.value)}
               className="mt-1"
             />
+            {errors.parentPhone && <p className="text-xs text-destructive mt-1">{errors.parentPhone}</p>}
+          </div>
+        </div>
+
+        {/* SMS opt-in (TextMagic / 10DLC compliance) */}
+        <div className="p-4 rounded-lg border border-border bg-muted/30">
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="smsConsent"
+              checked={form.smsConsent}
+              onCheckedChange={(checked) => update("smsConsent", checked === true)}
+              className="mt-0.5"
+            />
+            <div className="flex-1">
+              <Label htmlFor="smsConsent" className="text-sm font-semibold cursor-pointer">
+                Text me lesson reminders &amp; schedule updates
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                I agree to receive SMS text messages from <strong>Aquatic Dreams Swim Modesto</strong> about
+                my swimmer's lessons, schedule changes, reminders, and account updates at the phone
+                number above. Message frequency varies. Message and data rates may apply. Reply{" "}
+                <strong>STOP</strong> to unsubscribe or <strong>HELP</strong> for help. See our{" "}
+                <Link to="/sms-terms" target="_blank" className="underline hover:text-primary">SMS Terms</Link>
+                {" "}and{" "}
+                <Link to="/waivers" target="_blank" className="underline hover:text-primary">Privacy Policy</Link>.
+                Consent is not a condition of enrollment.
+              </p>
+            </div>
           </div>
         </div>
 

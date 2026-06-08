@@ -474,6 +474,7 @@ const SwimEnrollment = () => {
                     parentLastName: child.enrollmentData.parentLastName,
                     parentEmail: child.enrollmentData.parentEmail,
                     parentPhone: child.enrollmentData.parentPhone || null,
+                    smsConsent: !!child.enrollmentData.smsConsent,
                     medicalNotes: child.enrollmentData.hasMedical === "yes" ? (child.enrollmentData.medicalNotes || null) : null,
                     notes: child.enrollmentData.notes || null,
                     agreement: {

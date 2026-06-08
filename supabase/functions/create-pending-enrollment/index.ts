@@ -76,10 +76,23 @@ serve(async (req) => {
 
     // Build rows. Mirror payments-webhook shape EXCEPT status/payment_status:
     // these are reservations, not paid rows.
+    // Capture client IP from standard proxy headers — used as proof of SMS consent.
+    const clientIp = (req.headers.get("x-forwarded-for") || "")
+      .split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || null;
+    const SMS_CONSENT_VERSION = "2026-06-08";
+    const SMS_CONSENT_TEXT =
+      "I agree to receive SMS text messages from Aquatic Dreams Swim Modesto " +
+      "about my swimmer's lessons, schedule changes, reminders, and account " +
+      "updates at the phone number I provided. Message frequency varies. " +
+      "Message and data rates may apply. Reply STOP to unsubscribe or HELP for help. " +
+      "See our SMS Terms (/sms-terms) and Privacy Policy (/waivers). " +
+      "Consent is not a condition of enrollment.";
+
     const rows = payload.children.flatMap((child: any) =>
       child.sessionIds.map((sid: string, i: number) => {
         const isReturning = !child.isFirstTime;
         const chargeRegFee = child.isFirstTime && i === 0;
+        const smsConsent = child.smsConsent === true;
         return {
           swim_level: child.level,
           session_id: sid,
@@ -108,6 +121,12 @@ serve(async (req) => {
           payment_reference: "pending — emailed payment link",
           // Session fee will be collected via hosted link (returning) or day 1 (first-time default).
           session_fee_status: "due_day_1",
+          // SMS opt-in audit trail (TextMagic / 10DLC compliance)
+          sms_consent: smsConsent,
+          sms_consent_at: smsConsent ? new Date().toISOString() : null,
+          sms_consent_ip: smsConsent ? clientIp : null,
+          sms_consent_version: smsConsent ? SMS_CONSENT_VERSION : null,
+          sms_consent_text: smsConsent ? SMS_CONSENT_TEXT : null,
         };
       })
     );
