@@ -79,8 +79,8 @@ const EnrollmentConfirmation = ({ level, childName, childAge, sessionIds, sessio
       if (sessionsRes.data) {
         const periodIds = sessionsRes.data.map(s => s.session_period_id).filter(Boolean) as string[];
         if (periodIds.length > 0) {
-          const { data: periods } = await supabase
-            .from("session_periods")
+          const { data: periods } = await (supabase as any)
+            .from("session_periods_public")
             .select("id, name")
             .in("id", periodIds);
           const periodMap = Object.fromEntries((periods || []).map(p => [p.id, p.name]));
