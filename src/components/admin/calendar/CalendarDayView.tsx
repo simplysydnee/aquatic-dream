@@ -959,8 +959,11 @@ const CalendarDayView = ({
                         }}
                       >
                         <div className="flex items-start justify-between gap-1">
-                          <p className="text-xs font-semibold truncate leading-tight flex-1 min-w-0">
-                            {levelInfo?.name || s.swim_level}
+                          <p className="text-xs font-semibold truncate leading-tight flex-1 min-w-0 flex items-center gap-1">
+                            <span className="truncate">{levelInfo?.name || s.swim_level}</span>
+                            {sessionPhotoConsentMap.get(s.id) === true && (
+                              <Camera className="w-3 h-3 shrink-0 opacity-80" aria-label="All swimmers have photo consent" />
+                            )}
                           </p>
                           {isClosed ? (
                             <span className="shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-gray-500/80 text-white tracking-wide">
@@ -1010,6 +1013,11 @@ const CalendarDayView = ({
                         <p>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</p>
                         {s.instructors?.name && <p>Instructor: {s.instructors.name}</p>}
                         <p>{sessionEnrollments.length}/{s.max_students} swimmers</p>
+                        {sessionPhotoConsentMap.get(s.id) === true && (
+                          <p className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                            <Camera className="w-3 h-3" /> All swimmers have photo consent
+                          </p>
+                        )}
                         {sessionEnrollments.length > 0 && (
                           <ul className="mt-1 space-y-0.5">
                             {sessionEnrollments.slice(0, 5).map((enr) => (
