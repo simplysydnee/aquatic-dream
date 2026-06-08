@@ -147,6 +147,40 @@ const SwimEnrollmentsAdmin = () => {
       setEnrollments((prev) =>
         prev.map((e) => (e.id === enrollment.id ? ({ ...e, ...updates } as Enrollment) : e))
       );
+
+      // Email a receipt for cash/check payments when admin opted in.
+      if (
+        markPaidEmailReceipt &&
+        (markPaidMethod === "cash" || markPaidMethod === "check") &&
+        enrollment.parent_email &&
+        enrollment.parent_email.includes("@")
+      ) {
+        try {
+          const sess = enrollment.session_id ? sessions[enrollment.session_id] : null;
+          const sessionLabel = sess
+            ? `${sess.session_name || ""} ${formatDayOfWeek(sess.day_of_week)} ${formatTime12h(sess.start_time)}`.trim()
+            : undefined;
+          await supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "cash-receipt",
+              recipientEmail: enrollment.parent_email,
+              templateData: {
+                parentName: enrollment.parent_name,
+                childName: enrollment.child_name,
+                sessionLabel,
+                amountUsd: fee === "reg" ? 45 : 240,
+                paymentMethod: markPaidMethod,
+                paymentReference: ref,
+                receivedOn: new Date().toLocaleDateString(),
+                feeLabel: fee === "reg" ? "Registration fee" : "Session fee",
+              },
+            },
+          });
+        } catch (e) {
+          console.error("cash receipt send failed", e);
+        }
+      }
+
       toast({
         title: fee === "reg" ? "Reg fee marked paid" : "Session fee recorded",
         description: `${enrollment.child_name} · ${markPaidMethod}`,
