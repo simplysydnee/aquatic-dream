@@ -28,6 +28,7 @@ const BodySchema = z.object({
   child_last_name: z.string().min(1).max(80),
   child_age: z.number().int().min(1).max(99),
   notes: z.string().max(1000).optional().nullable(),
+  sms_consent: z.boolean().optional(),
   slots: z.array(SlotSchema).min(1).max(40),
   agreement: z.object({
     waiver_accepted: z.boolean(),
@@ -136,6 +137,18 @@ Deno.serve(async (req) => {
     });
 
     step = "insert_lesson_booking";
+    const smsConsent = body.sms_consent === true;
+    const clientIp = (req.headers.get("x-forwarded-for") || "")
+      .split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || null;
+    const SMS_CONSENT_VERSION = "2026-06-08";
+    const SMS_CONSENT_TEXT =
+      "I agree to receive SMS text messages from Aquatic Dreams Swim Modesto " +
+      "about my swimmer's lessons, schedule changes, reminders, and account " +
+      "updates at the phone number I provided. Message frequency varies. " +
+      "Message and data rates may apply. Reply STOP to unsubscribe or HELP for help. " +
+      "See our SMS Terms (/sms-terms) and Privacy Policy (/waivers). " +
+      "Consent is not a condition of enrollment.";
+
     const { error: bErr } = await supabase.from("lesson_bookings").insert({
       id: bookingId,
       lesson_type: "private",
@@ -162,6 +175,11 @@ Deno.serve(async (req) => {
       booking_source: "self_serve",
       stripe_customer_id: customerId,
       cancellation_policy_hours: 24,
+      sms_consent: smsConsent,
+      sms_consent_at: smsConsent ? new Date().toISOString() : null,
+      sms_consent_ip: smsConsent ? clientIp : null,
+      sms_consent_version: smsConsent ? SMS_CONSENT_VERSION : null,
+      sms_consent_text: smsConsent ? SMS_CONSENT_TEXT : null,
     });
     if (bErr) throw bErr;
 

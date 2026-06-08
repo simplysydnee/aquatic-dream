@@ -847,6 +847,11 @@ export type Database = {
           recurring: boolean
           series_end: string | null
           series_start: string
+          sms_consent: boolean
+          sms_consent_at: string | null
+          sms_consent_ip: string | null
+          sms_consent_text: string | null
+          sms_consent_version: string | null
           start_time: string
           status: string
           stripe_customer_id: string | null
@@ -884,6 +889,11 @@ export type Database = {
           recurring?: boolean
           series_end?: string | null
           series_start: string
+          sms_consent?: boolean
+          sms_consent_at?: string | null
+          sms_consent_ip?: string | null
+          sms_consent_text?: string | null
+          sms_consent_version?: string | null
           start_time: string
           status?: string
           stripe_customer_id?: string | null
@@ -921,6 +931,11 @@ export type Database = {
           recurring?: boolean
           series_end?: string | null
           series_start?: string
+          sms_consent?: boolean
+          sms_consent_at?: string | null
+          sms_consent_ip?: string | null
+          sms_consent_text?: string | null
+          sms_consent_version?: string | null
           start_time?: string
           status?: string
           stripe_customer_id?: string | null
