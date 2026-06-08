@@ -150,9 +150,9 @@ const SessionsAdmin = () => {
 
   const fetchData = async () => {
     const [sessRes, instrRes, periodRes] = await Promise.all([
-      supabase.from("swim_sessions").select("*").order("start_time"),
+      supabase.from("swim_sessions").select("id, swim_level, day_of_week, start_time, end_time, max_students, is_active, session_name, session_start_date, session_end_date, age_group, price_per_lesson, total_lessons, session_price, instructor_id, registration_status, session_period_id").order("start_time"),
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
-      supabase.from("session_periods").select("*").order("start_date"),
+      supabase.from("session_periods").select("id, name, start_date, end_date, is_active").order("start_date"),
     ]);
     if (sessRes.data) setSessions(sessRes.data as Session[]);
     if (instrRes.data) setInstructors(instrRes.data);

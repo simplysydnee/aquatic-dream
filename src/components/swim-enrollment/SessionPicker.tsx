@@ -72,7 +72,7 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         const today = new Date().toISOString().slice(0, 10);
         const [periodsRes, sessionsRes] = await Promise.all([
           (supabase as any).from("session_periods_public").select("*").eq("is_active", true).gte("end_date", today).order("start_date"),
-          supabase.from("swim_sessions").select("*")
+          supabase.from("swim_sessions").select("id, swim_level, day_of_week, start_time, end_time, max_students, is_active, session_name, session_start_date, session_end_date, age_group, price_per_lesson, total_lessons, session_price, instructor_id, registration_status, session_period_id")
             .eq("age_group", ageGroup)
             .eq("swim_level", level)
             .eq("is_active", true)
