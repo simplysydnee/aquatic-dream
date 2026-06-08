@@ -743,6 +743,9 @@ const SwimEnrollmentsAdmin = () => {
                       <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
                         <Eye className="w-4 h-4" />
                       </Button>
+                      <Button size="icon" variant="ghost" title="Delete enrollment" onClick={() => deleteEnrollment(e)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -882,6 +885,9 @@ const SwimEnrollmentsAdmin = () => {
                             <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
                               <Eye className="w-4 h-4" />
                             </Button>
+                            <Button size="icon" variant="ghost" title="Delete enrollment" onClick={() => deleteEnrollment(e)}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1012,9 +1018,14 @@ const SwimEnrollmentsAdmin = () => {
                           {new Date(e.created_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
-                          <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button size="icon" variant="ghost" onClick={() => { setSelectedEnrollment(e); setDialogOpen(true); }}>
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" title="Delete enrollment" onClick={() => deleteEnrollment(e)}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
