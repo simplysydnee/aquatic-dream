@@ -1150,6 +1150,17 @@ const SwimEnrollmentsAdmin = () => {
                 Optional. Stripe payments are recorded automatically.
               </p>
             </div>
+            {(markPaidMethod === "cash" || markPaidMethod === "check") && markPaidTarget?.enrollment.parent_email && (
+              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={markPaidEmailReceipt}
+                  onChange={(e) => setMarkPaidEmailReceipt(e.target.checked)}
+                  className="h-3.5 w-3.5"
+                />
+                Email a receipt to {markPaidTarget.enrollment.parent_email}
+              </label>
+            )}
           </div>
           <DialogFooter>
             <Button size="sm" variant="ghost" onClick={() => setMarkPaidTarget(null)} disabled={markPaidSaving}>Cancel</Button>
