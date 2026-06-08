@@ -1,42 +1,33 @@
-# Waiver prompt at check-in + admin mark-complete fix
+## 1. Front-desk pool waiver: in-dialog success screen
 
-## 1. Bug: Admin "Mark waiver complete" doesn't flag swim enrollments as signed
+**Problem:** After the signer submits the front-desk waiver, the dialog closes and drops them on the Waivers admin list — exposing other clients' info.
 
-In `supabase/functions/admin-mark-waiver-complete/index.ts`, when `targetType === "lesson_booking"` the function updates `lesson_bookings.waiver_signed_at`. For `targetType === "enrollment"` it inserts the `enrollment_agreements` row but **never updates `swim_enrollments.waiver_signed_at`**. So the Compliance tab and check-in flow still see the swimmer as "not signed" even after an admin marks it complete.
+**Change:** Keep the dialog open after signing and show an admin-only success view inside it. Admin clicks "Done" to close.
 
-**Fix:** add a parallel update for enrollments:
-```ts
-if (targetType === "enrollment") {
-  await admin
-    .from("swim_enrollments")
-    .update({ waiver_signed_at: new Date().toISOString() })
-    .eq("id", targetId);
-}
-```
+**Files**
+- `src/components/admin/waivers/FrontDeskVisitorWaiverDialog.tsx`
+  - Add local `signed` state.
+  - Pass `hideSuccessScreen` to `VisitorWaiverForm` and use the form's `onSubmitted` to flip `signed = true` instead of immediately calling parent `onSigned`.
+  - When `signed`, render a centered success card: green check, "Waiver received — please return the device to the front desk", and a "Done" button. Clicking "Done" resets state, calls parent `onSigned()` (which closes + refetches in `WaiversAdmin`).
+  - Prevent accidental dismiss while in `signed` state is fine; admin uses Done.
 
-## 2. Check-in: prompt to complete waiver when missing
+No changes to `VisitorWaiverForm` or backend.
 
-In `src/pages/admin/CheckInAdmin.tsx`:
+## 2. Calendar: camera icon on classes where every swimmer has photo consent
 
-- Extend the data fetch to load waiver status per enrollment:
-  - Add `waiver_signed_at` to the `swim_enrollments` select.
-  - Also fetch `enrollment_agreements` rows for the visible enrollment IDs (covers cases where the agreement exists but the column wasn't stamped — pre-fix legacy rows).
-  - Compute `hasWaiver = !!waiver_signed_at || agreementExists`.
-- Show a small "Waiver missing" pill on rows without a waiver.
-- When the admin clicks **Check in** on a swimmer without a waiver, intercept the action and open a modal:
-  - Title: "Waiver required before check-in"
-  - Body summarizing parent/child, with three buttons:
-    1. **Sign now (in person)** — opens the existing `FrontDeskEnrollmentWaiverDialog` (already used in `CalendarBlockDetail`) prefilled with the enrollment. On success: refresh, then auto-complete the check-in.
-    2. **Email waiver link** — calls `send-enrollment-waiver-link` edge function (already exists).
-    3. **Check in anyway** — proceeds with the original `setAttendance` call and writes `notes: "checked_in_without_waiver"` so it shows up in reports.
-- After the in-person waiver dialog returns success, re-run `fetchData()` then call `setAttendance(...)` to complete the original check-in.
+**Problem:** Admins need an at-a-glance signal of which groups can be photographed.
 
-## 3. Out of scope
+**Logic:** A class card shows a camera icon when the class has ≥1 enrollment AND every enrollment in that class has a matching `enrollment_agreements` row with `photo_release_accepted = true`. If any swimmer is missing consent (or has no agreement on file), no icon.
 
-- Kiosk (`/checkin`) waiver gating — can be a follow-up; this plan covers the admin check-in dashboard only.
-- No DB migration; the fix is purely edge function + frontend.
+**Files**
+- `src/components/admin/calendar/CalendarDayView.tsx`
+  - In the `showAD` swim-session loop (around line 397), compute `allPhotoOk` by checking that every `sessionEnrollments[i]` has an agreement in `agreements` with `photo_release_accepted === true` (keyed by `enrollment_id`).
+  - Add a new optional field (e.g. `photoOk: boolean`) on the calendar item and pass it through.
+- Wherever calendar items are rendered (same file, item card JSX), render a small `Camera` lucide icon next to the title when `photoOk` is true. Title tooltip: "All swimmers have photo consent".
+- Mirror the same icon in `CalendarWeekView.tsx` group rendering if it surfaces the same items.
 
-## Files touched
+No DB changes — `enrollment_agreements` is already loaded in `useCalendarData`.
 
-- `supabase/functions/admin-mark-waiver-complete/index.ts` — stamp `swim_enrollments.waiver_signed_at`.
-- `src/pages/admin/CheckInAdmin.tsx` — waiver status fetch, missing-waiver pill, intercept modal, integrate existing `FrontDeskEnrollmentWaiverDialog`.
+## Out of scope
+- Per-swimmer indicators inside the class detail (already shown in `ComplianceTab` / detail dialog).
+- Marketing/photo-release rules beyond the existing `photo_release_accepted` boolean.
