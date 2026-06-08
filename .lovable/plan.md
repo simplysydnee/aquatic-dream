@@ -1,33 +1,33 @@
-## 1. Front-desk pool waiver: in-dialog success screen
+## Kiosk Check-In Redesign
 
-**Problem:** After the signer submits the front-desk waiver, the dialog closes and drops them on the Waivers admin list — exposing other clients' info.
+Remove the PIN gate and the two-step (session → roster) flow. Parents land on one screen with every group for today, find their child's name, and tap **Check In**.
 
-**Change:** Keep the dialog open after signing and show an admin-only success view inside it. Admin clicks "Done" to close.
+### Changes to `src/pages/KioskCheckIn.tsx`
 
-**Files**
-- `src/components/admin/waivers/FrontDeskVisitorWaiverDialog.tsx`
-  - Add local `signed` state.
-  - Pass `hideSuccessScreen` to `VisitorWaiverForm` and use the form's `onSubmitted` to flip `signed = true` instead of immediately calling parent `onSigned`.
-  - When `signed`, render a centered success card: green check, "Waiver received — please return the device to the front desk", and a "Done" button. Clicking "Done" resets state, calls parent `onSigned()` (which closes + refetches in `WaiversAdmin`).
-  - Prevent accidental dismiss while in `signed` state is fine; admin uses Done.
+1. **Remove PIN authentication** entirely (drop `KIOSK_PIN`, `pin` state, `authenticated` state, and the PIN screen). Kiosk loads straight into today's lessons.
 
-No changes to `VisitorWaiverForm` or backend.
+2. **Remove the drill-down step** (`selectedSession` state and the per-session screen). Show all of today's groups stacked vertically on one screen.
 
-## 2. Calendar: camera icon on classes where every swimmer has photo consent
+3. **Auto-sort by time-of-day so the active/next class stays at the top:**
+   - Sessions that are **currently happening** (now is between start/end) → top, with a "Now" badge and subtle highlight.
+   - **Upcoming** sessions next, in time order.
+   - **Finished** sessions (end time has passed) → drop to the bottom, dimmed/collapsed.
+   - Re-evaluate every 60s via a `setInterval` so the order shifts down automatically as the day progresses.
 
-**Problem:** Admins need an at-a-glance signal of which groups can be photographed.
+4. **Each group card shows:**
+   - Time + level badge as the header
+   - List of children in that group, each as a large tap target with a **Check In** button (or a green ✓ "Checked in at h:mm a" once tapped)
+   - No back button needed — everything is on one screen
 
-**Logic:** A class card shows a camera icon when the class has ≥1 enrollment AND every enrollment in that class has a matching `enrollment_agreements` row with `photo_release_accepted = true`. If any swimmer is missing consent (or has no agreement on file), no icon.
+5. **Admin exit:** small "Exit kiosk" link in the corner that navigates back to `/admin` (replaces the PIN as the lock — admin already needs to be on the device to leave).
 
-**Files**
-- `src/components/admin/calendar/CalendarDayView.tsx`
-  - In the `showAD` swim-session loop (around line 397), compute `allPhotoOk` by checking that every `sessionEnrollments[i]` has an agreement in `agreements` with `photo_release_accepted === true` (keyed by `enrollment_id`).
-  - Add a new optional field (e.g. `photoOk: boolean`) on the calendar item and pass it through.
-- Wherever calendar items are rendered (same file, item card JSX), render a small `Camera` lucide icon next to the title when `photoOk` is true. Title tooltip: "All swimmers have photo consent".
-- Mirror the same icon in `CalendarWeekView.tsx` group rendering if it surfaces the same items.
+6. **Auto-refresh attendance** every 30s so check-ins from other devices appear without a manual reload.
 
-No DB changes — `enrollment_agreements` is already loaded in `useCalendarData`.
+### Out of scope
+- No changes to the `attendance` table or check-in write logic (still upserts the same row).
+- No parent accounts / PINs / name lookup — the screen is trusted because it lives on a staff-controlled iPad at the front desk.
 
-## Out of scope
-- Per-swimmer indicators inside the class detail (already shown in `ComplianceTab` / detail dialog).
-- Marketing/photo-release rules beyond the existing `photo_release_accepted` boolean.
+### One thing to confirm
+When a class **finishes**, should it:
+- (a) stay visible at the bottom, dimmed, until midnight, **or**
+- (b) disappear from the kiosk entirely?
