@@ -67,6 +67,7 @@ export interface EnrollmentAgreement {
   emergency_contact_name: string;
   emergency_contact_phone: string;
   emergency_contact_relationship: string;
+  photo_release_accepted?: boolean | null;
 }
 
 export interface LessonDate {
@@ -179,7 +180,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .lte("lesson_date", rangeEnd),
       supabase
         .from("enrollment_agreements")
-        .select("id, enrollment_id, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship"),
+        .select("id, enrollment_id, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, photo_release_accepted"),
       supabase
         .from("session_lesson_dates")
         .select("id, session_id, lesson_date, is_cancelled")
