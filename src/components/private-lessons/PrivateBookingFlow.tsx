@@ -31,7 +31,11 @@ const infoSchema = z.object({
   childLastName: z.string().trim().min(1),
   childDob: z.date(),
   notes: z.string().max(1000).optional(),
-});
+  smsConsent: z.boolean().default(false),
+}).refine(
+  (d) => !d.smsConsent || (d.parentPhone && d.parentPhone.trim().length >= 7),
+  { message: "Phone number is required to receive text messages", path: ["parentPhone"] }
+);
 
 function calcAge(dob: Date): number {
   const today = new Date();
@@ -56,6 +60,7 @@ export default function PrivateBookingFlow() {
     parentFirstName: "", parentLastName: "", parentEmail: "", parentPhone: "",
     childFirstName: "", childLastName: "", childDob: undefined as Date | undefined,
     notes: "",
+    smsConsent: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -110,6 +115,7 @@ export default function PrivateBookingFlow() {
           parent_last_name: form.parentLastName,
           parent_email: form.parentEmail,
           parent_phone: form.parentPhone || null,
+          sms_consent: !!form.smsConsent,
           child_first_name: form.childFirstName,
           child_last_name: form.childLastName,
           child_age: calcAge(form.childDob),
@@ -316,8 +322,37 @@ export default function PrivateBookingFlow() {
           {errors.parentEmail && <p className="text-xs text-destructive mt-1">{errors.parentEmail}</p>}
         </div>
         <div>
-          <Label>Phone</Label>
+          <Label>Phone (mobile, for text reminders)</Label>
           <Input type="tel" value={form.parentPhone} onChange={(e) => update("parentPhone", e.target.value)} />
+          {errors.parentPhone && <p className="text-xs text-destructive mt-1">{errors.parentPhone}</p>}
+        </div>
+      </div>
+
+      {/* SMS opt-in (TextMagic / 10DLC compliance) */}
+      <div className="p-4 rounded-lg border border-border bg-muted/30">
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            id="smsConsentPriv"
+            checked={form.smsConsent}
+            onChange={(e) => update("smsConsent", e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-border accent-primary"
+          />
+          <div className="flex-1">
+            <Label htmlFor="smsConsentPriv" className="text-sm font-semibold cursor-pointer">
+              Text me lesson reminders &amp; schedule updates
+            </Label>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              I agree to receive SMS text messages from <strong>Aquatic Dreams Swim Modesto</strong> about
+              my swimmer's lessons, schedule changes, reminders, and account updates at the phone
+              number above. Message frequency varies. Message and data rates may apply. Reply{" "}
+              <strong>STOP</strong> to unsubscribe or <strong>HELP</strong> for help. See our{" "}
+              <a href="/sms-terms" target="_blank" rel="noopener" className="underline hover:text-primary">SMS Terms</a>
+              {" "}and{" "}
+              <a href="/waivers" target="_blank" rel="noopener" className="underline hover:text-primary">Privacy Policy</a>.
+              Consent is not a condition of enrollment.
+            </p>
+          </div>
         </div>
       </div>
 
