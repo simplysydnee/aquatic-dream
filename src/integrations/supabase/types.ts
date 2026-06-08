@@ -1716,6 +1716,11 @@ export type Database = {
           session_fee_stripe_id: string | null
           session_id: string | null
           session_welcome_sent_at: string | null
+          sms_consent: boolean
+          sms_consent_at: string | null
+          sms_consent_ip: string | null
+          sms_consent_text: string | null
+          sms_consent_version: string | null
           status: string
           stripe_payment_id: string | null
           swim_level: string
@@ -1759,6 +1764,11 @@ export type Database = {
           session_fee_stripe_id?: string | null
           session_id?: string | null
           session_welcome_sent_at?: string | null
+          sms_consent?: boolean
+          sms_consent_at?: string | null
+          sms_consent_ip?: string | null
+          sms_consent_text?: string | null
+          sms_consent_version?: string | null
           status?: string
           stripe_payment_id?: string | null
           swim_level: string
@@ -1802,6 +1812,11 @@ export type Database = {
           session_fee_stripe_id?: string | null
           session_id?: string | null
           session_welcome_sent_at?: string | null
+          sms_consent?: boolean
+          sms_consent_at?: string | null
+          sms_consent_ip?: string | null
+          sms_consent_text?: string | null
+          sms_consent_version?: string | null
           status?: string
           stripe_payment_id?: string | null
           swim_level?: string
