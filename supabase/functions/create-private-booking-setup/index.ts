@@ -84,21 +84,13 @@ Deno.serve(async (req) => {
       taken.add(`${lb.instructor_id}|${row.occurrence_date}|${normalizeTime(lb.start_time)}`);
     }
 
-    step = "check_slot_holds";
-    const { data: holds, error: holdsErr } = await supabase
-      .from("slot_holds")
-      .select("instructor_id, slot_date, start_time, session_token, held_until")
-      .in("instructor_id", uniqInstructors)
-      .in("slot_date", uniqDates)
-      .gt("held_until", new Date().toISOString());
-    if (holdsErr) throw holdsErr;
-    for (const h of (holds as any[] | null) ?? []) {
-      if (h.session_token === body.session_token) continue;
-      taken.add(`${h.instructor_id}|${h.slot_date}|${normalizeTime(h.start_time)}`);
-    }
+    // NOTE: slot_holds are advisory-only (used to gray out the live picker).
+    // We deliberately do NOT block booking on them — stale holds from a
+    // refresh/retry would otherwise lock the same parent out for 10 min.
+    // The lesson_booking_occurrences check above is the real double-book guard.
 
     const conflicts = slotKeys.filter((k) => taken.has(k.replace(/\|(\d{2}:\d{2})$/, (_, t) => `|${normalizeTime(t)}`)));
-    if (conflicts.length) return j({ error: "slots_taken", conflicts, step }, 409);
+    if (conflicts.length) return j({ error: "slots_taken", conflicts, step: "check_slot_conflicts" }, 409);
 
     // Lookup instructor name (first slot used as primary on the booking row).
     step = "lookup_instructor";
