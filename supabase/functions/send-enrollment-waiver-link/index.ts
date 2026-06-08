@@ -51,8 +51,16 @@ Deno.serve(async (req) => {
       ? `${session.session_name || session.swim_level} — ${session.day_of_week} ${session.start_time}`
       : undefined
 
-    const { error: invokeErr } = await supabase.functions.invoke('send-transactional-email', {
-      body: {
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-email`
+    const sendRes = await fetch(fnUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+      },
+      body: JSON.stringify({
         templateName: 'enrollment-waiver-link',
         recipientEmail: enrollment.parent_email,
         idempotencyKey: `waiver-link-${enrollmentId}-${Date.now()}`,
@@ -62,9 +70,13 @@ Deno.serve(async (req) => {
           sessionInfo,
           waiverLink,
         },
-      },
+      }),
     })
-    if (invokeErr) return json({ error: invokeErr.message || 'Email send failed' }, 502)
+    if (!sendRes.ok) {
+      const txt = await sendRes.text().catch(() => '')
+      console.error('send-transactional-email failed:', sendRes.status, txt)
+      return json({ error: `Email send failed (${sendRes.status})` }, 502)
+    }
 
     return json({ success: true, waiverLink }, 200)
   } catch (err) {
