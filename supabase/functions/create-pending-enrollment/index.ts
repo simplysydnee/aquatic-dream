@@ -58,7 +58,7 @@ serve(async (req) => {
       .from("swim_enrollments")
       .select("session_id")
       .in("session_id", uniqueSessionIds)
-      .in("status", ["pending", "confirmed", "enrolled", "pending_payment"]);
+      .in("status", ["confirmed", "enrolled"]);
     const countMap: Record<string, number> = {};
     existing?.forEach((e) => { if (e.session_id) countMap[e.session_id] = (countMap[e.session_id] || 0) + 1; });
     const requestedMap: Record<string, number> = {};
