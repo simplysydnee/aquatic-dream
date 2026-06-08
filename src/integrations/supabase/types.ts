@@ -2489,6 +2489,35 @@ export type Database = {
         Args: { _email: string }
         Returns: string
       }
+      get_public_booking_blocks: {
+        Args: { _instructor_ids?: string[] }
+        Returns: {
+          break_end_time: string | null
+          break_start_time: string | null
+          created_at: string
+          day_of_week: number | null
+          default_lesson_type: string
+          end_date: string | null
+          end_time: string
+          id: string
+          instructor_id: string
+          is_blackout: boolean
+          kind: string
+          notes: string | null
+          pool_area: string
+          slot_minutes: number
+          start_date: string | null
+          start_time: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "instructor_booking_blocks"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_resend_audience_mappings: { Args: never; Returns: Json }
       get_session_enrollment_counts: {
         Args: { _session_ids: string[] }
         Returns: {
