@@ -1,47 +1,87 @@
-## Problem
+## Goal
+Make the enrollment flow compliant with TextMagic / carrier (10DLC) SMS rules so the form qualifies as a valid opt-in source. This requires an explicit, unchecked SMS consent checkbox with the required disclosure language, plus a public SMS Terms page and a Privacy Policy reference to SMS data handling.
 
-Parents trying to book private lessons hit **"Could not save booking — [check_slot_holds] slots_taken"**.
+## What TextMagic requires on the opt-in form
+1. A clearly labeled checkbox the user must actively check (not pre-checked, not bundled with TOS).
+2. Disclosure text immediately next to it that includes:
+   - Business name (Aquatic Dreams Swim Modesto)
+   - Message purpose (lesson reminders, schedule changes, account/booking info)
+   - "Message and data rates may apply"
+   - "Message frequency varies"
+   - "Reply STOP to unsubscribe, HELP for help"
+   - Links to Privacy Policy and SMS Terms
+3. The phone number field must be on the same form as the consent.
+4. Opt-in must be logged with timestamp, IP, and the exact disclosure text version shown.
+5. A public SMS Terms page reachable from the form and footer.
 
-Root cause confirmed against the DB: there are 8 active `slot_holds` rows in the table right now, all tied to one anonymous `session_token` (`10eef87…mq5er7kf`). Holds are created by `SlotPicker → holdSlots()` keyed on a `session_token` that lives in React state for the lifetime of the `PrivateBookingFlow` mount.
+## Changes
 
-If the parent:
-- refreshes the page mid-flow,
-- opens the booking page in a second tab,
-- or comes back after an earlier failed attempt (e.g. our previous Stripe error)
+### 1. Enrollment form — `src/components/swim-enrollment/EnrollmentForm.tsx`
+The parent phone field is already here. Right under the phone field add:
+- A required, unchecked checkbox: `smsConsent`
+- Label/disclosure (visible, not collapsed):
+  > "I agree to receive SMS text messages from Aquatic Dreams Swim Modesto about my swimmer's lessons, schedule changes, reminders, and account updates at the phone number above. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help. See our [SMS Terms](/sms-terms) and [Privacy Policy](/privacy-policy)."
+- A short helper line: "Optional — uncheck if you do not want lesson reminder texts." (only if we want it optional; per TextMagic it can be optional but must be unchecked by default either way).
 
-…the React component remounts and generates a **new** `session_token`. The old `session_token`'s holds linger for 10 minutes (`held_until` default). When the parent finishes the legal step, `create-private-booking-setup` queries `slot_holds`, skips holds where `session_token === body.session_token`, and treats the orphaned old-session holds as "taken by someone else." Booking is rejected even though it's the same person.
+Decision needed (see questions): required vs optional. Recommended = **optional but unchecked by default** so a parent who declines can still enroll, and we only text those who opted in.
 
-Lesley Willems in the screenshot is hitting exactly this — the 8 stale holds in the DB cover her selected slots.
+Add `smsConsent: boolean` to `EnrollmentFormData`.
 
-`slot_holds` is also only an advisory UX hint: it has no relationship to a real booking row and there's no DB-level uniqueness, so blocking on it isn't actually preventing double-booking. The real protection is the `lesson_booking_occurrences` conflict check (already in place above it in the same function).
+### 2. Legal step — `src/components/swim-enrollment/LegalAgreements.tsx`
+No change to consent capture itself (kept on the info step where phone lives, per TextMagic rule). The signature block in LegalAgreements already records IP + timestamp + signer; we'll extend the payload to also carry `smsConsent`, `smsConsentText` (the exact disclosure shown), and `smsConsentVersion`.
 
-## Plan
+### 3. Disclosure versioning — `src/components/swim-enrollment/legal-content.ts`
+Add `SMS_CONSENT_VERSION = "v1-2026-06-08"` and export `SMS_CONSENT_DISCLOSURE` (the exact string above) so we can prove what each parent agreed to.
 
-### 1. `supabase/functions/create-private-booking-setup/index.ts` — make slot_holds non-blocking
+### 4. Persist consent
+- DB migration: add columns to `swim_enrollments`
+  - `sms_consent boolean not null default false`
+  - `sms_consent_at timestamptz`
+  - `sms_consent_ip text`
+  - `sms_consent_version text`
+  - `sms_consent_text text`
+- Mirror columns on `lesson_requests` and the private-booking enrollment path so all enrollment entry points capture consent.
+- Edge function `create-pending-enrollment` (and `admin-create-enrollment`, `confirm-private-booking`, `submit-waitlist-request`, `LessonRequestForm` insert) write the consent fields when present.
 
-Two small changes inside the existing function, no schema changes:
+### 5. New public page — `src/pages/SmsTerms.tsx` at route `/sms-terms`
+Content covers: program name, message types, frequency, MSG&DATA disclaimer, STOP/HELP instructions, supported carriers disclaimer, how to opt out, contact email/phone, link to privacy policy. Add SEO tags and a link from the footer.
 
-a. **Drop holds from the hard conflict check.** Keep the `lesson_booking_occurrences` check exactly as-is — that's what actually prevents a real double-book. Remove the `slot_holds` lookup from the `taken` set used for the 409 `slots_taken` response. (We can leave the query in place for logging, or delete it; either is fine.)
+### 6. Privacy Policy update
+Add a "SMS / text messaging" section to existing privacy content (in `legal-content.ts`) noting:
+- Phone numbers collected for service communication
+- Never shared with third parties for marketing
+- Carrier (TextMagic) is the processor
+- How to opt out
 
-b. **Claim the slots.** Right after the successful `lesson_bookings` + `lesson_booking_occurrences` inserts, delete every `slot_holds` row whose `(instructor_id, slot_date, start_time)` matches one of the slots we just booked — regardless of `session_token`. This releases stale holds left behind by refreshes/retries and prevents the next parent from seeing a ghost hold either.
+### 7. Footer link
+Add "SMS Terms" link in `src/components/Footer.tsx` next to Privacy / Terms.
 
-### 2. No other files change
+### 8. Send-side enforcement
+Update the planned `send-lesson-reminders-sms` edge function (and any other SMS sender) to skip rows where `sms_consent != true` and log skipped recipients so staff can call/email them instead.
 
-- `SlotPicker.tsx` / `privateBooking.ts` stay as-is — holds are still useful for the live availability grid (`fetchOpenSlots`) to gray out slots another live shopper is actively selecting. We're only changing how the **server** treats them at commit time.
-- Frontend error parsing in `PrivateBookingFlow.tsx` stays — it's already surfacing the real server error correctly.
+### 9. Admin visibility
+On the enrollment detail dialog, show an "SMS: Opted in (date/IP)" or "SMS: Not opted in" badge so staff can see at a glance.
 
-### Why this is safe
+## Files touched
+- `src/components/swim-enrollment/EnrollmentForm.tsx` (UI + schema)
+- `src/components/swim-enrollment/LegalAgreements.tsx` (carry through to signature record)
+- `src/components/swim-enrollment/legal-content.ts` (disclosure constant + version)
+- `src/pages/SwimEnrollment.tsx` (pass consent into checkout payload)
+- `src/components/swim-enrollment/EnrollmentCheckout.tsx` (include in buildPayload)
+- `supabase/functions/create-pending-enrollment/index.ts` (persist)
+- `supabase/functions/admin-create-enrollment/index.ts` (persist + admin override)
+- `supabase/functions/confirm-private-booking/index.ts` (persist)
+- `src/components/swim-enrollment/LessonRequestForm.tsx` + table
+- New `src/pages/SmsTerms.tsx` + route in `src/App.tsx`
+- `src/components/Footer.tsx`
+- `src/components/admin/EnrollmentDetailDialog.tsx` (badge)
+- New migration adding consent columns
+- Privacy policy content update
 
-- Real double-booking is still blocked by the `lesson_booking_occurrences` conflict check (step `check_slot_conflicts`), which queries committed bookings excluding `cancelled` / `pending_card`.
-- The 10-minute hold TTL was already the only thing keeping stale holds from blocking forever. Treating holds as advisory removes the entire stale-hold failure class.
-- If two live shoppers truly race to the same slot in the same minute, the second one's `insert_lesson_booking` / occurrences insert will succeed for now (no DB unique index on `(instructor_id, slot_date, start_time)`), but that race already exists today — this change doesn't worsen it. If we want true race protection later, add a partial unique index on active occurrences; out of scope for this fix.
+## Opt-in screenshot for TextMagic
+Once shipped, take a screenshot of the Details step showing the SMS checkbox + disclosure and upload it to the TextMagic "Opt-in screenshot" field. Use `https://aquaticdreamsswim.com/privacy-policy` and `https://aquaticdreamsswim.com/sms-terms` in the two URL fields.
 
-### Files
-
-- `supabase/functions/create-private-booking-setup/index.ts` — remove holds from blocking conflict set; add post-insert cleanup of matching holds.
-
-### Out of scope
-
-- No DB schema changes, no new unique indexes.
-- No changes to `admin-create-private-booking-setup` (different code path, admins aren't hitting this).
-- No public-facing copy changes.
+## Open questions
+1. Make SMS consent **required** to complete enrollment, or **optional** (unchecked default)? Recommended: optional.
+2. Should we also collect SMS consent on the private-lesson booking flow and the waitlist form, or only the group enrollment form?
+3. Existing parents already in the DB — do you want a one-time email asking them to opt in to texts (so we can text current students legally), or only collect going forward?
