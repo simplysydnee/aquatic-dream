@@ -178,6 +178,22 @@ Deno.serve(async (req) => {
     const { error: oErr } = await supabase.from("lesson_booking_occurrences").insert(occurrences);
     if (oErr) throw oErr;
 
+    // Claim the slots: remove any slot_holds (from this or any other
+    // session) that cover the booked instructor/date/time so subsequent
+    // bookings aren't blocked by ghost holds.
+    step = "cleanup_slot_holds";
+    try {
+      await Promise.all(body.slots.map((s) =>
+        supabase.from("slot_holds")
+          .delete()
+          .eq("instructor_id", s.instructor_id)
+          .eq("slot_date", s.slot_date)
+          .eq("start_time", s.start_time)
+      ));
+    } catch (cleanupErr) {
+      console.error("slot_holds cleanup failed (non-fatal)", (cleanupErr as any)?.message);
+    }
+
     step = "insert_agreement";
     const { error: aErr } = await supabase.from("enrollment_agreements").insert({
       lesson_booking_id: bookingId,
