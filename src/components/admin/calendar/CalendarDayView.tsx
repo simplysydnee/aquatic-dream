@@ -427,6 +427,7 @@ const CalendarDayView = ({
           subtitle: s.session_name || (s.instructors?.name ? `Coach ${s.instructors.name}` : undefined),
           extra: `${sessionEnrollments.length}/${s.max_students} swimmers`,
           dimmed: false,
+          photoOk: sessionPhotoConsentMap.get(s.id) === true,
           onClick: () =>
             setDetailBlock({
               kind: "swim",
@@ -751,7 +752,12 @@ const CalendarDayView = ({
                               {it.extra}
                             </p>
                           )}
-                              <p className="text-sm font-semibold leading-tight mt-0.5 break-words">{it.title}</p>
+                              <p className="text-sm font-semibold leading-tight mt-0.5 break-words flex items-center gap-1">
+                                {it.title}
+                                {it.photoOk && (
+                                  <Camera className="w-3.5 h-3.5 shrink-0 opacity-80" aria-label="All swimmers have photo consent" />
+                                )}
+                              </p>
                               {it.subtitle && (
                                 <p className="text-xs opacity-75 leading-tight mt-0.5 break-words">{it.subtitle}</p>
                               )}
