@@ -112,6 +112,7 @@ const AddSwimmerDialog = ({
     setPaymentAmount("");
     setPaymentStatus("paid");
     setChargeOverride("");
+    setEmailReceipt(true);
     setPhoneCheckout(null);
     setTab("enroll");
   };
@@ -260,7 +261,11 @@ const AddSwimmerDialog = ({
     }
     setSaving(true);
     try {
-      await callAdminCreate(true);
+      const enrollmentId = await callAdminCreate(true);
+      if (enrollmentId && (paymentMethod === "cash" || paymentMethod === "check") && parentEmail) {
+        const amt = paymentAmount ? parseFloat(paymentAmount) : 30;
+        await sendCashReceipt(enrollmentId, amt, "Walk-in lesson");
+      }
       toast({ title: "Walk-in added", description: `${childName} checked in for today` });
       reset();
       onOpenChange(false);
