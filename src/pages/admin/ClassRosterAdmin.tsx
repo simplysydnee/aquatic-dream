@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
-import { Users, Plus, ArrowRightLeft, Loader2, Calendar, Clock } from "lucide-react";
+import { Users, Plus, ArrowRightLeft, Loader2, Calendar, Clock, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 import MoveSwimmerDialog from "@/components/admin/MoveSwimmerDialog";
@@ -233,6 +233,17 @@ const ClassRosterAdmin = () => {
     }
   };
 
+  const deleteEnrollment = async (e: Enrollment) => {
+    if (!window.confirm(`Permanently DELETE enrollment for ${e.child_name} (${e.parent_email})?\n\nThis cannot be undone and will NOT issue any refund.`)) return;
+    const { error } = await supabase.from("swim_enrollments").delete().eq("id", e.id);
+    if (error) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Enrollment deleted", description: e.child_name });
+      setEnrollments((prev) => prev.filter((x) => x.id !== e.id));
+    }
+  };
+
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
@@ -428,9 +439,14 @@ const ClassRosterAdmin = () => {
                               <Badge variant="outline" className="text-[10px] capitalize">{e.status}</Badge>
                             </div>
                           </div>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => { setMovingEnrollment(e); setMoveOpen(true); }}>
-                            <ArrowRightLeft className="w-3.5 h-3.5" />
-                          </Button>
+                          <div className="flex shrink-0">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setMovingEnrollment(e); setMoveOpen(true); }}>
+                              <ArrowRightLeft className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" title="Delete" onClick={() => deleteEnrollment(e)}>
+                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
@@ -469,10 +485,16 @@ const ClassRosterAdmin = () => {
                               <Badge variant="outline" className="text-xs capitalize">{e.status}</Badge>
                             </TableCell>
                             <TableCell className="py-2">
-                              <Button size="icon" variant="ghost" className="h-7 w-7"
-                                onClick={() => { setMovingEnrollment(e); setMoveOpen(true); }}>
-                                <ArrowRightLeft className="w-3.5 h-3.5" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" className="h-7 w-7"
+                                  onClick={() => { setMovingEnrollment(e); setMoveOpen(true); }}>
+                                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" title="Delete"
+                                  onClick={() => deleteEnrollment(e)}>
+                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
