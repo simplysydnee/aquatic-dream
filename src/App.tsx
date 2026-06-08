@@ -35,6 +35,7 @@ import MarketingAdmin from "./pages/admin/MarketingAdmin";
 import WaiversAdmin from "./pages/admin/WaiversAdmin";
 import PrivateLessonsAdmin from "./pages/admin/PrivateLessonsAdmin";
 import PrintDaySchedule from "./pages/admin/PrintDaySchedule";
+import CheckInAdmin from "./pages/admin/CheckInAdmin";
 import Waivers from "./pages/Waivers";
 import SmsTerms from "./pages/SmsTerms";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
@@ -87,6 +88,7 @@ const App = () => (
 
               <Route index element={<CalendarAdmin />} />
               <Route path="roster" element={<ClassRosterAdmin />} />
+              <Route path="checkin" element={<CheckInAdmin />} />
               <Route path="clients" element={<ClientsAdmin />} />
               <Route path="enrollments" element={<SwimEnrollmentsAdmin />} />
               <Route path="lesson-requests" element={<LessonRequestsAdmin />} />
