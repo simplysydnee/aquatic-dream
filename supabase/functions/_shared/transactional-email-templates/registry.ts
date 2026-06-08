@@ -27,6 +27,9 @@ import { template as enrollmentWaiverLink } from './enrollment-waiver-link.tsx'
 import { template as visitorWaiverCopy } from './visitor-waiver-copy.tsx'
 import { template as waitlistConfirmation } from './waitlist-confirmation.tsx'
 import { template as waitlistOwnerAlert } from './waitlist-owner-alert.tsx'
+import { template as cashReceipt } from './cash-receipt.tsx'
+
+
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'session-payment-link': sessionPaymentLink,
@@ -47,4 +50,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'visitor-waiver-copy': visitorWaiverCopy,
   'waitlist-confirmation': waitlistConfirmation,
   'waitlist-owner-alert': waitlistOwnerAlert,
+  'cash-receipt': cashReceipt,
 }
