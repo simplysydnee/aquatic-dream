@@ -39,6 +39,19 @@ const phaseFor = (start: string, end: string, now: Date): Phase => {
   return "done";
 };
 
+const daysForToday = (d: Date): string[] => {
+  switch (format(d, "EEEE")) {
+    case "Monday": return ["monday", "monday_wednesday"];
+    case "Tuesday": return ["tuesday", "tuesday_thursday"];
+    case "Wednesday": return ["wednesday", "monday_wednesday"];
+    case "Thursday": return ["thursday", "tuesday_thursday"];
+    case "Friday": return ["friday"];
+    case "Saturday": return ["saturday"];
+    case "Sunday": return ["sunday"];
+    default: return [];
+  }
+};
+
 const KioskCheckIn = () => {
   const [sessionGroups, setSessionGroups] = useState<SessionGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +59,6 @@ const KioskCheckIn = () => {
 
   const today = new Date();
   const dateStr = format(today, "yyyy-MM-dd");
-  const dayName = format(today, "EEEE");
 
   const fetchData = async () => {
     const [sessionsRes, enrollmentsRes, attendanceRes] = await Promise.all([
@@ -54,7 +66,7 @@ const KioskCheckIn = () => {
         .from("swim_sessions")
         .select("id, start_time, end_time, swim_level, age_group")
         .eq("is_active", true)
-        .eq("day_of_week", dayName),
+        .in("day_of_week", daysForToday(today)),
       supabase
         .from("swim_enrollments")
         .select("id, child_name, child_age, parent_name, session_id, status")
