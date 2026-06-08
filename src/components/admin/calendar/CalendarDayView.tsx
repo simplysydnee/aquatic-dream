@@ -10,7 +10,7 @@ import type {
   EnrollmentAgreement,
   LessonDate,
 } from "@/hooks/useCalendarData";
-import { Lock, Plus, Pencil, Trash2 } from "lucide-react";
+import { Lock, Plus, Pencil, Trash2, Camera } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -362,7 +362,25 @@ const CalendarDayView = ({
     dimmed: boolean;
     onClick: () => void;
     locked?: boolean;
+    photoOk?: boolean;
   };
+
+  // Helper: every enrollment in a class has photo_release_accepted === true
+  const sessionPhotoConsentMap = useMemo(() => {
+    const agreementByEnrollment = new Map(
+      agreements.map((a) => [a.enrollment_id, a.photo_release_accepted === true]),
+    );
+    const result = new Map<string, boolean>();
+    swimSessions.forEach((s) => {
+      const ses = enrollments.filter((e) => e.session_id === s.id);
+      if (ses.length === 0) {
+        result.set(s.id, false);
+        return;
+      }
+      result.set(s.id, ses.every((e) => agreementByEnrollment.get(e.id) === true));
+    });
+    return result;
+  }, [swimSessions, enrollments, agreements]);
 
   const agendaItems = useMemo<AgendaItem[]>(() => {
     if (!isMobile) return [];
