@@ -54,6 +54,10 @@ const FrontDeskEnrollmentWaiverDialog = ({ open, onOpenChange, enrollment, onSig
         privacy_policy_version: PRIVACY_POLICY_VERSION,
       } as any);
       if (error) throw error;
+      await supabase
+        .from("swim_enrollments")
+        .update({ waiver_signed_at: new Date().toISOString() })
+        .eq("id", enrollment.id);
       setDone(true);
       onSigned();
       toast({ title: "Waiver signed at front desk" });

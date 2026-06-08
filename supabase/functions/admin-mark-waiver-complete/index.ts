@@ -97,6 +97,12 @@ Deno.serve(async (req) => {
       .update({ waiver_signed_at: new Date().toISOString() })
       .eq("id", targetId);
     if (updErr) return json({ error: updErr.message }, 500);
+  } else if (targetType === "enrollment") {
+    const { error: updErr } = await admin
+      .from("swim_enrollments")
+      .update({ waiver_signed_at: new Date().toISOString() })
+      .eq("id", targetId);
+    if (updErr) return json({ error: updErr.message }, 500);
   }
 
   return json({ success: true });
