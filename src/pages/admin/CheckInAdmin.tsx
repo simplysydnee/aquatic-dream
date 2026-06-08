@@ -5,10 +5,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
-import { CheckCircle2, Undo2, Search, Tablet, RotateCw, UserX } from "lucide-react";
+import {
+  CheckCircle2,
+  Undo2,
+  Search,
+  Tablet,
+  RotateCw,
+  UserX,
+  ShieldAlert,
+  Mail,
+  PenLine,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import FrontDeskEnrollmentWaiverDialog from "@/components/admin/calendar/FrontDeskEnrollmentWaiverDialog";
 
 interface SessionInfo {
   id: string;
@@ -25,10 +44,12 @@ interface EnrollmentRow {
   child_name: string;
   child_age: number;
   parent_name: string;
+  parent_email: string;
   parent_phone: string | null;
   checked_in: boolean;
   no_show: boolean;
   notes: string | null;
+  has_waiver: boolean;
 }
 
 interface Group {
@@ -48,6 +69,11 @@ const CheckInAdmin = () => {
   const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Waiver prompt state
+  const [waiverPrompt, setWaiverPrompt] = useState<EnrollmentRow | null>(null);
+  const [signDialog, setSignDialog] = useState<EnrollmentRow | null>(null);
+  const [emailingFor, setEmailingFor] = useState<string | null>(null);
+
   const checkedInBy = `admin:${user?.email || "unknown"}`;
 
   const fetchData = async () => {
@@ -60,7 +86,9 @@ const CheckInAdmin = () => {
         .eq("day_of_week", dayName),
       supabase
         .from("swim_enrollments")
-        .select("id, session_id, child_name, child_age, parent_name, parent_phone, status")
+        .select(
+          "id, session_id, child_name, child_age, parent_name, parent_email, parent_phone, status, waiver_signed_at",
+        )
         .in("status", ["pending", "confirmed", "enrolled"]),
       supabase
         .from("attendance")
@@ -70,6 +98,18 @@ const CheckInAdmin = () => {
 
     const sessions = (sessionsRes.data || []) as SessionInfo[];
     const enrollments = (enrollRes.data || []) as any[];
+
+    // Fetch agreements for visible enrollments (covers legacy rows missing waiver_signed_at stamp)
+    const enrIds = enrollments.map((e) => e.id);
+    let agreementIds = new Set<string>();
+    if (enrIds.length) {
+      const { data: ags } = await supabase
+        .from("enrollment_agreements")
+        .select("enrollment_id")
+        .in("enrollment_id", enrIds);
+      agreementIds = new Set((ags || []).map((a: any) => a.enrollment_id));
+    }
+
     const attMap = new Map<string, { checked_in: boolean; notes: string | null }>(
       (attendanceRes.data || []).map((a: any) => [a.enrollment_id, { checked_in: !!a.checked_in, notes: a.notes }]),
     );
@@ -87,10 +127,12 @@ const CheckInAdmin = () => {
               child_name: e.child_name,
               child_age: e.child_age,
               parent_name: e.parent_name,
+              parent_email: e.parent_email,
               parent_phone: e.parent_phone,
               checked_in: a?.checked_in ?? false,
               no_show: a?.notes === "no_show",
               notes: a?.notes ?? null,
+              has_waiver: !!e.waiver_signed_at || agreementIds.has(e.id),
             } as EnrollmentRow;
           }),
       }))
@@ -138,6 +180,30 @@ const CheckInAdmin = () => {
     );
   };
 
+  const handleCheckInClick = (enr: EnrollmentRow) => {
+    if (!enr.has_waiver) {
+      setWaiverPrompt(enr);
+      return;
+    }
+    setAttendance(enr, { checked_in: true, notes: null });
+  };
+
+  const emailWaiverLink = async (enr: EnrollmentRow) => {
+    setEmailingFor(enr.id);
+    try {
+      const { error } = await supabase.functions.invoke("send-enrollment-waiver-link", {
+        body: { enrollmentId: enr.id, siteUrl: window.location.origin },
+      });
+      if (error) throw error;
+      toast({ title: "Waiver link emailed", description: enr.parent_email });
+      setWaiverPrompt(null);
+    } catch (e: any) {
+      toast({ title: "Failed to email waiver", description: e?.message, variant: "destructive" });
+    } finally {
+      setEmailingFor(null);
+    }
+  };
+
   const filtered = useMemo(() => {
     if (!search.trim()) return groups;
     const q = search.trim().toLowerCase();
@@ -158,9 +224,10 @@ const CheckInAdmin = () => {
       acc.total += g.enrollments.length;
       acc.checked += g.enrollments.filter((e) => e.checked_in).length;
       acc.noshow += g.enrollments.filter((e) => e.no_show).length;
+      acc.missingWaiver += g.enrollments.filter((e) => !e.has_waiver).length;
       return acc;
     },
-    { total: 0, checked: 0, noshow: 0 },
+    { total: 0, checked: 0, noshow: 0, missingWaiver: 0 },
   );
 
   return (
@@ -171,6 +238,7 @@ const CheckInAdmin = () => {
           <p className="text-sm text-muted-foreground">
             {format(today, "EEEE, MMMM d, yyyy")} · {totals.checked}/{totals.total} checked in
             {totals.noshow > 0 && ` · ${totals.noshow} no-show`}
+            {totals.missingWaiver > 0 && ` · ${totals.missingWaiver} missing waiver`}
           </p>
         </div>
         <div className="flex gap-2">
@@ -244,7 +312,14 @@ const CheckInAdmin = () => {
                         }`}
                       >
                         <div className="min-w-0">
-                          <p className="font-medium truncate">{e.child_name}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium truncate">{e.child_name}</p>
+                            {!e.has_waiver && (
+                              <Badge variant="destructive" className="gap-1 text-[10px] py-0 h-5">
+                                <ShieldAlert className="w-3 h-3" /> Waiver missing
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground truncate">
                             Age {e.child_age} · {e.parent_name}
                             {e.parent_phone ? ` · ${e.parent_phone}` : ""}
@@ -270,7 +345,7 @@ const CheckInAdmin = () => {
                               <Button
                                 size="sm"
                                 disabled={busy}
-                                onClick={() => setAttendance(e, { checked_in: true, notes: null })}
+                                onClick={() => handleCheckInClick(e)}
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Check in
                               </Button>
@@ -300,6 +375,87 @@ const CheckInAdmin = () => {
           );
         })
       )}
+
+      {/* Waiver-required prompt */}
+      <Dialog open={!!waiverPrompt} onOpenChange={(o) => !o && setWaiverPrompt(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-destructive" />
+              Waiver required before check-in
+            </DialogTitle>
+            <DialogDescription>
+              {waiverPrompt && (
+                <>
+                  No signed waiver on file for{" "}
+                  <span className="font-medium text-foreground">{waiverPrompt.child_name}</span> (parent:{" "}
+                  {waiverPrompt.parent_name}). Choose how to handle it.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Button
+              onClick={() => {
+                if (waiverPrompt) {
+                  setSignDialog(waiverPrompt);
+                  setWaiverPrompt(null);
+                }
+              }}
+            >
+              <PenLine className="w-4 h-4 mr-2" />
+              Sign now (in person)
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!!emailingFor}
+              onClick={() => waiverPrompt && emailWaiverLink(waiverPrompt)}
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              {emailingFor ? "Sending…" : "Email waiver link to parent"}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (waiverPrompt) {
+                  setAttendance(waiverPrompt, { checked_in: true, notes: "checked_in_without_waiver" });
+                  setWaiverPrompt(null);
+                }
+              }}
+            >
+              Check in anyway
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setWaiverPrompt(null)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* In-person sign dialog */}
+      <FrontDeskEnrollmentWaiverDialog
+        open={!!signDialog}
+        onOpenChange={(o) => !o && setSignDialog(null)}
+        enrollment={
+          signDialog
+            ? {
+                id: signDialog.id,
+                parent_name: signDialog.parent_name,
+                parent_email: signDialog.parent_email,
+                child_name: signDialog.child_name,
+              }
+            : null
+        }
+        onSigned={async () => {
+          const target = signDialog;
+          if (target) {
+            await setAttendance(target, { checked_in: true, notes: null });
+          }
+          await fetchData();
+        }}
+      />
     </div>
   );
 };
