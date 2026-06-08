@@ -68,9 +68,10 @@ export async function fetchOpenSlots(opts: {
   const instructorMap = Object.fromEntries(instructors.map((i) => [i.id, i.name]));
   const allowed = new Set(opts.instructorIds && opts.instructorIds.length ? opts.instructorIds : instructors.map((i) => i.id));
 
-  // Fetch blocks
-  const { data: blocks } = await supabase.from("instructor_booking_blocks")
-    .select("*").in("instructor_id", Array.from(allowed));
+  // Fetch blocks via SECURITY DEFINER RPC (table is not publicly readable)
+  const { data: blocks } = await supabase.rpc("get_public_booking_blocks", {
+    _instructor_ids: Array.from(allowed),
+  });
   const blocksList = (blocks as Block[]) || [];
 
   // Fetch existing occurrences in window
