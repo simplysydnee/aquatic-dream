@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { z } from "zod";
 
 const enrollmentSchema = z.object({
@@ -19,9 +21,14 @@ const enrollmentSchema = z.object({
   isFirstTime: z.enum(["yes", "no"], { required_error: "Please select one" }),
   hasMedical: z.enum(["yes", "no"], { required_error: "Please select one" }),
   medicalNotes: z.string().trim().max(1000).optional(),
+  smsConsent: z.boolean().default(false),
 }).refine(
   (data) => data.hasMedical !== "yes" || (data.medicalNotes && data.medicalNotes.length > 0),
   { message: "Please describe the medical conditions or allergies", path: ["medicalNotes"] }
+).refine(
+  // If they checked SMS consent they must have provided a phone number.
+  (data) => !data.smsConsent || (data.parentPhone && data.parentPhone.trim().length >= 7),
+  { message: "Phone number is required to receive text messages", path: ["parentPhone"] }
 );
 
 type ParsedEnrollment = z.infer<typeof enrollmentSchema>;
@@ -55,6 +62,7 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentFirstName, 
     isFirstTime: "" as "" | "yes" | "no",
     hasMedical: "" as "" | "yes" | "no",
     medicalNotes: "",
+    smsConsent: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -78,7 +86,7 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentFirstName, 
     });
   };
 
-  const update = (key: string, value: string) => {
+  const update = (key: string, value: string | boolean) => {
     setForm({ ...form, [key]: value });
     if (errors[key]) setErrors({ ...errors, [key]: "" });
   };
