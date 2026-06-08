@@ -766,14 +766,15 @@ function ResendAudiencesTab() {
   const [levels, setLevels] = useState<any[]>([]);
 
   async function load() {
-    const [p, s, l] = await Promise.all([
-      supabase.from("session_periods").select("id, name, is_active, resend_audience_id").order("start_date", { ascending: false }),
-      supabase.from("swim_sessions").select("id, session_name, swim_level, day_of_week, start_time, is_active, resend_audience_id").eq("is_active", true).order("swim_level"),
-      supabase.from("resend_level_audiences").select("level, resend_audience_id"),
-    ]);
-    setPeriods(p.data || []);
-    setSessions(s.data || []);
-    setLevels(l.data || []);
+    const { data, error } = await supabase.rpc("get_resend_audience_mappings");
+    if (error) {
+      toast.error(error.message || "Failed to load audiences");
+      return;
+    }
+    const payload = (data as any) || {};
+    setPeriods(payload.periods || []);
+    setSessions(payload.sessions || []);
+    setLevels(payload.levels || []);
   }
 
   useEffect(() => { load(); }, []);
