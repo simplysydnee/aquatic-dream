@@ -168,7 +168,7 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentFirstName, 
             {errors.parentEmail && <p className="text-xs text-destructive mt-1">{errors.parentEmail}</p>}
           </div>
           <div>
-            <Label htmlFor="parentPhone">Phone (optional)</Label>
+            <Label htmlFor="parentPhone">Phone (mobile, for text reminders)</Label>
             <Input
               id="parentPhone"
               type="tel"
@@ -176,6 +176,34 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentFirstName, 
               onChange={(e) => update("parentPhone", e.target.value)}
               className="mt-1"
             />
+            {errors.parentPhone && <p className="text-xs text-destructive mt-1">{errors.parentPhone}</p>}
+          </div>
+        </div>
+
+        {/* SMS opt-in (TextMagic / 10DLC compliance) */}
+        <div className="p-4 rounded-lg border border-border bg-muted/30">
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="smsConsent"
+              checked={form.smsConsent}
+              onCheckedChange={(checked) => update("smsConsent", checked === true)}
+              className="mt-0.5"
+            />
+            <div className="flex-1">
+              <Label htmlFor="smsConsent" className="text-sm font-semibold cursor-pointer">
+                Text me lesson reminders &amp; schedule updates
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                I agree to receive SMS text messages from <strong>Aquatic Dreams Swim Modesto</strong> about
+                my swimmer's lessons, schedule changes, reminders, and account updates at the phone
+                number above. Message frequency varies. Message and data rates may apply. Reply{" "}
+                <strong>STOP</strong> to unsubscribe or <strong>HELP</strong> for help. See our{" "}
+                <Link to="/sms-terms" target="_blank" className="underline hover:text-primary">SMS Terms</Link>
+                {" "}and{" "}
+                <Link to="/waivers" target="_blank" className="underline hover:text-primary">Privacy Policy</Link>.
+                Consent is not a condition of enrollment.
+              </p>
+            </div>
           </div>
         </div>
 
