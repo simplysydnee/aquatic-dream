@@ -54,6 +54,7 @@ const AddSwimmerDialog = ({
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"paid" | "unpaid">("paid");
+  const [emailReceipt, setEmailReceipt] = useState(true);
 
   // Account credit lookup
   const [availableCredits, setAvailableCredits] = useState<{ id: string; amount_cents: number }[]>([]);
@@ -191,19 +192,40 @@ const AddSwimmerDialog = ({
     return data?.enrollmentId ?? null;
   };
 
+  const sendCashReceipt = async (
+    enrollmentId: string,
+    amountUsd: number,
+    feeLabel: string,
+  ) => {
+    if (!emailReceipt) return;
+    if (!parentEmail || !parentEmail.includes("@")) return;
+    if (paymentStatus !== "paid") return;
+    if (paymentMethod !== "cash" && paymentMethod !== "check") return;
+    try {
+      await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "cash-receipt",
+          recipientEmail: parentEmail.trim(),
+          templateData: {
+            parentName: parentName || undefined,
+            childName,
+            sessionLabel: sessionName,
+            amountUsd,
+            paymentMethod,
+            paymentReference: paymentReference.trim() || null,
+            receivedOn: new Date().toLocaleDateString(),
+            feeLabel,
+          },
+        },
+      });
+    } catch (err) {
+      console.error("cash receipt email failed", err);
+    }
+  };
+
   const handleEnroll = async () => {
     if (!childName || !childAge || !parentName || !parentEmail) {
       toast({ title: "Missing fields", description: "Fill in child name, age, parent name, and email.", variant: "destructive" });
-      return;
-    }
-    const isStripeAsync = paymentMethod === "stripe_link" || paymentMethod === "stripe_phone";
-    if (
-      !isStripeAsync &&
-      paymentStatus === "paid" &&
-      !paymentReference.trim() &&
-      paymentMethod !== "comp"
-    ) {
-      toast({ title: "Payment reference required", description: "Enter a receipt #, check #, or note for the audit log.", variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -215,6 +237,10 @@ const AddSwimmerDialog = ({
         toast({ title: "Enrollment created", description: "Enter the parent's card to charge now." });
         onSaved();
       } else {
+        if (enrollmentId && paymentStatus === "paid" && (paymentMethod === "cash" || paymentMethod === "check")) {
+          const amt = paymentAmount ? parseFloat(paymentAmount) : (isFirstTime ? 45 : 240);
+          await sendCashReceipt(enrollmentId, amt, isFirstTime ? "Registration fee" : "Session fee");
+        }
         toast({ title: "Swimmer enrolled", description: `${childName} added to ${sessionName}` });
         reset();
         onOpenChange(false);
