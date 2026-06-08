@@ -10,7 +10,7 @@ import type {
   EnrollmentAgreement,
   LessonDate,
 } from "@/hooks/useCalendarData";
-import { Lock, Plus, Pencil, Trash2 } from "lucide-react";
+import { Lock, Plus, Pencil, Trash2, Camera } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -362,7 +362,25 @@ const CalendarDayView = ({
     dimmed: boolean;
     onClick: () => void;
     locked?: boolean;
+    photoOk?: boolean;
   };
+
+  // Helper: every enrollment in a class has photo_release_accepted === true
+  const sessionPhotoConsentMap = useMemo(() => {
+    const agreementByEnrollment = new Map(
+      agreements.map((a) => [a.enrollment_id, a.photo_release_accepted === true]),
+    );
+    const result = new Map<string, boolean>();
+    swimSessions.forEach((s) => {
+      const ses = enrollments.filter((e) => e.session_id === s.id);
+      if (ses.length === 0) {
+        result.set(s.id, false);
+        return;
+      }
+      result.set(s.id, ses.every((e) => agreementByEnrollment.get(e.id) === true));
+    });
+    return result;
+  }, [swimSessions, enrollments, agreements]);
 
   const agendaItems = useMemo<AgendaItem[]>(() => {
     if (!isMobile) return [];
@@ -409,6 +427,7 @@ const CalendarDayView = ({
           subtitle: s.session_name || (s.instructors?.name ? `Coach ${s.instructors.name}` : undefined),
           extra: `${sessionEnrollments.length}/${s.max_students} swimmers`,
           dimmed: false,
+          photoOk: sessionPhotoConsentMap.get(s.id) === true,
           onClick: () =>
             setDetailBlock({
               kind: "swim",
@@ -733,7 +752,12 @@ const CalendarDayView = ({
                               {it.extra}
                             </p>
                           )}
-                              <p className="text-sm font-semibold leading-tight mt-0.5 break-words">{it.title}</p>
+                              <p className="text-sm font-semibold leading-tight mt-0.5 break-words flex items-center gap-1">
+                                {it.title}
+                                {it.photoOk && (
+                                  <Camera className="w-3.5 h-3.5 shrink-0 opacity-80" aria-label="All swimmers have photo consent" />
+                                )}
+                              </p>
                               {it.subtitle && (
                                 <p className="text-xs opacity-75 leading-tight mt-0.5 break-words">{it.subtitle}</p>
                               )}
@@ -935,8 +959,11 @@ const CalendarDayView = ({
                         }}
                       >
                         <div className="flex items-start justify-between gap-1">
-                          <p className="text-xs font-semibold truncate leading-tight flex-1 min-w-0">
-                            {levelInfo?.name || s.swim_level}
+                          <p className="text-xs font-semibold truncate leading-tight flex-1 min-w-0 flex items-center gap-1">
+                            <span className="truncate">{levelInfo?.name || s.swim_level}</span>
+                            {sessionPhotoConsentMap.get(s.id) === true && (
+                              <Camera className="w-3 h-3 shrink-0 opacity-80" aria-label="All swimmers have photo consent" />
+                            )}
                           </p>
                           {isClosed ? (
                             <span className="shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-gray-500/80 text-white tracking-wide">
@@ -986,6 +1013,11 @@ const CalendarDayView = ({
                         <p>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</p>
                         {s.instructors?.name && <p>Instructor: {s.instructors.name}</p>}
                         <p>{sessionEnrollments.length}/{s.max_students} swimmers</p>
+                        {sessionPhotoConsentMap.get(s.id) === true && (
+                          <p className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                            <Camera className="w-3 h-3" /> All swimmers have photo consent
+                          </p>
+                        )}
                         {sessionEnrollments.length > 0 && (
                           <ul className="mt-1 space-y-0.5">
                             {sessionEnrollments.slice(0, 5).map((enr) => (
