@@ -11,7 +11,7 @@ import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/comp
 import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
 import SessionEnrollmentCards from "@/components/admin/SessionEnrollmentCards";
 import { Progress } from "@/components/ui/progress";
-import { Eye, CheckCircle, Send, ArrowRightLeft } from "lucide-react";
+import { Eye, CheckCircle, Send, ArrowRightLeft, Trash2 } from "lucide-react";
 import MoveSwimmerDialog from "@/components/admin/MoveSwimmerDialog";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -254,6 +254,17 @@ const SwimEnrollmentsAdmin = () => {
     }
     await supabase.from("swim_enrollments").update({ status }).eq("id", id);
     setEnrollments((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
+  };
+
+  const deleteEnrollment = async (e: Enrollment) => {
+    if (!window.confirm(`Permanently DELETE enrollment for ${e.child_name} (${e.parent_email})?\n\nThis cannot be undone and will NOT issue any refund. Use Cancel instead if a refund is needed.`)) return;
+    const { error } = await supabase.from("swim_enrollments").delete().eq("id", e.id);
+    if (error) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Enrollment deleted", description: e.child_name });
+      setEnrollments((prev) => prev.filter((x) => x.id !== e.id));
+    }
   };
 
   const confirmCancellation = async () => {
