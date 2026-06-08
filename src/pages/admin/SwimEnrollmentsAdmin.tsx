@@ -113,6 +113,7 @@ const SwimEnrollmentsAdmin = () => {
   >(null);
   const [markPaidMethod, setMarkPaidMethod] = useState<"cash" | "check" | "comp" | "other">("cash");
   const [markPaidReference, setMarkPaidReference] = useState("");
+  const [markPaidEmailReceipt, setMarkPaidEmailReceipt] = useState(true);
   const [markPaidSaving, setMarkPaidSaving] = useState(false);
 
   const openMarkPaid = (
@@ -123,6 +124,7 @@ const SwimEnrollmentsAdmin = () => {
     setMarkPaidTarget({ enrollment, fee, defaultMethod });
     setMarkPaidMethod(defaultMethod);
     setMarkPaidReference("");
+    setMarkPaidEmailReceipt(true);
   };
 
   const confirmMarkPaid = async () => {
