@@ -232,16 +232,20 @@ export default function BookFromRequestDialog({ request, open, onOpenChange, onB
       return;
     }
 
-    // 4. confirmation email + payment link for first occurrence
+    // 4. confirmation email + payment link
+    //    - 1 lesson: single-occurrence wrapper builds one Stripe link.
+    //    - 2+ lessons: series wrapper builds one combined Stripe link
+    //      covering the whole series so the parent doesn't get multiple
+    //      payment emails.
     if (sendPaymentLink && insertedOccs.length > 0) {
       try {
-        const { error: sendErr } = await supabase.functions.invoke("send-lesson-booking-confirmation", {
-          body: {
-            occurrenceId: insertedOccs[0].id,
-            environment: getStripeEnvironment(),
-            siteUrl: window.location.origin,
-          },
-        });
+        const fnName = insertedOccs.length > 1
+          ? "send-lesson-series-confirmation"
+          : "send-lesson-booking-confirmation";
+        const body = insertedOccs.length > 1
+          ? { bookingId: bookingRow.id, environment: getStripeEnvironment(), siteUrl: window.location.origin }
+          : { occurrenceId: insertedOccs[0].id, environment: getStripeEnvironment(), siteUrl: window.location.origin };
+        const { error: sendErr } = await supabase.functions.invoke(fnName, { body });
         if (sendErr) throw sendErr;
       } catch (e: any) {
         toast({
