@@ -286,15 +286,78 @@ export function useSwimmers() {
     });
 
     (bookingsRes.data || []).forEach((b: any) => {
-      if (!b.parent_email || !b.child_name) return;
-      const s = ensure(b.child_name, b.parent_email, {
-        parent_name: b.parent_name,
-        parent_phone: b.parent_phone,
-      });
-      s.bookings.push(b as SwimmerBooking);
+      if (!b.parent_email) return;
+
+      // Prefer first+last when present (cleaner than the raw child_name field
+      // which is sometimes set to the parent's name for semi-private bookings).
+      const composedName =
+        b.child_first_name && b.child_last_name
+          ? `${b.child_first_name} ${b.child_last_name}`
+          : b.child_name || "";
+
+      const parentEmailNorm = normalizeEmail(b.parent_email);
+      const parentNameNorm = normalizeName(b.parent_name);
+      const childNorm = normalizeName(composedName);
+      const childFirstNorm = normalizeName(b.child_first_name);
+
+      // Booking has no real child identity (e.g. semi-private where child_name
+      // was set to the parent's own name). Try to attach to an existing
+      // swimmer for the same parent.
+      const childIsParent =
+        !b.child_first_name &&
+        !b.child_last_name &&
+        (!childNorm || childNorm === parentNameNorm);
+
+      // 1) Exact normalized match
+      let target = map.get(swimmerKey(composedName, b.parent_email));
+
+      // 2) Fuzzy match against existing swimmers under same parent
+      if (!target) {
+        const sameParent = Array.from(map.values()).filter(
+          (s) => normalizeEmail(s.parent_email) === parentEmailNorm,
+        );
+
+        if (!target && childNorm) {
+          target =
+            sameParent.find((s) => normalizeName(s.child_name) === childNorm) ||
+            sameParent.find((s) => {
+              const sn = normalizeName(s.child_name);
+              return (
+                sn &&
+                (sn.startsWith(childNorm + " ") ||
+                  childNorm.startsWith(sn + " ") ||
+                  (childFirstNorm && sn.split(" ")[0] === childFirstNorm))
+              );
+            });
+        }
+
+        // 3) Booking with no real child name → attach to the parent's sole swimmer
+        if (!target && childIsParent && sameParent.length === 1) {
+          target = sameParent[0];
+        }
+      }
+
+      if (!target) {
+        const displayName = composedName.trim() || b.child_name || b.parent_name || "Unknown";
+        target = ensure(displayName, b.parent_email, {
+          parent_name: b.parent_name,
+          parent_phone: b.parent_phone,
+        });
+      } else {
+        if (b.parent_name && !target.parent_name) target.parent_name = b.parent_name;
+        if (b.parent_phone && !target.parent_phone) target.parent_phone = b.parent_phone;
+      }
+
+      target.bookings.push(b as SwimmerBooking);
     });
 
     const list = Array.from(map.values()).map((s) => {
+      // Sort bookings newest-first by series_start (fallback created_at)
+      s.bookings.sort((a, b) => {
+        const ad = a.series_start || a.created_at;
+        const bd = b.series_start || b.created_at;
+        return ad < bd ? 1 : -1;
+      });
       const { statuses, primary } = computeStatuses(s);
       return {
         ...s,
