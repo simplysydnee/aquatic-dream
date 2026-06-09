@@ -1,0 +1,1 @@
+REVOKE SELECT (resend_audience_id) ON public.swim_sessions FROM anon, authenticated;
