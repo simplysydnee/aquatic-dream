@@ -1,47 +1,37 @@
-## Goal
-Let parents enroll in a session that has already started. The picker should:
-1. Still display sessions whose period hasn't ended (already true).
-2. Hide past lesson dates and show only the remaining classes.
-3. Show a **prorated price** = remaining lessons × per-lesson rate.
-4. At checkout, if the session has already started, charge the **full prorated amount now** (skip the first-timer "pay session fee on day 1" option, since day 1 has passed).
+## Problem
 
-## Scope
-Frontend display + checkout pricing only. No new tables, no admin changes, no change to returning-customer behavior for not-yet-started sessions.
+On a swimmer's card (Clients → swimmer drawer → **Activity**), booked **private** and **semi-private** lessons are missing in two cases:
 
-## Changes
+1. The parent has a session enrollment AND a private/semi booking, but the booking does not merge onto the same swimmer because the names don't match exactly (extra/double whitespace, "Arthur" vs "Arthur Sidell", different casing, etc.).
+2. The parent only has private/semi bookings (no session enrollment). For many semi-private rows the booking's `child_name` is actually the **parent's** name (the `child_first_name`/`child_last_name` columns are null), so the swimmer ends up listed under the parent, or the real child never gets a card at all.
 
-### 1. `src/components/swim-enrollment/SessionPicker.tsx`
-- Today's date (Pacific) computed once at component mount.
-- After fetching `session_lesson_dates` for displayed sessions, derive `remainingDates[sessionId]` (lesson_date >= today, not cancelled). Do this for *all* visible sessions, not only selected ones — needed for pricing in the card.
-- If a session has 0 remaining lesson dates → hide it (treat like full).
-- In each session card:
-  - Replace "X spots left" with the count of **remaining classes** alongside spots.
-  - Show prorated price badge: `$<remaining × price_per_lesson>` (strike-through the full `session_price` when it differs).
-- Update the date list under selected sessions to show only remaining dates, with header like "Session XYZ — N classes remaining (started <date>)".
-- Hand the prorated price up to the parent (extend `onSelect` to pass `{ sessionIds, proratedPrices: Record<sessionId, number> }`, or fetch again in parent — see step 2).
+Both stem from `useSwimmers` keying swimmers on a naïve `child_name|parent_email` and never reconciling bookings against existing enrollment-derived swimmers.
 
-### 2. `src/pages/SwimEnrollment.tsx`
-- After session selection, also load `session_lesson_dates` for the chosen sessions to compute prorated price per session (`remainingLessons × price_per_lesson`, falling back to full `session_price` when session hasn't started).
-- Use prorated value in the "today total" display and pass into `sessionPrices` map (already plumbed through to checkout). Also pass a new flag `sessionStarted: Record<sessionId, boolean>` so the checkout step knows when the in-person option must be hidden.
+## Fix (frontend only, in `src/hooks/useSwimmers.ts`)
 
-### 3. `src/components/swim-enrollment/EnrollmentCheckout.tsx`
-- Accept `allSessionsStarted: boolean` (true when every selected session has already started).
-- When `hasFirstTimers && allSessionsStarted`: skip the radio choice and force `payAhead = true` (full reg + prorated session fee). Show copy: "This session has already started — full amount due today."
-- When mixed (some started, some not): still force `pay_ahead` for the started ones. Simplest: if **any** selected session has started for a first-timer, force pay_ahead globally and hide the toggle.
+### 1. Normalize names before keying
+- Lowercase, trim, **collapse internal whitespace**, and strip punctuation.
+- Use a `child_first_name + child_last_name` based key when those columns exist; fall back to `child_name`.
+- Apply the same normalization to enrollments, requests, and bookings.
 
-### 4. `supabase/functions/create-checkout/index.ts`
-- For each session being charged, query `session_lesson_dates` (not cancelled, date >= today PT). If `remaining < total_lessons` then `unit_amount = remaining × price_per_lesson * 100`; otherwise keep `session_price`.
-- Refuse the request (409) if `remaining === 0` for any selected session.
-- If `child.isFirstTime && payAhead === false` but any of that child's sessions has started → override to `payAhead = true` (server-authoritative, mirrors UI).
-- Update the defensive guard: allowed `unit_amount` is either `session_price` or `remaining × price_per_lesson` based on DB lesson dates. Continue refusing anything else.
+### 2. Two-pass merge for bookings
+- Pass 1: build the swimmer map from enrollments + requests as today.
+- Pass 2 (bookings): before creating a new swimmer for a booking, try to attach it to an existing swimmer for the same parent_email when either:
+  - normalized full name matches, OR
+  - normalized first name matches and last name is empty/contained, OR
+  - the booking has no real child name (semi-private case where `child_first_name`/`child_last_name` are null AND `child_name` equals the parent's name) AND the parent has exactly one existing swimmer → attach to that swimmer.
+- Only fall through to creating a new swimmer card when no reasonable parent match exists.
 
-### 5. Confirmation copy (`EnrollmentConfirmation.tsx`)
-- Already derives session fee from `totalDue - registrationFee`; just verify it renders correctly with the prorated total (no logic change expected, only sanity check after wiring).
+### 3. Use the cleaner display name
+- When a booking has `child_first_name` + `child_last_name`, prefer that over the looser `child_name` for the swimmer's display name.
 
-## Pricing rule
-Per-session charge = `min(total_lessons, remaining_lessons) × price_per_lesson`. For sessions not yet started, `remaining_lessons === total_lessons`, so the existing `session_price` stays unchanged.
+### 4. Activity tab ordering (`SwimmerDetailDrawer.tsx`)
+- Sort `swimmer.bookings` newest-first by `series_start` (fallback `created_at`) so the most recent booking shows on top — small consistency fix while we're in there.
 
-## Out of scope
-- Editing past-session enrollments retroactively.
-- Admin manual entry flow (`admin-create-enrollment`) — can be a follow-up if needed.
-- Refund handling for missed classes once enrolled.
+No backend / RLS / schema changes needed. No edits to enrollment, payment, or checkout logic.
+
+## Verification
+
+- Open a parent who has only private bookings → confirm one swimmer card per real child, all bookings listed under **Activity → Lessons & Requests**.
+- Open a parent who has both an enrollment and a private booking for the same child → confirm the booking now appears on the same card as the enrollment (no duplicate card).
+- Open a semi-private booking where `child_name` was the parent's name → confirm it attaches to the single existing child swimmer for that parent instead of creating a duplicate parent-named card.
