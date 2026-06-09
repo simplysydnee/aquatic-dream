@@ -25,6 +25,14 @@ import WaiverDetailDrawer from "@/components/admin/waivers/WaiverDetailDrawer";
 
 export type WaiverSource = "visitor" | "lesson" | "enrollment";
 
+export interface WaiverLink {
+  enrollment_id: string | null;
+  lesson_booking_id: string | null;
+  child_name: string | null;
+  parent_email: string | null;
+  link_kind: "enrollment" | "lesson";
+}
+
 export interface UnifiedWaiverRow {
   id: string;
   source: WaiverSource;
@@ -35,18 +43,21 @@ export interface UnifiedWaiverRow {
   photo_release: boolean;
   signed_at: string;
   raw: any;
+  links?: WaiverLink[];
 }
 
 const WaiversAdmin = () => {
   const [search, setSearch] = useState("");
-  const [sourceFilter, setSourceFilter] = useState<"all" | WaiverSource>("all");
+  const [sourceFilter, setSourceFilter] = useState<
+    "all" | WaiverSource | "linked-visitor" | "unlinked-visitor"
+  >("all");
   const [kioskOpen, setKioskOpen] = useState(false);
   const [detailRow, setDetailRow] = useState<UnifiedWaiverRow | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-waivers"],
     queryFn: async (): Promise<UnifiedWaiverRow[]> => {
-      const [visitorsRes, agreementsRes] = await Promise.all([
+      const [visitorsRes, agreementsRes, linksRes] = await Promise.all([
         supabase
           .from("visitor_waivers")
           .select("*")
@@ -57,9 +68,22 @@ const WaiversAdmin = () => {
             "*, swim_enrollments:enrollment_id(child_name, parent_email)",
           )
           .order("signed_at", { ascending: false }),
+        supabase.rpc("get_visitor_waiver_links" as any),
       ]);
       if (visitorsRes.error) throw visitorsRes.error;
       if (agreementsRes.error) throw agreementsRes.error;
+
+      const linksByWaiver: Record<string, WaiverLink[]> = {};
+      for (const l of ((linksRes.data as any[]) || [])) {
+        const arr = linksByWaiver[l.visitor_waiver_id] || (linksByWaiver[l.visitor_waiver_id] = []);
+        arr.push({
+          enrollment_id: l.enrollment_id,
+          lesson_booking_id: l.lesson_booking_id,
+          child_name: l.child_name,
+          parent_email: l.parent_email,
+          link_kind: l.link_kind,
+        });
+      }
 
       const lessonBookingIds = Array.from(
         new Set(
@@ -87,6 +111,7 @@ const WaiversAdmin = () => {
         photo_release: !!v.photo_release_accepted,
         signed_at: v.signed_at,
         raw: v,
+        links: linksByWaiver[v.id] || [],
       }));
 
       const agreements: UnifiedWaiverRow[] = (agreementsRes.data || []).map((a: any) => {
@@ -119,16 +144,28 @@ const WaiversAdmin = () => {
     if (!data) return [];
     const q = search.trim().toLowerCase();
     return data.filter((r) => {
-      if (sourceFilter !== "all" && r.source !== sourceFilter) return false;
+      const linkCount = r.links?.length || 0;
+      if (sourceFilter === "linked-visitor") {
+        if (r.source !== "visitor" || linkCount === 0) return false;
+      } else if (sourceFilter === "unlinked-visitor") {
+        if (r.source !== "visitor" || linkCount > 0) return false;
+      } else if (sourceFilter !== "all" && r.source !== sourceFilter) {
+        return false;
+      }
       if (!q) return true;
       const swimmerStr = (r.swimmers || [])
         .map((s: any) => `${s.first_name || ""} ${s.last_name || ""}`)
         .join(" ")
         .toLowerCase();
+      const linkStr = (r.links || [])
+        .map((l) => `${l.child_name || ""} ${l.parent_email || ""}`)
+        .join(" ")
+        .toLowerCase();
       return (
         r.signer_name.toLowerCase().includes(q) ||
         r.signer_email.toLowerCase().includes(q) ||
-        swimmerStr.includes(q)
+        swimmerStr.includes(q) ||
+        linkStr.includes(q)
       );
     });
   }, [data, search, sourceFilter]);
@@ -171,6 +208,8 @@ const WaiversAdmin = () => {
             <SelectItem value="visitor">Visitor waivers</SelectItem>
             <SelectItem value="enrollment">Swim enrollments</SelectItem>
             <SelectItem value="lesson">Lesson bookings</SelectItem>
+            <SelectItem value="linked-visitor">Visitor → linked to swimmer</SelectItem>
+            <SelectItem value="unlinked-visitor">Visitor → unmatched</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -232,7 +271,18 @@ const WaiversAdmin = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">{r.source}</Badge>
+                      {r.source === "visitor" && (r.links?.length || 0) > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          <Badge className="bg-primary text-primary-foreground w-fit">
+                            Linked · {r.links!.length}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {Array.from(new Set(r.links!.map((l) => l.child_name).filter(Boolean))).join(", ")}
+                          </span>
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="capitalize">{r.source}</Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm whitespace-nowrap">
                       {new Date(r.signed_at).toLocaleDateString()}

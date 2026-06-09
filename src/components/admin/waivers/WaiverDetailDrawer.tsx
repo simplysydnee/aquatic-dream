@@ -97,6 +97,21 @@ const WaiverDetailDrawer = ({ open, onOpenChange, row }: Props) => {
           />
           {row.source === "visitor" && (
             <Row
+              label="Linked swimmers"
+              value={
+                (row.links?.length || 0) === 0
+                  ? "No matching enrolled swimmer or lesson booking"
+                  : row.links!
+                      .map(
+                        (l) =>
+                          `${l.child_name || "—"} (${l.link_kind === "enrollment" ? "Enrollment" : "Lesson"})`,
+                      )
+                      .join("; ")
+              }
+            />
+          )}
+          {row.source === "visitor" && (
+            <Row
               label="Email copy"
               value={
                 raw.email_sent_at

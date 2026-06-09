@@ -2102,6 +2102,58 @@ export type Database = {
         }
         Relationships: []
       }
+      visitor_waiver_links: {
+        Row: {
+          created_at: string
+          enrollment_id: string | null
+          id: string
+          lesson_booking_id: string | null
+          matched_by: string
+          swimmer_name: string
+          visitor_waiver_id: string
+        }
+        Insert: {
+          created_at?: string
+          enrollment_id?: string | null
+          id?: string
+          lesson_booking_id?: string | null
+          matched_by?: string
+          swimmer_name: string
+          visitor_waiver_id: string
+        }
+        Update: {
+          created_at?: string
+          enrollment_id?: string | null
+          id?: string
+          lesson_booking_id?: string | null
+          matched_by?: string
+          swimmer_name?: string
+          visitor_waiver_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visitor_waiver_links_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "swim_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visitor_waiver_links_lesson_booking_id_fkey"
+            columns: ["lesson_booking_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visitor_waiver_links_visitor_waiver_id_fkey"
+            columns: ["visitor_waiver_id"]
+            isOneToOne: false
+            referencedRelation: "visitor_waivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       visitor_waivers: {
         Row: {
           completed_by_staff_id: string | null
@@ -2542,6 +2594,18 @@ export type Database = {
           waiver_signed_at: string
         }[]
       }
+      get_visitor_waiver_links: {
+        Args: never
+        Returns: {
+          child_name: string
+          enrollment_id: string
+          lesson_booking_id: string
+          link_kind: string
+          parent_email: string
+          swimmer_name: string
+          visitor_waiver_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2549,6 +2613,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      link_visitor_waiver: { Args: { _waiver_id: string }; Returns: undefined }
       mark_lesson_waiver_signed: { Args: { _token: string }; Returns: string }
       mark_swim_enrollment_waiver_signed: {
         Args: { _token: string }

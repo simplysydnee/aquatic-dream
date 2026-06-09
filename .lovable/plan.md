@@ -1,48 +1,54 @@
-## Goal
+## What I found
 
-1. Send the existing "June Private Lessons – $50 Special" campaign to **anapaulajimenez@gmail.com** (Armani Eshaq's parent on file).
-2. In the swimmer drawer **Messages** tab, add a per-email **Resend** action that pre-fills Compose, plus a dedicated **"Send fresh payment link"** action that regenerates Stripe URLs for emails that contain them (welcome / session payment / registration fee).
+The admin **Complete New Waiver** flow writes to `visitor_waivers`, so the Waivers page labels those as **visitor** even when the swimmer is already enrolled. Right now, there are **42 active enrolled swimmers** whose names match a recent visitor/kiosk waiver, and all 42 are still showing incomplete because their enrollment record was never linked/stamped.
 
----
+## Plan
 
-## Part 1 — Send campaign to Armani
+### 1. Preserve legal waiver records, don’t delete duplicates
+- Keep every submitted waiver as its own legal record.
+- Treat multiple waivers for the same swimmer as history, not data to delete.
+- Use the most recent active waiver for the swimmer’s current “waiver complete” status.
 
-The `send-marketing-campaign` edge function already accepts `test_email`, which renders and sends the exact campaign body to one address without touching campaign recipient state. No new template needed.
+### 2. Add a real link between visitor waivers and enrolled swimmers
+Create a backend link table that connects:
+- `visitor_waivers` → `swim_enrollments`
+- `visitor_waivers` → `lesson_bookings`
 
-Steps (one-shot, runs in build mode):
-- Invoke `send-marketing-campaign` with `{ campaign_id: "d1a373a5-2b75-4c40-bfaa-bddb2705030d", test_email: "anapaulajimenez@gmail.com" }`.
-- Verify a row appears in `email_send_log` for that address.
+This lets the app know a “visitor” waiver actually covers an enrolled swimmer or private lesson booking.
 
-(No code change required — this is a one-time admin action triggered from the agent.)
+### 3. Backfill existing completed admin waivers
+For all existing visitor/kiosk waivers:
+- Match swimmer first + last name to active enrolled swimmer / lesson booking child name.
+- Link the waiver to the matching enrollment or booking.
+- Stamp `waiver_signed_at` on the swimmer/booking when it is currently blank.
+- If a swimmer has 2–3 waivers, link them all but use the newest valid waiver as the current completion source.
 
----
+### 4. Auto-link future “Complete New Waiver” submissions
+Update the `submit-visitor-waiver` backend function so when staff completes a new waiver from `/admin/waivers`, it immediately:
+- Saves the visitor waiver.
+- Searches for matching enrolled swimmers / bookings.
+- Creates the link records.
+- Updates `waiver_signed_at` so roster/calendar/client pages show waiver complete right away.
 
-## Part 2 — Messages tab upgrades
+### 5. Fix how the Waivers admin page labels them
+Update `/admin/waivers` so linked visitor waivers no longer look like unrelated visitors:
+- Show linked enrolled swimmer names.
+- Label linked records as **Enrollment** or **Lesson** when applicable.
+- Keep truly unmatched waivers as **Visitor**.
+- Optionally show a small indicator when a row was originally submitted from the admin visitor-waiver flow.
 
-File: `src/components/admin/swimmer/tabs/CommunicationsTab.tsx` (already lists every email sent to `swimmer.parent_email` from `email_send_log`).
+### 6. Audit view for unmatched or duplicate cases
+Add a small admin-only audit section/filter on the Waivers page:
+- **Linked to swimmer**
+- **Unmatched visitor waiver**
+- **Multiple waivers for same swimmer**
 
-### A. Resend (pre-fill Compose)
-- Add a `Resend` button on each log row.
-- On click: pull `metadata.subject` and `metadata.html` from the log row, strip the appended unsubscribe footer, convert the HTML body to plain text (simple `html-to-text` via regex / DOM parser), and load it into the existing Compose subject + body fields.
-- Admin tweaks then clicks **Send email** — this already invokes `send-transactional-email` with the `admin-freeform` template, so it ships as a clean new send under the admin's name.
+This makes it easy to clean up cases where names are misspelled or a parent entered a nickname.
 
-### B. "Send fresh payment link" (regenerates Stripe URL)
-- Show this secondary action only when `template_name` is one of:
-  - `session-welcome` → call `send-session-welcome-email`
-  - `session-payment-link` → call `send-session-payment-link`
-  - `registration-fee-payment-link` → call `send-registration-fee-payment-link`
-- Each of those edge fns already creates a fresh Stripe Checkout URL and emails it.
-- Required arg is the related `enrollment_id`. Resolve it by looking up the most recent `swim_enrollments` row for `swimmer.parent_email` + `swimmer.child_name` (the swimmer drawer already has both). If multiple, prompt admin to pick from a small dropdown.
-- On success, toast and refresh the log.
+## Verification
 
-### C. Small polish
-- Disable the Resend button while sending.
-- Add a tooltip on "Send fresh payment link" explaining it generates a new Stripe checkout URL (the old one may have expired or been completed).
-
----
-
-## Out of scope
-
-- Building a generic "regenerate any link" engine — only the three known payment templates above.
-- Editing the marketing campaign content.
-- Adding a new transactional template for the June $50 promo (the campaign already exists).
+After implementation:
+- The 42 currently matched active enrollments should show waiver complete.
+- Existing admin/kiosk waivers for enrolled swimmers should display as linked to their swimmer instead of only “visitor.”
+- New waivers completed from the admin waiver page should immediately update the swimmer’s waiver status.
+- Duplicate waiver submissions remain available as history but do not cause duplicate “incomplete” statuses.
