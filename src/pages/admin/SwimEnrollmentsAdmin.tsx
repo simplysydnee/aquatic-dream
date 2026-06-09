@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
+import SendPaymentLinkDialog, { type SendPaymentLinkTarget } from "@/components/admin/SendPaymentLinkDialog";
 import SessionEnrollmentCards from "@/components/admin/SessionEnrollmentCards";
 import { Progress } from "@/components/ui/progress";
 import { Eye, CheckCircle, Send, ArrowRightLeft, Trash2 } from "lucide-react";
