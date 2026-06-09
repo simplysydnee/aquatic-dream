@@ -255,6 +255,19 @@ Deno.serve(async (req) => {
     const waiverToken =
       crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
 
+    // Dedupe waiver: if this swimmer already has a signed waiver on file
+    // (matched by first + last name + DOB across visitor waivers, swim
+    // enrollment agreements, or prior lesson bookings), inherit that
+    // signed_at so we don't ask the parent to sign again.
+    let inheritedWaiverSignedAt: string | null = null;
+    if (p.child_first_name && p.child_last_name && p.child_dob) {
+      const { data: signedAt } = await supabaseAdmin.rpc(
+        "get_active_waiver_signed_at_for_swimmer",
+        { _first: p.child_first_name, _last: p.child_last_name, _dob: p.child_dob },
+      );
+      if (signedAt) inheritedWaiverSignedAt = signedAt as string;
+    }
+
     // If admin captured a card via Stripe Setup Checkout, resolve the
     // payment method now and stamp it on the booking. We never want a
     // "card_on_file" booking row without a real card attached.
