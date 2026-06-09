@@ -271,7 +271,18 @@ const WaiversAdmin = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">{r.source}</Badge>
+                      {r.source === "visitor" && (r.links?.length || 0) > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          <Badge className="bg-primary text-primary-foreground w-fit">
+                            Linked · {r.links!.length}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {Array.from(new Set(r.links!.map((l) => l.child_name).filter(Boolean))).join(", ")}
+                          </span>
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="capitalize">{r.source}</Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm whitespace-nowrap">
                       {new Date(r.signed_at).toLocaleDateString()}
