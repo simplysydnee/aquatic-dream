@@ -822,6 +822,7 @@ export type Database = {
           booking_source: string
           cancellation_policy_hours: number
           child_age: number | null
+          child_dob: string | null
           child_first_name: string | null
           child_last_name: string | null
           child_name: string | null
@@ -864,6 +865,7 @@ export type Database = {
           booking_source?: string
           cancellation_policy_hours?: number
           child_age?: number | null
+          child_dob?: string | null
           child_first_name?: string | null
           child_last_name?: string | null
           child_name?: string | null
@@ -906,6 +908,7 @@ export type Database = {
           booking_source?: string
           cancellation_policy_hours?: number
           child_age?: number | null
+          child_dob?: string | null
           child_first_name?: string | null
           child_last_name?: string | null
           child_name?: string | null
@@ -2463,6 +2466,10 @@ export type Database = {
           waiver_id: string
         }[]
       }
+      get_active_waiver_signed_at_for_swimmer: {
+        Args: { _dob: string; _first: string; _last: string }
+        Returns: string
+      }
       get_email_by_unsubscribe_token: {
         Args: { _token: string }
         Returns: string
@@ -2638,6 +2645,10 @@ export type Database = {
       }
       release_slot_holds: { Args: { p_session_token: string }; Returns: number }
       swimmer_has_active_waiver: {
+        Args: { _dob: string; _first: string; _last: string }
+        Returns: boolean
+      }
+      swimmer_has_waiver_on_file: {
         Args: { _dob: string; _first: string; _last: string }
         Returns: boolean
       }

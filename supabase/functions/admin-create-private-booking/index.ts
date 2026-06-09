@@ -30,6 +30,7 @@ const CreateSchema = z.object({
   child_first_name: z.string().max(80).optional().nullable(),
   child_last_name: z.string().max(80).optional().nullable(),
   child_age: z.number().int().min(0).max(120).optional().nullable(),
+  child_dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
   recurring: z.boolean().default(false),
   series_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
@@ -254,6 +255,19 @@ Deno.serve(async (req) => {
     const waiverToken =
       crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
 
+    // Dedupe waiver: if this swimmer already has a signed waiver on file
+    // (matched by first + last name + DOB across visitor waivers, swim
+    // enrollment agreements, or prior lesson bookings), inherit that
+    // signed_at so we don't ask the parent to sign again.
+    let inheritedWaiverSignedAt: string | null = null;
+    if (p.child_first_name && p.child_last_name && p.child_dob) {
+      const { data: signedAt } = await supabaseAdmin.rpc(
+        "get_active_waiver_signed_at_for_swimmer",
+        { _first: p.child_first_name, _last: p.child_last_name, _dob: p.child_dob },
+      );
+      if (signedAt) inheritedWaiverSignedAt = signedAt as string;
+    }
+
     // If admin captured a card via Stripe Setup Checkout, resolve the
     // payment method now and stamp it on the booking. We never want a
     // "card_on_file" booking row without a real card attached.
@@ -294,6 +308,7 @@ Deno.serve(async (req) => {
         child_first_name: p.child_first_name || null,
         child_last_name: p.child_last_name || null,
         child_age: p.child_age ?? null,
+        child_dob: p.child_dob || null,
         start_time: p.start_time,
         end_time: p.end_time,
         pool_area: p.pool_area,
@@ -306,6 +321,7 @@ Deno.serve(async (req) => {
         status: "active",
         booking_source: "admin",
         waiver_token: waiverToken,
+        waiver_signed_at: inheritedWaiverSignedAt,
         cancellation_policy_hours: 24,
         stripe_customer_id: stripeCustomerId,
         stripe_payment_method_id: stripePaymentMethodId,
@@ -331,12 +347,40 @@ Deno.serve(async (req) => {
       throw oErr;
     }
 
-    // Send confirmation email (best-effort — booking already created)
+    // Send confirmation email (best-effort — booking already created).
+    //   - Card on file: send the bundled confirmation w/ "card will be
+    //     charged day-of" note (no payment link). Auto-charge cron handles
+    //     the actual charge.
+    //   - No card: route through the wrapper so the email includes a
+    //     Stripe payment link (single occurrence) or a combined series
+    //     link (recurring), plus the waiver link if unsigned.
     let emailSent = false;
     let emailError: string | undefined;
     if (p.send_confirmation) {
       try {
-        await sendConfirmationEmail(bookingId, p.collect_card_on_file);
+        if (p.collect_card_on_file) {
+          await sendConfirmationEmail(bookingId, true);
+        } else {
+          const env = (p.stripe_environment || "live") as StripeEnv;
+          const fnName = dates.length > 1
+            ? "send-lesson-series-confirmation"
+            : "send-lesson-booking-confirmation";
+          const body: Record<string, unknown> = { environment: env, siteUrl: SITE_BASE };
+          if (dates.length > 1) {
+            body.bookingId = bookingId;
+          } else {
+            const { data: firstOcc } = await supabaseAdmin
+              .from("lesson_booking_occurrences")
+              .select("id")
+              .eq("booking_id", bookingId)
+              .order("occurrence_date", { ascending: true })
+              .limit(1)
+              .maybeSingle();
+            body.occurrenceId = (firstOcc as any)?.id;
+          }
+          const { error: invokeErr } = await supabaseAdmin.functions.invoke(fnName, { body });
+          if (invokeErr) throw invokeErr;
+        }
         emailSent = true;
       } catch (err: any) {
         emailError = err?.message || String(err);

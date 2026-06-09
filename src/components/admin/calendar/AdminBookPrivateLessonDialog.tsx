@@ -53,6 +53,7 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
   const [childFirst, setChildFirst] = useState("");
   const [childLast, setChildLast] = useState("");
   const [childAge, setChildAge] = useState<string>("");
+  const [childDob, setChildDob] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [recurring, setRecurring] = useState(false);
   const [seriesEnd, setSeriesEnd] = useState("");
@@ -100,7 +101,7 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
     setEndTime("15:30");
     setPoolArea("shallow");
     setParentFirst(""); setParentLast(""); setParentEmail(""); setParentPhone("");
-    setChildFirst(""); setChildLast(""); setChildAge("");
+    setChildFirst(""); setChildLast(""); setChildAge(""); setChildDob("");
     setNotes(""); setRecurring(false); setSeriesEnd("");
     setSendConfirmation(true); setCollectCardOnFile(true); setPriceOverride("");
     setSetupClientSecret(null); setCheckoutSessionId(null); setStripeCustomerId(null);
@@ -126,6 +127,7 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
           child_first_name: childFirst || null,
           child_last_name: childLast || null,
           child_age: childAge ? Number(childAge) : null,
+          child_dob: childDob || null,
           notes: notes || null,
           recurring,
           series_end: recurring ? seriesEnd : null,
@@ -316,6 +318,10 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
               <Input placeholder="First name" value={childFirst} onChange={(e) => setChildFirst(e.target.value)} />
               <Input placeholder="Last name" value={childLast} onChange={(e) => setChildLast(e.target.value)} />
               <Input type="number" placeholder="Age" value={childAge} onChange={(e) => setChildAge(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Date of birth (optional — used to skip the waiver if already signed)</Label>
+              <Input type="date" value={childDob} onChange={(e) => setChildDob(e.target.value)} />
             </div>
           </div>
 

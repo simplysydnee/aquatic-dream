@@ -110,9 +110,15 @@ Deno.serve(async (req) => {
       payment_link_email_error: null,
     }).eq('id', occ.id)
 
-    // Build waiver link if booking has a token and isn't signed yet
-    const waiverLink = booking.waiver_token && !booking.waiver_signed_at
-      ? `${returnBase}/lesson-waiver/${booking.waiver_token}`
+    // Build waiver link if booking isn't signed yet — backfill the token
+    // when missing so the email's waiver section always renders correctly.
+    let waiverToken = booking.waiver_token as string | null
+    if (!waiverToken && !booking.waiver_signed_at) {
+      waiverToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')
+      await supabase.from('lesson_bookings').update({ waiver_token: waiverToken }).eq('id', booking.id)
+    }
+    const waiverLink = waiverToken && !booking.waiver_signed_at
+      ? `${returnBase}/lesson-waiver/${waiverToken}`
       : undefined
 
     // Build "Add to Calendar" links (works on iPhone, Android, Outlook + Google)

@@ -84,18 +84,27 @@ Deno.serve(async (req) => {
 
     const paymentLink = checkoutSession.url
 
-    // Stamp every unpaid occurrence with the same series checkout
+    // Stamp every unpaid occurrence with the same series checkout URL.
+    // IMPORTANT: do NOT write the cs_ session id to stripe_session_id —
+    // that column is reserved for the verified pi_ PaymentIntent written
+    // by payments-webhook on checkout.session.completed.
     const occIds = occs.map((o: any) => o.id)
     await supabase.from('lesson_booking_occurrences').update({
       stripe_checkout_url: paymentLink,
-      stripe_session_id: checkoutSession.id,
       payment_link_sent_at: new Date().toISOString(),
       payment_link_email_status: 'queued',
       payment_link_email_error: null,
     }).in('id', occIds)
 
-    const waiverLink = booking.waiver_token && !booking.waiver_signed_at
-      ? `${returnBase}/lesson-waiver/${booking.waiver_token}`
+    // Backfill waiver_token if missing AND not yet signed, so the email
+    // can always render the "Sign Waiver" button when needed.
+    let waiverToken = booking.waiver_token as string | null
+    if (!waiverToken && !booking.waiver_signed_at) {
+      waiverToken = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')
+      await supabase.from('lesson_bookings').update({ waiver_token: waiverToken }).eq('id', booking.id)
+    }
+    const waiverLink = waiverToken && !booking.waiver_signed_at
+      ? `${returnBase}/lesson-waiver/${waiverToken}`
       : undefined
 
     // ICS with all dates
