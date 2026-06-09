@@ -311,6 +311,34 @@ const CalendarDayView = ({
     return result;
   }, [todaySessions]);
 
+  // ── Lane assignment for overlapping AD pool events (private/semi-private/walk-in) ──
+  const adEventLanes = useMemo(() => {
+    const result = new Map<string, { lane: number; laneCount: number }>();
+    const sorted = [...adEvents].sort(
+      (a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
+    );
+    let cluster: { id: string; start: number; end: number; lane: number }[] = [];
+    let clusterEnd = -1;
+    const flush = () => {
+      const count = cluster.reduce((m, c) => Math.max(m, c.lane + 1), 0);
+      for (const c of cluster) result.set(c.id, { lane: c.lane, laneCount: count });
+      cluster = [];
+      clusterEnd = -1;
+    };
+    for (const e of sorted) {
+      const start = timeToMinutes(e.start_time);
+      const end = timeToMinutes(e.end_time);
+      if (cluster.length && start >= clusterEnd) flush();
+      const usedLanes = new Set(cluster.filter((c) => c.end > start).map((c) => c.lane));
+      let lane = 0;
+      while (usedLanes.has(lane)) lane++;
+      cluster.push({ id: e.id, start, end, lane });
+      clusterEnd = Math.max(clusterEnd, end);
+    }
+    if (cluster.length) flush();
+    return result;
+  }, [adEvents]);
+
   // ── Build columns ──
   const columns = useMemo<ColumnDef[]>(() => {
     const cols: ColumnDef[] = [];
@@ -560,17 +588,28 @@ const CalendarDayView = ({
     onClick?: () => void,
     isICS?: boolean,
     actions?: React.ReactNode,
-    tooltip?: React.ReactNode
+    tooltip?: React.ReactNode,
+    lane?: number,
+    laneCount?: number
   ) => {
     const top = minutesToTop(startMins);
     const height = durationHeight(startMins, endMins);
     const colors = BLOCK_COLORS[colorKey] || BLOCK_COLORS.other;
 
+    const useLanes = laneCount && laneCount > 1 && typeof lane === "number";
+    const laneStyle = useLanes
+      ? {
+          left: `calc((100% - 4px) / ${laneCount} * ${lane} + 2px)`,
+          width: `calc((100% - 4px) / ${laneCount} - 2px)`,
+        }
+      : undefined;
+
     const blockEl = (
       <div
         key={key}
         className={cn(
-          "absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden transition-opacity cursor-pointer hover:shadow-md z-10",
+          "absolute rounded-md border-l-[3px] px-2 py-1 overflow-hidden transition-opacity cursor-pointer hover:shadow-md z-10",
+          !useLanes && "left-1 right-1",
           dimmed && "opacity-[0.12]"
         )}
         style={{
@@ -579,6 +618,7 @@ const CalendarDayView = ({
           backgroundColor: colors.bg,
           borderLeftColor: colors.border,
           color: colors.text,
+          ...(laneStyle || {}),
         }}
         onMouseMove={(e) => e.stopPropagation()}
         onClick={(e) => {
@@ -1040,6 +1080,7 @@ const CalendarDayView = ({
                 const endMins = timeToMinutes(e.end_time);
                 const colorKey = e.event_type;
                 const dimmed = !activeFilters.has(e.event_type as ActivityType);
+                const laneInfo = adEventLanes.get(e.id);
 
                 return renderBlock(
                   e.id,
@@ -1072,7 +1113,9 @@ const CalendarDayView = ({
                     {e.instructor_name && <p>Instructor: {e.instructor_name}</p>}
                     {e.pool_area && <p>Area: {e.pool_area}</p>}
                     {e.notes && <p className="opacity-80">{e.notes}</p>}
-                  </div>
+                  </div>,
+                  laneInfo?.lane,
+                  laneInfo?.laneCount
                 );
               })}
 
