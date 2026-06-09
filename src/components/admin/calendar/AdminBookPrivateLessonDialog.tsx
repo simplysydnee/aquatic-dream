@@ -53,6 +53,7 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
   const [childFirst, setChildFirst] = useState("");
   const [childLast, setChildLast] = useState("");
   const [childAge, setChildAge] = useState<string>("");
+  const [childDob, setChildDob] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [recurring, setRecurring] = useState(false);
   const [seriesEnd, setSeriesEnd] = useState("");
