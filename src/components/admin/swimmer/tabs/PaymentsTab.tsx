@@ -81,6 +81,8 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
   const [reference, setReference] = useState("");
   const [occurrences, setOccurrences] = useState<LessonOccurrence[]>([]);
   const [checkoutOccurrenceId, setCheckoutOccurrenceId] = useState<string | null>(null);
+  const [payLinkTarget, setPayLinkTarget] = useState<SendPaymentLinkTarget | null>(null);
+  const [payLinkOpen, setPayLinkOpen] = useState(false);
 
   const bookingIds = useMemo(() => swimmer.bookings.map((b) => b.id), [swimmer.bookings]);
 
@@ -551,6 +553,13 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
         }}
         occurrenceId={checkoutOccurrenceId}
         title="Charge card for lesson"
+      />
+
+      <SendPaymentLinkDialog
+        open={payLinkOpen}
+        onOpenChange={setPayLinkOpen}
+        target={payLinkTarget}
+        onSent={onChanged}
       />
     </div>
   );
