@@ -534,6 +534,7 @@ const SwimEnrollment = () => {
                 hasFirstTimers={hasFirstTimers}
                 sessionFeeUsd={sessionFeeUsd}
                 sessionFeeCount={sessionFeeCount}
+                forceFullPayment={forceFullPayment}
                 onBack={() => setStep("legal")}
                 onSessionFull={() => setStep("full")}
               />
