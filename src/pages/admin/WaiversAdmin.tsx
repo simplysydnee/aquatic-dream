@@ -111,6 +111,7 @@ const WaiversAdmin = () => {
         photo_release: !!v.photo_release_accepted,
         signed_at: v.signed_at,
         raw: v,
+        links: linksByWaiver[v.id] || [],
       }));
 
       const agreements: UnifiedWaiverRow[] = (agreementsRes.data || []).map((a: any) => {
