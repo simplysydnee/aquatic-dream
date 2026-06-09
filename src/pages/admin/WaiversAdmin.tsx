@@ -25,6 +25,14 @@ import WaiverDetailDrawer from "@/components/admin/waivers/WaiverDetailDrawer";
 
 export type WaiverSource = "visitor" | "lesson" | "enrollment";
 
+export interface WaiverLink {
+  enrollment_id: string | null;
+  lesson_booking_id: string | null;
+  child_name: string | null;
+  parent_email: string | null;
+  link_kind: "enrollment" | "lesson";
+}
+
 export interface UnifiedWaiverRow {
   id: string;
   source: WaiverSource;
@@ -35,18 +43,21 @@ export interface UnifiedWaiverRow {
   photo_release: boolean;
   signed_at: string;
   raw: any;
+  links?: WaiverLink[];
 }
 
 const WaiversAdmin = () => {
   const [search, setSearch] = useState("");
-  const [sourceFilter, setSourceFilter] = useState<"all" | WaiverSource>("all");
+  const [sourceFilter, setSourceFilter] = useState<
+    "all" | WaiverSource | "linked-visitor" | "unlinked-visitor"
+  >("all");
   const [kioskOpen, setKioskOpen] = useState(false);
   const [detailRow, setDetailRow] = useState<UnifiedWaiverRow | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-waivers"],
     queryFn: async (): Promise<UnifiedWaiverRow[]> => {
-      const [visitorsRes, agreementsRes] = await Promise.all([
+      const [visitorsRes, agreementsRes, linksRes] = await Promise.all([
         supabase
           .from("visitor_waivers")
           .select("*")
@@ -57,9 +68,22 @@ const WaiversAdmin = () => {
             "*, swim_enrollments:enrollment_id(child_name, parent_email)",
           )
           .order("signed_at", { ascending: false }),
+        supabase.rpc("get_visitor_waiver_links" as any),
       ]);
       if (visitorsRes.error) throw visitorsRes.error;
       if (agreementsRes.error) throw agreementsRes.error;
+
+      const linksByWaiver: Record<string, WaiverLink[]> = {};
+      for (const l of ((linksRes.data as any[]) || [])) {
+        const arr = linksByWaiver[l.visitor_waiver_id] || (linksByWaiver[l.visitor_waiver_id] = []);
+        arr.push({
+          enrollment_id: l.enrollment_id,
+          lesson_booking_id: l.lesson_booking_id,
+          child_name: l.child_name,
+          parent_email: l.parent_email,
+          link_kind: l.link_kind,
+        });
+      }
 
       const lessonBookingIds = Array.from(
         new Set(
