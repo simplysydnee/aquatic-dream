@@ -347,12 +347,40 @@ Deno.serve(async (req) => {
       throw oErr;
     }
 
-    // Send confirmation email (best-effort — booking already created)
+    // Send confirmation email (best-effort — booking already created).
+    //   - Card on file: send the bundled confirmation w/ "card will be
+    //     charged day-of" note (no payment link). Auto-charge cron handles
+    //     the actual charge.
+    //   - No card: route through the wrapper so the email includes a
+    //     Stripe payment link (single occurrence) or a combined series
+    //     link (recurring), plus the waiver link if unsigned.
     let emailSent = false;
     let emailError: string | undefined;
     if (p.send_confirmation) {
       try {
-        await sendConfirmationEmail(bookingId, p.collect_card_on_file);
+        if (p.collect_card_on_file) {
+          await sendConfirmationEmail(bookingId, true);
+        } else {
+          const env = (p.stripe_environment || "live") as StripeEnv;
+          const fnName = dates.length > 1
+            ? "send-lesson-series-confirmation"
+            : "send-lesson-booking-confirmation";
+          const body: Record<string, unknown> = { environment: env, siteUrl: SITE_BASE };
+          if (dates.length > 1) {
+            body.bookingId = bookingId;
+          } else {
+            const { data: firstOcc } = await supabaseAdmin
+              .from("lesson_booking_occurrences")
+              .select("id")
+              .eq("booking_id", bookingId)
+              .order("occurrence_date", { ascending: true })
+              .limit(1)
+              .maybeSingle();
+            body.occurrenceId = (firstOcc as any)?.id;
+          }
+          const { error: invokeErr } = await supabaseAdmin.functions.invoke(fnName, { body });
+          if (invokeErr) throw invokeErr;
+        }
         emailSent = true;
       } catch (err: any) {
         emailError = err?.message || String(err);
