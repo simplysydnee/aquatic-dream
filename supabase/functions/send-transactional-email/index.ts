@@ -105,6 +105,62 @@ Deno.serve(async (req) => {
     )
   }
 
+  // Auth gate: certain templates accept admin-controlled freeform content and
+  // must only be sendable by an authenticated admin (or by internal callers
+  // using the service-role key). Public/anon callers can only invoke
+  // transactional templates triggered by their own form submissions.
+  const ADMIN_ONLY_TEMPLATES = new Set([
+    'admin-freeform',
+    'early-access-invite',
+    'lesson-request-reply',
+    'instructor-schedule',
+  ])
+
+  const authHeader = req.headers.get('Authorization') || ''
+  const bearer = authHeader.replace(/^Bearer\s+/i, '')
+  const isServiceRoleCaller = !!bearer && bearer === supabaseServiceKey
+
+  if (ADMIN_ONLY_TEMPLATES.has(templateName) && !isServiceRoleCaller) {
+    if (!bearer) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    try {
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: `Bearer ${bearer}` } },
+      })
+      const { data: userData, error: userErr } = await userClient.auth.getUser()
+      if (userErr || !userData?.user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const adminCheck = createClient(supabaseUrl, supabaseServiceKey)
+      const { data: roleRow } = await adminCheck
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userData.user.id)
+        .eq('role', 'admin')
+        .maybeSingle()
+      if (!roleRow) {
+        return new Response(JSON.stringify({ error: 'Admin only' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    } catch (e) {
+      console.error('Admin gate failed', e)
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+  }
+
   // Resolve effective recipient: template-level `to` takes precedence over
   // the caller-provided recipientEmail. This allows notification templates
   // to always send to a fixed address (e.g., site owner from env var).
