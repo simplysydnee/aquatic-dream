@@ -311,6 +311,34 @@ const CalendarDayView = ({
     return result;
   }, [todaySessions]);
 
+  // ── Lane assignment for overlapping AD pool events (private/semi-private/walk-in) ──
+  const adEventLanes = useMemo(() => {
+    const result = new Map<string, { lane: number; laneCount: number }>();
+    const sorted = [...adEvents].sort(
+      (a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
+    );
+    let cluster: { id: string; start: number; end: number; lane: number }[] = [];
+    let clusterEnd = -1;
+    const flush = () => {
+      const count = cluster.reduce((m, c) => Math.max(m, c.lane + 1), 0);
+      for (const c of cluster) result.set(c.id, { lane: c.lane, laneCount: count });
+      cluster = [];
+      clusterEnd = -1;
+    };
+    for (const e of sorted) {
+      const start = timeToMinutes(e.start_time);
+      const end = timeToMinutes(e.end_time);
+      if (cluster.length && start >= clusterEnd) flush();
+      const usedLanes = new Set(cluster.filter((c) => c.end > start).map((c) => c.lane));
+      let lane = 0;
+      while (usedLanes.has(lane)) lane++;
+      cluster.push({ id: e.id, start, end, lane });
+      clusterEnd = Math.max(clusterEnd, end);
+    }
+    if (cluster.length) flush();
+    return result;
+  }, [adEvents]);
+
   // ── Build columns ──
   const columns = useMemo<ColumnDef[]>(() => {
     const cols: ColumnDef[] = [];
