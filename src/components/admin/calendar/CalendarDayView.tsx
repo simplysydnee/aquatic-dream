@@ -1080,6 +1080,7 @@ const CalendarDayView = ({
                 const endMins = timeToMinutes(e.end_time);
                 const colorKey = e.event_type;
                 const dimmed = !activeFilters.has(e.event_type as ActivityType);
+                const laneInfo = adEventLanes.get(e.id);
 
                 return renderBlock(
                   e.id,
@@ -1112,7 +1113,9 @@ const CalendarDayView = ({
                     {e.instructor_name && <p>Instructor: {e.instructor_name}</p>}
                     {e.pool_area && <p>Area: {e.pool_area}</p>}
                     {e.notes && <p className="opacity-80">{e.notes}</p>}
-                  </div>
+                  </div>,
+                  laneInfo?.lane,
+                  laneInfo?.laneCount
                 );
               })}
 
