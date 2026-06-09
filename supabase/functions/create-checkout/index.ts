@@ -179,6 +179,9 @@ serve(async (req) => {
     //   - First-time child + payAhead=false (default): charge ONLY the $45 reg fee.
     //                       Session fee collected in person on day 1.
     //   - First-time child + payAhead=true: charge $45 reg fee + the session_price.
+    //   - First-time child whose session has ALREADY STARTED: server forces
+    //                       payAhead=true and uses the prorated session charge.
+    //                       There's no day-1 to collect in person.
     type LineItem = {
       price_data: {
         currency: string;
@@ -193,6 +196,10 @@ serve(async (req) => {
     const stripe = createStripeClient(env);
 
     for (const child of typedPayload.children) {
+      // Force pay-ahead if any of this child's sessions has already started.
+      const childHasStartedSession = child.sessionIds.some((sid) => sessionStarted[sid]);
+      const effectivePayAhead = child.isFirstTime && (child.payAhead || childHasStartedSession);
+
       if (child.isFirstTime) {
         lineItems.push({
           price_data: {
@@ -202,14 +209,15 @@ serve(async (req) => {
           },
           quantity: 1,
         });
-        if (child.payAhead) {
+        if (effectivePayAhead) {
           for (const sid of child.sessionIds) {
             const s = sessionMap[sid];
-            const cents = Math.round(Number(s.session_price ?? 240) * 100);
+            const cents = sessionChargeCents[sid];
+            const label = sessionStarted[sid] ? "Prorated session fee" : "Session fee";
             lineItems.push({
               price_data: {
                 currency: "usd",
-                product_data: { name: `Session fee — ${child.childName} (${s.session_start_date ?? ""})` },
+                product_data: { name: `${label} — ${child.childName} (${s.session_start_date ?? ""})` },
                 unit_amount: cents,
               },
               quantity: 1,
@@ -219,11 +227,12 @@ serve(async (req) => {
       } else {
         for (const sid of child.sessionIds) {
           const s = sessionMap[sid];
-          const cents = Math.round(Number(s.session_price ?? 240) * 100);
+          const cents = sessionChargeCents[sid];
+          const label = sessionStarted[sid] ? "Prorated session fee" : "Session fee";
           lineItems.push({
             price_data: {
               currency: "usd",
-              product_data: { name: `Session fee — ${child.childName} (${s.session_start_date ?? ""})` },
+              product_data: { name: `${label} — ${child.childName} (${s.session_start_date ?? ""})` },
               unit_amount: cents,
             },
             quantity: 1,
@@ -239,23 +248,24 @@ serve(async (req) => {
       });
     }
 
-    // Defensive guard: never charge a session fee unit_amount that doesn't
-    // match what's in the DB. Catches any future regression that re-introduces
-    // a price drift.
+    // Defensive guard: a session line item must match either the full DB
+    // session_price OR the prorated (remaining-lessons × price_per_lesson)
+    // charge we computed above. Anything else is refused.
+    const allowedSessionCents = new Set<number>(Object.values(sessionChargeCents));
     for (const li of lineItems) {
       const amt = li.price_data.unit_amount;
-      const looksLikeSessionFee = li.price_data.product_data.name.startsWith("Session fee");
-      if (looksLikeSessionFee) {
-        const matches = sessions.some((s) => Math.round(Number(s.session_price ?? 240) * 100) === amt);
-        if (!matches) {
-          console.error("Session fee unit_amount does not match any DB session_price", amt);
-          return new Response(JSON.stringify({ error: "Session fee mismatch — refusing to charge" }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+      const looksLikeSessionFee =
+        li.price_data.product_data.name.startsWith("Session fee") ||
+        li.price_data.product_data.name.startsWith("Prorated session fee");
+      if (looksLikeSessionFee && !allowedSessionCents.has(amt)) {
+        console.error("Session fee unit_amount does not match any computed charge", amt);
+        return new Response(JSON.stringify({ error: "Session fee mismatch — refusing to charge" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     }
+
 
     // Stage payload in pending_enrollments RIGHT BEFORE creating the Stripe session.
     // This minimizes the window during which temporary data exists.
