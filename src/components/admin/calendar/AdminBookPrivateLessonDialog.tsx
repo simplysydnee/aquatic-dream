@@ -127,6 +127,7 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
           child_first_name: childFirst || null,
           child_last_name: childLast || null,
           child_age: childAge ? Number(childAge) : null,
+          child_dob: childDob || null,
           notes: notes || null,
           recurring,
           series_end: recurring ? seriesEnd : null,
