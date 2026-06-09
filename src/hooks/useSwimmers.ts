@@ -117,8 +117,18 @@ export interface Swimmer {
   primary_status: SwimmerStatus;
 }
 
+const normalizeName = (name: string | null | undefined) =>
+  (name || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const normalizeEmail = (email: string | null | undefined) =>
+  (email || "").trim().toLowerCase();
+
 const swimmerKey = (childName: string, parentEmail: string) =>
-  `${childName.trim().toLowerCase()}|${parentEmail.trim().toLowerCase()}`;
+  `${normalizeName(childName)}|${normalizeEmail(parentEmail)}`;
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
