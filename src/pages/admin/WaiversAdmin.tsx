@@ -144,16 +144,28 @@ const WaiversAdmin = () => {
     if (!data) return [];
     const q = search.trim().toLowerCase();
     return data.filter((r) => {
-      if (sourceFilter !== "all" && r.source !== sourceFilter) return false;
+      const linkCount = r.links?.length || 0;
+      if (sourceFilter === "linked-visitor") {
+        if (r.source !== "visitor" || linkCount === 0) return false;
+      } else if (sourceFilter === "unlinked-visitor") {
+        if (r.source !== "visitor" || linkCount > 0) return false;
+      } else if (sourceFilter !== "all" && r.source !== sourceFilter) {
+        return false;
+      }
       if (!q) return true;
       const swimmerStr = (r.swimmers || [])
         .map((s: any) => `${s.first_name || ""} ${s.last_name || ""}`)
         .join(" ")
         .toLowerCase();
+      const linkStr = (r.links || [])
+        .map((l) => `${l.child_name || ""} ${l.parent_email || ""}`)
+        .join(" ")
+        .toLowerCase();
       return (
         r.signer_name.toLowerCase().includes(q) ||
         r.signer_email.toLowerCase().includes(q) ||
-        swimmerStr.includes(q)
+        swimmerStr.includes(q) ||
+        linkStr.includes(q)
       );
     });
   }, [data, search, sourceFilter]);
