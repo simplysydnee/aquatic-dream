@@ -479,9 +479,6 @@ const SwimEnrollment = () => {
           {step === "payment" && checkoutInputs && (() => {
             const inputs = checkoutInputs;
             const hasFirstTimers = inputs.children.some(c => c.isFirstTime);
-            // Use the first first-timer's session_price (they're all $240 in practice).
-            // Counted: number of session-fee charges if pay-ahead is selected
-            // (one per first-timer × their session count).
             const firstTimerSessionIds = inputs.children
               .filter(c => c.isFirstTime)
               .flatMap(c => c.sessionIds);
@@ -489,6 +486,12 @@ const SwimEnrollment = () => {
             const sessionFeeUsd = firstTimerSessionIds.length > 0
               ? (inputs.sessionPrices[firstTimerSessionIds[0]] ?? 240)
               : 240;
+            // If any first-timer is enrolling in a session that has already
+            // started, we MUST collect the session fee at checkout — there is
+            // no day-1 to settle it in person.
+            const forceFullPayment = firstTimerSessionIds.some(
+              (sid) => inputs.sessionStarted[sid],
+            );
 
             return (
               <EnrollmentCheckout
