@@ -27,15 +27,18 @@ Deno.serve(async (req) => {
       new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }),
     );
     laToday.setHours(0, 0, 0, 0);
-    const yyyy_mm_dd = laToday.toISOString().slice(0, 10);
+    // Look ahead 2 days so we can charge lessons ~24h before start_time.
+    const lookahead = new Date(laToday);
+    lookahead.setDate(lookahead.getDate() + 2);
+    const yyyy_mm_dd_max = lookahead.toISOString().slice(0, 10);
 
-    // Charge occurrences whose date <= today (so we capture day-of charges
-    // and any missed prior days) and are still pending.
+    // Charge occurrences whose date <= today+2 and are still pending.
+    // Per-row guard below enforces the 24h-before-start-time window.
     const { data: due, error } = await supabase
       .from("lesson_booking_occurrences")
       .select("id, booking_id, occurrence_date, status, lesson_bookings!inner(id, parent_email, parent_first_name, parent_name, child_name, stripe_customer_id, stripe_payment_method_id, price_per_session, instructor_name, lesson_type, start_time, end_time)")
       .eq("auto_charge_status", "pending")
-      .lte("occurrence_date", yyyy_mm_dd)
+      .lte("occurrence_date", yyyy_mm_dd_max)
       .neq("status", "cancelled")
       .limit(50);
     if (error) throw error;
@@ -44,15 +47,17 @@ Deno.serve(async (req) => {
     const nowMs = Date.now();
     for (const row of (due as any[]) ?? []) {
       const b = row.lesson_bookings;
-      // Don't charge a lesson before it has ended (Pacific time). Past days always pass.
-      if (row.occurrence_date === yyyy_mm_dd && b?.end_time) {
-        const lessonEnd = new Date(
-          new Date(`${row.occurrence_date}T${b.end_time}`).toLocaleString("en-US", {
+      // Charge no earlier than 24 hours before the lesson's start_time (Pacific).
+      // Past-due occurrences (date in the past) always pass.
+      if (b?.start_time) {
+        const lessonStart = new Date(
+          new Date(`${row.occurrence_date}T${b.start_time}`).toLocaleString("en-US", {
             timeZone: "America/Los_Angeles",
           }),
         );
-        if (nowMs < lessonEnd.getTime()) {
-          results.push({ id: row.id, ok: false, reason: "lesson_not_ended" });
+        const chargeWindowOpen = lessonStart.getTime() - 24 * 60 * 60 * 1000;
+        if (nowMs < chargeWindowOpen) {
+          results.push({ id: row.id, ok: false, reason: "before_24h_window" });
           continue;
         }
       }
