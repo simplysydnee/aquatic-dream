@@ -176,11 +176,11 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
   const sendStripeLink = (e: SwimmerEnrollment) => {
     setPayLinkTarget({
       enrollmentId: e.id,
-      sessionId: (e as any).session_id ?? null,
-      childName: (e as any).child_name ?? swimmer.child_name,
+      sessionId: e.session_id ?? null,
+      childName: e.child_name || swimmer.child_name,
       parentEmail: e.parent_email,
       isFirstTime: !!e.is_first_time,
-      waiverSignedAt: (e as any).waiver_signed_at ?? null,
+      waiverSignedAt: e.waiver_signed_at ?? null,
     });
     setPayLinkOpen(true);
   };
