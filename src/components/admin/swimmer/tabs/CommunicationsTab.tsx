@@ -1,12 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Send, Inbox, AlertCircle } from "lucide-react";
+import { Mail, Send, Inbox, AlertCircle, RotateCcw, Link2 } from "lucide-react";
 import type { Swimmer } from "@/hooks/useSwimmers";
 
 interface Props {
@@ -23,7 +30,38 @@ interface LogRow {
   metadata: any;
 }
 
+interface EnrollmentRow {
+  id: string;
+  created_at: string;
+  swim_level: string | null;
+  session_id: string | null;
+  payment_status: string | null;
+  is_first_time: boolean | null;
+}
+
 const fmt = (iso: string) => new Date(iso).toLocaleString();
+
+const PAYMENT_LINK_TEMPLATES: Record<
+  string,
+  { fn: string; label: string; description: string }
+> = {
+  "session-welcome": {
+    fn: "send-session-welcome-email",
+    label: "Resend welcome + fresh payment link",
+    description:
+      "Regenerates the session welcome email with a brand-new Stripe checkout URL.",
+  },
+  "session-payment-link": {
+    fn: "send-session-payment-link",
+    label: "Send fresh session payment link",
+    description: "Creates a new $240 Stripe checkout URL and emails it.",
+  },
+  "registration-fee-payment-link": {
+    fn: "send-registration-fee-payment-link",
+    label: "Send fresh registration fee link",
+    description: "Creates a new $45 Stripe checkout URL and emails it.",
+  },
+};
 
 const statusTone = (s: string) => {
   switch (s) {
@@ -41,6 +79,36 @@ const statusTone = (s: string) => {
   }
 };
 
+// Convert rendered HTML email body into editable plain text for Compose.
+// Strips the unsubscribe footer and collapses common tags.
+function htmlToPlain(html: string): string {
+  if (!html) return "";
+  let s = html;
+  // Drop everything from common footer markers onward
+  const footerIdx = s.search(
+    /(unsubscribe|preferences|you (are|received this)|view in browser)/i,
+  );
+  if (footerIdx > 200) s = s.slice(0, footerIdx);
+  s = s
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<head[\s\S]*?<\/head>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|tr|h\d|li)>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/gi, "$2 ($1)")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return s;
+}
+
 export default function CommunicationsTab({ swimmer }: Props) {
   const { toast } = useToast();
   const [logs, setLogs] = useState<LogRow[]>([]);
@@ -49,12 +117,17 @@ export default function CommunicationsTab({ swimmer }: Props) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [busyRow, setBusyRow] = useState<string | null>(null);
+  const [enrollments, setEnrollments] = useState<EnrollmentRow[]>([]);
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<string>("");
 
   const load = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("email_send_log")
-      .select("id, template_name, status, created_at, error_message, message_id, metadata")
+      .select(
+        "id, template_name, status, created_at, error_message, message_id, metadata",
+      )
       .ilike("recipient_email", swimmer.parent_email)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -62,7 +135,6 @@ export default function CommunicationsTab({ swimmer }: Props) {
       console.error("load email log", error);
       setLogs([]);
     } else {
-      // Dedupe by message_id keeping latest status per email
       const seen = new Set<string>();
       const unique: LogRow[] = [];
       for (const row of data || []) {
@@ -76,10 +148,68 @@ export default function CommunicationsTab({ swimmer }: Props) {
     setLoading(false);
   };
 
+  const loadEnrollments = async () => {
+    const { data } = await supabase
+      .from("swim_enrollments")
+      .select("id, created_at, swim_level, session_id, payment_status, is_first_time")
+      .ilike("parent_email", swimmer.parent_email)
+      .ilike("child_name", swimmer.child_name)
+      .order("created_at", { ascending: false });
+    const rows = (data || []) as EnrollmentRow[];
+    setEnrollments(rows);
+    if (rows.length && !selectedEnrollmentId) {
+      setSelectedEnrollmentId(rows[0].id);
+    }
+  };
+
   useEffect(() => {
     load();
+    loadEnrollments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swimmer.parent_email]);
+  }, [swimmer.parent_email, swimmer.child_name]);
+
+  const prefillResend = (log: LogRow) => {
+    const subj: string =
+      log.metadata?.subject ||
+      log.metadata?.templateData?.subject ||
+      log.template_name;
+    const html: string = log.metadata?.html || "";
+    const plain = htmlToPlain(html) || `(Original message content unavailable — please retype.)`;
+    setSubject(subj.startsWith("Re: ") ? subj : `Re: ${subj}`);
+    setBody(plain);
+    setShowCompose(true);
+    setTimeout(() => {
+      document.getElementById("email-subject")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+  };
+
+  const sendFreshPaymentLink = async (log: LogRow) => {
+    const cfg = PAYMENT_LINK_TEMPLATES[log.template_name];
+    if (!cfg) return;
+    if (!selectedEnrollmentId) {
+      toast({
+        title: "Pick an enrollment first",
+        description: "Choose which enrollment the payment link applies to.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setBusyRow(log.id);
+    try {
+      const { data, error } = await supabase.functions.invoke(cfg.fn, {
+        body: { enrollmentId: selectedEnrollmentId, environment: "live" },
+      });
+      if (error || (data as any)?.error) {
+        throw new Error(error?.message || (data as any)?.error || "Send failed");
+      }
+      toast({ title: "Fresh payment link sent", description: `Re-emailed ${swimmer.parent_email}` });
+      setTimeout(load, 1200);
+    } catch (e: any) {
+      toast({ title: "Send failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setBusyRow(null);
+    }
+  };
 
   const sendEmail = async () => {
     if (!subject.trim() || !body.trim()) {
@@ -112,6 +242,11 @@ export default function CommunicationsTab({ swimmer }: Props) {
     }
   };
 
+  const enrollmentLabel = (e: EnrollmentRow) =>
+    `${e.swim_level || "—"} · ${new Date(e.created_at).toLocaleDateString()} · ${e.payment_status || "unpaid"}`;
+
+  const hasPaymentEnrollments = useMemo(() => enrollments.length > 0, [enrollments]);
+
   return (
     <div className="space-y-4">
       <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">
@@ -120,7 +255,7 @@ export default function CommunicationsTab({ swimmer }: Props) {
         <span className="font-medium text-foreground">info@aquaticdreamsswim.com</span>.
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-sm">
           <span className="font-semibold">{logs.length}</span>{" "}
           <span className="text-muted-foreground">emails sent to {swimmer.parent_email}</span>
@@ -130,6 +265,25 @@ export default function CommunicationsTab({ swimmer }: Props) {
           {showCompose ? "Cancel" : "Compose"}
         </Button>
       </div>
+
+      {hasPaymentEnrollments && (
+        <div className="rounded-md border bg-card p-2.5 flex items-center gap-2 text-xs">
+          <Link2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-muted-foreground shrink-0">Payment links apply to:</span>
+          <Select value={selectedEnrollmentId} onValueChange={setSelectedEnrollmentId}>
+            <SelectTrigger className="h-7 text-xs flex-1">
+              <SelectValue placeholder="Select enrollment" />
+            </SelectTrigger>
+            <SelectContent>
+              {enrollments.map((e) => (
+                <SelectItem key={e.id} value={e.id} className="text-xs">
+                  {enrollmentLabel(e)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {showCompose && (
         <div className="rounded-lg border p-3 space-y-2 bg-card">
@@ -148,7 +302,7 @@ export default function CommunicationsTab({ swimmer }: Props) {
               id="email-body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              rows={6}
+              rows={10}
               placeholder="Hi there, just following up..."
             />
           </div>
@@ -171,10 +325,12 @@ export default function CommunicationsTab({ swimmer }: Props) {
         <div className="space-y-2">
           {logs.map((log) => {
             const subj = log.metadata?.subject || log.metadata?.templateData?.subject;
+            const paymentCfg = PAYMENT_LINK_TEMPLATES[log.template_name];
+            const rowBusy = busyRow === log.id;
             return (
               <div key={log.id} className="rounded-md border p-2.5 text-xs">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="font-medium text-sm">{subj || log.template_name}</div>
                     <div className="text-muted-foreground mt-0.5">
                       {log.template_name} · {fmt(log.created_at)}
@@ -189,6 +345,31 @@ export default function CommunicationsTab({ swimmer }: Props) {
                   <Badge variant="outline" className={statusTone(log.status)}>
                     {log.status}
                   </Badge>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => prefillResend(log)}
+                    disabled={rowBusy}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Resend (edit)
+                  </Button>
+                  {paymentCfg && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => sendFreshPaymentLink(log)}
+                      disabled={rowBusy || !selectedEnrollmentId}
+                      title={paymentCfg.description}
+                    >
+                      <Link2 className="h-3 w-3" />
+                      {rowBusy ? "Sending…" : paymentCfg.label}
+                    </Button>
+                  )}
                 </div>
               </div>
             );
