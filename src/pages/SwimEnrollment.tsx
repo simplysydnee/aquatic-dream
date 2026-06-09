@@ -65,7 +65,10 @@ const SwimEnrollment = () => {
   const [checkoutInputs, setCheckoutInputs] = useState<{
     children: ChildEnrollment[];
     signerIp: string | null;
+    /** Effective price per session (prorated when the session is already in progress). */
     sessionPrices: Record<string, number>;
+    /** True per session if at least one lesson has already passed (forces pay-at-checkout). */
+    sessionStarted: Record<string, boolean>;
   } | null>(null);
   // For confirmation: all children info
   const [confirmedChildren, setConfirmedChildren] = useState<ChildEnrollment[]>([]);
@@ -238,7 +241,7 @@ const SwimEnrollment = () => {
     // Fetch sessions for capacity check + price/total calculation
     const { data: sessions } = await supabase
       .from("swim_sessions")
-      .select("id, max_students, session_price, session_start_date")
+      .select("id, max_students, session_price, session_start_date, price_per_lesson, total_lessons")
       .in("id", uniqueSessionIds);
 
     if (!sessions || sessions.length === 0) {
@@ -247,7 +250,7 @@ const SwimEnrollment = () => {
       return;
     }
 
-    const sessionMap = Object.fromEntries(sessions.map(s => [s.id, s]));
+    
 
     // Capacity check — only count paid/active rows. Public RPC returns aggregates only.
     const { data: existingEnrollments } = await supabase.rpc("get_session_enrollment_counts", {
@@ -281,25 +284,56 @@ const SwimEnrollment = () => {
       });
     }
 
-    // Calculate "today" total for display purposes — assumes payAhead=false
-    // (i.e. just reg fees for first-timers). The user can opt to pay ahead in
-    // the next step; that updates the Stripe-side total. The server is
-    // authoritative for the actual charge.
-    const total = allChildren.reduce((sum, child) => {
-      return sum + child.sessionIds.reduce((cs, sid, i) => {
-        const s = sessionMap[sid];
-        const sessionPrice = s?.session_price ?? 240;
-        if (child.isFirstTime) {
-          return cs + (i === 0 ? PRICING.registrationFee : 0);
-        }
-        return cs + sessionPrice;
-      }, 0);
-    }, 0);
+    // Count remaining (non-cancelled) lesson dates per session to prorate
+    // the price when the session has already started.
+    const todayPT = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
+    const { data: remainingDates } = await supabase
+      .from("session_lesson_dates")
+      .select("session_id, lesson_date")
+      .in("session_id", uniqueSessionIds)
+      .eq("is_cancelled", false)
+      .gte("lesson_date", todayPT);
+    const remainingMap: Record<string, number> = {};
+    (remainingDates || []).forEach((d: any) => {
+      remainingMap[d.session_id] = (remainingMap[d.session_id] || 0) + 1;
+    });
 
     const sessionPrices: Record<string, number> = {};
-    for (const s of sessions) sessionPrices[s.id] = Number(s.session_price ?? 240);
+    const sessionStarted: Record<string, boolean> = {};
+    for (const s of sessions) {
+      const totalLessons = Number(s.total_lessons) || 8;
+      const perLesson = Number(s.price_per_lesson) || PRICING.group;
+      const fullPrice = Number(s.session_price) || (totalLessons * perLesson);
+      const remaining = remainingMap[s.id] ?? totalLessons;
+      const started = remaining > 0 && remaining < totalLessons;
+      const prorated = started ? Math.min(remaining * perLesson, fullPrice) : fullPrice;
+      sessionPrices[s.id] = prorated;
+      sessionStarted[s.id] = started;
+    }
 
-    setCheckoutInputs({ children: allChildren, signerIp: null, sessionPrices });
+    // Calculate "today" total.
+    //   - Returning swimmers: full (possibly prorated) session price per session.
+    //   - First-timer in a not-yet-started session: $45 reg fee only (session fee due day 1).
+    //   - First-timer in an already-started session: $45 reg fee + the prorated
+    //     session price — no day-1 to pay it in person, so it must clear now.
+    let total = 0;
+    for (const child of allChildren) {
+      if (child.isFirstTime) {
+        total += PRICING.registrationFee;
+        for (const sid of child.sessionIds) {
+          if (sessionStarted[sid]) total += sessionPrices[sid] ?? 0;
+        }
+      } else {
+        for (const sid of child.sessionIds) {
+          total += sessionPrices[sid] ?? 0;
+        }
+      }
+    }
+
+    setCheckoutInputs({ children: allChildren, signerIp: null, sessionPrices, sessionStarted });
     setTotalDue(total);
     setConfirmedChildren(allChildren);
 
@@ -445,9 +479,6 @@ const SwimEnrollment = () => {
           {step === "payment" && checkoutInputs && (() => {
             const inputs = checkoutInputs;
             const hasFirstTimers = inputs.children.some(c => c.isFirstTime);
-            // Use the first first-timer's session_price (they're all $240 in practice).
-            // Counted: number of session-fee charges if pay-ahead is selected
-            // (one per first-timer × their session count).
             const firstTimerSessionIds = inputs.children
               .filter(c => c.isFirstTime)
               .flatMap(c => c.sessionIds);
@@ -455,6 +486,12 @@ const SwimEnrollment = () => {
             const sessionFeeUsd = firstTimerSessionIds.length > 0
               ? (inputs.sessionPrices[firstTimerSessionIds[0]] ?? 240)
               : 240;
+            // If any first-timer is enrolling in a session that has already
+            // started, we MUST collect the session fee at checkout — there is
+            // no day-1 to settle it in person.
+            const forceFullPayment = firstTimerSessionIds.some(
+              (sid) => inputs.sessionStarted[sid],
+            );
 
             return (
               <EnrollmentCheckout
@@ -497,6 +534,7 @@ const SwimEnrollment = () => {
                 hasFirstTimers={hasFirstTimers}
                 sessionFeeUsd={sessionFeeUsd}
                 sessionFeeCount={sessionFeeCount}
+                forceFullPayment={forceFullPayment}
                 onBack={() => setStep("legal")}
                 onSessionFull={() => setStep("full")}
               />

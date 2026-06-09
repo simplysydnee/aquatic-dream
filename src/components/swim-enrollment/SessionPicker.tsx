@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar, ShoppingBag, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Users, Loader2, DollarSign, Calendar, ShoppingBag, CheckCircle2, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, PRICING } from "./types";
 import LevelFullScreen from "./LevelFullScreen";
@@ -18,6 +18,14 @@ interface SlotInfo {
   spots_left: number;
   session_start_date: string;
   session_end_date: string;
+  // Pricing
+  full_price: number;
+  price_per_lesson: number;
+  total_lessons: number;
+  remaining_lessons: number;
+  prorated_price: number;
+  is_started: boolean;
+  remaining_dates: string[];
 }
 
 interface Props {
@@ -55,12 +63,19 @@ function formatDayOfWeek(dow: string) {
   return parts.map(p => map[p] || p).join(" & ");
 }
 
+// Today in Pacific time as YYYY-MM-DD (matches how lesson_date is compared elsewhere).
+function todayPacificISO(): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  return fmt.format(new Date()); // en-CA produces YYYY-MM-DD
+}
+
 const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
   const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [classDates, setClassDates] = useState<Record<string, string[]>>({});
-  const [loadingDates, setLoadingDates] = useState(false);
 
   const ageGroup = getAgeGroup(childAge);
   const levelInfo = LEVEL_DISPLAY[level];
@@ -69,7 +84,7 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
     async function fetchSessions() {
       setLoading(true);
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayPacificISO();
         const [periodsRes, sessionsRes] = await Promise.all([
           (supabase as any).from("session_periods_public").select("*").eq("is_active", true).gte("end_date", today).order("start_date"),
           supabase.from("swim_sessions").select("id, swim_level, day_of_week, start_time, end_time, max_students, is_active, session_name, session_start_date, session_end_date, age_group, price_per_lesson, total_lessons, session_price, instructor_id, registration_status, session_period_id")
@@ -98,31 +113,69 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         }
 
         const allIds = activeSessions.map(s => s.id);
-        const { data: enrollments } = await supabase.rpc("get_session_enrollment_counts", { _session_ids: allIds } as any);
+
+        // Fetch enrollment counts and all future (non-cancelled) lesson dates
+        // for every visible session — needed to filter out fully-elapsed
+        // sessions and prorate price for ones already in progress.
+        const [enrollmentsRes, datesRes] = await Promise.all([
+          supabase.rpc("get_session_enrollment_counts", { _session_ids: allIds } as any),
+          supabase
+            .from("session_lesson_dates")
+            .select("session_id, lesson_date")
+            .in("session_id", allIds)
+            .eq("is_cancelled", false)
+            .gte("lesson_date", today)
+            .order("lesson_date"),
+        ]);
 
         const countMap: Record<string, number> = {};
-        (enrollments as any[] | null)?.forEach((e) => {
+        (enrollmentsRes.data as any[] | null)?.forEach((e) => {
           if (e?.session_id) countMap[e.session_id] = e.enrolled_count || 0;
+        });
+
+        const remainingByIdMap: Record<string, string[]> = {};
+        (datesRes.data || []).forEach((d: any) => {
+          if (!remainingByIdMap[d.session_id]) remainingByIdMap[d.session_id] = [];
+          remainingByIdMap[d.session_id].push(d.lesson_date);
         });
 
         const periodMap = Object.fromEntries(periods.map(p => [p.id, p]));
 
-        const result: SlotInfo[] = activeSessions.map(s => {
-          const totalEnrolled = countMap[s.id] || 0;
-          const period = periodMap[s.session_period_id!];
-          return {
-            assignSessionId: s.id,
-            periodName: period?.name || "Session",
-            start_time: s.start_time,
-            end_time: s.end_time,
-            day_of_week: s.day_of_week,
-            max_students: s.max_students,
-            total_enrolled: totalEnrolled,
-            spots_left: s.max_students - totalEnrolled,
-            session_start_date: s.session_start_date || "",
-            session_end_date: s.session_end_date || "",
-          };
-        });
+        const result: SlotInfo[] = activeSessions
+          .map((s) => {
+            const totalEnrolled = countMap[s.id] || 0;
+            const period = periodMap[s.session_period_id!];
+            const remainingDates = remainingByIdMap[s.id] || [];
+            const remainingLessons = remainingDates.length;
+            const totalLessons = Number(s.total_lessons) || 8;
+            const perLessonRate = Number(s.price_per_lesson) || PRICING.group;
+            const fullPrice = Number(s.session_price) || (totalLessons * perLessonRate);
+            const isStarted = remainingLessons > 0 && remainingLessons < totalLessons;
+            const proratedPrice = isStarted
+              ? Math.min(remainingLessons * perLessonRate, fullPrice)
+              : fullPrice;
+            return {
+              assignSessionId: s.id,
+              periodName: period?.name || "Session",
+              start_time: s.start_time,
+              end_time: s.end_time,
+              day_of_week: s.day_of_week,
+              max_students: s.max_students,
+              total_enrolled: totalEnrolled,
+              spots_left: s.max_students - totalEnrolled,
+              session_start_date: s.session_start_date || "",
+              session_end_date: s.session_end_date || "",
+              full_price: fullPrice,
+              price_per_lesson: perLessonRate,
+              total_lessons: totalLessons,
+              remaining_lessons: remainingLessons,
+              prorated_price: proratedPrice,
+              is_started: isStarted,
+              remaining_dates: remainingDates,
+            };
+          })
+          // Hide sessions where every lesson has already passed.
+          .filter((s) => s.remaining_lessons > 0);
 
         result.sort((a, b) => {
           if (a.periodName !== b.periodName) return a.periodName.localeCompare(b.periodName);
@@ -140,29 +193,6 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
     fetchSessions();
   }, [level, ageGroup]);
 
-  // Fetch class dates when selection changes
-  useEffect(() => {
-    if (selectedIds.size === 0) { setClassDates({}); return; }
-    async function fetchDates() {
-      setLoadingDates(true);
-      const ids = Array.from(selectedIds);
-      const { data } = await supabase
-        .from("session_lesson_dates")
-        .select("session_id, lesson_date, is_cancelled")
-        .in("session_id", ids)
-        .eq("is_cancelled", false)
-        .order("lesson_date");
-      const grouped: Record<string, string[]> = {};
-      data?.forEach(d => {
-        if (!grouped[d.session_id]) grouped[d.session_id] = [];
-        grouped[d.session_id].push(d.lesson_date);
-      });
-      setClassDates(grouped);
-      setLoadingDates(false);
-    }
-    fetchDates();
-  }, [selectedIds.size]);
-
   // Group by period
   const grouped = slots.reduce<Record<string, SlotInfo[]>>((acc, s) => {
     const key = `${s.periodName}|${s.session_start_date}|${s.session_end_date}`;
@@ -170,6 +200,11 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
     acc[key].push(s);
     return acc;
   }, {});
+
+  const slotMap = useMemo(
+    () => Object.fromEntries(slots.map((s) => [s.assignSessionId, s])),
+    [slots],
+  );
 
   const levelFull = !loading && (slots.length === 0 || slots.every(s => s.spots_left <= 0));
 
@@ -276,6 +311,27 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
                             </div>
                           )}
                         </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                          {slot.is_started ? (
+                            <>
+                              <span className="font-semibold text-foreground">
+                                ${slot.prorated_price}
+                              </span>
+                              <span className="text-xs text-muted-foreground line-through">
+                                ${slot.full_price}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                <Zap className="w-3 h-3" />
+                                In progress — {slot.remaining_lessons} of {slot.total_lessons} classes left
+                              </span>
+                            </>
+                          ) : (
+                            <span className="font-semibold text-foreground">
+                              ${slot.full_price}
+                              <span className="text-xs text-muted-foreground font-normal"> · {slot.total_lessons} classes</span>
+                            </span>
+                          )}
+                        </div>
                       </button>
                     );
                   })}
@@ -286,17 +342,17 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         </div>
       )}
 
-      {selectedIds.size > 0 && Object.keys(classDates).length > 0 && (
+      {selectedIds.size > 0 && (
         <div className="mt-4 space-y-3">
           {Array.from(selectedIds).map(id => {
-            const slot = slots.find(s => s.assignSessionId === id);
-            const dates = classDates[id] || [];
-            if (dates.length === 0) return null;
+            const slot = slotMap[id];
+            const dates = slot?.remaining_dates || [];
+            if (!slot || dates.length === 0) return null;
             return (
               <div key={id} className="p-4 rounded-xl border border-primary/20 bg-accent/30">
                 <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-primary" />
-                  {slot?.periodName} — {dates.length} classes
+                  {slot.periodName} — {dates.length} {slot.is_started ? "classes remaining" : "classes"}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {dates.map(d => (
@@ -308,11 +364,6 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
               </div>
             );
           })}
-        </div>
-      )}
-      {selectedIds.size > 0 && loadingDates && (
-        <div className="mt-4 flex justify-center">
-          <Loader2 className="w-4 h-4 animate-spin text-primary" />
         </div>
       )}
 
