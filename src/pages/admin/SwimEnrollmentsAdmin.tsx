@@ -1069,6 +1069,22 @@ const SwimEnrollmentsAdmin = () => {
         onMoved={fetchData}
       />
 
+      <SendPaymentLinkDialog
+        open={payLinkOpen}
+        onOpenChange={setPayLinkOpen}
+        target={payLinkTarget}
+        onSent={() => {
+          if (payLinkTarget) {
+            setEnrollments((prev) => prev.map((e) =>
+              e.id === payLinkTarget.enrollmentId
+                ? { ...e, payment_reminder_sent_at: new Date().toISOString() }
+                : e,
+            ));
+          }
+        }}
+      />
+
+
       <AlertDialog open={!!cancelTarget} onOpenChange={(o) => { if (!o) setCancelTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
