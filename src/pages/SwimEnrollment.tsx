@@ -65,7 +65,10 @@ const SwimEnrollment = () => {
   const [checkoutInputs, setCheckoutInputs] = useState<{
     children: ChildEnrollment[];
     signerIp: string | null;
+    /** Effective price per session (prorated when the session is already in progress). */
     sessionPrices: Record<string, number>;
+    /** True per session if at least one lesson has already passed (forces pay-at-checkout). */
+    sessionStarted: Record<string, boolean>;
   } | null>(null);
   // For confirmation: all children info
   const [confirmedChildren, setConfirmedChildren] = useState<ChildEnrollment[]>([]);
