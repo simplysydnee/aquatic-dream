@@ -86,7 +86,7 @@ serve(async (req) => {
     // Fetch sessions
     const { data: sessions, error: sessErr } = await supabaseAdmin
       .from("swim_sessions")
-      .select("id, max_students, session_price, session_start_date")
+      .select("id, max_students, session_price, session_start_date, price_per_lesson, total_lessons")
       .in("id", uniqueSessionIds);
 
     if (sessErr || !sessions || sessions.length !== uniqueSessionIds.length) {
@@ -94,6 +94,46 @@ serve(async (req) => {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Count remaining (non-cancelled, future) lesson dates per session.
+    // Today is computed in America/Los_Angeles to match how lesson_dates
+    // are managed in the admin UI.
+    const todayPT = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
+    const { data: lessonDates } = await supabaseAdmin
+      .from("session_lesson_dates")
+      .select("session_id, lesson_date")
+      .in("session_id", uniqueSessionIds)
+      .eq("is_cancelled", false)
+      .gte("lesson_date", todayPT);
+    const remainingMap: Record<string, number> = {};
+    (lessonDates || []).forEach((d: any) => {
+      remainingMap[d.session_id] = (remainingMap[d.session_id] || 0) + 1;
+    });
+
+    // Compute effective (prorated) charge per session in cents.
+    const sessionChargeCents: Record<string, number> = {};
+    const sessionStarted: Record<string, boolean> = {};
+    for (const s of sessions) {
+      const totalLessons = Number(s.total_lessons) || 8;
+      const perLesson = Number(s.price_per_lesson) || 30;
+      const fullDollars = Number(s.session_price) || (totalLessons * perLesson);
+      const remaining = remainingMap[s.id] ?? totalLessons;
+      if (remaining <= 0) {
+        return new Response(JSON.stringify({ error: `Session ${s.id} has no remaining classes` }), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const started = remaining < totalLessons;
+      const dollars = started
+        ? Math.min(remaining * perLesson, fullDollars)
+        : fullDollars;
+      sessionChargeCents[s.id] = Math.round(dollars * 100);
+      sessionStarted[s.id] = started;
     }
 
     // Server-side capacity check — only confirmed rows count
