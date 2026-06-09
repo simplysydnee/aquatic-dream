@@ -319,6 +319,10 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
               <Input placeholder="Last name" value={childLast} onChange={(e) => setChildLast(e.target.value)} />
               <Input type="number" placeholder="Age" value={childAge} onChange={(e) => setChildAge(e.target.value)} />
             </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Date of birth (optional — used to skip the waiver if already signed)</Label>
+              <Input type="date" value={childDob} onChange={(e) => setChildDob(e.target.value)} />
+            </div>
           </div>
 
           {/* Price + options */}
