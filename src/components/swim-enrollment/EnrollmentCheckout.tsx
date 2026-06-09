@@ -182,7 +182,14 @@ export default function EnrollmentCheckout({
 
       {!CHECKOUT_FALLBACK && (!hasFirstTimers || confirmed) && (
         <>
-          {hasFirstTimers && (
+          {hasFirstTimers && forceFullPayment && (
+            <div className="mb-3 text-sm rounded-lg border border-amber-200 bg-amber-50 text-amber-900 p-3">
+              This session has already started — the full amount
+              (<strong>${(45 + sessionTotal).toFixed(0)}</strong>: $45 registration + ${sessionTotal.toFixed(0)} prorated session fee)
+              is due today.
+            </div>
+          )}
+          {hasFirstTimers && !forceFullPayment && (
             <div className="flex items-center justify-between mb-3 text-sm">
               <span className="text-muted-foreground">
                 {payAhead === "pay_ahead"
