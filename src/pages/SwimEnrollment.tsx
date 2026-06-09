@@ -250,7 +250,7 @@ const SwimEnrollment = () => {
       return;
     }
 
-    const sessionMap = Object.fromEntries(sessions.map(s => [s.id, s]));
+    
 
     // Capacity check — only count paid/active rows. Public RPC returns aggregates only.
     const { data: existingEnrollments } = await supabase.rpc("get_session_enrollment_counts", {
