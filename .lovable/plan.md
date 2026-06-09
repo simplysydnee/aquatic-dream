@@ -1,37 +1,24 @@
 ## Problem
 
-On a swimmer's card (Clients → swimmer drawer → **Activity**), booked **private** and **semi-private** lessons are missing in two cases:
+Monday Jun 8 at 8:00–8:30pm there are two semi-private bookings sharing the slot (Sierra Perez and Diego Capistran). Both have their own `pool_event` row, but the day-view grid renders every AD pool event with `absolute left-1 right-1`, so two events at the same time stack directly on top of each other and only the last-painted one is visible. The user sees Sierra, Diego is hidden underneath.
 
-1. The parent has a session enrollment AND a private/semi booking, but the booking does not merge onto the same swimmer because the names don't match exactly (extra/double whitespace, "Arthur" vs "Arthur Sidell", different casing, etc.).
-2. The parent only has private/semi bookings (no session enrollment). For many semi-private rows the booking's `child_name` is actually the **parent's** name (the `child_first_name`/`child_last_name` columns are null), so the swimmer ends up listed under the parent, or the real child never gets a card at all.
+## Fix (frontend only, `src/components/admin/calendar/CalendarDayView.tsx`)
 
-Both stem from `useSwimmers` keying swimmers on a naïve `child_name|parent_email` and never reconciling bookings against existing enrollment-derived swimmers.
+### 1. Compute lanes for overlapping AD pool events
+Add an `adEventLanes` memo (mirroring the existing `sessionLanes` sweep-line logic) keyed by `pool_event.id`, producing `{ lane, laneCount }` for every event in `adEvents` (so private, semi-private, and walk-in pool events all share lane assignment in the single AD column).
 
-## Fix (frontend only, in `src/hooks/useSwimmers.ts`)
+### 2. Teach `renderBlock` about lanes
+Add two optional params `lane?: number` and `laneCount?: number`. When `laneCount > 1`, replace the hard-coded `left-1 right-1` with inline `left` / `width` based on the lane index (e.g. `calc((100% - 4px) / laneCount * lane + 2px)` and a matching width), keeping a small 2px gap. When `laneCount` is 1 or undefined, behavior is unchanged.
 
-### 1. Normalize names before keying
-- Lowercase, trim, **collapse internal whitespace**, and strip punctuation.
-- Use a `child_first_name + child_last_name` based key when those columns exist; fall back to `child_name`.
-- Apply the same normalization to enrollments, requests, and bookings.
+### 3. Pass lanes from the AD event map
+In the `adEvents.map(...)` render at ~line 1038, look up `adEventLanes.get(e.id)` and pass `lane` / `laneCount` into `renderBlock`. No changes needed for swim-lesson or dive/rental sections (they already have their own column treatment).
 
-### 2. Two-pass merge for bookings
-- Pass 1: build the swimmer map from enrollments + requests as today.
-- Pass 2 (bookings): before creating a new swimmer for a booking, try to attach it to an existing swimmer for the same parent_email when either:
-  - normalized full name matches, OR
-  - normalized first name matches and last name is empty/contained, OR
-  - the booking has no real child name (semi-private case where `child_first_name`/`child_last_name` are null AND `child_name` equals the parent's name) AND the parent has exactly one existing swimmer → attach to that swimmer.
-- Only fall through to creating a new swimmer card when no reasonable parent match exists.
+### 4. (Tiny consistency) The same lane logic also applies to `walkInEvents` since they're folded into `adEvents` — they'll automatically benefit because everything goes through the shared `adEventLanes` map.
 
-### 3. Use the cleaner display name
-- When a booking has `child_first_name` + `child_last_name`, prefer that over the looser `child_name` for the swimmer's display name.
-
-### 4. Activity tab ordering (`SwimmerDetailDrawer.tsx`)
-- Sort `swimmer.bookings` newest-first by `series_start` (fallback `created_at`) so the most recent booking shows on top — small consistency fix while we're in there.
-
-No backend / RLS / schema changes needed. No edits to enrollment, payment, or checkout logic.
+No backend, RLS, or data changes. No edits to PrivateLessonsPanel, detail dialog, or print sheet.
 
 ## Verification
 
-- Open a parent who has only private bookings → confirm one swimmer card per real child, all bookings listed under **Activity → Lessons & Requests**.
-- Open a parent who has both an enrollment and a private booking for the same child → confirm the booking now appears on the same card as the enrollment (no duplicate card).
-- Open a semi-private booking where `child_name` was the parent's name → confirm it attaches to the single existing child swimmer for that parent instead of creating a duplicate parent-named card.
+- Open Calendar → Mon Jun 8 → confirm two side-by-side blocks at 8:00pm, one labeled "Semi-Private Lesson — Sierra Perez" and one "Semi-Private Lesson — Diego Capistran".
+- Confirm non-overlapping AD blocks at other times still render full-width (lane logic only kicks in when `laneCount > 1`).
+- Confirm walk-in pool events that overlap with a private lesson at the same time also display side-by-side rather than hidden.
