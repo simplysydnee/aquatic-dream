@@ -101,7 +101,7 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
     setEndTime("15:30");
     setPoolArea("shallow");
     setParentFirst(""); setParentLast(""); setParentEmail(""); setParentPhone("");
-    setChildFirst(""); setChildLast(""); setChildAge("");
+    setChildFirst(""); setChildLast(""); setChildAge(""); setChildDob("");
     setNotes(""); setRecurring(false); setSeriesEnd("");
     setSendConfirmation(true); setCollectCardOnFile(true); setPriceOverride("");
     setSetupClientSecret(null); setCheckoutSessionId(null); setStripeCustomerId(null);
