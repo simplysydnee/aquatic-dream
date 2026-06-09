@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import { toast } from "@/hooks/use-toast";
 import { Save, FileCheck, ShieldCheck, Camera, AlertTriangle, User, Phone, Send, ArrowRightLeft, CalendarClock } from "lucide-react";
+import SendPaymentLinkDialog, { type SendPaymentLinkTarget } from "@/components/admin/SendPaymentLinkDialog";
 
 interface SessionOption {
   id: string;
