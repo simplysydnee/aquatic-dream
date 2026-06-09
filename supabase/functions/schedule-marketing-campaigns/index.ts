@@ -10,6 +10,20 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // Only the service role (used by pg_cron) or a configured CRON_SECRET may invoke.
+  const authHeader = req.headers.get("Authorization") || "";
+  const bearer = authHeader.replace(/^Bearer\s+/i, "");
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const providedSecret = req.headers.get("x-cron-secret") || "";
+  const isServiceRole = !!bearer && bearer === SERVICE_ROLE;
+  const isCronSecret = !!cronSecret && providedSecret === cronSecret;
+  if (!isServiceRole && !isCronSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   const nowIso = new Date().toISOString();
