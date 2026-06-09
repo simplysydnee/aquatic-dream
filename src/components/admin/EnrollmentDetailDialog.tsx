@@ -420,7 +420,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                           disabled={sendingLink}
                         >
                           <Send className="w-4 h-4 mr-2" />
-                          {sendingLink ? "Sending..." : "Send $240 Session Fee Payment Link"}
+                          Send Session Fee Payment Link…
                         </Button>
                       </div>
                     )}
@@ -552,6 +552,11 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
           </TabsContent>
         </Tabs>
       </DialogContent>
+      <SendPaymentLinkDialog
+        open={payLinkOpen}
+        onOpenChange={setPayLinkOpen}
+        target={payLinkTarget}
+      />
     </Dialog>
   );
 };
