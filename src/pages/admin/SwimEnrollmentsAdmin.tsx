@@ -100,6 +100,8 @@ const SwimEnrollmentsAdmin = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [moveTarget, setMoveTarget] = useState<Enrollment | null>(null);
   const [moveOpen, setMoveOpen] = useState(false);
+  const [payLinkTarget, setPayLinkTarget] = useState<SendPaymentLinkTarget | null>(null);
+  const [payLinkOpen, setPayLinkOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [sessionFilter, setSessionFilter] = useState<string>("all");
@@ -340,17 +342,16 @@ const SwimEnrollmentsAdmin = () => {
     }
   };
 
-  const sendPaymentLink = async (enrollment: Enrollment) => {
-    toast({ title: "Sending payment link...", description: `Emailing ${enrollment.parent_email}` });
-    const { data, error } = await supabase.functions.invoke("send-session-payment-link", {
-      body: { enrollmentId: enrollment.id, environment: "live" },
+  const sendPaymentLink = (enrollment: Enrollment) => {
+    setPayLinkTarget({
+      enrollmentId: enrollment.id,
+      sessionId: enrollment.session_id,
+      childName: enrollment.child_name,
+      parentEmail: enrollment.parent_email,
+      isFirstTime: enrollment.is_first_time,
+      waiverSignedAt: null,
     });
-    if (error || !data?.success) {
-      toast({ title: "Failed to send", description: error?.message || data?.error || "Please try again.", variant: "destructive" });
-    } else {
-      toast({ title: "Payment link sent!", description: `Email sent to ${enrollment.parent_email}` });
-      setEnrollments((prev) => prev.map((e) => (e.id === enrollment.id ? { ...e, payment_reminder_sent_at: new Date().toISOString() } : e)));
-    }
+    setPayLinkOpen(true);
   };
 
   const paymentStatusColor = (status: string) => {
