@@ -30,6 +30,7 @@ const CreateSchema = z.object({
   child_first_name: z.string().max(80).optional().nullable(),
   child_last_name: z.string().max(80).optional().nullable(),
   child_age: z.number().int().min(0).max(120).optional().nullable(),
+  child_dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
   recurring: z.boolean().default(false),
   series_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
