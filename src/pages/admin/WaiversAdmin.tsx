@@ -208,6 +208,8 @@ const WaiversAdmin = () => {
             <SelectItem value="visitor">Visitor waivers</SelectItem>
             <SelectItem value="enrollment">Swim enrollments</SelectItem>
             <SelectItem value="lesson">Lesson bookings</SelectItem>
+            <SelectItem value="linked-visitor">Visitor → linked to swimmer</SelectItem>
+            <SelectItem value="unlinked-visitor">Visitor → unmatched</SelectItem>
           </SelectContent>
         </Select>
       </div>
