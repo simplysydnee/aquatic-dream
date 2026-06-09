@@ -77,6 +77,8 @@ export interface SwimmerBooking {
   parent_email: string;
   parent_phone: string | null;
   child_name: string | null;
+  child_first_name?: string | null;
+  child_last_name?: string | null;
   price_per_session: number | null;
   created_at: string;
 }
