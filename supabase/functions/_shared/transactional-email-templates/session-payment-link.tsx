@@ -14,6 +14,8 @@ interface SessionPaymentLinkProps {
   amountDue?: string
   paymentLink?: string
   dueDate?: string
+  waiverLink?: string
+  prorationNote?: string
 }
 
 const SessionPaymentLinkEmail = ({
@@ -23,10 +25,12 @@ const SessionPaymentLinkEmail = ({
   amountDue,
   paymentLink,
   dueDate,
+  waiverLink,
+  prorationNote,
 }: SessionPaymentLinkProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Session fee {amountDue ? `(${amountDue}) ` : ''}due on the first day of lessons — {SITE_NAME}</Preview>
+    <Preview>Session fee {amountDue ? `(${amountDue}) ` : ''}due — {SITE_NAME}</Preview>
     <Body style={main}>
       <Container style={container}>
         <Img src={LOGO_URL} width="80" height="80" alt="Aquatic Dreams" style={logo} />
@@ -37,9 +41,14 @@ const SessionPaymentLinkEmail = ({
         </Text>
         <Text style={text}>
           {childName ? `${childName}'s` : "Your swimmer's"} session fee
-          {amountDue ? <> of <strong>{amountDue}</strong></> : null} is due on the{' '}
-          <strong>first day of lessons{dueDate ? ` — ${dueDate}` : ''}</strong>.
+          {amountDue ? <> of <strong>{amountDue}</strong></> : null} is due
+          {dueDate ? <> by <strong>{dueDate}</strong></> : <> on the <strong>first day of lessons</strong></>}.
         </Text>
+        {prorationNote && (
+          <Text style={{ ...text, fontStyle: 'italic' as const, color: '#475569' }}>
+            {prorationNote}
+          </Text>
+        )}
         {sessionInfo && (
           <Section style={infoBox}>
             <Text style={infoText}>📋 {sessionInfo}</Text>
@@ -60,6 +69,21 @@ const SessionPaymentLinkEmail = ({
               <Link href={paymentLink} style={linkStyle}>{paymentLink}</Link>
             </Text>
           </>
+        )}
+        {waiverLink && (
+          <Section style={waiverBox}>
+            <Text style={{ ...text, margin: '0 0 10px' }}>
+              <strong>One more step:</strong> please sign the swimmer waiver before the first lesson.
+            </Text>
+            <Section style={{ textAlign: 'center' as const, margin: '8px 0 4px' }}>
+              <Button style={waiverButton} href={waiverLink}>
+                Sign Waiver
+              </Button>
+            </Section>
+            <Text style={{ ...mutedText, textAlign: 'center' as const, margin: '8px 0 0' }}>
+              <Link href={waiverLink} style={linkStyle}>{waiverLink}</Link>
+            </Text>
+          </Section>
         )}
         <Section style={policyBox}>
           <Text style={policyText}>
@@ -87,17 +111,19 @@ export const template = {
   component: SessionPaymentLinkEmail,
   subject: (data: Record<string, any>) => {
     const who = data.childName ? ` for ${data.childName}` : ''
-    const when = data.dueDate ? ` (Due ${data.dueDate})` : ''
-    return `Session Fee Due${when}${who} — ${SITE_NAME}`
+    const amt = data.amountDue ? ` ${data.amountDue}` : ''
+    return `Session Fee${amt} Due${who} — ${SITE_NAME}`
   },
   displayName: 'Session payment link',
   previewData: {
     parentName: 'Jane',
     childName: 'Tommy',
     sessionInfo: 'Session 1 — Mon 3:00 PM — Little Fins (White)',
-    amountDue: '$240',
+    amountDue: '$150',
     paymentLink: 'https://example.com/pay',
     dueDate: 'June 8, 2025',
+    waiverLink: 'https://example.com/enrollment-waiver/abc123',
+    prorationNote: 'Prorated for 5 remaining lessons (5 × $30).',
   },
 } satisfies TemplateEntry
 
@@ -121,6 +147,17 @@ const button = {
   textDecoration: 'none',
   display: 'inline-block' as const,
 }
+const waiverButton = {
+  backgroundColor: '#0f2343',
+  color: '#ffffff',
+  padding: '12px 24px',
+  borderRadius: '8px',
+  fontSize: '15px',
+  fontWeight: '600' as const,
+  textDecoration: 'none',
+  display: 'inline-block' as const,
+}
+const waiverBox = { backgroundColor: '#fff8f1', border: '1px solid #f7d9b8', padding: '16px', borderRadius: '6px', margin: '16px 0 0' }
 const footer = { fontSize: '13px', color: '#888', margin: '30px 0 0', lineHeight: '1.5' }
 const policyBox = { backgroundColor: '#fafafa', border: '1px solid #e5e7eb', padding: '12px 16px', borderRadius: '4px', margin: '16px 0 0' }
 const policyText = { fontSize: '12px', color: '#64748b', lineHeight: '1.5', margin: '0' }

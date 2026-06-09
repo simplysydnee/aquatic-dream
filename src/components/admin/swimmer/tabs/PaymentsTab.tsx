@@ -14,6 +14,7 @@ import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabel
 import { getStripeEnvironment } from "@/lib/stripe";
 import CreditsSection from "./CreditsSection";
 import LessonOccurrenceCheckoutDialog from "@/components/admin/calendar/LessonOccurrenceCheckoutDialog";
+import SendPaymentLinkDialog, { type SendPaymentLinkTarget } from "@/components/admin/SendPaymentLinkDialog";
 
 interface Props {
   swimmer: Swimmer;
@@ -80,6 +81,8 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
   const [reference, setReference] = useState("");
   const [occurrences, setOccurrences] = useState<LessonOccurrence[]>([]);
   const [checkoutOccurrenceId, setCheckoutOccurrenceId] = useState<string | null>(null);
+  const [payLinkTarget, setPayLinkTarget] = useState<SendPaymentLinkTarget | null>(null);
+  const [payLinkOpen, setPayLinkOpen] = useState(false);
 
   const bookingIds = useMemo(() => swimmer.bookings.map((b) => b.id), [swimmer.bookings]);
 
@@ -170,20 +173,16 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
     }
   };
 
-  const sendStripeLink = async (e: SwimmerEnrollment) => {
-    setBusyId(e.id);
-    try {
-      const { error } = await supabase.functions.invoke("send-session-payment-link", {
-        body: { enrollmentId: e.id, environment: getStripeEnvironment(), siteUrl: window.location.origin },
-      });
-      if (error) throw error;
-      toast({ title: "Stripe link emailed", description: `Sent to ${e.parent_email}` });
-      onChanged?.();
-    } catch (err: any) {
-      toast({ title: "Send failed", description: err?.message, variant: "destructive" });
-    } finally {
-      setBusyId(null);
-    }
+  const sendStripeLink = (e: SwimmerEnrollment) => {
+    setPayLinkTarget({
+      enrollmentId: e.id,
+      sessionId: e.session_id ?? null,
+      childName: e.child_name || swimmer.child_name,
+      parentEmail: e.parent_email,
+      isFirstTime: !!e.is_first_time,
+      waiverSignedAt: e.waiver_signed_at ?? null,
+    });
+    setPayLinkOpen(true);
   };
 
   const sendRegFeeLink = async (e: SwimmerEnrollment) => {
@@ -554,6 +553,13 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
         }}
         occurrenceId={checkoutOccurrenceId}
         title="Charge card for lesson"
+      />
+
+      <SendPaymentLinkDialog
+        open={payLinkOpen}
+        onOpenChange={setPayLinkOpen}
+        target={payLinkTarget}
+        onSent={onChanged}
       />
     </div>
   );

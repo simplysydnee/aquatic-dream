@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import { toast } from "@/hooks/use-toast";
 import { Save, FileCheck, ShieldCheck, Camera, AlertTriangle, User, Phone, Send, ArrowRightLeft, CalendarClock } from "lucide-react";
+import SendPaymentLinkDialog, { type SendPaymentLinkTarget } from "@/components/admin/SendPaymentLinkDialog";
 
 interface SessionOption {
   id: string;
@@ -100,6 +101,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
   const [saving, setSaving] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
   const [sendingRegLink, setSendingRegLink] = useState(false);
+  const [payLinkOpen, setPayLinkOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionOption[]>([]);
   const [originalSessionId, setOriginalSessionId] = useState<string | null>(null);
 
@@ -192,19 +194,21 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
     if (form) setForm({ ...form, [key]: value });
   };
 
-  const handleSendPaymentLink = async () => {
+  const handleSendPaymentLink = () => {
     if (!form) return;
-    setSendingLink(true);
-    const { data, error } = await supabase.functions.invoke("send-session-payment-link", {
-      body: { enrollmentId: form.id, environment: "live" },
-    });
-    setSendingLink(false);
-    if (error || !data?.success) {
-      toast({ title: "Failed to send", description: error?.message || data?.error || "Please try again.", variant: "destructive" });
-    } else {
-      toast({ title: "Payment link sent!", description: `Email sent to ${form.parent_email}` });
-    }
+    setPayLinkOpen(true);
   };
+
+  const payLinkTarget: SendPaymentLinkTarget | null = form
+    ? {
+        enrollmentId: form.id,
+        sessionId: form.session_id,
+        childName: form.child_name,
+        parentEmail: form.parent_email,
+        isFirstTime: form.is_first_time,
+        waiverSignedAt: (form as any).waiver_signed_at ?? null,
+      }
+    : null;
 
   const handleSendRegFeeLink = async () => {
     if (!form) return;
@@ -416,7 +420,7 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
                           disabled={sendingLink}
                         >
                           <Send className="w-4 h-4 mr-2" />
-                          {sendingLink ? "Sending..." : "Send $240 Session Fee Payment Link"}
+                          Send Session Fee Payment Link…
                         </Button>
                       </div>
                     )}
@@ -548,6 +552,11 @@ const EnrollmentDetailDialog = ({ enrollment, open, onOpenChange, onUpdated }: P
           </TabsContent>
         </Tabs>
       </DialogContent>
+      <SendPaymentLinkDialog
+        open={payLinkOpen}
+        onOpenChange={setPayLinkOpen}
+        target={payLinkTarget}
+      />
     </Dialog>
   );
 };
