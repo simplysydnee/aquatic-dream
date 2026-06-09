@@ -20,6 +20,11 @@ interface EnrollmentCheckoutProps {
   sessionFeeUsd: number;
   /** Number of session-fee charges that pay-ahead would add. */
   sessionFeeCount: number;
+  /**
+   * When true, the session has already started for at least one first-timer.
+   * The "pay session fee on day 1" option is unavailable — full payment due now.
+   */
+  forceFullPayment?: boolean;
   onBack: () => void;
   /** Called when the server reports a session is full (409). Skip throwing — show fallback. */
   onSessionFull?: () => void;
@@ -31,12 +36,16 @@ export default function EnrollmentCheckout({
   hasFirstTimers,
   sessionFeeUsd,
   sessionFeeCount,
+  forceFullPayment = false,
   onBack,
   onSessionFull,
 }: EnrollmentCheckoutProps) {
   // Default = pay reg fee only (current behavior). User can opt to pay ahead.
-  const [payAhead, setPayAhead] = useState<"reg_only" | "pay_ahead">("reg_only");
-  const [confirmed, setConfirmed] = useState(false);
+  // When forceFullPayment is set, we lock to "pay_ahead" and skip the toggle.
+  const [payAhead, setPayAhead] = useState<"reg_only" | "pay_ahead">(
+    forceFullPayment ? "pay_ahead" : "reg_only",
+  );
+  const [confirmed, setConfirmed] = useState(forceFullPayment);
 
   // The embedded checkout will mount with the payload at confirmation time.
   // Changing the toggle after confirming requires "Change" → re-mounts with new payload.
