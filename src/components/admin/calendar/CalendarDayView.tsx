@@ -588,17 +588,28 @@ const CalendarDayView = ({
     onClick?: () => void,
     isICS?: boolean,
     actions?: React.ReactNode,
-    tooltip?: React.ReactNode
+    tooltip?: React.ReactNode,
+    lane?: number,
+    laneCount?: number
   ) => {
     const top = minutesToTop(startMins);
     const height = durationHeight(startMins, endMins);
     const colors = BLOCK_COLORS[colorKey] || BLOCK_COLORS.other;
 
+    const useLanes = laneCount && laneCount > 1 && typeof lane === "number";
+    const laneStyle = useLanes
+      ? {
+          left: `calc((100% - 4px) / ${laneCount} * ${lane} + 2px)`,
+          width: `calc((100% - 4px) / ${laneCount} - 2px)`,
+        }
+      : undefined;
+
     const blockEl = (
       <div
         key={key}
         className={cn(
-          "absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 overflow-hidden transition-opacity cursor-pointer hover:shadow-md z-10",
+          "absolute rounded-md border-l-[3px] px-2 py-1 overflow-hidden transition-opacity cursor-pointer hover:shadow-md z-10",
+          !useLanes && "left-1 right-1",
           dimmed && "opacity-[0.12]"
         )}
         style={{
@@ -607,6 +618,7 @@ const CalendarDayView = ({
           backgroundColor: colors.bg,
           borderLeftColor: colors.border,
           color: colors.text,
+          ...(laneStyle || {}),
         }}
         onMouseMove={(e) => e.stopPropagation()}
         onClick={(e) => {
