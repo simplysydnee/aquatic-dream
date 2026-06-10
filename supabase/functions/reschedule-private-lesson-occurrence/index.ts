@@ -66,19 +66,10 @@ async function validateSlot(opts: {
   const eMin = toMin(end);
   if (eMin <= sMin) return "Invalid time range";
 
-  // 1) instructor has a published shift covering this slot
-  const { data: shifts } = await supabaseAdmin
-    .from("shifts")
-    .select("start_time, end_time, status")
-    .eq("shift_date", date)
-    .eq("instructor_id", instructor_id)
-    .eq("status", "published");
-  const hasShift = (shifts || []).some((s: any) => {
-    const ss = toMin(norm(s.start_time));
-    const se = toMin(norm(s.end_time));
-    return ss <= sMin && se >= eMin;
-  });
-  if (!hasShift) return `Instructor has no published shift covering ${fmtDateLabel(date)} ${fmtTimeLabel(start)}–${fmtTimeLabel(end)}`;
+  // NOTE: Admin overrides intentionally do NOT require a published shift —
+  // admins reschedule outside the published schedule all the time. We still
+  // enforce real conflicts (pool area + overlapping lessons) below.
+
 
   // 2) no conflicting pool_events in same area
   const { data: events } = await supabaseAdmin
