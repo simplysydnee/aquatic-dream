@@ -239,19 +239,25 @@ Deno.serve(async (req) => {
 
     // Build occurrence dates
     const dates: string[] = [];
-    const start = new Date(p.start_date + "T00:00");
-    if (p.recurring && p.series_end) {
-      const end = new Date(p.series_end + "T00:00");
-      const cur = new Date(start);
-      while (cur <= end) {
-        const y = cur.getFullYear();
-        const m = String(cur.getMonth() + 1).padStart(2, "0");
-        const d = String(cur.getDate()).padStart(2, "0");
-        dates.push(`${y}-${m}-${d}`);
-        cur.setDate(cur.getDate() + 7);
-      }
+    if (p.occurrence_dates && p.occurrence_dates.length > 0) {
+      // Explicit list from the wizard (already filtered by admin).
+      const uniqSorted = Array.from(new Set(p.occurrence_dates)).sort();
+      dates.push(...uniqSorted);
     } else {
-      dates.push(p.start_date);
+      const start = new Date(p.start_date + "T00:00");
+      if (p.recurring && p.series_end) {
+        const end = new Date(p.series_end + "T00:00");
+        const cur = new Date(start);
+        while (cur <= end) {
+          const y = cur.getFullYear();
+          const m = String(cur.getMonth() + 1).padStart(2, "0");
+          const d = String(cur.getDate()).padStart(2, "0");
+          dates.push(`${y}-${m}-${d}`);
+          cur.setDate(cur.getDate() + 7);
+        }
+      } else {
+        dates.push(p.start_date);
+      }
     }
 
     const seriesEnd = dates[dates.length - 1];
