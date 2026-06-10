@@ -66,6 +66,26 @@ const levelClass = (level?: string | null) => {
   return cn(c.bg, c.text, "ring-1", c.ring, "border-transparent");
 };
 
+type LessonStatusKind = "attended" | "no_show" | "cancelled" | "upcoming";
+
+const lessonStatusBadge = (kind: LessonStatusKind) => {
+  switch (kind) {
+    case "attended":
+      return { label: "Attended", className: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+    case "no_show":
+      return { label: "No-show", className: "bg-rose-100 text-rose-800 border-rose-200" };
+    case "cancelled":
+      return { label: "Cancelled", className: "bg-muted text-muted-foreground border-border" };
+    case "upcoming":
+      return { label: "Booked", className: "bg-sky-100 text-sky-800 border-sky-200" };
+  }
+};
+
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 export default function SwimmerDetailDrawer({
   swimmer,
   siblings,
