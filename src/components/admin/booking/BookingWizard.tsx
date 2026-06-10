@@ -141,15 +141,25 @@ export interface BookingWizardProps {
   /** Optional prefill from calendar click. */
   initialSlot?: Partial<SlotDraft> & { lessonType?: BookingType };
   initialType?: BookingType;
+  /** Optional prefill of the Client step (e.g. from a pending lesson request). */
+  initialClient?: Partial<ClientDraft>;
+  /** When provided, the wizard starts on this step (only if the prefill makes it valid). */
+  initialStep?: StepKey;
   onDone?: () => void;
   onCancel?: () => void;
   compact?: boolean; // dialog variant uses smaller paddings
 }
 
-export default function BookingWizard({ initialSlot, initialType, onDone, onCancel, compact }: BookingWizardProps) {
-  const [step, setStep] = useState<StepKey>("client");
+export default function BookingWizard({ initialSlot, initialType, initialClient, initialStep, onDone, onCancel, compact }: BookingWizardProps) {
+  const [step, setStep] = useState<StepKey>(initialStep ?? "client");
   const [draft, setDraft] = useState<BookingDraft>({
-    client: { ...EMPTY_CLIENT, swimmers: [{ first_name: "", last_name: "", age: null, dob: null }] },
+    client: {
+      ...EMPTY_CLIENT,
+      ...(initialClient ?? {}),
+      swimmers: initialClient?.swimmers && initialClient.swimmers.length > 0
+        ? initialClient.swimmers
+        : [{ first_name: "", last_name: "", age: null, dob: null }],
+    },
     type: initialType ?? null,
     slot: initialSlot
       ? {
@@ -165,6 +175,7 @@ export default function BookingWizard({ initialSlot, initialType, onDone, onCanc
     payment: { collectCardOnFile: true, sendConfirmation: true, priceOverride: "" },
     notes: "",
   });
+
 
   const setClient = (c: ClientDraft) => setDraft((d) => ({ ...d, client: c }));
   const setType = (t: BookingType) => setDraft((d) => ({ ...d, type: t }));
@@ -300,7 +311,19 @@ interface ClientSearchResult {
   swimmer_first: string | null;
   swimmer_last: string | null;
   swimmer_dob: string | null;
-  source: "booking" | "enrollment";
+  swimmer_age?: number | null;
+  source: "booking" | "enrollment" | "request";
+  request_preferred_times?: string | null;
+  request_notes?: string | null;
+  request_status?: string | null;
+}
+
+function splitName(full: string | null | undefined): { first: string; last: string } {
+  const s = (full || "").trim();
+  if (!s) return { first: "", last: "" };
+  const parts = s.split(/\s+/);
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
 }
 
 function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: ClientDraft) => void }) {
@@ -316,7 +339,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
     setSearching(true);
     (async () => {
       const like = `%${q}%`;
-      const [b, e] = await Promise.all([
+      const [b, e, r] = await Promise.all([
         supabase.from("lesson_bookings")
           .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
           .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},parent_phone.ilike.${like}`)
@@ -327,27 +350,49 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
           .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},parent_phone.ilike.${like}`)
           .order("updated_at", { ascending: false })
           .limit(20),
+        supabase.from("lesson_requests")
+          .select("parent_name,parent_email,parent_phone,child_name,child_age,child_dob,preferred_times,notes,status,created_at")
+          .in("status", ["new", "contacted", "scheduled"])
+          .or(`parent_email.ilike.${like},parent_name.ilike.${like},child_name.ilike.${like},parent_phone.ilike.${like}`)
+          .order("created_at", { ascending: false })
+          .limit(20),
       ]);
       if (cancelled) return;
       const map = new Map<string, ClientSearchResult>();
-      const add = (row: any, source: "booking" | "enrollment") => {
+      const add = (row: any, source: "booking" | "enrollment" | "request") => {
         const email = (row.parent_email || "").toLowerCase().trim();
-        const key = `${email}|${(row.child_first_name || "").toLowerCase()}|${(row.child_last_name || "").toLowerCase()}`;
+        let pf = "", pl = "", cf = "", cl = "";
+        if (source === "request") {
+          const p = splitName(row.parent_name);
+          const c = splitName(row.child_name);
+          pf = p.first; pl = p.last; cf = c.first; cl = c.last;
+        } else {
+          pf = row.parent_first_name || "";
+          pl = row.parent_last_name || "";
+          cf = row.child_first_name || "";
+          cl = row.child_last_name || "";
+        }
+        const key = `${email}|${cf.toLowerCase()}|${cl.toLowerCase()}`;
         if (!email || map.has(key)) return;
         map.set(key, {
-          parent_first: row.parent_first_name || "",
-          parent_last: row.parent_last_name || "",
+          parent_first: pf,
+          parent_last: pl,
           parent_email: email,
           parent_phone: row.parent_phone || null,
-          swimmer_first: row.child_first_name || null,
-          swimmer_last: row.child_last_name || null,
+          swimmer_first: cf || null,
+          swimmer_last: cl || null,
           swimmer_dob: row.child_dob || null,
+          swimmer_age: row.child_age ?? null,
           source,
+          request_preferred_times: source === "request" ? row.preferred_times : null,
+          request_notes: source === "request" ? row.notes : null,
+          request_status: source === "request" ? row.status : null,
         });
       };
-      (b.data || []).forEach((r) => add(r, "booking"));
-      (e.data || []).forEach((r) => add(r, "enrollment"));
-      setResults(Array.from(map.values()).slice(0, 12));
+      (b.data || []).forEach((row) => add(row, "booking"));
+      (e.data || []).forEach((row) => add(row, "enrollment"));
+      (r.data || []).forEach((row) => add(row, "request"));
+      setResults(Array.from(map.values()).slice(0, 15));
       setSearching(false);
     })();
     return () => { cancelled = true; };
@@ -363,7 +408,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
         first_name: r.swimmer_first || "",
         last_name: r.swimmer_last || "",
         dob: r.swimmer_dob,
-        age: null,
+        age: r.swimmer_age ?? null,
       }],
     });
     // Stay in search mode — selection is shown inline; admin can click "Edit details" if needed.
@@ -452,29 +497,48 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
             </div>
           )}
           <div className="space-y-1.5 max-h-[420px] overflow-y-auto">
-            {results.map((r, i) => (
-              <button
-                key={i}
-                onClick={() => pick(r)}
-                className="w-full text-left p-3 border rounded-md hover:border-primary hover:bg-accent/30 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{r.parent_first} {r.parent_last}</p>
-                    <p className="text-xs text-muted-foreground truncate">{r.parent_email}{r.parent_phone ? ` · ${r.parent_phone}` : ""}</p>
-                    {r.swimmer_first && (
-                      <p className="text-xs text-foreground/70 mt-0.5">
-                        Swimmer: {r.swimmer_first} {r.swimmer_last}{r.swimmer_dob ? ` (DOB ${r.swimmer_dob})` : ""}
-                      </p>
-                    )}
+            {results.map((r, i) => {
+              const chipClass =
+                r.source === "request"
+                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                  : r.source === "enrollment"
+                  ? "bg-emerald-50 text-emerald-900 border-emerald-300"
+                  : "bg-sky-50 text-sky-900 border-sky-300";
+              const chipLabel =
+                r.source === "request" ? "Lesson Request" : r.source === "enrollment" ? "Group" : "Private";
+              return (
+                <button
+                  key={i}
+                  onClick={() => pick(r)}
+                  className="w-full text-left p-3 border rounded-md hover:border-primary hover:bg-accent/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{r.parent_first} {r.parent_last}</p>
+                      <p className="text-xs text-muted-foreground truncate">{r.parent_email}{r.parent_phone ? ` · ${r.parent_phone}` : ""}</p>
+                      {r.swimmer_first && (
+                        <p className="text-xs text-foreground/70 mt-0.5">
+                          Swimmer: {r.swimmer_first} {r.swimmer_last}
+                          {r.swimmer_age != null ? ` (age ${r.swimmer_age})` : r.swimmer_dob ? ` (DOB ${r.swimmer_dob})` : ""}
+                        </p>
+                      )}
+                      {r.source === "request" && (r.request_preferred_times || r.request_notes) && (
+                        <p className="text-[11px] text-muted-foreground italic mt-1 line-clamp-2">
+                          {r.request_preferred_times ? `Prefers: ${r.request_preferred_times}` : ""}
+                          {r.request_preferred_times && r.request_notes ? " · " : ""}
+                          {r.request_notes ?? ""}
+                        </p>
+                      )}
+                    </div>
+                    <Badge variant="outline" className={cn("text-[10px] shrink-0", chipClass)}>
+                      {chipLabel}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="text-[10px] shrink-0">
-                    {r.source === "booking" ? "Private" : "Group"}
-                  </Badge>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
+
         </div>
       ) : (
         <div className="space-y-4">
