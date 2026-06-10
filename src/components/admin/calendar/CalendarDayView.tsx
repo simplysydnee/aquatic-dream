@@ -208,6 +208,16 @@ const CalendarDayView = ({
     );
   }, [lessonDates, dateStr]);
 
+  // Map session_id -> overridden instructor name for the selected date
+  const sessionInstructorOverrideToday = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const ld of lessonDates) {
+      if (ld.lesson_date !== dateStr || ld.is_cancelled) continue;
+      if (ld.instructor_override_name) m.set(ld.session_id, ld.instructor_override_name);
+    }
+    return m;
+  }, [lessonDates, dateStr]);
+
   const todaySessions = useMemo(
     () => swimSessions.filter(
       (s) =>
