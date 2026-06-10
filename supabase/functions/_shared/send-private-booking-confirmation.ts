@@ -181,5 +181,33 @@ export async function sendPrivateBookingConfirmation(
         },
   ).eq("id", booking_id);
 
+  // Semi-private cc: notify the 2nd swimmer's parent when their email differs.
+  const partnerEmail = (b.partner_parent_email || "").toString().toLowerCase().trim();
+  const primaryEmail = (b.parent_email || "").toString().toLowerCase().trim();
+  if (partnerEmail && partnerEmail !== primaryEmail) {
+    const partnerChild = b.partner_swimmer_first_name || "your swimmer";
+    const partnerKey = opts.mode === "resend"
+      ? `private-booking-partner-resend-${booking_id}-${Date.now()}`
+      : `private-booking-partner-${booking_id}`;
+    try {
+      await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "lesson-booking-confirmation",
+          recipientEmail: partnerEmail,
+          idempotencyKey: partnerKey,
+          templateData: {
+            ...emailBody.templateData,
+            parentName: b.partner_parent_name || undefined,
+            childName: partnerChild,
+          },
+        },
+      });
+    } catch (e: any) {
+      console.error("partner-parent confirmation email failed", {
+        booking_id, partnerEmail, error: e?.message || e,
+      });
+    }
+  }
+
   return emailErrorMsg ? { ok: false, error: emailErrorMsg } : { ok: true };
 }
