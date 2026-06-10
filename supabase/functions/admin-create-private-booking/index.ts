@@ -340,6 +340,11 @@ Deno.serve(async (req) => {
         cancellation_policy_hours: 24,
         stripe_customer_id: stripeCustomerId,
         stripe_payment_method_id: stripePaymentMethodId,
+        partner_swimmer_first_name: p.partner_swimmer_first_name || null,
+        partner_swimmer_last_name: p.partner_swimmer_last_name || null,
+        partner_parent_name: p.partner_parent_name || null,
+        partner_parent_email: p.partner_parent_email || null,
+        partner_parent_phone: p.partner_parent_phone || null,
       })
       .select("id")
       .single();
