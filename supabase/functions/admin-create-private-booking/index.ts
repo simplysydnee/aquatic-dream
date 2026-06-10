@@ -196,6 +196,46 @@ async function sendConfirmationEmail(bookingId: string, includeCardOnFile: boole
       : { confirmation_email_status: "sent", confirmation_email_sent_at: new Date().toISOString(), confirmation_email_error: null },
   ).eq("id", bookingId);
 
+  // Semi-private: if the 2nd swimmer's parent has a different email, send
+  // them a copy of the confirmation (best-effort, doesn't fail the booking).
+  const partnerEmail = ((booking as any).partner_parent_email || "").toString().toLowerCase().trim();
+  const primaryEmail = ((booking as any).parent_email || "").toString().toLowerCase().trim();
+  if (partnerEmail && partnerEmail !== primaryEmail) {
+    const partnerChild =
+      (booking as any).partner_swimmer_first_name ||
+      [(booking as any).partner_swimmer_first_name, (booking as any).partner_swimmer_last_name].filter(Boolean).join(" ") ||
+      "your swimmer";
+    try {
+      await supabaseAdmin.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "lesson-booking-confirmation",
+          recipientEmail: partnerEmail,
+          idempotencyKey: `private-booking-partner-${bookingId}-${dates.length}`,
+          templateData: {
+            parentName: (booking as any).partner_parent_name || undefined,
+            childName: partnerChild,
+            lessonTypeLabel,
+            lessonTime: lessonTimeLabel,
+            instructorName: (booking as any).instructor_name,
+            totalOccurrences: dates.length,
+            scheduleList,
+            seriesMode: dates.length > 1,
+            lessonDate: dates.length === 1 ? fmtDate(dates[0]) : undefined,
+            totalAmountDue: `$${total.toFixed(2)}`,
+            amountDue: dates.length === 1 ? `$${total.toFixed(2)}` : undefined,
+            waiverSigned: true,
+            icsLink: icsUrl,
+            googleCalendarLink: googleUrl,
+            cardOnFileNote,
+            promoNote,
+          },
+        },
+      });
+    } catch (e: any) {
+      console.error("partner-parent confirmation email failed", { bookingId, partnerEmail, error: e?.message || e });
+    }
+  }
+
   if (invokeFailure) throw new Error(invokeFailure);
 }
 
