@@ -57,10 +57,10 @@ export default function BookingNew() {
         .from("lesson_requests")
         .select("id,status,parent_name,parent_email,parent_phone,child_name,child_age,child_dob,preferred_times,notes,created_at")
         .in("status", ["new", "contacted"])
-        .order("created_at", { ascending: false })
-        .limit(15);
+        .order("created_at", { ascending: false });
       setRequests((data as PendingRequest[] | null) ?? []);
       setLoadingReqs(false);
+
     })();
   }, []);
 
