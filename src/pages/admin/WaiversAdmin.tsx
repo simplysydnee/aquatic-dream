@@ -307,6 +307,7 @@ const WaiversAdmin = () => {
         open={!!detailRow}
         onOpenChange={(v) => !v && setDetailRow(null)}
         row={detailRow}
+        onChanged={() => refetch()}
       />
     </div>
   );
