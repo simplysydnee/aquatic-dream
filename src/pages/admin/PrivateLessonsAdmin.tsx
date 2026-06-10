@@ -971,7 +971,14 @@ export default function PrivateLessonsAdmin() {
                 </Table>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-border">
+                <Button
+                  variant="outline"
+                  onClick={() => setRescheduleState({ booking: detailBooking, mode: "remaining" })}
+                  disabled={detailBooking.status === "cancelled"}
+                >
+                  <CalendarClock className="w-4 h-4 mr-1" /> Reschedule remaining
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => setConfirmCancel(detailBooking)}
@@ -986,6 +993,7 @@ export default function PrivateLessonsAdmin() {
                   <Trash2 className="w-4 h-4 mr-1" /> Delete
                 </Button>
               </div>
+
             </div>
           )}
         </DialogContent>
