@@ -54,4 +54,6 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'waitlist-confirmation': waitlistConfirmation,
   'waitlist-owner-alert': waitlistOwnerAlert,
   'cash-receipt': cashReceipt,
+  'private-lesson-rescheduled': privateLessonRescheduled,
 }
+
