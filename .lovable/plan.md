@@ -1,24 +1,40 @@
-## Problem
 
-Monday Jun 8 at 8:00–8:30pm there are two semi-private bookings sharing the slot (Sierra Perez and Diego Capistran). Both have their own `pool_event` row, but the day-view grid renders every AD pool event with `absolute left-1 right-1`, so two events at the same time stack directly on top of each other and only the last-painted one is visible. The user sees Sierra, Diego is hidden underneath.
+# Resend Private Lesson Confirmations
 
-## Fix (frontend only, `src/components/admin/calendar/CalendarDayView.tsx`)
+Send confirmation emails to the 15 active private-lesson bookings that never got one (Taylen Tickenoff excluded). Emails make clear there's nothing to pay now — the card on file is charged the day of each lesson ($50 in June, $65 after, per existing `getPrivateLessonPrice`). First-time private-lesson parents also get the full "What to Expect" welcome block.
 
-### 1. Compute lanes for overlapping AD pool events
-Add an `adEventLanes` memo (mirroring the existing `sessionLanes` sweep-line logic) keyed by `pool_event.id`, producing `{ lane, laneCount }` for every event in `adEvents` (so private, semi-private, and walk-in pool events all share lane assignment in the single AD column).
+## Changes
 
-### 2. Teach `renderBlock` about lanes
-Add two optional params `lane?: number` and `laneCount?: number`. When `laneCount > 1`, replace the hard-coded `left-1 right-1` with inline `left` / `width` based on the lane index (e.g. `calc((100% - 4px) / laneCount * lane + 2px)` and a matching width), keeping a small 2px gap. When `laneCount` is 1 or undefined, behavior is unchanged.
+### 1. `src/components/admin/email-templates/lesson-booking-confirmation.tsx`
+- Add props: `chargeNotice?: string`, `isFirstPrivateLesson?: boolean`.
+- When `paymentLink` is missing/empty, hide the "Pay Now" CTA block entirely and render `chargeNotice` instead (e.g. "Your card on file will be charged $50 the day of each June lesson and $65 for any lesson after June. Nothing to pay now — just show up.").
+- When `isFirstPrivateLesson` is true, append a "Welcome to Aquatic Dreams — What to Expect" section with the full copy the user provided (Arrival, Pre-Class Prep, Swim Diapers, Meeting Your Instructor, Pool Deck & Viewing Rules, Departure, 30-min no-food reminder, sign-off).
+- Keep the existing concise "Parent Information" bullets for all bookings.
 
-### 3. Pass lanes from the AD event map
-In the `adEvents.map(...)` render at ~line 1038, look up `adEventLanes.get(e.id)` and pass `lane` / `laneCount` into `renderBlock`. No changes needed for swim-lesson or dive/rental sections (they already have their own column treatment).
+### 2. New `supabase/functions/_shared/send-private-booking-confirmation.ts`
+Shared helper extracted from `confirm-private-booking/index.ts`:
+- Loads booking + occurrences.
+- Builds schedule list, ICS + Google calendar links via `buildSessionCalendarLinks`.
+- Computes per-occurrence price via `getPrivateLessonPrice`; builds `totalAmountDue` string (handles mixed June/post-June series).
+- Builds `chargeNotice` string from the same pricing data.
+- Computes `isFirstPrivateLesson` = no prior `lesson_bookings` row for `parent_email` with `lesson_type in ('private','semi_private')` and `status='active'` created before this booking.
+- Invokes `send-transactional-email` with `templateName: 'lesson-booking-confirmation'`, omitting `paymentLink`, passing `chargeNotice` + `isFirstPrivateLesson`.
+- Idempotency key: `private-booking-<id>` for initial send, `private-booking-resend-<id>-<timestamp>` for resends.
+- Updates `confirmation_email_status` / `_sent_at` / `_error` on `lesson_bookings`.
 
-### 4. (Tiny consistency) The same lane logic also applies to `walkInEvents` since they're folded into `adEvents` — they'll automatically benefit because everything goes through the shared `adEventLanes` map.
+### 3. Refactor `supabase/functions/confirm-private-booking/index.ts`
+Replace inline email-build block with a call to the shared helper (initial-send mode). No behavior change for new bookings beyond the new copy + chargeNotice.
 
-No backend, RLS, or data changes. No edits to PrivateLessonsPanel, detail dialog, or print sheet.
+### 4. New `supabase/functions/resend-private-booking-confirmation/index.ts`
+- Admin-only (verify JWT + `has_role(uid,'admin')`).
+- Body: `{ booking_id: uuid }` or `{ booking_ids: uuid[] }`.
+- Loops, calls the shared helper in resend mode, returns per-booking `{ booking_id, success, error? }`.
 
-## Verification
+### 5. Backfill
+Call `resend-private-booking-confirmation` once with the 15 booking IDs (Taylen excluded), report success/failure per booking.
 
-- Open Calendar → Mon Jun 8 → confirm two side-by-side blocks at 8:00pm, one labeled "Semi-Private Lesson — Sierra Perez" and one "Semi-Private Lesson — Diego Capistran".
-- Confirm non-overlapping AD blocks at other times still render full-width (lane logic only kicks in when `laneCount > 1`).
-- Confirm walk-in pool events that overlap with a private lesson at the same time also display side-by-side rather than hidden.
+## Technical notes
+- No DB migration needed — `confirmation_email_status` columns already exist on `lesson_bookings`.
+- `getPrivateLessonPrice` already returns $50 for 2026-06-01..2026-06-30 and $65 otherwise — used as-is.
+- Semi-private ($45) handled by same helper since `getPrivateLessonPrice` covers it.
+- No payment-link generation anywhere in this flow.

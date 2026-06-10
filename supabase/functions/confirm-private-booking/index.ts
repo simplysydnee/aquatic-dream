@@ -3,9 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
-import { buildSessionCalendarLinks } from "../_shared/calendar-links.ts";
-import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
-
+import { sendPrivateBookingConfirmation } from "../_shared/send-private-booking-confirmation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,97 +61,8 @@ Deno.serve(async (req) => {
       await supabase.from("slot_holds").delete().eq("session_token", session_token);
     }
 
-    // Fetch booking + occurrences for email
-    const { data: booking } = await supabase
-      .from("lesson_bookings").select("*").eq("id", booking_id).maybeSingle();
-    const { data: occs } = await supabase
-      .from("lesson_booking_occurrences").select("occurrence_date")
-      .eq("booking_id", booking_id).order("occurrence_date");
-
-    if (booking) {
-      const b: any = booking;
-      const occList = ((occs as any[]) || []);
-      const schedule = occList.map((o) => ({
-        date: new Date(o.occurrence_date + "T00:00:00").toLocaleDateString("en-US", {
-          weekday: "long", month: "long", day: "numeric", year: "numeric",
-        }),
-        time: `${formatTime(b.start_time)} – ${formatTime(b.end_time)}`,
-      }));
-
-      let icsLink: string | undefined;
-      let googleCalendarLink: string | undefined;
-      if (occList.length > 0 && b.start_time && b.end_time) {
-        const titleParts = [
-          b.child_first_name || b.child_name ? `${b.child_first_name || b.child_name}'s Private Lesson` : "Private Lesson",
-          "— Aquatic Dreams",
-        ];
-        const links = buildSessionCalendarLinks({
-          uid: `private-booking-${booking_id}`,
-          title: titleParts.join(" "),
-          dates: occList.map((o) => o.occurrence_date),
-          start: b.start_time,
-          end: b.end_time,
-          location: "1212 Kansas Ave, Modesto, CA 95351",
-          description: `Private swim lesson with ${b.instructor_name || "your instructor"}. Questions: info@aquaticdreamsswim.com / (209) 577-3483`,
-        });
-        icsLink = links.icsUrl;
-        googleCalendarLink = links.googleUrl;
-      }
-
-      const emailBody = {
-        templateName: "lesson-booking-confirmation",
-        recipientEmail: b.parent_email,
-        idempotencyKey: `private-booking-${booking_id}`,
-        templateData: {
-          parentName: b.parent_first_name || b.parent_name,
-          childName: b.child_first_name || b.child_name,
-          lessonTypeLabel: "Private Lesson",
-          instructorName: b.instructor_name,
-          seriesMode: schedule.length > 1,
-          totalOccurrences: schedule.length,
-          totalAmountDue: (() => {
-            const perPrices = occList.map((o) => getPrivateLessonPrice(b.lesson_type, o.occurrence_date));
-            const total = perPrices.reduce((s, p) => s + p, 0);
-            const allSame = perPrices.every((p) => p === perPrices[0]);
-            if (allSame) {
-              return `$${total.toFixed(2)} (charged $${perPrices[0].toFixed(0)} the day of each lesson)`;
-            }
-            return `$${total.toFixed(2)} total — June lessons $50 each, other lessons $65 each, charged the day of each lesson`;
-          })(),
-          scheduleList: schedule,
-          lessonDate: schedule[0]?.date,
-          lessonTime: schedule[0]?.time,
-          amountDue: `$${getPrivateLessonPrice(b.lesson_type, occList[0]?.occurrence_date || b.series_start).toFixed(0)}`,
-          waiverSigned: true,
-          icsLink,
-          googleCalendarLink,
-        },
-      };
-
-      let emailErrorMsg: string | null = null;
-      try {
-        const { data: invokeData, error: invokeErr } = await supabase.functions.invoke(
-          "send-transactional-email",
-          { body: emailBody },
-        );
-        const apiErr = (invokeData as any)?.error;
-        if (invokeErr || apiErr) {
-          emailErrorMsg = String(invokeErr?.message || apiErr || "unknown error");
-          console.error("confirmation email failed", { booking_id, recipient: b.parent_email, invokeErr, apiErr });
-        }
-      } catch (e: any) {
-        emailErrorMsg = e?.message || String(e);
-        console.error("confirmation email threw", { booking_id, error: emailErrorMsg });
-      }
-
-      await supabase.from("lesson_bookings").update(
-        emailErrorMsg
-          ? { confirmation_email_status: "failed", confirmation_email_error: emailErrorMsg }
-          : { confirmation_email_status: "sent", confirmation_email_sent_at: new Date().toISOString(), confirmation_email_error: null },
-      ).eq("id", booking_id);
-    }
-
-
+    // Send confirmation via shared helper (card-on-file, no payment link).
+    await sendPrivateBookingConfirmation(supabase, booking_id, { mode: "initial" });
 
     return j({ success: true, booking_id });
   } catch (err: any) {
@@ -161,15 +70,6 @@ Deno.serve(async (req) => {
     return j({ error: err?.message || "Internal error" }, 500);
   }
 });
-
-function formatTime(t: string): string {
-  if (!t) return "";
-  const [h, m] = t.split(":");
-  const hh = parseInt(h, 10);
-  const ampm = hh >= 12 ? "PM" : "AM";
-  const display = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
-  return `${display}:${m} ${ampm}`;
-}
 
 function j(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

@@ -26,6 +26,10 @@ interface LessonBookingConfirmationProps {
   seriesMode?: boolean
   totalAmountDue?: string // "$520.00"
   scheduleList?: { date: string; time: string }[]
+  // Card-on-file flow (private lessons): no paymentLink, show charge notice instead.
+  chargeNotice?: string
+  // First-ever private lesson with us → show extended welcome / what-to-expect block.
+  isFirstPrivateLesson?: boolean
 }
 
 const LessonBookingConfirmationEmail = ({
@@ -46,13 +50,17 @@ const LessonBookingConfirmationEmail = ({
   seriesMode,
   totalAmountDue,
   scheduleList,
+  chargeNotice,
+  isFirstPrivateLesson,
 }: LessonBookingConfirmationProps) => (
   <Html lang="en" dir="ltr">
     <Head />
     <Preview>
-      {seriesMode
-        ? `Your ${lessonTypeLabel || 'lesson'} series is booked — pay ${totalAmountDue || ''} to confirm`
-        : `Your ${lessonTypeLabel || 'lesson'} is booked${lessonDate ? ` for ${lessonDate}` : ''} — pay ${amountDue || ''} to confirm`}
+      {paymentLink
+        ? (seriesMode
+            ? `Your ${lessonTypeLabel || 'lesson'} series is booked — pay ${totalAmountDue || ''} to confirm`
+            : `Your ${lessonTypeLabel || 'lesson'} is booked${lessonDate ? ` for ${lessonDate}` : ''} — pay ${amountDue || ''} to confirm`)
+        : `Your ${lessonTypeLabel || 'lesson'} is booked — see you at the pool!`}
     </Preview>
     <Body style={main}>
       <Container style={container}>
@@ -62,9 +70,9 @@ const LessonBookingConfirmationEmail = ({
         <Text style={text}>{parentName ? `Hi ${parentName},` : 'Hello,'}</Text>
         <Text style={text}>
           {seriesMode ? (
-            <>{childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'} series</strong> ({scheduleList?.length || totalOccurrences} lessons) is booked. One payment covers the whole series — pay below to confirm.</>
+            <>{childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'} series</strong> ({scheduleList?.length || totalOccurrences} lessons) is booked.{paymentLink ? ' One payment covers the whole series — pay below to confirm.' : ''}</>
           ) : (
-            <>{childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'}</strong> is booked. Please complete payment below to confirm your spot.</>
+            <>{childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'}</strong> is booked{paymentLink ? '. Please complete payment below to confirm your spot.' : ' — you\'re all set.'}</>
           )}
         </Text>
 
@@ -125,7 +133,7 @@ const LessonBookingConfirmationEmail = ({
           </Section>
         )}
 
-        {paymentLink && (
+        {paymentLink ? (
           <Section style={stepBox}>
             {waiverLink && !waiverSigned && <Text style={stepLabel}>{seriesMode ? 'Step 2 — Pay for the full series' : 'Step 2 — Pay for this lesson'}</Text>}
             <Section style={{ textAlign: 'center' as const, margin: '12px 0 4px' }}>
@@ -140,7 +148,12 @@ const LessonBookingConfirmationEmail = ({
               <Link href={paymentLink} style={linkStyle}>{paymentLink}</Link>
             </Text>
           </Section>
-        )}
+        ) : chargeNotice ? (
+          <Section style={chargeNoticeBox}>
+            <Text style={chargeNoticeHeading}>💳 Payment — Card on File</Text>
+            <Text style={chargeNoticeText}>{chargeNotice}</Text>
+          </Section>
+        ) : null}
 
         {seriesMode && totalOccurrences && totalOccurrences > 1 ? (
           <Section style={policyBox}>
@@ -169,6 +182,22 @@ const LessonBookingConfirmationEmail = ({
           <Text style={parentInfoItem}>• Please only bring required family with you to the pool to ensure we have enough space on the pool deck.</Text>
           <Text style={parentInfoItem}>• All children not with an instructor in the pool may <strong>NOT</strong> touch the water at any time.</Text>
         </Section>
+
+        {isFirstPrivateLesson && (
+          <Section style={welcomeBox}>
+            <Text style={welcomeHeading}>Welcome to Aquatic Dreams — What to Expect</Text>
+            <Text style={welcomeSubheading}>Arrival & Facility Flow</Text>
+            <Text style={welcomeItem}><strong>Arrival:</strong> Enter through the double doors at the front of the building.</Text>
+            <Text style={welcomeItem}><strong>Pre-Class Prep:</strong> Restrooms and changing rooms are in the main lobby. Please ensure your child uses the restroom before class.</Text>
+            <Text style={welcomeItem}><strong>Swim Diapers:</strong> Required for all swimmers who are not fully potty-trained — no exceptions.</Text>
+            <Text style={welcomeItem}><strong>Meeting Your Instructor:</strong> Your instructor will greet your swimmer on the pool deck at their scheduled class time.</Text>
+            <Text style={welcomeItem}><strong>Pool Deck & Viewing Rules:</strong> For everyone's safety, only enrolled swimmers and instructors are allowed on the pool deck. Families are welcome to watch from the designated viewing area. Children not in class may not touch the water at any time.</Text>
+            <Text style={welcomeItem}><strong>Departure:</strong> Pool-deck restrooms are available for changing. To keep our retail store dry, all families must exit through the back door from the pool area.</Text>
+            <Text style={welcomeReminder}>⚠️ Reminder: Please do not feed your child within 30 minutes prior to their swim lesson.</Text>
+            <Text style={welcomeSignoff}>Thank you so much for choosing Aquatic Dreams. We can't wait to see you at the pool!</Text>
+            <Text style={welcomeSignoff}>With excitement,<br />The Aquatic Dreams Team</Text>
+          </Section>
+        )}
 
         <Hr style={hr} />
         <Text style={text}>
@@ -269,3 +298,12 @@ const calBtnSecondary = {
 const parentInfoBox = { backgroundColor: '#fff7ed', border: '1px solid #fdba74', padding: '14px 18px', borderRadius: '6px', margin: '20px 0 0' }
 const parentInfoHeading = { fontSize: '14px', fontWeight: '700' as const, color: '#9a3412', margin: '0 0 8px', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }
 const parentInfoItem = { fontSize: '13px', color: '#7c2d12', lineHeight: '1.5', margin: '4px 0' }
+const chargeNoticeBox = { backgroundColor: '#ecfdf5', border: '1px solid #6ee7b7', padding: '14px 18px', borderRadius: '6px', margin: '8px 0 16px' }
+const chargeNoticeHeading = { fontSize: '14px', fontWeight: '700' as const, color: '#065f46', margin: '0 0 6px', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }
+const chargeNoticeText = { fontSize: '14px', color: '#064e3b', lineHeight: '1.5', margin: '0' }
+const welcomeBox = { backgroundColor: '#f0f7fa', border: '1px solid #b7dde9', padding: '16px 18px', borderRadius: '6px', margin: '20px 0 0' }
+const welcomeHeading = { fontSize: '15px', fontWeight: '700' as const, color: '#0f2343', margin: '0 0 10px', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }
+const welcomeSubheading = { fontSize: '14px', fontWeight: '700' as const, color: '#0f2343', margin: '8px 0 6px' }
+const welcomeItem = { fontSize: '13px', color: '#1f2937', lineHeight: '1.55', margin: '6px 0' }
+const welcomeReminder = { fontSize: '13px', color: '#92400e', backgroundColor: '#fef3c7', padding: '8px 12px', borderRadius: '4px', margin: '12px 0', lineHeight: '1.5', fontWeight: '600' as const }
+const welcomeSignoff = { fontSize: '13px', color: '#1f2937', lineHeight: '1.55', margin: '10px 0 0' }
