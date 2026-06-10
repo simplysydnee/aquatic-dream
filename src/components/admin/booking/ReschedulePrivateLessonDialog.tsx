@@ -140,8 +140,8 @@ const ReschedulePrivateLessonDialog = ({
     if (!booking || !selectedOcc) return;
     setBusy(true);
     try {
-      const env = getStripeEnvironment();
       const payload: any = {
+
         booking_id: booking.id,
         mode,
         notify: true,
