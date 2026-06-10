@@ -728,6 +728,8 @@ export type Database = {
           cancel_token: string | null
           cancelled_at: string | null
           cancelled_by: string | null
+          checked_in_at: string | null
+          checked_in_by: string | null
           created_at: string
           id: string
           occurrence_date: string
@@ -755,6 +757,8 @@ export type Database = {
           cancel_token?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          checked_in_at?: string | null
+          checked_in_by?: string | null
           created_at?: string
           id?: string
           occurrence_date: string
@@ -782,6 +786,8 @@ export type Database = {
           cancel_token?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          checked_in_at?: string | null
+          checked_in_by?: string | null
           created_at?: string
           id?: string
           occurrence_date?: string
@@ -2349,6 +2355,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      bookings_waiver_status: {
+        Args: { _ids: string[] }
+        Returns: {
+          booking_id: string
+          has_waiver: boolean
+        }[]
+      }
       claim_open_shift: {
         Args: { _shift_id: string }
         Returns: {
@@ -2429,6 +2442,13 @@ export type Database = {
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
+      }
+      enrollments_waiver_status: {
+        Args: { _ids: string[] }
+        Returns: {
+          enrollment_id: string
+          has_waiver: boolean
+        }[]
       }
       get_active_instructors_public: {
         Args: never
