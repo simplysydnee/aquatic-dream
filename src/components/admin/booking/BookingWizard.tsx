@@ -141,15 +141,25 @@ export interface BookingWizardProps {
   /** Optional prefill from calendar click. */
   initialSlot?: Partial<SlotDraft> & { lessonType?: BookingType };
   initialType?: BookingType;
+  /** Optional prefill of the Client step (e.g. from a pending lesson request). */
+  initialClient?: Partial<ClientDraft>;
+  /** When provided, the wizard starts on this step (only if the prefill makes it valid). */
+  initialStep?: StepKey;
   onDone?: () => void;
   onCancel?: () => void;
   compact?: boolean; // dialog variant uses smaller paddings
 }
 
-export default function BookingWizard({ initialSlot, initialType, onDone, onCancel, compact }: BookingWizardProps) {
-  const [step, setStep] = useState<StepKey>("client");
+export default function BookingWizard({ initialSlot, initialType, initialClient, initialStep, onDone, onCancel, compact }: BookingWizardProps) {
+  const [step, setStep] = useState<StepKey>(initialStep ?? "client");
   const [draft, setDraft] = useState<BookingDraft>({
-    client: { ...EMPTY_CLIENT, swimmers: [{ first_name: "", last_name: "", age: null, dob: null }] },
+    client: {
+      ...EMPTY_CLIENT,
+      ...(initialClient ?? {}),
+      swimmers: initialClient?.swimmers && initialClient.swimmers.length > 0
+        ? initialClient.swimmers
+        : [{ first_name: "", last_name: "", age: null, dob: null }],
+    },
     type: initialType ?? null,
     slot: initialSlot
       ? {
@@ -165,6 +175,7 @@ export default function BookingWizard({ initialSlot, initialType, onDone, onCanc
     payment: { collectCardOnFile: true, sendConfirmation: true, priceOverride: "" },
     notes: "",
   });
+
 
   const setClient = (c: ClientDraft) => setDraft((d) => ({ ...d, client: c }));
   const setType = (t: BookingType) => setDraft((d) => ({ ...d, type: t }));
