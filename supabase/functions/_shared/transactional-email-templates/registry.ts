@@ -28,6 +28,9 @@ import { template as visitorWaiverCopy } from './visitor-waiver-copy.tsx'
 import { template as waitlistConfirmation } from './waitlist-confirmation.tsx'
 import { template as waitlistOwnerAlert } from './waitlist-owner-alert.tsx'
 import { template as cashReceipt } from './cash-receipt.tsx'
+import { template as privateLessonRescheduled } from './private-lesson-rescheduled.tsx'
+
+
 
 
 
@@ -51,4 +54,6 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'waitlist-confirmation': waitlistConfirmation,
   'waitlist-owner-alert': waitlistOwnerAlert,
   'cash-receipt': cashReceipt,
+  'private-lesson-rescheduled': privateLessonRescheduled,
 }
+
