@@ -1,28 +1,43 @@
 ## Goal
-Manually book Kiaan Bansal (age 2) into Grace Cavanaugh's existing Saturday booking block on **Sat, June 13, 2026, 11:00–11:30 AM**, under existing parent **Sandeep Kaur** (`ohhsipayy@gmail.com`). Charge **$50** (June private-lesson rate) on lesson day. Email Sandeep a secure link to save a card on file.
+Build a **new dedicated template** `lesson-booking-confirmation-manual` for any admin-booked private/semi-private lesson where the parent has NOT paid yet and just needs to save a card on file. Reusable for all future manual bookings — not a flag on the existing template.
 
-## Confirmed from DB
-- Parent already in system: SANDEEP KAUR · ohhsipayy@gmail.com (Giana Bansal's parent).
-- Instructor: Grace Cavanaugh (`6701866e-971b-42fb-9014-0a07badedc6c`).
-- Grace's existing weekly Saturday booking block covers 10:00–13:00 starting 6/13 — the 11:00 slot is inside that block, so we're filling an existing opening, not creating a new shift.
+## Why a separate template (not a flag)
+- Different intent: parent didn't self-checkout, an admin booked them. Copy should reflect that ("We've booked Kiaan for…").
+- Different CTA: "Save Card on File" (Stripe setup link), not "Pay Now".
+- Different body line: "No charge today — we'll automatically charge {amount} on lesson day."
+- Keeps the existing `lesson-booking-confirmation` (self-serve paid path) untouched and safe.
 
-## Steps
+## Changes
 
-1. **Insert one `lesson_bookings` row** (data tool):
-   - `lesson_type: private`, `status: pending_card`, `booking_source: admin_manual`
-   - Parent: SANDEEP KAUR / ohhsipayy@gmail.com (no phone on file)
-   - Child: Kiaan Bansal, age 2
-   - Instructor: Grace Cavanaugh (id above), `pool_area: shallow`
-   - `series_start = series_end = 2026-06-13`, `start_time 11:00`, `end_time 11:30`
-   - `price_per_session: 50`, `cancellation_policy_hours: 24`
-   - Fresh `waiver_token` (Bansal waiver from Giana auto-links via existing trigger).
-2. **Insert one `lesson_booking_occurrences` row** for 2026-06-13: `status: pending_card`, `payment_status: card_on_file`, `auto_charge_status: pending`, fresh `cancel_token`.
-3. **Create a Stripe sandbox setup-mode Checkout Session** for Sandeep's customer (lookup-or-create by email), with `metadata.booking_id` so `payments-webhook` flips the booking to `confirmed` once the card is saved. Stash the URL on the booking row.
-4. **Send Sandeep the confirmation email** via `send-transactional-email` (template `lesson-booking-confirmation`) with the Stripe setup URL as the CTA ("Save card on file"). Idempotency key `private-booking-${booking_id}`.
+### 1. New file: `supabase/functions/_shared/transactional-email-templates/lesson-booking-confirmation-manual.tsx`
+- Branded like `lesson-booking-confirmation` (same header, colors, container, lesson-details card, cancellation policy footer).
+- Props: `parentName`, `childName`, `instructorName`, `lessonTypeLabel` ("Private Lesson" | "Semi-Private Lesson"), `lessonDate`, `lessonTime`, `amountDue`, `paymentLink` (Stripe setup URL), optional `notes`.
+- Subject: `"Private Lesson Booked — {lessonDate} — Aquatic Dreams"` (dynamic on lessonTypeLabel).
+- Preview: `"Your lesson is booked — save a card on file"`.
+- Body intro: `"We've booked {childName} for a {lessonTypeLabel} with {instructorName}."`
+- Highlight line: `"No charge today — we'll automatically charge {amountDue} on lesson day."`
+- Primary CTA button → `paymentLink` labeled **"Save Card on File"** (same button styling as existing template).
+- Includes `previewData` so it renders immediately on `/admin/emails`.
 
-No schema changes, no new booking block — just data inserts + one Stripe call + one email send.
+### 2. `supabase/functions/_shared/transactional-email-templates/registry.ts`
+- Register the new template under key `lesson-booking-confirmation-manual` with `displayName: "Lesson Booking Confirmation (Manual / Card on File)"`.
+
+### 3. `supabase/functions/admin-card-on-file-link/index.ts`
+- Swap `templateName` from `admin-freeform` → `lesson-booking-confirmation-manual`.
+- Build `templateData` from the booking row.
+- Same Stripe setup-session creation logic stays as-is.
+
+### 4. Deploy & preview (STOP here for your review)
+- Deploy `preview-transactional-email`, `send-transactional-email`, `admin-card-on-file-link`.
+- You refresh `/admin/emails`, open "Lesson Booking Confirmation (Manual / Card on File)", confirm layout + button.
+
+### 5. After your approval
+- Re-invoke `admin-card-on-file-link` for booking `95be6665-a982-46b5-a4d9-ac177f3037fe` → Sandeep gets the new branded email. Same Stripe link, same $50 auto-charge on lesson day.
+
+## Reusability
+Any future admin manual booking flow (private or semi-private, no payment captured) calls `admin-card-on-file-link` (or any function) with `templateName: 'lesson-booking-confirmation-manual'` and the booking's data. One template covers all of it.
 
 ## Out of scope
-- No charge today; $50 auto-charges on 6/13 via existing `charge-private-lesson-occurrence` cron once card is saved.
-- No 2nd swimmer (private, not semi-private).
-- No SMS (no phone on file).
+- No DB / schema changes.
+- No change to the existing self-serve `lesson-booking-confirmation` template.
+- No change to the Stripe setup flow itself.
