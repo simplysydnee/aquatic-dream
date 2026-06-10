@@ -34,6 +34,9 @@ const CreateSchema = z.object({
   notes: z.string().max(2000).optional().nullable(),
   recurring: z.boolean().default(false),
   series_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  // Optional explicit list of occurrence dates. When provided, overrides
+  // the weekly-expansion logic so admins can deselect dates in the wizard.
+  occurrence_dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
   price_per_session: z.number().positive().optional(),
   send_confirmation: z.boolean().default(true),
   collect_card_on_file: z.boolean().default(true),
