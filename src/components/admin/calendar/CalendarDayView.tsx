@@ -734,7 +734,10 @@ const CalendarDayView = ({
       {/* ── Instructors today (clickable to open day-modal) ── */}
       {(() => {
         const names = new Set<string>();
-        todaySessions.forEach((s) => s.instructors?.name && names.add(s.instructors.name));
+        todaySessions.forEach((s) => {
+          const eff = sessionInstructorOverrideToday.get(s.id) || s.instructors?.name;
+          if (eff) names.add(eff);
+        });
         adEvents.forEach((e) => e.instructor_name && names.add(e.instructor_name));
         swimLessonEvents.forEach((e) => e.instructor_name && names.add(e.instructor_name));
         const list = [...names].sort();
