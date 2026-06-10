@@ -1,56 +1,46 @@
+## Problem
 
-## Goal
+On `/admin/private-lessons/new`, the "Client" step searches only `lesson_bookings` + `swim_enrollments`. Lesson requests never become "clients" until they get booked or enrolled, so a family that filled out the request form is invisible here. The data is fine — `lesson_requests` has parent name/email/phone, child name, age, dob, notes — it just isn't queried.
 
-When rescheduling a private lesson:
-1. Make the **current occurrence date being moved** visible at the top of the dialog (right now it's buried in a dropdown).
-2. Replace the "open slot" source: instead of deriving slots from published `shifts`, derive them from the **instructor private-lesson booking blocks** (`instructor_booking_blocks`) we've already created — only showing windows inside those blocks that aren't already booked.
-3. Give the admin an inline escape hatch: if no existing block fits, let them **create a new one-off block or a recurring weekly block** without leaving the dialog, then immediately pick a slot inside the newly-created block.
+## Fix
 
-## UX
+### 1. Add `lesson_requests` to the client search (BookingWizard ClientStep)
 
-`ReschedulePrivateLessonDialog.tsx`
+Extend the parallel query in `src/components/admin/booking/BookingWizard.tsx` (around line 319) to also hit `lesson_requests`:
 
-- Add a header summary row showing the occurrence being moved:
-  ```
-  Currently: Sat, Jun 13 · 10:00–10:30 AM · Coach Jane
-  ```
-  Rendered above the mode radio group. For "remaining" mode, also show how many lessons will move.
+- Select: `parent_name, parent_email, parent_phone, child_name, child_age, child_dob, lesson_type, preferred_times, notes, status, created_at`
+- Same `.or(...ilike...)` across parent_name/email/phone and child_name
+- Filter to open requests: `status in ('new','contacted','scheduled')` (skip `closed`)
+- Order by `created_at desc`, limit 20
 
-- Slot picker section is restructured into two tabs / segments:
-  1. **From existing open blocks** (default). Lists every 15-min start inside an `instructor_booking_blocks` row that
-     - matches the chosen date (weekly day-of-week or date_range covering the date),
-     - isn't a blackout / break window,
-     - has no other booking occurrence overlapping it,
-     - has no conflicting `pool_events` in the same pool area.
-     Each row: `10:00–10:30 AM · Coach Jane · "Sat AM block"`.
-  2. **Create a new block**. Inline mini-form:
-     - Instructor (dropdown of active instructors)
-     - Kind: One-off (date) | Weekly recurring (day-of-week + start/end date)
-     - Time window (start/end, defaults to the lesson length window around the lesson's existing time)
-     - Pool area
-     On submit: insert into `instructor_booking_blocks`, then immediately offer that as the chosen slot for the reschedule and continue.
+Merge into the existing dedup `map` with `source: "request"`. Because `lesson_requests` only has a combined `parent_name`/`child_name`, split on first space into first/last when populating `parent_first/parent_last` and `swimmer_first/swimmer_last` for the picker.
 
-- "Change instructor only" mode keeps its current behavior but its instructor list is rebuilt from blocks that cover the existing occurrence window (instead of shifts).
+### 2. Surface requests visually in the result list
 
-## Data layer
+Add a `"request"` variant to `ClientSearchResult.source` and render a colored chip ("Lesson Request") next to "Booking" / "Enrollment" so admins immediately see this person came from the request form (not a past client).
 
-- Add a new hook `useAvailableBlockSlots(date, { lengthMin, stepMin, poolArea })` that:
-  - Calls `get_public_booking_blocks` RPC (already exists) to get all non-blackout blocks.
-  - Filters blocks active for the given date (weekly vs date_range, dow, start/end dates).
-  - Walks each block's `[start_time, end_time]` window in `stepMin` increments, skipping the break window (`break_start_time`/`break_end_time`), removing candidates that overlap an existing `lesson_booking_occurrences` row for that instructor/date, and removing candidates that conflict with `pool_events` in the same area.
-  - Returns the same `AvailableSlot[]` shape the existing UI uses, plus `hasAnyBlock` (for the empty state copy: "No private-lesson blocks created for that day — create one below.").
+Show the request's `preferred_times` and `notes` as a one-line muted subtitle when present — that context is the whole reason the admin is booking them.
 
-- Keep `useAvailableSlots` (shifts-based) untouched for other callers.
+### 3. Quick access to pending requests from the booking page
 
-- "Create new block" calls `supabase.from("instructor_booking_blocks").insert(...)` directly (admin RLS already allows it on this table); on success, refetch the hook and auto-select the matching slot.
+Right now there's no entry point from `/admin/private-lessons/new` to recent requests. Add a small panel above (or beside) the wizard on `src/pages/admin/BookingNew.tsx` titled "Pending lesson requests" that lists the latest ~10 open requests (`status != 'closed'/'scheduled'`). Clicking one prefills the wizard's client step with that request's parent/child info and jumps to the Type step.
 
-## Edge function
+Implementation:
+- New small component `PendingRequestsSidebar` (or inline in `BookingNew.tsx`) that fetches `lesson_requests` once on mount.
+- Lift `initialClient` into `BookingWizard` as a new optional prop (mirroring `initialSlot`/`initialType`) so the page can pass a prefilled client.
+- Each row shows: child name, age, parent name, preferred times, "Book →" button.
 
-No change to `reschedule-private-lesson-occurrence` — payload shape is unchanged. We're only changing where the candidate slot came from.
+### 4. Same boost in the quick-book dialog
+
+`BookingQuickDialog` already renders `BookingWizard`. The search upgrade in step 1 is enough there — no extra UI needed inside the dialog itself, since the dialog is launched from contexts (calendar click) where the admin already knows the slot.
+
+## Out of scope
+
+- No DB migration. `lesson_requests` already has all needed fields and RLS already allows admin reads.
+- We are **not** auto-promoting requests into a separate "clients" table — the app's notion of a client is computed (see `useSwimmers.ts`), and requests are already included there. The only gap is the booking-wizard search, which this plan closes.
+- No change to the underlying lesson-request status flow; booking from a request doesn't auto-mark it `scheduled` (existing "Book from request" flow handles that separately).
 
 ## Files
 
-- `src/hooks/useAvailableBlockSlots.ts` (new)
-- `src/components/admin/booking/ReschedulePrivateLessonDialog.tsx` (header summary, swap slot source, add "Create new block" inline form)
-
-No DB migration needed.
+- `src/components/admin/booking/BookingWizard.tsx` — extend search, render request source chip, accept new `initialClient` prop.
+- `src/pages/admin/BookingNew.tsx` — add pending requests panel, pass `initialClient` to wizard.
