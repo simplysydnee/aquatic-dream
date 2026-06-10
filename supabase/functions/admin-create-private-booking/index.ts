@@ -34,6 +34,9 @@ const CreateSchema = z.object({
   notes: z.string().max(2000).optional().nullable(),
   recurring: z.boolean().default(false),
   series_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  // Optional explicit list of occurrence dates. When provided, overrides
+  // the weekly-expansion logic so admins can deselect dates in the wizard.
+  occurrence_dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
   price_per_session: z.number().positive().optional(),
   send_confirmation: z.boolean().default(true),
   collect_card_on_file: z.boolean().default(true),
@@ -236,19 +239,25 @@ Deno.serve(async (req) => {
 
     // Build occurrence dates
     const dates: string[] = [];
-    const start = new Date(p.start_date + "T00:00");
-    if (p.recurring && p.series_end) {
-      const end = new Date(p.series_end + "T00:00");
-      const cur = new Date(start);
-      while (cur <= end) {
-        const y = cur.getFullYear();
-        const m = String(cur.getMonth() + 1).padStart(2, "0");
-        const d = String(cur.getDate()).padStart(2, "0");
-        dates.push(`${y}-${m}-${d}`);
-        cur.setDate(cur.getDate() + 7);
-      }
+    if (p.occurrence_dates && p.occurrence_dates.length > 0) {
+      // Explicit list from the wizard (already filtered by admin).
+      const uniqSorted = Array.from(new Set(p.occurrence_dates)).sort();
+      dates.push(...uniqSorted);
     } else {
-      dates.push(p.start_date);
+      const start = new Date(p.start_date + "T00:00");
+      if (p.recurring && p.series_end) {
+        const end = new Date(p.series_end + "T00:00");
+        const cur = new Date(start);
+        while (cur <= end) {
+          const y = cur.getFullYear();
+          const m = String(cur.getMonth() + 1).padStart(2, "0");
+          const d = String(cur.getDate()).padStart(2, "0");
+          dates.push(`${y}-${m}-${d}`);
+          cur.setDate(cur.getDate() + 7);
+        }
+      } else {
+        dates.push(p.start_date);
+      }
     }
 
     const seriesEnd = dates[dates.length - 1];
@@ -313,10 +322,10 @@ Deno.serve(async (req) => {
         end_time: p.end_time,
         pool_area: p.pool_area,
         price_per_session: price,
-        series_start: p.start_date,
+        series_start: dates[0],
         series_end: seriesEnd,
-        recurring: !!p.recurring,
-        frequency: p.recurring ? "weekly" : null,
+        recurring: !!p.recurring || dates.length > 1,
+        frequency: (p.recurring || dates.length > 1) ? "weekly" : null,
         notes: p.notes || null,
         status: "active",
         booking_source: "admin",

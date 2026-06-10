@@ -598,7 +598,12 @@ export default function PrivateLessonsAdmin() {
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
-      <h1 className="font-display text-2xl font-bold mb-4">Private & Semi-Private Lessons</h1>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <h1 className="font-display text-2xl font-bold">Private & Semi-Private Lessons</h1>
+        <Button onClick={() => (window.location.href = "/admin/private-lessons/new")}>
+          <Plus className="w-4 h-4 mr-1" /> Book a lesson
+        </Button>
+      </div>
       <Tabs defaultValue="availability">
         <TabsList>
           <TabsTrigger value="availability">Availability</TabsTrigger>
