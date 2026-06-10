@@ -351,27 +351,61 @@ export default function SwimmerDetailDrawer({
                   <p className="text-xs text-muted-foreground italic">No session enrollments.</p>
                 ) : (
                   <div className="space-y-2">
-                    {enrollmentEntries.map((e) => (
-                      <div key={e.id} className="rounded-md border p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-xs text-muted-foreground">{fmtDateTime(e.date)}</div>
-                            <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
-                              {e.title}
-                              {e.level && (
-                                <Badge variant="outline" className={cn("text-[10px] uppercase", levelClass(e.level))}>
-                                  {e.level}
-                                </Badge>
-                              )}
+                    {enrollmentEntries.map((e) => {
+                      const enr = swimmer.enrollments.find((x) => x.id === e.id);
+                      const sid = enr?.session_id ?? null;
+                      const dates = sid
+                        ? lessonDates
+                            .filter((d) => d.session_id === sid)
+                            .sort((a, b) => (a.lesson_date < b.lesson_date ? -1 : 1))
+                        : [];
+                      const today = todayISO();
+                      const attMap = new Map(
+                        attendance
+                          .filter((a) => a.enrollment_id === e.id)
+                          .map((a) => [a.lesson_date, a.checked_in]),
+                      );
+                      return (
+                        <div key={e.id} className="rounded-md border p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-xs text-muted-foreground">{fmtDateTime(e.date)}</div>
+                              <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
+                                {e.title}
+                                {e.level && (
+                                  <Badge variant="outline" className={cn("text-[10px] uppercase", levelClass(e.level))}>
+                                    {e.level}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">{e.sub}</div>
                             </div>
-                            <div className="text-xs text-muted-foreground mt-0.5">{e.sub}</div>
+                            <Button variant="link" size="sm" className="h-auto p-0 text-xs shrink-0" onClick={e.onClick}>
+                              Open →
+                            </Button>
                           </div>
-                          <Button variant="link" size="sm" className="h-auto p-0 text-xs shrink-0" onClick={e.onClick}>
-                            Open →
-                          </Button>
+                          {dates.length > 0 && (
+                            <ul className="mt-3 divide-y border-t">
+                              {dates.map((d) => {
+                                let kind: LessonStatusKind;
+                                if (d.is_cancelled) kind = "cancelled";
+                                else if (d.lesson_date > today) kind = "upcoming";
+                                else kind = attMap.get(d.lesson_date) ? "attended" : "no_show";
+                                const badge = lessonStatusBadge(kind);
+                                return (
+                                  <li key={d.lesson_date} className="py-2 flex items-center justify-between gap-2">
+                                    <span className="text-xs text-foreground">{fmtOccDate(d.lesson_date)}</span>
+                                    <Badge variant="outline" className={cn("text-[10px]", badge.className)}>
+                                      {badge.label}
+                                    </Badge>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </section>
