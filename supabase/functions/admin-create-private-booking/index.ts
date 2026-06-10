@@ -44,6 +44,12 @@ const CreateSchema = z.object({
   stripe_environment: z.enum(["sandbox", "live"]).optional(),
   stripe_customer_id: z.string().optional().nullable(),
   stripe_checkout_session_id: z.string().optional().nullable(),
+  // Optional 2nd-swimmer info for semi-private bookings.
+  partner_swimmer_first_name: z.string().max(80).optional().nullable(),
+  partner_swimmer_last_name: z.string().max(80).optional().nullable(),
+  partner_parent_name: z.string().max(200).optional().nullable(),
+  partner_parent_email: z.string().email().optional().nullable(),
+  partner_parent_phone: z.string().max(40).optional().nullable(),
 });
 
 const ResendSchema = z.object({
