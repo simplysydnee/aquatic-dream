@@ -486,29 +486,48 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
             </div>
           )}
           <div className="space-y-1.5 max-h-[420px] overflow-y-auto">
-            {results.map((r, i) => (
-              <button
-                key={i}
-                onClick={() => pick(r)}
-                className="w-full text-left p-3 border rounded-md hover:border-primary hover:bg-accent/30 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{r.parent_first} {r.parent_last}</p>
-                    <p className="text-xs text-muted-foreground truncate">{r.parent_email}{r.parent_phone ? ` · ${r.parent_phone}` : ""}</p>
-                    {r.swimmer_first && (
-                      <p className="text-xs text-foreground/70 mt-0.5">
-                        Swimmer: {r.swimmer_first} {r.swimmer_last}{r.swimmer_dob ? ` (DOB ${r.swimmer_dob})` : ""}
-                      </p>
-                    )}
+            {results.map((r, i) => {
+              const chipClass =
+                r.source === "request"
+                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                  : r.source === "enrollment"
+                  ? "bg-emerald-50 text-emerald-900 border-emerald-300"
+                  : "bg-sky-50 text-sky-900 border-sky-300";
+              const chipLabel =
+                r.source === "request" ? "Lesson Request" : r.source === "enrollment" ? "Group" : "Private";
+              return (
+                <button
+                  key={i}
+                  onClick={() => pick(r)}
+                  className="w-full text-left p-3 border rounded-md hover:border-primary hover:bg-accent/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{r.parent_first} {r.parent_last}</p>
+                      <p className="text-xs text-muted-foreground truncate">{r.parent_email}{r.parent_phone ? ` · ${r.parent_phone}` : ""}</p>
+                      {r.swimmer_first && (
+                        <p className="text-xs text-foreground/70 mt-0.5">
+                          Swimmer: {r.swimmer_first} {r.swimmer_last}
+                          {r.swimmer_age != null ? ` (age ${r.swimmer_age})` : r.swimmer_dob ? ` (DOB ${r.swimmer_dob})` : ""}
+                        </p>
+                      )}
+                      {r.source === "request" && (r.request_preferred_times || r.request_notes) && (
+                        <p className="text-[11px] text-muted-foreground italic mt-1 line-clamp-2">
+                          {r.request_preferred_times ? `Prefers: ${r.request_preferred_times}` : ""}
+                          {r.request_preferred_times && r.request_notes ? " · " : ""}
+                          {r.request_notes ?? ""}
+                        </p>
+                      )}
+                    </div>
+                    <Badge variant="outline" className={cn("text-[10px] shrink-0", chipClass)}>
+                      {chipLabel}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="text-[10px] shrink-0">
-                    {r.source === "booking" ? "Private" : "Group"}
-                  </Badge>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
+
         </div>
       ) : (
         <div className="space-y-4">
