@@ -366,8 +366,13 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
         age: null,
       }],
     });
-    setMode("create"); // jump to editable form to verify/edit
+    // Stay in search mode — selection is shown inline; admin can click "Edit details" if needed.
   };
+
+  const hasSelectedClient =
+    mode === "search" &&
+    client.parent_email.trim() &&
+    client.swimmers[0]?.first_name?.trim();
 
   const updateSwimmer = (idx: number, patch: Partial<Swimmer>) => {
     const arr = [...client.swimmers];
