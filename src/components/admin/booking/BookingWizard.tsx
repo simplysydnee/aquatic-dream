@@ -35,6 +35,11 @@ interface Swimmer {
   last_name: string;
   age?: number | null;
   dob?: string | null;
+  // Only used for swimmers[1] in a semi-private booking: optional contact
+  // info for the 2nd swimmer's parent so we can cc them the confirmation.
+  partner_parent_name?: string;
+  partner_parent_email?: string;
+  partner_parent_phone?: string;
 }
 
 interface ClientDraft {
@@ -624,11 +629,6 @@ function TypeStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type]);
 
-  const updateSwimmer = (idx: number, patch: Partial<Swimmer>) => {
-    const arr = [...client.swimmers];
-    arr[idx] = { ...arr[idx], ...patch };
-    onClientChange({ ...client, swimmers: arr });
-  };
 
   return (
     <Card className="p-5">
@@ -658,16 +658,222 @@ function TypeStep({
 
       {type === "semi_private" && (
         <div className="border-t pt-4">
-          <p className="text-sm font-semibold mb-2">Second swimmer</p>
-          <div className="grid grid-cols-12 gap-2">
-            <Input className="col-span-4" placeholder="First" value={client.swimmers[1]?.first_name ?? ""} onChange={(e) => updateSwimmer(1, { first_name: e.target.value })} />
-            <Input className="col-span-4" placeholder="Last" value={client.swimmers[1]?.last_name ?? ""} onChange={(e) => updateSwimmer(1, { last_name: e.target.value })} />
-            <Input className="col-span-2" type="number" placeholder="Age" value={client.swimmers[1]?.age ?? ""} onChange={(e) => updateSwimmer(1, { age: e.target.value ? Number(e.target.value) : null })} />
-            <Input className="col-span-2" type="date" value={client.swimmers[1]?.dob ?? ""} onChange={(e) => updateSwimmer(1, { dob: e.target.value || null })} />
-          </div>
+          <SecondSwimmerPicker
+            primaryEmail={client.parent_email}
+            swimmer={client.swimmers[1]}
+            onChange={(sw) => {
+              const arr = [...client.swimmers];
+              arr[1] = sw;
+              onClientChange({ ...client, swimmers: arr });
+            }}
+          />
         </div>
       )}
     </Card>
+  );
+}
+
+// 2nd-swimmer picker for semi-private bookings.
+// Search reuses the same parallel queries as ClientStep (lesson_bookings,
+// swim_enrollments, lesson_requests). Picking a result fills swimmer name +
+// DOB and stashes the parent contact as partner_* metadata so the booking
+// edge fn can cc them the confirmation.
+function SecondSwimmerPicker({
+  primaryEmail, swimmer, onChange,
+}: {
+  primaryEmail: string;
+  swimmer: Swimmer | undefined;
+  onChange: (sw: Swimmer) => void;
+}) {
+  const [mode, setMode] = useState<"search" | "manual">("search");
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ClientSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setResults([]); return; }
+    let cancelled = false;
+    setSearching(true);
+    (async () => {
+      const like = `%${q}%`;
+      const [b, e, r] = await Promise.all([
+        supabase.from("lesson_bookings")
+          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
+          .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},parent_phone.ilike.${like}`)
+          .order("updated_at", { ascending: false })
+          .limit(20),
+        supabase.from("swim_enrollments")
+          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
+          .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},parent_phone.ilike.${like}`)
+          .order("updated_at", { ascending: false })
+          .limit(20),
+        supabase.from("lesson_requests")
+          .select("parent_name,parent_email,parent_phone,child_name,child_age,child_dob,status,created_at")
+          .in("status", ["new", "contacted", "scheduled"])
+          .or(`parent_email.ilike.${like},parent_name.ilike.${like},child_name.ilike.${like},parent_phone.ilike.${like}`)
+          .order("created_at", { ascending: false })
+          .limit(20),
+      ]);
+      if (cancelled) return;
+      const map = new Map<string, ClientSearchResult>();
+      const add = (row: any, source: "booking" | "enrollment" | "request") => {
+        const email = (row.parent_email || "").toLowerCase().trim();
+        let pf = "", pl = "", cf = "", cl = "";
+        if (source === "request") {
+          const p = splitName(row.parent_name);
+          const c = splitName(row.child_name);
+          pf = p.first; pl = p.last; cf = c.first; cl = c.last;
+        } else {
+          pf = row.parent_first_name || "";
+          pl = row.parent_last_name || "";
+          cf = row.child_first_name || "";
+          cl = row.child_last_name || "";
+        }
+        const key = `${email}|${cf.toLowerCase()}|${cl.toLowerCase()}`;
+        if (!email || !cf || map.has(key)) return;
+        map.set(key, {
+          parent_first: pf, parent_last: pl, parent_email: email,
+          parent_phone: row.parent_phone || null,
+          swimmer_first: cf, swimmer_last: cl,
+          swimmer_dob: row.child_dob || null,
+          swimmer_age: row.child_age ?? null,
+          source,
+        });
+      };
+      (b.data || []).forEach((row) => add(row, "booking"));
+      (e.data || []).forEach((row) => add(row, "enrollment"));
+      (r.data || []).forEach((row) => add(row, "request"));
+      setResults(Array.from(map.values()).slice(0, 12));
+      setSearching(false);
+    })();
+    return () => { cancelled = true; };
+  }, [query]);
+
+  const pick = (r: ClientSearchResult) => {
+    const parentName = `${r.parent_first} ${r.parent_last}`.trim();
+    const differentParent =
+      r.parent_email && r.parent_email.toLowerCase() !== primaryEmail.toLowerCase();
+    onChange({
+      first_name: r.swimmer_first || "",
+      last_name: r.swimmer_last || "",
+      age: r.swimmer_age ?? null,
+      dob: r.swimmer_dob,
+      partner_parent_name: differentParent ? parentName : undefined,
+      partner_parent_email: differentParent ? r.parent_email : undefined,
+      partner_parent_phone: differentParent ? (r.parent_phone || undefined) : undefined,
+    });
+  };
+
+  const sw = swimmer || { first_name: "", last_name: "", age: null, dob: null };
+  const hasSelection = !!sw.first_name?.trim();
+  const partnerEmailDifferent =
+    !!sw.partner_parent_email &&
+    sw.partner_parent_email.toLowerCase() !== primaryEmail.toLowerCase();
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold">Second swimmer</p>
+        <div className="flex gap-1 bg-muted rounded-md p-0.5">
+          <button onClick={() => setMode("search")} className={cn("px-3 py-1 rounded text-xs font-medium", mode === "search" ? "bg-card shadow-sm" : "text-muted-foreground")}>
+            <Search className="w-3 h-3 inline mr-1" /> Find
+          </button>
+          <button onClick={() => setMode("manual")} className={cn("px-3 py-1 rounded text-xs font-medium", mode === "manual" ? "bg-card shadow-sm" : "text-muted-foreground")}>
+            <UserPlus className="w-3 h-3 inline mr-1" /> Add manually
+          </button>
+        </div>
+      </div>
+
+      {hasSelection && (
+        <div className="flex items-start justify-between gap-2 p-3 rounded-md border-2 border-primary bg-primary/5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-primary" />
+              <p className="font-semibold text-sm truncate">{sw.first_name} {sw.last_name}</p>
+            </div>
+            {sw.partner_parent_name && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                Parent: {sw.partner_parent_name}
+              </p>
+            )}
+            {sw.partner_parent_email && (
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                {sw.partner_parent_email}{sw.partner_parent_phone ? ` · ${sw.partner_parent_phone}` : ""}
+                {partnerEmailDifferent && <span className="ml-1 text-primary">· will be cc'd</span>}
+              </p>
+            )}
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => onChange({ first_name: "", last_name: "", age: null, dob: null })}>
+            Change
+          </Button>
+        </div>
+      )}
+
+      {mode === "search" ? (
+        <>
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search existing clients or lesson requests…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          {searching && <p className="text-xs text-muted-foreground">Searching…</p>}
+          <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
+            {results.map((r, i) => {
+              const chipClass =
+                r.source === "request"
+                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                  : r.source === "enrollment"
+                  ? "bg-emerald-50 text-emerald-900 border-emerald-300"
+                  : "bg-sky-50 text-sky-900 border-sky-300";
+              const chipLabel = r.source === "request" ? "Request" : r.source === "enrollment" ? "Group" : "Private";
+              return (
+                <button
+                  key={i}
+                  onClick={() => pick(r)}
+                  className="w-full text-left p-2.5 border rounded-md hover:border-primary hover:bg-accent/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate">
+                        {r.swimmer_first} {r.swimmer_last}
+                        {r.swimmer_age != null && <span className="text-xs font-normal text-muted-foreground ml-1">· age {r.swimmer_age}</span>}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        Parent: {r.parent_first} {r.parent_last}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground truncate">{r.parent_email}</p>
+                    </div>
+                    <Badge variant="outline" className={cn("text-[10px] shrink-0", chipClass)}>{chipLabel}</Badge>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <div className="grid grid-cols-12 gap-2">
+            <Input className="col-span-4" placeholder="First" value={sw.first_name} onChange={(e) => onChange({ ...sw, first_name: e.target.value })} />
+            <Input className="col-span-4" placeholder="Last" value={sw.last_name} onChange={(e) => onChange({ ...sw, last_name: e.target.value })} />
+            <Input className="col-span-2" type="number" placeholder="Age" value={sw.age ?? ""} onChange={(e) => onChange({ ...sw, age: e.target.value ? Number(e.target.value) : null })} />
+            <Input className="col-span-2" type="date" value={sw.dob ?? ""} onChange={(e) => onChange({ ...sw, dob: e.target.value || null })} />
+          </div>
+          <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+            <p className="text-xs font-semibold">2nd swimmer's parent (optional — cc'd on confirmation if email differs)</p>
+            <div className="grid grid-cols-12 gap-2">
+              <Input className="col-span-4" placeholder="Parent name" value={sw.partner_parent_name ?? ""} onChange={(e) => onChange({ ...sw, partner_parent_name: e.target.value || undefined })} />
+              <Input className="col-span-5" type="email" placeholder="Parent email" value={sw.partner_parent_email ?? ""} onChange={(e) => onChange({ ...sw, partner_parent_email: e.target.value || undefined })} />
+              <Input className="col-span-3" placeholder="Phone" value={sw.partner_parent_phone ?? ""} onChange={(e) => onChange({ ...sw, partner_parent_phone: e.target.value || undefined })} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1243,6 +1449,14 @@ function ReviewStep({
         stripe_customer_id: customerId,
         stripe_checkout_session_id: sessionId,
       };
+      const sw2 = draft.client.swimmers[1];
+      if (draft.type === "semi_private" && sw2?.first_name?.trim()) {
+        body.partner_swimmer_first_name = sw2.first_name;
+        body.partner_swimmer_last_name = sw2.last_name || null;
+        body.partner_parent_name = sw2.partner_parent_name || null;
+        body.partner_parent_email = sw2.partner_parent_email?.toLowerCase().trim() || null;
+        body.partner_parent_phone = sw2.partner_parent_phone || null;
+      }
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking", { body });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
