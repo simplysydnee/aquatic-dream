@@ -1,42 +1,23 @@
-## The bug
+## Problem
+The class roster panel shows "Waiver !" for Arely Carrera even though her waiver page shows "On file · Signed by Lizvett Leon 5/4/2026".
 
-When you reassign a group class for a specific day from Jaclyn to Sutton, the change is saved correctly to the database — but the calendar day view never reads it back, so it keeps showing Jaclyn.
+Root cause: two sources of truth are out of sync.
+- The roster (`CalendarBlockDetail.tsx` line 530) checks `swim_enrollments.waiver_signed_at`.
+- The Waivers admin / swimmer drawer reads from the `enrollment_agreements` table.
 
-### What the reassign actually does
+Arely's enrollments (and 25 other rows total) have valid `enrollment_agreements` rows signed 5/4/2026, but `swim_enrollments.waiver_signed_at` was never written. This happens for waivers signed inline during the original enrollment flow — only the self-serve token flow (`mark_swim_enrollment_waiver_signed` RPC) and the front-desk dialog backfill the flag.
 
-`performReassign` (in `src/lib/lessonCancel.ts`) writes the new instructor to `session_lesson_dates.instructor_override_id` for just the selected dates. This is the right place — it leaves the rest of the recurring series on the original instructor.
+## Fix (DB-only, no UI changes)
 
-`InstructorDayModal.tsx` already reads this column correctly (line 91: `effectiveInstructorId = d.instructor_override_id || sess.instructor_id`), which is why the reassign *looks* like it worked from that drawer.
+Single migration that:
 
-### Why the main calendar doesn't update
+1. **Backfill** — for every `swim_enrollments` row with `waiver_signed_at IS NULL`, set it to the most-recent `enrollment_agreements.signed_at` where `waiver_accepted = true` (25 rows updated, including both of Arely's enrollments).
 
-Two places drop the override on the floor:
+2. **Trigger** — `AFTER INSERT OR UPDATE OF signed_at, waiver_accepted ON enrollment_agreements`: when `waiver_accepted = true`, set `swim_enrollments.waiver_signed_at = GREATEST(coalesce(existing, signed_at), NEW.signed_at)` for the referenced enrollment. Keeps the two columns in sync going forward regardless of which signing path is used.
 
-1. **`src/hooks/useCalendarData.ts` line 185-188** — selects `session_lesson_dates` but only pulls `id, session_id, lesson_date, is_cancelled`. The `instructor_override_id` and any override `instructor_name` are never fetched.
-2. **`src/components/admin/calendar/CalendarDayView.tsx`** — when it renders group-class blocks it uses `swim_sessions.instructors.name` directly (e.g. line 1054, line 455). It never consults the per-date override, so the column placement, the block subtitle ("Coach …"), and the tooltip all show the base instructor.
+No app code changes; the roster's existing `enr.waiver_signed_at` check becomes correct.
 
-The "Today's Instructors" column header list at the top of the day view (line 720+) has the same issue: it builds the list from `swim_sessions.instructors.name`, so Sutton won't even get a column for today unless she already teaches another base session that day.
-
-## The fix
-
-1. **Fetch the override.** In `useCalendarData.ts`, expand the `session_lesson_dates` select to include `instructor_override_id`, and join the instructor name:
-   ```ts
-   .select("id, session_id, lesson_date, is_cancelled, instructor_override_id, instructor_override:instructors!session_lesson_dates_instructor_override_id_fkey(name)")
-   ```
-   Update the `LessonDate` type accordingly so consumers can read `override_instructor_id` / `override_instructor_name`.
-
-2. **Apply the override in the day view.** In `CalendarDayView.tsx`, build a lookup `Map<sessionId, { id, name }>` from today's `lessonDates` overrides. Then everywhere a group-class block resolves its instructor, prefer the override:
-   - The "Today's Instructors" column list (around line 720).
-   - The column-filter in the grid render (line 915 — `(s.instructor_name || "Instructor") === col.label` should compare against the *effective* name).
-   - The tooltip/subtitle that prints "Coach …" (line 455, 1054).
-
-3. **Refresh trigger.** `ReassignDialog` already calls `onDone?.()` and the existing `onRefetch` chain re-runs `useCalendarData`, so once the select includes the override the UI will update on the next refetch with no other plumbing.
-
-4. **Out of scope (note only).** Reassigning private/semi-private lessons is currently disabled in `InstructorDayModal` (`hasUnreassignable` blocks the button) and `performReassign` has no path for `lesson_booking_occurrences`. If you also tried to reassign a private lesson, that's a separate missing feature — not part of this fix.
-
-## Files to change
-
-- `src/hooks/useCalendarData.ts` — extend the `session_lesson_dates` query + `LessonDate` type.
-- `src/components/admin/calendar/CalendarDayView.tsx` — apply the override when computing the instructor for group classes (columns list, column filter, subtitle, tooltip).
-
-No DB migration, no edge-function changes.
+## Verification
+After migration:
+- `SELECT waiver_signed_at FROM swim_enrollments WHERE child_name ILIKE 'Arely Carrera'` returns non-null.
+- Reload the Yellow class panel — "Waiver ✓" badge instead of "Waiver !".
