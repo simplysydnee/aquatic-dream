@@ -2332,6 +2332,33 @@ export type Database = {
       }
     }
     Functions: {
+      admin_link_visitor_waiver: {
+        Args: {
+          _enrollment_id?: string
+          _lesson_booking_id?: string
+          _waiver_id: string
+        }
+        Returns: string
+      }
+      admin_search_link_targets: {
+        Args: { _q: string }
+        Returns: {
+          child_name: string
+          detail: string
+          kind: string
+          parent_email: string
+          parent_name: string
+          target_id: string
+        }[]
+      }
+      admin_unlink_visitor_waiver: {
+        Args: {
+          _enrollment_id?: string
+          _lesson_booking_id?: string
+          _waiver_id: string
+        }
+        Returns: number
+      }
       approve_shift_trade: {
         Args: { _trade_id: string }
         Returns: {
