@@ -117,7 +117,8 @@ export default function PrivateLessonsAdmin() {
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
       supabase.from("instructor_booking_blocks").select("*").order("created_at", { ascending: false }),
       supabase.from("lesson_bookings")
-        .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error)")
+        .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
+
         .in("lesson_type", ["private", "semi_private"])
         .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(200),
