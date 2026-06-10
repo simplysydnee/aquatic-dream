@@ -28,6 +28,19 @@ type Occurrence = {
   payment_status: string;
   status: string;
   cancelled_at: string | null;
+  checked_in_at: string | null;
+};
+
+type AttendanceRow = {
+  enrollment_id: string;
+  lesson_date: string;
+  checked_in: boolean;
+};
+
+type LessonDateRow = {
+  session_id: string;
+  lesson_date: string;
+  is_cancelled: boolean;
 };
 
 interface Props {
@@ -53,6 +66,26 @@ const levelClass = (level?: string | null) => {
   return cn(c.bg, c.text, "ring-1", c.ring, "border-transparent");
 };
 
+type LessonStatusKind = "attended" | "no_show" | "cancelled" | "upcoming";
+
+const lessonStatusBadge = (kind: LessonStatusKind) => {
+  switch (kind) {
+    case "attended":
+      return { label: "Attended", className: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+    case "no_show":
+      return { label: "No-show", className: "bg-rose-100 text-rose-800 border-rose-200" };
+    case "cancelled":
+      return { label: "Cancelled", className: "bg-muted text-muted-foreground border-border" };
+    case "upcoming":
+      return { label: "Booked", className: "bg-sky-100 text-sky-800 border-sky-200" };
+  }
+};
+
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 export default function SwimmerDetailDrawer({
   swimmer,
   siblings,
@@ -67,29 +100,66 @@ export default function SwimmerDetailDrawer({
   const { isAdmin } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
+  const [lessonDates, setLessonDates] = useState<LessonDateRow[]>([]);
 
   const bookingIds = swimmer ? swimmer.bookings.map((b) => b.id) : [];
   const bookingIdsKey = bookingIds.join(",");
+  const enrollmentIds = swimmer ? swimmer.enrollments.map((e) => e.id) : [];
+  const enrollmentIdsKey = enrollmentIds.join(",");
+  const sessionIds = swimmer
+    ? Array.from(new Set(swimmer.enrollments.map((e) => e.session_id).filter(Boolean) as string[]))
+    : [];
+  const sessionIdsKey = sessionIds.join(",");
 
   useEffect(() => {
-    if (!swimmer || bookingIds.length === 0) {
+    if (!swimmer) {
       setOccurrences([]);
+      setAttendance([]);
+      setLessonDates([]);
       return;
     }
     let cancelled = false;
-    supabase
-      .from("lesson_booking_occurrences")
-      .select("id, booking_id, occurrence_date, payment_status, status, cancelled_at")
-      .in("booking_id", bookingIds)
-      .order("occurrence_date", { ascending: true })
-      .then(({ data }) => {
-        if (!cancelled && data) setOccurrences(data as Occurrence[]);
-      });
+    if (bookingIds.length) {
+      supabase
+        .from("lesson_booking_occurrences")
+        .select("id, booking_id, occurrence_date, payment_status, status, cancelled_at, checked_in_at")
+        .in("booking_id", bookingIds)
+        .order("occurrence_date", { ascending: true })
+        .then(({ data }) => {
+          if (!cancelled && data) setOccurrences(data as Occurrence[]);
+        });
+    } else {
+      setOccurrences([]);
+    }
+    if (enrollmentIds.length) {
+      supabase
+        .from("attendance")
+        .select("enrollment_id, lesson_date, checked_in")
+        .in("enrollment_id", enrollmentIds)
+        .then(({ data }) => {
+          if (!cancelled && data) setAttendance(data as AttendanceRow[]);
+        });
+    } else {
+      setAttendance([]);
+    }
+    if (sessionIds.length) {
+      supabase
+        .from("session_lesson_dates")
+        .select("session_id, lesson_date, is_cancelled")
+        .in("session_id", sessionIds)
+        .order("lesson_date", { ascending: true })
+        .then(({ data }) => {
+          if (!cancelled && data) setLessonDates(data as LessonDateRow[]);
+        });
+    } else {
+      setLessonDates([]);
+    }
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swimmer?.key, bookingIdsKey]);
+  }, [swimmer?.key, bookingIdsKey, enrollmentIdsKey, sessionIdsKey]);
 
   if (!swimmer) return null;
 
@@ -281,27 +351,61 @@ export default function SwimmerDetailDrawer({
                   <p className="text-xs text-muted-foreground italic">No session enrollments.</p>
                 ) : (
                   <div className="space-y-2">
-                    {enrollmentEntries.map((e) => (
-                      <div key={e.id} className="rounded-md border p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-xs text-muted-foreground">{fmtDateTime(e.date)}</div>
-                            <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
-                              {e.title}
-                              {e.level && (
-                                <Badge variant="outline" className={cn("text-[10px] uppercase", levelClass(e.level))}>
-                                  {e.level}
-                                </Badge>
-                              )}
+                    {enrollmentEntries.map((e) => {
+                      const enr = swimmer.enrollments.find((x) => x.id === e.id);
+                      const sid = enr?.session_id ?? null;
+                      const dates = sid
+                        ? lessonDates
+                            .filter((d) => d.session_id === sid)
+                            .sort((a, b) => (a.lesson_date < b.lesson_date ? -1 : 1))
+                        : [];
+                      const today = todayISO();
+                      const attMap = new Map(
+                        attendance
+                          .filter((a) => a.enrollment_id === e.id)
+                          .map((a) => [a.lesson_date, a.checked_in]),
+                      );
+                      return (
+                        <div key={e.id} className="rounded-md border p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-xs text-muted-foreground">{fmtDateTime(e.date)}</div>
+                              <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
+                                {e.title}
+                                {e.level && (
+                                  <Badge variant="outline" className={cn("text-[10px] uppercase", levelClass(e.level))}>
+                                    {e.level}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">{e.sub}</div>
                             </div>
-                            <div className="text-xs text-muted-foreground mt-0.5">{e.sub}</div>
+                            <Button variant="link" size="sm" className="h-auto p-0 text-xs shrink-0" onClick={e.onClick}>
+                              Open →
+                            </Button>
                           </div>
-                          <Button variant="link" size="sm" className="h-auto p-0 text-xs shrink-0" onClick={e.onClick}>
-                            Open →
-                          </Button>
+                          {dates.length > 0 && (
+                            <ul className="mt-3 divide-y border-t">
+                              {dates.map((d) => {
+                                let kind: LessonStatusKind;
+                                if (d.is_cancelled) kind = "cancelled";
+                                else if (d.lesson_date > today) kind = "upcoming";
+                                else kind = attMap.get(d.lesson_date) ? "attended" : "no_show";
+                                const badge = lessonStatusBadge(kind);
+                                return (
+                                  <li key={d.lesson_date} className="py-2 flex items-center justify-between gap-2">
+                                    <span className="text-xs text-foreground">{fmtOccDate(d.lesson_date)}</span>
+                                    <Badge variant="outline" className={cn("text-[10px]", badge.className)}>
+                                      {badge.label}
+                                    </Badge>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </section>
@@ -363,7 +467,13 @@ export default function SwimmerDetailDrawer({
                           ) : (
                             <ul className="divide-y">
                               {occs.map((o) => {
-                                const cancelled = o.status === "cancelled" || !!o.cancelled_at;
+                                const isCancelled = o.status === "cancelled" || !!o.cancelled_at;
+                                const today = todayISO();
+                                let attKind: LessonStatusKind;
+                                if (isCancelled) attKind = "cancelled";
+                                else if (o.occurrence_date > today) attKind = "upcoming";
+                                else attKind = o.checked_in_at ? "attended" : "no_show";
+                                const attBadge = lessonStatusBadge(attKind);
                                 const tip = paymentStatusTooltip(o.payment_status);
                                 return (
                                   <li key={o.id} className="p-3 flex items-center justify-between gap-2">
@@ -374,33 +484,36 @@ export default function SwimmerDetailDrawer({
                                         {b.instructor_name ? ` · ${b.instructor_name}` : ""}
                                       </div>
                                     </div>
-                                    {cancelled ? (
-                                      <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
-                                        Cancelled
+                                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                                      <Badge variant="outline" className={cn("text-[10px]", attBadge.className)}>
+                                        {attBadge.label}
                                       </Badge>
-                                    ) : tip ? (
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Badge
-                                              variant="outline"
-                                              className={cn(
-                                                "cursor-help inline-flex items-center gap-1",
-                                                paymentStatusBadgeClass(o.payment_status),
-                                              )}
-                                            >
-                                              {formatPaymentStatus(o.payment_status)}
-                                              <HelpCircle className="h-3 w-3 opacity-70" />
-                                            </Badge>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="max-w-xs">{tip}</TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    ) : (
-                                      <Badge variant="outline" className={paymentStatusBadgeClass(o.payment_status)}>
-                                        {formatPaymentStatus(o.payment_status)}
-                                      </Badge>
-                                    )}
+                                      {!isCancelled && (
+                                        tip ? (
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Badge
+                                                  variant="outline"
+                                                  className={cn(
+                                                    "cursor-help inline-flex items-center gap-1 text-[10px]",
+                                                    paymentStatusBadgeClass(o.payment_status),
+                                                  )}
+                                                >
+                                                  {formatPaymentStatus(o.payment_status)}
+                                                  <HelpCircle className="h-3 w-3 opacity-70" />
+                                                </Badge>
+                                              </TooltipTrigger>
+                                              <TooltipContent className="max-w-xs">{tip}</TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        ) : (
+                                          <Badge variant="outline" className={cn("text-[10px]", paymentStatusBadgeClass(o.payment_status))}>
+                                            {formatPaymentStatus(o.payment_status)}
+                                          </Badge>
+                                        )
+                                      )}
+                                    </div>
                                   </li>
                                 );
                               })}
