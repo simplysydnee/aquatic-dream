@@ -70,9 +70,9 @@ const LessonBookingConfirmationEmail = ({
         <Text style={text}>{parentName ? `Hi ${parentName},` : 'Hello,'}</Text>
         <Text style={text}>
           {seriesMode ? (
-            <>{childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'} series</strong> ({scheduleList?.length || totalOccurrences} lessons) is booked. One payment covers the whole series — pay below to confirm.</>
+            <>{childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'} series</strong> ({scheduleList?.length || totalOccurrences} lessons) is booked.{paymentLink ? ' One payment covers the whole series — pay below to confirm.' : ''}</>
           ) : (
-            <>{childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'}</strong> is booked. Please complete payment below to confirm your spot.</>
+            <>{childName ? `${childName}'s` : 'Your'} <strong>{lessonTypeLabel || 'swim lesson'}</strong> is booked{paymentLink ? '. Please complete payment below to confirm your spot.' : ' — you\'re all set.'}</>
           )}
         </Text>
 
