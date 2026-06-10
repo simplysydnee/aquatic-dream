@@ -698,14 +698,34 @@ function RecurringSlotChooser({
   blocks, slot, onChange,
 }: { blocks: RecurringBlock[]; slot: SlotDraft | null; onChange: (s: SlotDraft) => void }) {
   const [seriesWeeks, setSeriesWeeks] = useState(8);
+  const [dayFilter, setDayFilter] = useState<string>("all");
+  const [instructorFilter, setInstructorFilter] = useState<string>("all");
+
+  const instructorOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    blocks.forEach((b) => m.set(b.instructor_id, b.instructor_name));
+    return Array.from(m.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [blocks]);
+
+  const dayOptions = useMemo(() => {
+    const s = new Set<number>();
+    blocks.forEach((b) => s.add(b.day_of_week));
+    return Array.from(s).sort((a, b) => a - b);
+  }, [blocks]);
+
+  const filteredBlocks = useMemo(() => blocks.filter((b) => {
+    if (dayFilter !== "all" && b.day_of_week !== Number(dayFilter)) return false;
+    if (instructorFilter !== "all" && b.instructor_id !== instructorFilter) return false;
+    return true;
+  }), [blocks, dayFilter, instructorFilter]);
 
   const groupedByDay = useMemo(() => {
     const g: Record<number, RecurringBlock[]> = {};
-    for (const b of blocks) {
+    for (const b of filteredBlocks) {
       (g[b.day_of_week] = g[b.day_of_week] || []).push(b);
     }
     return g;
-  }, [blocks]);
+  }, [filteredBlocks]);
 
   const selectBlock = (b: RecurringBlock) => {
     const dates = generateRecurringDates(b.day_of_week, seriesWeeks, b.start_date, b.end_date);
@@ -733,8 +753,41 @@ function RecurringSlotChooser({
     <div className="space-y-5">
       {!slot?.blockId && (
         <div className="space-y-4">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Filter:</span>
+            <Select value={dayFilter} onValueChange={setDayFilter}>
+              <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Day" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All days</SelectItem>
+                {dayOptions.map((d) => (
+                  <SelectItem key={d} value={String(d)}>{WEEKDAY_NAMES[d]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={instructorFilter} onValueChange={setInstructorFilter}>
+              <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Instructor" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All instructors</SelectItem>
+                {instructorOptions.map((i) => (
+                  <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(dayFilter !== "all" || instructorFilter !== "all") && (
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setDayFilter("all"); setInstructorFilter("all"); }}>
+                Clear
+              </Button>
+            )}
+            <span className="text-xs text-muted-foreground ml-auto">{filteredBlocks.length} slot{filteredBlocks.length === 1 ? "" : "s"}</span>
+          </div>
+
           {Object.keys(groupedByDay).length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">No recurring booking blocks configured. Switch to "One-time" or set up blocks in Private Lessons admin.</p>
+            <p className="text-sm text-muted-foreground text-center py-8">
+              {blocks.length === 0
+                ? "No recurring booking blocks configured. Switch to \"One-time\" or set up blocks in Private Lessons admin."
+                : "No slots match these filters."}
+            </p>
           )}
           {Object.entries(groupedByDay).sort(([a], [b]) => Number(a) - Number(b)).map(([dow, bs]) => (
             <div key={dow}>
