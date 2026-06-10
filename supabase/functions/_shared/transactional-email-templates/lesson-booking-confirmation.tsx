@@ -26,6 +26,10 @@ interface LessonBookingConfirmationProps {
   seriesMode?: boolean
   totalAmountDue?: string // "$520.00"
   scheduleList?: { date: string; time: string }[]
+  // Card-on-file flow (private lessons): no paymentLink, show charge notice instead.
+  chargeNotice?: string
+  // First-ever private lesson with us → show extended welcome / what-to-expect block.
+  isFirstPrivateLesson?: boolean
 }
 
 const LessonBookingConfirmationEmail = ({
