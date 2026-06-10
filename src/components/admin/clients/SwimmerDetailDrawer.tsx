@@ -28,6 +28,19 @@ type Occurrence = {
   payment_status: string;
   status: string;
   cancelled_at: string | null;
+  checked_in_at: string | null;
+};
+
+type AttendanceRow = {
+  enrollment_id: string;
+  lesson_date: string;
+  checked_in: boolean;
+};
+
+type LessonDateRow = {
+  session_id: string;
+  lesson_date: string;
+  is_cancelled: boolean;
 };
 
 interface Props {
