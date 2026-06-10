@@ -35,6 +35,11 @@ interface Swimmer {
   last_name: string;
   age?: number | null;
   dob?: string | null;
+  // Only used for swimmers[1] in a semi-private booking: optional contact
+  // info for the 2nd swimmer's parent so we can cc them the confirmation.
+  partner_parent_name?: string;
+  partner_parent_email?: string;
+  partner_parent_phone?: string;
 }
 
 interface ClientDraft {
