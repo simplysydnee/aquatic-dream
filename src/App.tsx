@@ -105,6 +105,7 @@ const App = () => (
               <Route path="waivers" element={<WaiversAdmin />} />
               <Route path="sessions" element={<SessionsAdmin />} />
               <Route path="private-lessons" element={<PrivateLessonsAdmin />} />
+              <Route path="private-lessons/new" element={<BookingNew />} />
 
 
               <Route path="careers" element={<JobPostingsAdmin />} />
