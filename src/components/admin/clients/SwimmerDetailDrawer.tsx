@@ -80,29 +80,66 @@ export default function SwimmerDetailDrawer({
   const { isAdmin } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
+  const [lessonDates, setLessonDates] = useState<LessonDateRow[]>([]);
 
   const bookingIds = swimmer ? swimmer.bookings.map((b) => b.id) : [];
   const bookingIdsKey = bookingIds.join(",");
+  const enrollmentIds = swimmer ? swimmer.enrollments.map((e) => e.id) : [];
+  const enrollmentIdsKey = enrollmentIds.join(",");
+  const sessionIds = swimmer
+    ? Array.from(new Set(swimmer.enrollments.map((e) => e.session_id).filter(Boolean) as string[]))
+    : [];
+  const sessionIdsKey = sessionIds.join(",");
 
   useEffect(() => {
-    if (!swimmer || bookingIds.length === 0) {
+    if (!swimmer) {
       setOccurrences([]);
+      setAttendance([]);
+      setLessonDates([]);
       return;
     }
     let cancelled = false;
-    supabase
-      .from("lesson_booking_occurrences")
-      .select("id, booking_id, occurrence_date, payment_status, status, cancelled_at")
-      .in("booking_id", bookingIds)
-      .order("occurrence_date", { ascending: true })
-      .then(({ data }) => {
-        if (!cancelled && data) setOccurrences(data as Occurrence[]);
-      });
+    if (bookingIds.length) {
+      supabase
+        .from("lesson_booking_occurrences")
+        .select("id, booking_id, occurrence_date, payment_status, status, cancelled_at, checked_in_at")
+        .in("booking_id", bookingIds)
+        .order("occurrence_date", { ascending: true })
+        .then(({ data }) => {
+          if (!cancelled && data) setOccurrences(data as Occurrence[]);
+        });
+    } else {
+      setOccurrences([]);
+    }
+    if (enrollmentIds.length) {
+      supabase
+        .from("attendance")
+        .select("enrollment_id, lesson_date, checked_in")
+        .in("enrollment_id", enrollmentIds)
+        .then(({ data }) => {
+          if (!cancelled && data) setAttendance(data as AttendanceRow[]);
+        });
+    } else {
+      setAttendance([]);
+    }
+    if (sessionIds.length) {
+      supabase
+        .from("session_lesson_dates")
+        .select("session_id, lesson_date, is_cancelled")
+        .in("session_id", sessionIds)
+        .order("lesson_date", { ascending: true })
+        .then(({ data }) => {
+          if (!cancelled && data) setLessonDates(data as LessonDateRow[]);
+        });
+    } else {
+      setLessonDates([]);
+    }
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swimmer?.key, bookingIdsKey]);
+  }, [swimmer?.key, bookingIdsKey, enrollmentIdsKey, sessionIdsKey]);
 
   if (!swimmer) return null;
 
