@@ -300,7 +300,19 @@ interface ClientSearchResult {
   swimmer_first: string | null;
   swimmer_last: string | null;
   swimmer_dob: string | null;
-  source: "booking" | "enrollment";
+  swimmer_age?: number | null;
+  source: "booking" | "enrollment" | "request";
+  request_preferred_times?: string | null;
+  request_notes?: string | null;
+  request_status?: string | null;
+}
+
+function splitName(full: string | null | undefined): { first: string; last: string } {
+  const s = (full || "").trim();
+  if (!s) return { first: "", last: "" };
+  const parts = s.split(/\s+/);
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
 }
 
 function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: ClientDraft) => void }) {
@@ -316,7 +328,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
     setSearching(true);
     (async () => {
       const like = `%${q}%`;
-      const [b, e] = await Promise.all([
+      const [b, e, r] = await Promise.all([
         supabase.from("lesson_bookings")
           .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
           .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},parent_phone.ilike.${like}`)
@@ -327,27 +339,49 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
           .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},parent_phone.ilike.${like}`)
           .order("updated_at", { ascending: false })
           .limit(20),
+        supabase.from("lesson_requests")
+          .select("parent_name,parent_email,parent_phone,child_name,child_age,child_dob,preferred_times,notes,status,created_at")
+          .in("status", ["new", "contacted", "scheduled"])
+          .or(`parent_email.ilike.${like},parent_name.ilike.${like},child_name.ilike.${like},parent_phone.ilike.${like}`)
+          .order("created_at", { ascending: false })
+          .limit(20),
       ]);
       if (cancelled) return;
       const map = new Map<string, ClientSearchResult>();
-      const add = (row: any, source: "booking" | "enrollment") => {
+      const add = (row: any, source: "booking" | "enrollment" | "request") => {
         const email = (row.parent_email || "").toLowerCase().trim();
-        const key = `${email}|${(row.child_first_name || "").toLowerCase()}|${(row.child_last_name || "").toLowerCase()}`;
+        let pf = "", pl = "", cf = "", cl = "";
+        if (source === "request") {
+          const p = splitName(row.parent_name);
+          const c = splitName(row.child_name);
+          pf = p.first; pl = p.last; cf = c.first; cl = c.last;
+        } else {
+          pf = row.parent_first_name || "";
+          pl = row.parent_last_name || "";
+          cf = row.child_first_name || "";
+          cl = row.child_last_name || "";
+        }
+        const key = `${email}|${cf.toLowerCase()}|${cl.toLowerCase()}`;
         if (!email || map.has(key)) return;
         map.set(key, {
-          parent_first: row.parent_first_name || "",
-          parent_last: row.parent_last_name || "",
+          parent_first: pf,
+          parent_last: pl,
           parent_email: email,
           parent_phone: row.parent_phone || null,
-          swimmer_first: row.child_first_name || null,
-          swimmer_last: row.child_last_name || null,
+          swimmer_first: cf || null,
+          swimmer_last: cl || null,
           swimmer_dob: row.child_dob || null,
+          swimmer_age: row.child_age ?? null,
           source,
+          request_preferred_times: source === "request" ? row.preferred_times : null,
+          request_notes: source === "request" ? row.notes : null,
+          request_status: source === "request" ? row.status : null,
         });
       };
-      (b.data || []).forEach((r) => add(r, "booking"));
-      (e.data || []).forEach((r) => add(r, "enrollment"));
-      setResults(Array.from(map.values()).slice(0, 12));
+      (b.data || []).forEach((row) => add(row, "booking"));
+      (e.data || []).forEach((row) => add(row, "enrollment"));
+      (r.data || []).forEach((row) => add(row, "request"));
+      setResults(Array.from(map.values()).slice(0, 15));
       setSearching(false);
     })();
     return () => { cancelled = true; };
@@ -363,7 +397,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
         first_name: r.swimmer_first || "",
         last_name: r.swimmer_last || "",
         dob: r.swimmer_dob,
-        age: null,
+        age: r.swimmer_age ?? null,
       }],
     });
     // Stay in search mode — selection is shown inline; admin can click "Edit details" if needed.
