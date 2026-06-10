@@ -629,11 +629,6 @@ function TypeStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type]);
 
-  const updateSwimmer = (idx: number, patch: Partial<Swimmer>) => {
-    const arr = [...client.swimmers];
-    arr[idx] = { ...arr[idx], ...patch };
-    onClientChange({ ...client, swimmers: arr });
-  };
 
   return (
     <Card className="p-5">
