@@ -133,7 +133,7 @@ const LessonBookingConfirmationEmail = ({
           </Section>
         )}
 
-        {paymentLink && (
+        {paymentLink ? (
           <Section style={stepBox}>
             {waiverLink && !waiverSigned && <Text style={stepLabel}>{seriesMode ? 'Step 2 — Pay for the full series' : 'Step 2 — Pay for this lesson'}</Text>}
             <Section style={{ textAlign: 'center' as const, margin: '12px 0 4px' }}>
@@ -148,7 +148,12 @@ const LessonBookingConfirmationEmail = ({
               <Link href={paymentLink} style={linkStyle}>{paymentLink}</Link>
             </Text>
           </Section>
-        )}
+        ) : chargeNotice ? (
+          <Section style={chargeNoticeBox}>
+            <Text style={chargeNoticeHeading}>💳 Payment — Card on File</Text>
+            <Text style={chargeNoticeText}>{chargeNotice}</Text>
+          </Section>
+        ) : null}
 
         {seriesMode && totalOccurrences && totalOccurrences > 1 ? (
           <Section style={policyBox}>
