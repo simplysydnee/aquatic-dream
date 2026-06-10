@@ -366,8 +366,13 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
         age: null,
       }],
     });
-    setMode("create"); // jump to editable form to verify/edit
+    // Stay in search mode — selection is shown inline; admin can click "Edit details" if needed.
   };
+
+  const hasSelectedClient =
+    mode === "search" &&
+    client.parent_email.trim() &&
+    client.swimmers[0]?.first_name?.trim();
 
   const updateSwimmer = (idx: number, patch: Partial<Swimmer>) => {
     const arr = [...client.swimmers];
@@ -400,6 +405,30 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
 
       {mode === "search" ? (
         <div className="space-y-3">
+          {hasSelectedClient && (
+            <div className="flex items-start justify-between gap-2 p-3 rounded-md border-2 border-primary bg-primary/5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-primary" />
+                  <p className="font-semibold text-sm truncate">{client.parent_first} {client.parent_last}</p>
+                </div>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  {client.parent_email}{client.parent_phone ? ` · ${client.parent_phone}` : ""}
+                </p>
+                {client.swimmers[0]?.first_name && (
+                  <p className="text-xs text-foreground/70 mt-0.5">
+                    Swimmer: {client.swimmers[0].first_name} {client.swimmers[0].last_name}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <Button variant="ghost" size="sm" onClick={() => setMode("create")}>Edit</Button>
+                <Button variant="ghost" size="sm" onClick={() => { onChange({ ...EMPTY_CLIENT, swimmers: [{ first_name: "", last_name: "", age: null, dob: null }] }); setQuery(""); }}>
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
             <Input
@@ -669,14 +698,34 @@ function RecurringSlotChooser({
   blocks, slot, onChange,
 }: { blocks: RecurringBlock[]; slot: SlotDraft | null; onChange: (s: SlotDraft) => void }) {
   const [seriesWeeks, setSeriesWeeks] = useState(8);
+  const [dayFilter, setDayFilter] = useState<string>("all");
+  const [instructorFilter, setInstructorFilter] = useState<string>("all");
+
+  const instructorOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    blocks.forEach((b) => m.set(b.instructor_id, b.instructor_name));
+    return Array.from(m.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [blocks]);
+
+  const dayOptions = useMemo(() => {
+    const s = new Set<number>();
+    blocks.forEach((b) => s.add(b.day_of_week));
+    return Array.from(s).sort((a, b) => a - b);
+  }, [blocks]);
+
+  const filteredBlocks = useMemo(() => blocks.filter((b) => {
+    if (dayFilter !== "all" && b.day_of_week !== Number(dayFilter)) return false;
+    if (instructorFilter !== "all" && b.instructor_id !== instructorFilter) return false;
+    return true;
+  }), [blocks, dayFilter, instructorFilter]);
 
   const groupedByDay = useMemo(() => {
     const g: Record<number, RecurringBlock[]> = {};
-    for (const b of blocks) {
+    for (const b of filteredBlocks) {
       (g[b.day_of_week] = g[b.day_of_week] || []).push(b);
     }
     return g;
-  }, [blocks]);
+  }, [filteredBlocks]);
 
   const selectBlock = (b: RecurringBlock) => {
     const dates = generateRecurringDates(b.day_of_week, seriesWeeks, b.start_date, b.end_date);
@@ -704,8 +753,41 @@ function RecurringSlotChooser({
     <div className="space-y-5">
       {!slot?.blockId && (
         <div className="space-y-4">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Filter:</span>
+            <Select value={dayFilter} onValueChange={setDayFilter}>
+              <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Day" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All days</SelectItem>
+                {dayOptions.map((d) => (
+                  <SelectItem key={d} value={String(d)}>{WEEKDAY_NAMES[d]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={instructorFilter} onValueChange={setInstructorFilter}>
+              <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Instructor" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All instructors</SelectItem>
+                {instructorOptions.map((i) => (
+                  <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(dayFilter !== "all" || instructorFilter !== "all") && (
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setDayFilter("all"); setInstructorFilter("all"); }}>
+                Clear
+              </Button>
+            )}
+            <span className="text-xs text-muted-foreground ml-auto">{filteredBlocks.length} slot{filteredBlocks.length === 1 ? "" : "s"}</span>
+          </div>
+
           {Object.keys(groupedByDay).length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">No recurring booking blocks configured. Switch to "One-time" or set up blocks in Private Lessons admin.</p>
+            <p className="text-sm text-muted-foreground text-center py-8">
+              {blocks.length === 0
+                ? "No recurring booking blocks configured. Switch to \"One-time\" or set up blocks in Private Lessons admin."
+                : "No slots match these filters."}
+            </p>
           )}
           {Object.entries(groupedByDay).sort(([a], [b]) => Number(a) - Number(b)).map(([dow, bs]) => (
             <div key={dow}>
