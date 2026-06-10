@@ -1067,7 +1067,11 @@ const CalendarDayView = ({
                           {isClosed && <span className="ml-1 text-muted-foreground">(Closed)</span>}
                         </p>
                         <p>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</p>
-                        {s.instructors?.name && <p>Instructor: {s.instructors.name}</p>}
+                        {(() => {
+                          const eff = sessionInstructorOverrideToday.get(s.id) || s.instructors?.name;
+                          const isOverride = !!sessionInstructorOverrideToday.get(s.id);
+                          return eff ? <p>Instructor: {eff}{isOverride ? " (reassigned)" : ""}</p> : null;
+                        })()}
                         <p>{sessionEnrollments.length}/{s.max_students} swimmers</p>
                         {sessionPhotoConsentMap.get(s.id) === true && (
                           <p className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
