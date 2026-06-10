@@ -50,13 +50,17 @@ const LessonBookingConfirmationEmail = ({
   seriesMode,
   totalAmountDue,
   scheduleList,
+  chargeNotice,
+  isFirstPrivateLesson,
 }: LessonBookingConfirmationProps) => (
   <Html lang="en" dir="ltr">
     <Head />
     <Preview>
-      {seriesMode
-        ? `Your ${lessonTypeLabel || 'lesson'} series is booked — pay ${totalAmountDue || ''} to confirm`
-        : `Your ${lessonTypeLabel || 'lesson'} is booked${lessonDate ? ` for ${lessonDate}` : ''} — pay ${amountDue || ''} to confirm`}
+      {paymentLink
+        ? (seriesMode
+            ? `Your ${lessonTypeLabel || 'lesson'} series is booked — pay ${totalAmountDue || ''} to confirm`
+            : `Your ${lessonTypeLabel || 'lesson'} is booked${lessonDate ? ` for ${lessonDate}` : ''} — pay ${amountDue || ''} to confirm`)
+        : `Your ${lessonTypeLabel || 'lesson'} is booked — see you at the pool!`}
     </Preview>
     <Body style={main}>
       <Container style={container}>
