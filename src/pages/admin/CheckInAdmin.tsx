@@ -29,32 +29,33 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import FrontDeskEnrollmentWaiverDialog from "@/components/admin/calendar/FrontDeskEnrollmentWaiverDialog";
 
-interface SessionInfo {
-  id: string;
-  start_time: string;
-  end_time: string;
-  swim_level: string;
-  age_group: string | null;
-  session_name: string | null;
-}
+type RowKind = "group" | "private" | "semi_private";
 
-interface EnrollmentRow {
-  id: string;
-  session_id: string;
+interface Row {
+  kind: RowKind;
+  id: string; // enrollment_id (group) or occurrence_id (private)
+  session_id: string | null;
   child_name: string;
-  child_age: number;
+  child_age: number | null;
   parent_name: string;
   parent_email: string;
   parent_phone: string | null;
+  has_waiver: boolean;
   checked_in: boolean;
+  checked_in_at: string | null;
   no_show: boolean;
   notes: string | null;
-  has_waiver: boolean;
 }
 
-interface Group {
-  session: SessionInfo;
-  enrollments: EnrollmentRow[];
+interface Slot {
+  key: string;
+  start_time: string;
+  end_time: string;
+  swim_level: string | null;
+  session_name: string | null;
+  instructor_name: string | null;
+  lesson_type: RowKind;
+  rows: Row[];
 }
 
 const daysForToday = (d: Date): string[] => {
@@ -76,82 +77,144 @@ const CheckInAdmin = () => {
   const today = new Date();
   const dateStr = format(today, "yyyy-MM-dd");
 
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Waiver prompt state
-  const [waiverPrompt, setWaiverPrompt] = useState<EnrollmentRow | null>(null);
-  const [signDialog, setSignDialog] = useState<EnrollmentRow | null>(null);
+  const [waiverPrompt, setWaiverPrompt] = useState<Row | null>(null);
+  const [signDialog, setSignDialog] = useState<Row | null>(null);
   const [emailingFor, setEmailingFor] = useState<string | null>(null);
 
   const checkedInBy = `admin:${user?.email || "unknown"}`;
 
   const fetchData = async () => {
     setLoading(true);
-    const [sessionsRes, enrollRes, attendanceRes] = await Promise.all([
+    const [sessionsRes, enrollRes, attendanceRes, occRes] = await Promise.all([
       supabase
         .from("swim_sessions")
-        .select("id, start_time, end_time, swim_level, age_group, session_name")
+        .select("id, start_time, end_time, swim_level, age_group, session_name, instructor_id, session_start_date, session_end_date, instructors(name)")
         .eq("is_active", true)
-        .in("day_of_week", daysForToday(today)),
+        .in("day_of_week", daysForToday(today))
+        .lte("session_start_date", dateStr)
+        .gte("session_end_date", dateStr),
       supabase
         .from("swim_enrollments")
-        .select(
-          "id, session_id, child_name, child_age, parent_name, parent_email, parent_phone, status, waiver_signed_at",
-        )
-        .in("status", ["pending", "confirmed", "enrolled"]),
+        .select("id, session_id, child_name, child_age, parent_name, parent_email, parent_phone, status")
+        .in("status", ["confirmed", "enrolled"]),
       supabase
         .from("attendance")
-        .select("enrollment_id, checked_in, notes")
+        .select("enrollment_id, checked_in, checked_in_at, notes")
         .eq("lesson_date", dateStr),
+      supabase
+        .from("lesson_booking_occurrences")
+        .select("id, occurrence_date, status, checked_in_at, lesson_bookings!inner(id, lesson_type, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, status)")
+        .eq("occurrence_date", dateStr)
+        .not("status", "in", "(cancelled,pending_card)") as any,
     ]);
 
-    const sessions = (sessionsRes.data || []) as SessionInfo[];
+    const sessions = (sessionsRes.data || []) as any[];
     const enrollments = (enrollRes.data || []) as any[];
-
-    // Fetch agreements for visible enrollments (covers legacy rows missing waiver_signed_at stamp)
-    const enrIds = enrollments.map((e) => e.id);
-    let agreementIds = new Set<string>();
-    if (enrIds.length) {
-      const { data: ags } = await supabase
-        .from("enrollment_agreements")
-        .select("enrollment_id")
-        .in("enrollment_id", enrIds);
-      agreementIds = new Set((ags || []).map((a: any) => a.enrollment_id));
-    }
-
-    const attMap = new Map<string, { checked_in: boolean; notes: string | null }>(
-      (attendanceRes.data || []).map((a: any) => [a.enrollment_id, { checked_in: !!a.checked_in, notes: a.notes }]),
+    const attMap = new Map<string, any>(
+      (attendanceRes.data || []).map((a: any) => [a.enrollment_id, a])
     );
 
-    const grouped: Group[] = sessions
-      .map((s) => ({
-        session: s,
-        enrollments: enrollments
-          .filter((e) => e.session_id === s.id)
-          .map((e) => {
-            const a = attMap.get(e.id);
-            return {
-              id: e.id,
-              session_id: e.session_id,
-              child_name: e.child_name,
-              child_age: e.child_age,
-              parent_name: e.parent_name,
-              parent_email: e.parent_email,
-              parent_phone: e.parent_phone,
-              checked_in: a?.checked_in ?? false,
-              no_show: a?.notes === "no_show",
-              notes: a?.notes ?? null,
-              has_waiver: !!e.waiver_signed_at || agreementIds.has(e.id),
-            } as EnrollmentRow;
-          }),
-      }))
-      .filter((g) => g.enrollments.length > 0)
-      .sort((a, b) => a.session.start_time.localeCompare(b.session.start_time));
+    // Universal waiver lookup
+    const enrIds = enrollments.map((e) => e.id);
+    const waiverByEnr = new Map<string, boolean>();
+    if (enrIds.length) {
+      const { data: w } = await (supabase.rpc as any)("enrollments_waiver_status", { _ids: enrIds });
+      ((w as any[]) || []).forEach((r) => waiverByEnr.set(r.enrollment_id, !!r.has_waiver));
+    }
 
-    setGroups(grouped);
+    const occurrences = (((occRes as any).data) || []).filter(
+      (o: any) => o.lesson_bookings?.status === "active"
+    );
+    const bookingIds = Array.from(
+      new Set(occurrences.map((o: any) => o.lesson_bookings?.id).filter(Boolean))
+    ) as string[];
+    const waiverByBooking = new Map<string, boolean>();
+    if (bookingIds.length) {
+      const { data: w } = await (supabase.rpc as any)("bookings_waiver_status", { _ids: bookingIds });
+      ((w as any[]) || []).forEach((r) => waiverByBooking.set(r.booking_id, !!r.has_waiver));
+    }
+
+    const groupSlots: Slot[] = sessions.map((s) => {
+      const seen = new Set<string>();
+      const rows: Row[] = [];
+      for (const e of enrollments.filter((x) => x.session_id === s.id)) {
+        const nameKey = `name:${(e.child_name || "").trim().toLowerCase()}`;
+        if (seen.has(e.id) || seen.has(nameKey)) continue;
+        seen.add(e.id);
+        seen.add(nameKey);
+        const a = attMap.get(e.id);
+        rows.push({
+          kind: "group",
+          id: e.id,
+          session_id: s.id,
+          child_name: e.child_name,
+          child_age: e.child_age ?? null,
+          parent_name: e.parent_name,
+          parent_email: e.parent_email,
+          parent_phone: e.parent_phone,
+          has_waiver: waiverByEnr.get(e.id) ?? false,
+          checked_in: !!a?.checked_in,
+          checked_in_at: a?.checked_in_at ?? null,
+          no_show: a?.notes === "no_show",
+          notes: a?.notes ?? null,
+        });
+      }
+      return {
+        key: `g:${s.id}`,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        swim_level: s.swim_level,
+        session_name: s.session_name,
+        instructor_name: s.instructors?.name ?? null,
+        lesson_type: "group" as RowKind,
+        rows,
+      };
+    }).filter((g) => g.rows.length > 0);
+
+    const privateSlots: Slot[] = occurrences.map((o: any) => {
+      const b = o.lesson_bookings;
+      const kind: RowKind = b.lesson_type === "semi_private" ? "semi_private" : "private";
+      const row: Row = {
+        kind,
+        id: o.id,
+        session_id: null,
+        child_name: b.child_name || "(no name)",
+        child_age: b.child_age ?? null,
+        parent_name: b.parent_name || "",
+        parent_email: b.parent_email || "",
+        parent_phone: b.parent_phone || null,
+        has_waiver: waiverByBooking.get(b.id) ?? false,
+        checked_in: !!o.checked_in_at,
+        checked_in_at: o.checked_in_at ?? null,
+        no_show: false,
+        notes: null,
+      };
+      return {
+        key: `p:${o.id}`,
+        start_time: (b.start_time || "").slice(0, 8),
+        end_time: (b.end_time || "").slice(0, 8),
+        swim_level: null,
+        session_name: kind === "semi_private" ? "Semi-Private" : "Private",
+        instructor_name: b.instructor_name || null,
+        lesson_type: kind,
+        rows: [row],
+      };
+    });
+
+    const all = [...groupSlots, ...privateSlots].sort((a, b) => {
+      if (a.start_time !== b.start_time) return a.start_time.localeCompare(b.start_time);
+      const ia = (a.instructor_name || "zzz").toLowerCase();
+      const ib = (b.instructor_name || "zzz").toLowerCase();
+      if (ia !== ib) return ia.localeCompare(ib);
+      return (a.swim_level || a.session_name || "").localeCompare(b.swim_level || b.session_name || "");
+    });
+
+    setSlots(all);
     setLoading(false);
   };
 
@@ -160,54 +223,96 @@ const CheckInAdmin = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const setAttendance = async (
-    enr: EnrollmentRow,
-    next: { checked_in: boolean; notes: string | null },
-  ) => {
-    setBusyId(enr.id);
+  const setGroupAttendance = async (row: Row, next: { checked_in: boolean; notes: string | null }) => {
+    if (!row.session_id) return;
+    setBusyId(row.id);
     const { error } = await supabase.from("attendance").upsert(
       {
-        enrollment_id: enr.id,
-        session_id: enr.session_id,
+        enrollment_id: row.id,
+        session_id: row.session_id,
         lesson_date: dateStr,
         checked_in: next.checked_in,
         checked_in_at: next.checked_in ? new Date().toISOString() : null,
         checked_in_by: checkedInBy,
         notes: next.notes,
       },
-      { onConflict: "enrollment_id,lesson_date" },
+      { onConflict: "enrollment_id,lesson_date" }
     );
     setBusyId(null);
     if (error) {
       toast({ title: "Failed", description: error.message, variant: "destructive" });
       return;
     }
-    setGroups((prev) =>
+    setSlots((prev) =>
       prev.map((g) => ({
         ...g,
-        enrollments: g.enrollments.map((e) =>
-          e.id === enr.id ? { ...e, checked_in: next.checked_in, no_show: next.notes === "no_show", notes: next.notes } : e,
+        rows: g.rows.map((r) =>
+          r.id === row.id
+            ? {
+                ...r,
+                checked_in: next.checked_in,
+                checked_in_at: next.checked_in ? new Date().toISOString() : null,
+                no_show: next.notes === "no_show",
+                notes: next.notes,
+              }
+            : r
         ),
-      })),
+      }))
     );
   };
 
-  const handleCheckInClick = (enr: EnrollmentRow) => {
-    if (!enr.has_waiver) {
-      setWaiverPrompt(enr);
+  const setPrivateAttendance = async (row: Row, checkedIn: boolean) => {
+    setBusyId(row.id);
+    const { error } = await (supabase
+      .from("lesson_booking_occurrences") as any)
+      .update({
+        checked_in_at: checkedIn ? new Date().toISOString() : null,
+        checked_in_by: checkedIn ? checkedInBy : null,
+      })
+      .eq("id", row.id);
+    setBusyId(null);
+    if (error) {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
       return;
     }
-    setAttendance(enr, { checked_in: true, notes: null });
+    setSlots((prev) =>
+      prev.map((g) => ({
+        ...g,
+        rows: g.rows.map((r) =>
+          r.id === row.id
+            ? { ...r, checked_in: checkedIn, checked_in_at: checkedIn ? new Date().toISOString() : null }
+            : r
+        ),
+      }))
+    );
   };
 
-  const emailWaiverLink = async (enr: EnrollmentRow) => {
-    setEmailingFor(enr.id);
+  const handleCheckInClick = (row: Row) => {
+    if (!row.has_waiver) {
+      setWaiverPrompt(row);
+      return;
+    }
+    if (row.kind === "group") setGroupAttendance(row, { checked_in: true, notes: null });
+    else setPrivateAttendance(row, true);
+  };
+
+  const handleUndo = (row: Row) => {
+    if (row.kind === "group") setGroupAttendance(row, { checked_in: false, notes: null });
+    else setPrivateAttendance(row, false);
+  };
+
+  const emailWaiverLink = async (row: Row) => {
+    if (row.kind !== "group") {
+      toast({ title: "Not supported", description: "Email waiver link is only available for group sessions right now." });
+      return;
+    }
+    setEmailingFor(row.id);
     try {
       const { error } = await supabase.functions.invoke("send-enrollment-waiver-link", {
-        body: { enrollmentId: enr.id, siteUrl: window.location.origin },
+        body: { enrollmentId: row.id, siteUrl: window.location.origin },
       });
       if (error) throw error;
-      toast({ title: "Waiver link emailed", description: enr.parent_email });
+      toast({ title: "Waiver link emailed", description: row.parent_email });
       setWaiverPrompt(null);
     } catch (e: any) {
       toast({ title: "Failed to email waiver", description: e?.message, variant: "destructive" });
@@ -217,29 +322,29 @@ const CheckInAdmin = () => {
   };
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return groups;
+    if (!search.trim()) return slots;
     const q = search.trim().toLowerCase();
-    return groups
+    return slots
       .map((g) => ({
         ...g,
-        enrollments: g.enrollments.filter(
-          (e) =>
-            e.child_name.toLowerCase().includes(q) ||
-            (e.parent_name || "").toLowerCase().includes(q),
+        rows: g.rows.filter(
+          (r) =>
+            r.child_name.toLowerCase().includes(q) ||
+            (r.parent_name || "").toLowerCase().includes(q)
         ),
       }))
-      .filter((g) => g.enrollments.length > 0);
-  }, [groups, search]);
+      .filter((g) => g.rows.length > 0);
+  }, [slots, search]);
 
-  const totals = groups.reduce(
+  const totals = slots.reduce(
     (acc, g) => {
-      acc.total += g.enrollments.length;
-      acc.checked += g.enrollments.filter((e) => e.checked_in).length;
-      acc.noshow += g.enrollments.filter((e) => e.no_show).length;
-      acc.missingWaiver += g.enrollments.filter((e) => !e.has_waiver).length;
+      acc.total += g.rows.length;
+      acc.checked += g.rows.filter((e) => e.checked_in).length;
+      acc.noshow += g.rows.filter((e) => e.no_show).length;
+      acc.missingWaiver += g.rows.filter((e) => !e.has_waiver).length;
       return acc;
     },
-    { total: 0, checked: 0, noshow: 0, missingWaiver: 0 },
+    { total: 0, checked: 0, noshow: 0, missingWaiver: 0 }
   );
 
   return (
@@ -287,30 +392,40 @@ const CheckInAdmin = () => {
         </Card>
       ) : (
         filtered.map((g) => {
-          const levelInfo = LEVEL_DISPLAY[g.session.swim_level as SwimLevel];
-          const checked = g.enrollments.filter((e) => e.checked_in).length;
+          const levelInfo = g.swim_level ? LEVEL_DISPLAY[g.swim_level as SwimLevel] : null;
+          const checked = g.rows.filter((e) => e.checked_in).length;
+          const isPrivate = g.lesson_type !== "group";
           return (
-            <Card key={g.session.id}>
+            <Card key={g.key}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-lg">
-                      {format(new Date(`2000-01-01T${g.session.start_time}`), "h:mm a")}
+                      {format(new Date(`2000-01-01T${g.start_time}`), "h:mm a")}
                     </span>
-                    <Badge variant="outline" className={levelInfo?.color || ""}>
-                      {levelInfo?.name || g.session.swim_level}
-                    </Badge>
-                    {g.session.session_name && (
-                      <span className="text-xs text-muted-foreground">{g.session.session_name}</span>
+                    {isPrivate ? (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
+                        {g.lesson_type === "semi_private" ? "Semi-Private" : "Private"}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className={levelInfo?.color || ""}>
+                        {levelInfo?.name || g.swim_level}
+                      </Badge>
+                    )}
+                    {g.instructor_name && (
+                      <span className="text-xs text-muted-foreground">w/ {g.instructor_name}</span>
+                    )}
+                    {!isPrivate && g.session_name && (
+                      <span className="text-xs text-muted-foreground">{g.session_name}</span>
                     )}
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {checked}/{g.enrollments.length} checked in
+                    {checked}/{g.rows.length} checked in
                   </span>
                 </div>
 
                 <div className="space-y-2">
-                  {g.enrollments.map((e) => {
+                  {g.rows.map((e) => {
                     const busy = busyId === e.id;
                     return (
                       <div
@@ -327,13 +442,13 @@ const CheckInAdmin = () => {
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-medium truncate">{e.child_name}</p>
                             {!e.has_waiver && (
-                              <Badge variant="destructive" className="gap-1 text-[10px] py-0 h-5">
+                              <Badge variant="destructive" className="gap-1 text-[10px] py-0 h-5" title="No waiver of any type on file (visitor, enrollment, or private lesson)">
                                 <ShieldAlert className="w-3 h-3" /> Waiver missing
                               </Badge>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground truncate">
-                            Age {e.child_age} · {e.parent_name}
+                            {e.child_age != null ? `Age ${e.child_age} · ` : ""}{e.parent_name}
                             {e.parent_phone ? ` · ${e.parent_phone}` : ""}
                           </p>
                         </div>
@@ -347,34 +462,32 @@ const CheckInAdmin = () => {
                                 size="sm"
                                 variant="ghost"
                                 disabled={busy}
-                                onClick={() => setAttendance(e, { checked_in: false, notes: null })}
+                                onClick={() => handleUndo(e)}
                               >
                                 <Undo2 className="w-3.5 h-3.5" />
                               </Button>
                             </>
                           ) : (
                             <>
-                              <Button
-                                size="sm"
-                                disabled={busy}
-                                onClick={() => handleCheckInClick(e)}
-                              >
+                              <Button size="sm" disabled={busy} onClick={() => handleCheckInClick(e)}>
                                 <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Check in
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={busy}
-                                onClick={() =>
-                                  setAttendance(e, {
-                                    checked_in: false,
-                                    notes: e.no_show ? null : "no_show",
-                                  })
-                                }
-                              >
-                                <UserX className="w-3.5 h-3.5 mr-1" />
-                                {e.no_show ? "Clear" : "No-show"}
-                              </Button>
+                              {e.kind === "group" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    setGroupAttendance(e, {
+                                      checked_in: false,
+                                      notes: e.no_show ? null : "no_show",
+                                    })
+                                  }
+                                >
+                                  <UserX className="w-3.5 h-3.5 mr-1" />
+                                  {e.no_show ? "Clear" : "No-show"}
+                                </Button>
+                              )}
                             </>
                           )}
                         </div>
@@ -388,7 +501,6 @@ const CheckInAdmin = () => {
         })
       )}
 
-      {/* Waiver-required prompt */}
       <Dialog open={!!waiverPrompt} onOpenChange={(o) => !o && setWaiverPrompt(null)}>
         <DialogContent>
           <DialogHeader>
@@ -399,7 +511,7 @@ const CheckInAdmin = () => {
             <DialogDescription>
               {waiverPrompt && (
                 <>
-                  No signed waiver on file for{" "}
+                  No signed waiver (visitor, enrollment, or private lesson) on file for{" "}
                   <span className="font-medium text-foreground">{waiverPrompt.child_name}</span> (parent:{" "}
                   {waiverPrompt.parent_name}). Choose how to handle it.
                 </>
@@ -409,27 +521,30 @@ const CheckInAdmin = () => {
           <div className="grid gap-2">
             <Button
               onClick={() => {
-                if (waiverPrompt) {
+                if (waiverPrompt && waiverPrompt.kind === "group") {
                   setSignDialog(waiverPrompt);
                   setWaiverPrompt(null);
+                } else {
+                  toast({ title: "Use Waivers page", description: "Sign a visitor waiver for this swimmer." });
                 }
               }}
             >
               <PenLine className="w-4 h-4 mr-2" />
               Sign now (in person)
             </Button>
-            <Button
-              variant="outline"
-              disabled={!!emailingFor}
-              onClick={() => waiverPrompt && emailWaiverLink(waiverPrompt)}
-            >
-              <Mail className="w-4 h-4 mr-2" />
-              {emailingFor ? "Sending…" : "Email waiver link to parent"}
-            </Button>
+            {waiverPrompt?.kind === "group" && (
+              <Button
+                variant="outline"
+                disabled={!!emailingFor}
+                onClick={() => waiverPrompt && emailWaiverLink(waiverPrompt)}
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                {emailingFor ? "Sending…" : "Email waiver link to parent"}
+              </Button>
+            )}
             <p className="text-xs text-muted-foreground px-1">
               A signed waiver is required before any swimmer can be checked in.
             </p>
-
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setWaiverPrompt(null)}>
@@ -439,12 +554,11 @@ const CheckInAdmin = () => {
         </DialogContent>
       </Dialog>
 
-      {/* In-person sign dialog */}
       <FrontDeskEnrollmentWaiverDialog
         open={!!signDialog}
         onOpenChange={(o) => !o && setSignDialog(null)}
         enrollment={
-          signDialog
+          signDialog && signDialog.kind === "group"
             ? {
                 id: signDialog.id,
                 parent_name: signDialog.parent_name,
@@ -455,8 +569,8 @@ const CheckInAdmin = () => {
         }
         onSigned={async () => {
           const target = signDialog;
-          if (target) {
-            await setAttendance(target, { checked_in: true, notes: null });
+          if (target && target.kind === "group") {
+            await setGroupAttendance(target, { checked_in: true, notes: null });
           }
           await fetchData();
         }}
