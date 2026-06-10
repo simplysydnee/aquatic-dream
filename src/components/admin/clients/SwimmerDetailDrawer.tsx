@@ -369,7 +369,7 @@ export default function SwimmerDetailDrawer({
                         <div key={e.id} className="rounded-md border p-3">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="text-xs text-muted-foreground">{fmtDateTime(e.date)}</div>
+                              <div className="text-xs text-muted-foreground">Enrolled: {fmtDateTime(e.date)}</div>
                               <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap">
                                 {e.title}
                                 {e.level && (
