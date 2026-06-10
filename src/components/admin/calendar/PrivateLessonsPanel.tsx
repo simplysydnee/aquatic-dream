@@ -140,10 +140,19 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
         )}
       </Card>
 
-      <AdminBookPrivateLessonDialog
+      <BookingQuickDialog
         open={bookOpen}
         onOpenChange={setBookOpen}
-        prefill={prefill}
+        initialSlot={prefill ? {
+          mode: prefill.start_time ? "one_time" : undefined,
+          instructorId: prefill.instructor_id,
+          instructorName: prefill.instructor_name,
+          date: prefill.date,
+          startTime: prefill.start_time,
+          endTime: prefill.end_time,
+          poolArea: prefill.pool_area,
+        } : undefined}
+        initialType={prefill?.lesson_type === "semi_private" ? "semi_private" : "private"}
         onBooked={onRefetch}
       />
       <PrivateLessonDetailDialog
