@@ -75,6 +75,8 @@ export interface LessonDate {
   session_id: string;
   lesson_date: string;
   is_cancelled: boolean;
+  instructor_override_id?: string | null;
+  instructor_override_name?: string | null;
 }
 
 export interface PrivateLessonBooking {
