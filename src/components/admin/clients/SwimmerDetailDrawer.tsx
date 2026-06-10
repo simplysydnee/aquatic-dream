@@ -467,7 +467,13 @@ export default function SwimmerDetailDrawer({
                           ) : (
                             <ul className="divide-y">
                               {occs.map((o) => {
-                                const cancelled = o.status === "cancelled" || !!o.cancelled_at;
+                                const isCancelled = o.status === "cancelled" || !!o.cancelled_at;
+                                const today = todayISO();
+                                let attKind: LessonStatusKind;
+                                if (isCancelled) attKind = "cancelled";
+                                else if (o.occurrence_date > today) attKind = "upcoming";
+                                else attKind = o.checked_in_at ? "attended" : "no_show";
+                                const attBadge = lessonStatusBadge(attKind);
                                 const tip = paymentStatusTooltip(o.payment_status);
                                 return (
                                   <li key={o.id} className="p-3 flex items-center justify-between gap-2">
@@ -478,33 +484,36 @@ export default function SwimmerDetailDrawer({
                                         {b.instructor_name ? ` · ${b.instructor_name}` : ""}
                                       </div>
                                     </div>
-                                    {cancelled ? (
-                                      <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
-                                        Cancelled
+                                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                                      <Badge variant="outline" className={cn("text-[10px]", attBadge.className)}>
+                                        {attBadge.label}
                                       </Badge>
-                                    ) : tip ? (
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Badge
-                                              variant="outline"
-                                              className={cn(
-                                                "cursor-help inline-flex items-center gap-1",
-                                                paymentStatusBadgeClass(o.payment_status),
-                                              )}
-                                            >
-                                              {formatPaymentStatus(o.payment_status)}
-                                              <HelpCircle className="h-3 w-3 opacity-70" />
-                                            </Badge>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="max-w-xs">{tip}</TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    ) : (
-                                      <Badge variant="outline" className={paymentStatusBadgeClass(o.payment_status)}>
-                                        {formatPaymentStatus(o.payment_status)}
-                                      </Badge>
-                                    )}
+                                      {!isCancelled && (
+                                        tip ? (
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Badge
+                                                  variant="outline"
+                                                  className={cn(
+                                                    "cursor-help inline-flex items-center gap-1 text-[10px]",
+                                                    paymentStatusBadgeClass(o.payment_status),
+                                                  )}
+                                                >
+                                                  {formatPaymentStatus(o.payment_status)}
+                                                  <HelpCircle className="h-3 w-3 opacity-70" />
+                                                </Badge>
+                                              </TooltipTrigger>
+                                              <TooltipContent className="max-w-xs">{tip}</TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        ) : (
+                                          <Badge variant="outline" className={cn("text-[10px]", paymentStatusBadgeClass(o.payment_status))}>
+                                            {formatPaymentStatus(o.payment_status)}
+                                          </Badge>
+                                        )
+                                      )}
+                                    </div>
                                   </li>
                                 );
                               })}
