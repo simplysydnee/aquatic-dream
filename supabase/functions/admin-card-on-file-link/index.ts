@@ -74,31 +74,37 @@ Deno.serve(async (req) => {
 
     const amt = amountLabel || "$50";
     const dateStr = new Date(booking.series_start + "T12:00:00").toLocaleDateString("en-US", {
-      weekday: "long", month: "long", day: "numeric",
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
     });
-    const timeStr = (booking.start_time || "").slice(0, 5);
+    const fmtTime = (t?: string) => {
+      if (!t) return "";
+      const [hh, mm] = t.slice(0, 5).split(":").map(Number);
+      const period = hh >= 12 ? "PM" : "AM";
+      const h12 = ((hh + 11) % 12) + 1;
+      return `${h12}:${String(mm).padStart(2, "0")} ${period}`;
+    };
+    const timeRange = booking.end_time
+      ? `${fmtTime(booking.start_time)} – ${fmtTime(booking.end_time)}`
+      : fmtTime(booking.start_time);
 
-    const body = [
-      `${booking.child_name}'s private swim lesson with ${booking.instructor_name} is booked for ${dateStr} at ${timeStr}.`,
-      "",
-      `Please save a card on file using the secure link below. No charge today — we'll automatically charge ${amt} on the day of the lesson.`,
-      "",
-      paymentLink,
-      "",
-      "You can cancel up to 24 hours before the lesson at no charge. No-shows and late cancellations are charged in full.",
-      "",
-      "See you at the pool!",
-    ].join("\n");
+    const lessonTypeLabel = booking.lesson_type === "semi_private"
+      ? "Semi-Private Lesson"
+      : "Private Lesson";
 
     const { error: emailErr } = await supabase.functions.invoke("send-transactional-email", {
       body: {
-        templateName: "admin-freeform",
+        templateName: "lesson-booking-confirmation-manual",
         recipientEmail: booking.parent_email,
         idempotencyKey: `private-booking-card-${bookingId}-${Date.now()}`,
         templateData: {
           parentName: booking.parent_name,
-          subject: `Save your card for ${booking.child_name}'s swim lesson with ${booking.instructor_name}`,
-          body,
+          childName: booking.child_name,
+          lessonTypeLabel,
+          lessonDate: dateStr,
+          lessonTime: timeRange,
+          instructorName: booking.instructor_name,
+          amountDue: amt,
+          paymentLink,
         },
       },
     });
