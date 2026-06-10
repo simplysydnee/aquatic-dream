@@ -66,5 +66,7 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.submit-visitor-waiver]
     verify_jwt = false
+  [functions.resend-private-booking-confirmation]
+    verify_jwt = true
 
 
