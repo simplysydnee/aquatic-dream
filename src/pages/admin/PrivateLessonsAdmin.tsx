@@ -1205,7 +1205,7 @@ export default function PrivateLessonsAdmin() {
                         const bookingId = activeSlot.booking!.booking_id;
                         const { data, error } = await supabase
                           .from("lesson_bookings")
-                          .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error)")
+                          .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
                           .eq("id", bookingId)
                           .maybeSingle();
                         if (error || !data) {
