@@ -455,17 +455,22 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-primary" />
-                  <p className="font-semibold text-sm truncate">{client.parent_first} {client.parent_last}</p>
+                  <p className="font-semibold text-sm truncate">
+                    {client.swimmers[0]?.first_name
+                      ? `${client.swimmers[0].first_name} ${client.swimmers[0].last_name}`
+                      : `${client.parent_first} ${client.parent_last}`}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {client.parent_email}{client.parent_phone ? ` · ${client.parent_phone}` : ""}
-                </p>
                 {client.swimmers[0]?.first_name && (
-                  <p className="text-xs text-foreground/70 mt-0.5">
-                    Swimmer: {client.swimmers[0].first_name} {client.swimmers[0].last_name}
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    Parent: {client.parent_first} {client.parent_last}
                   </p>
                 )}
+                <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                  {client.parent_email}{client.parent_phone ? ` · ${client.parent_phone}` : ""}
+                </p>
               </div>
+
               <div className="flex gap-1 shrink-0">
                 <Button variant="ghost" size="sm" onClick={() => setMode("create")}>Edit</Button>
                 <Button variant="ghost" size="sm" onClick={() => { onChange({ ...EMPTY_CLIENT, swimmers: [{ first_name: "", last_name: "", age: null, dob: null }] }); setQuery(""); }}>
@@ -514,14 +519,25 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">{r.parent_first} {r.parent_last}</p>
-                      <p className="text-xs text-muted-foreground truncate">{r.parent_email}{r.parent_phone ? ` · ${r.parent_phone}` : ""}</p>
-                      {r.swimmer_first && (
-                        <p className="text-xs text-foreground/70 mt-0.5">
-                          Swimmer: {r.swimmer_first} {r.swimmer_last}
-                          {r.swimmer_age != null ? ` (age ${r.swimmer_age})` : r.swimmer_dob ? ` (DOB ${r.swimmer_dob})` : ""}
-                        </p>
+                      {r.swimmer_first ? (
+                        <>
+                          <p className="font-semibold text-sm truncate">
+                            {r.swimmer_first} {r.swimmer_last}
+                            {r.swimmer_age != null ? (
+                              <span className="text-xs font-normal text-muted-foreground ml-1">· age {r.swimmer_age}</span>
+                            ) : r.swimmer_dob ? (
+                              <span className="text-xs font-normal text-muted-foreground ml-1">· DOB {r.swimmer_dob}</span>
+                            ) : null}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
+                            Parent: {r.parent_first} {r.parent_last}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="font-semibold text-sm truncate">{r.parent_first} {r.parent_last}</p>
                       )}
+                      <p className="text-[11px] text-muted-foreground truncate">{r.parent_email}{r.parent_phone ? ` · ${r.parent_phone}` : ""}</p>
+
                       {r.source === "request" && (r.request_preferred_times || r.request_notes) && (
                         <p className="text-[11px] text-muted-foreground italic mt-1 line-clamp-2">
                           {r.request_preferred_times ? `Prefers: ${r.request_preferred_times}` : ""}
