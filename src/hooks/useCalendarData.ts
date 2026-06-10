@@ -207,7 +207,17 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     if (eventsRes.data) setPoolEvents(eventsRes.data);
     if (attendanceRes.data) setAttendance(attendanceRes.data);
     if (agreementsRes.data) setAgreements(agreementsRes.data);
-    if (lessonDatesRes.data) setLessonDates(lessonDatesRes.data);
+    const _instructorNameMap = new Map<string, string>(
+      ((instructorsRes.data as any[]) || []).map((i) => [i.id, i.name])
+    );
+    if (lessonDatesRes.data) {
+      setLessonDates((lessonDatesRes.data as any[]).map((d) => ({
+        ...d,
+        instructor_override_name: d.instructor_override_id
+          ? (_instructorNameMap.get(d.instructor_override_id) || null)
+          : null,
+      })));
+    }
 
     // ── Map private lesson occurrences ──
     const privates: PrivateLessonBooking[] = ((privateOccRes.data as any[]) || []).map((o) => {
