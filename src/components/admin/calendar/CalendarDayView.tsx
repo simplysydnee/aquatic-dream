@@ -462,7 +462,10 @@ const CalendarDayView = ({
           colorKey: "swim",
           levelKey: s.swim_level,
           title: levelInfo?.name || s.swim_level,
-          subtitle: s.session_name || (s.instructors?.name ? `Coach ${s.instructors.name}` : undefined),
+          subtitle: (() => {
+            const effName = sessionInstructorOverrideToday.get(s.id) || s.instructors?.name;
+            return s.session_name || (effName ? `Coach ${effName}` : undefined);
+          })(),
           extra: `${sessionEnrollments.length}/${s.max_students} swimmers`,
           dimmed: false,
           photoOk: sessionPhotoConsentMap.get(s.id) === true,
