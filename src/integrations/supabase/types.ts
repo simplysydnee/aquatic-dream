@@ -731,7 +731,10 @@ export type Database = {
           checked_in_at: string | null
           checked_in_by: string | null
           created_at: string
+          end_time_override: string | null
           id: string
+          instructor_override_id: string | null
+          instructor_override_name: string | null
           occurrence_date: string
           paid_at: string | null
           payment_link_email_error: string | null
@@ -742,6 +745,7 @@ export type Database = {
           payment_status: string
           pool_event_id: string | null
           reminder_attempted_at: string | null
+          start_time_override: string | null
           status: string
           stripe_checkout_url: string | null
           stripe_payment_intent_id: string | null
@@ -760,7 +764,10 @@ export type Database = {
           checked_in_at?: string | null
           checked_in_by?: string | null
           created_at?: string
+          end_time_override?: string | null
           id?: string
+          instructor_override_id?: string | null
+          instructor_override_name?: string | null
           occurrence_date: string
           paid_at?: string | null
           payment_link_email_error?: string | null
@@ -771,6 +778,7 @@ export type Database = {
           payment_status?: string
           pool_event_id?: string | null
           reminder_attempted_at?: string | null
+          start_time_override?: string | null
           status?: string
           stripe_checkout_url?: string | null
           stripe_payment_intent_id?: string | null
@@ -789,7 +797,10 @@ export type Database = {
           checked_in_at?: string | null
           checked_in_by?: string | null
           created_at?: string
+          end_time_override?: string | null
           id?: string
+          instructor_override_id?: string | null
+          instructor_override_name?: string | null
           occurrence_date?: string
           paid_at?: string | null
           payment_link_email_error?: string | null
@@ -800,6 +811,7 @@ export type Database = {
           payment_status?: string
           pool_event_id?: string | null
           reminder_attempted_at?: string | null
+          start_time_override?: string | null
           status?: string
           stripe_checkout_url?: string | null
           stripe_payment_intent_id?: string | null
@@ -812,6 +824,13 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "lesson_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_booking_occurrences_instructor_override_id_fkey"
+            columns: ["instructor_override_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
             referencedColumns: ["id"]
           },
           {
