@@ -10,8 +10,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { getStripeEnvironment } from "@/lib/stripe";
 import { useAvailableSlots } from "@/hooks/useAvailableSlots";
+
 
 type Mode = "one" | "remaining" | "instructor";
 
