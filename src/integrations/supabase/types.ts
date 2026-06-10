@@ -867,6 +867,11 @@ export type Database = {
           parent_last_name: string | null
           parent_name: string
           parent_phone: string | null
+          partner_parent_email: string | null
+          partner_parent_name: string | null
+          partner_parent_phone: string | null
+          partner_swimmer_first_name: string | null
+          partner_swimmer_last_name: string | null
           pool_area: string
           price_per_session: number
           recur_days: string[] | null
@@ -910,6 +915,11 @@ export type Database = {
           parent_last_name?: string | null
           parent_name: string
           parent_phone?: string | null
+          partner_parent_email?: string | null
+          partner_parent_name?: string | null
+          partner_parent_phone?: string | null
+          partner_swimmer_first_name?: string | null
+          partner_swimmer_last_name?: string | null
           pool_area?: string
           price_per_session?: number
           recur_days?: string[] | null
@@ -953,6 +963,11 @@ export type Database = {
           parent_last_name?: string | null
           parent_name?: string
           parent_phone?: string | null
+          partner_parent_email?: string | null
+          partner_parent_name?: string | null
+          partner_parent_phone?: string | null
+          partner_swimmer_first_name?: string | null
+          partner_swimmer_last_name?: string | null
           pool_area?: string
           price_per_session?: number
           recur_days?: string[] | null
