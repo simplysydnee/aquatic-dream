@@ -208,6 +208,16 @@ const CalendarDayView = ({
     );
   }, [lessonDates, dateStr]);
 
+  // Map session_id -> overridden instructor name for the selected date
+  const sessionInstructorOverrideToday = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const ld of lessonDates) {
+      if (ld.lesson_date !== dateStr || ld.is_cancelled) continue;
+      if (ld.instructor_override_name) m.set(ld.session_id, ld.instructor_override_name);
+    }
+    return m;
+  }, [lessonDates, dateStr]);
+
   const todaySessions = useMemo(
     () => swimSessions.filter(
       (s) =>
@@ -452,7 +462,10 @@ const CalendarDayView = ({
           colorKey: "swim",
           levelKey: s.swim_level,
           title: levelInfo?.name || s.swim_level,
-          subtitle: s.session_name || (s.instructors?.name ? `Coach ${s.instructors.name}` : undefined),
+          subtitle: (() => {
+            const effName = sessionInstructorOverrideToday.get(s.id) || s.instructors?.name;
+            return s.session_name || (effName ? `Coach ${effName}` : undefined);
+          })(),
           extra: `${sessionEnrollments.length}/${s.max_students} swimmers`,
           dimmed: false,
           photoOk: sessionPhotoConsentMap.get(s.id) === true,
@@ -721,7 +734,10 @@ const CalendarDayView = ({
       {/* ── Instructors today (clickable to open day-modal) ── */}
       {(() => {
         const names = new Set<string>();
-        todaySessions.forEach((s) => s.instructors?.name && names.add(s.instructors.name));
+        todaySessions.forEach((s) => {
+          const eff = sessionInstructorOverrideToday.get(s.id) || s.instructors?.name;
+          if (eff) names.add(eff);
+        });
         adEvents.forEach((e) => e.instructor_name && names.add(e.instructor_name));
         swimLessonEvents.forEach((e) => e.instructor_name && names.add(e.instructor_name));
         const list = [...names].sort();
@@ -1051,7 +1067,11 @@ const CalendarDayView = ({
                           {isClosed && <span className="ml-1 text-muted-foreground">(Closed)</span>}
                         </p>
                         <p>{fmtTime(s.start_time)} – {fmtTime(s.end_time)}</p>
-                        {s.instructors?.name && <p>Instructor: {s.instructors.name}</p>}
+                        {(() => {
+                          const eff = sessionInstructorOverrideToday.get(s.id) || s.instructors?.name;
+                          const isOverride = !!sessionInstructorOverrideToday.get(s.id);
+                          return eff ? <p>Instructor: {eff}{isOverride ? " (reassigned)" : ""}</p> : null;
+                        })()}
                         <p>{sessionEnrollments.length}/{s.max_students} swimmers</p>
                         {sessionPhotoConsentMap.get(s.id) === true && (
                           <p className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">

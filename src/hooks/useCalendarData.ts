@@ -75,6 +75,8 @@ export interface LessonDate {
   session_id: string;
   lesson_date: string;
   is_cancelled: boolean;
+  instructor_override_id?: string | null;
+  instructor_override_name?: string | null;
 }
 
 export interface PrivateLessonBooking {
@@ -183,7 +185,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .select("id, enrollment_id, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, photo_release_accepted"),
       supabase
         .from("session_lesson_dates")
-        .select("id, session_id, lesson_date, is_cancelled")
+        .select("id, session_id, lesson_date, is_cancelled, instructor_override_id")
         .gte("lesson_date", rangeStart)
         .lte("lesson_date", rangeEnd),
       supabase
@@ -205,7 +207,17 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     if (eventsRes.data) setPoolEvents(eventsRes.data);
     if (attendanceRes.data) setAttendance(attendanceRes.data);
     if (agreementsRes.data) setAgreements(agreementsRes.data);
-    if (lessonDatesRes.data) setLessonDates(lessonDatesRes.data);
+    const _instructorNameMap = new Map<string, string>(
+      ((instructorsRes.data as any[]) || []).map((i) => [i.id, i.name])
+    );
+    if (lessonDatesRes.data) {
+      setLessonDates((lessonDatesRes.data as any[]).map((d) => ({
+        ...d,
+        instructor_override_name: d.instructor_override_id
+          ? (_instructorNameMap.get(d.instructor_override_id) || null)
+          : null,
+      })));
+    }
 
     // ── Map private lesson occurrences ──
     const privates: PrivateLessonBooking[] = ((privateOccRes.data as any[]) || []).map((o) => {

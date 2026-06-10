@@ -1,133 +1,42 @@
+## The bug
 
-# Admin Booking — Unified Client-First Wizard
+When you reassign a group class for a specific day from Jaclyn to Sutton, the change is saved correctly to the database — but the calendar day view never reads it back, so it keeps showing Jaclyn.
 
-Rebuild the manual admin booking flow so staff follow one consistent path: **Client → Booking Type → Slot(s) → Review & Book**. Replace the current cramped single-dialog form everywhere it appears, and add a roomier full-page version for new-client / recurring bookings.
+### What the reassign actually does
 
-## Goals
+`performReassign` (in `src/lib/lessonCancel.ts`) writes the new instructor to `session_lesson_dates.instructor_override_id` for just the selected dates. This is the right place — it leaves the rest of the recurring series on the original instructor.
 
-- One mental model for booking Private, Semi-Private, or Group Class.
-- Client selected first (search existing or create new inline).
-- For recurring private/semi: pick the already-defined recurring slot, then deselect any dates that don't work.
-- Quick path stays fast; deep path handles new clients & long series.
+`InstructorDayModal.tsx` already reads this column correctly (line 91: `effectiveInstructorId = d.instructor_override_id || sess.instructor_id`), which is why the reassign *looks* like it worked from that drawer.
 
----
+### Why the main calendar doesn't update
 
-## UX Flow
+Two places drop the override on the floor:
 
-```text
-┌──────────────────────────────────────────────────────────┐
-│  Step 1  CLIENT                                          │
-│  ───────────────────────────────────────────────────     │
-│  [ Search name / email / phone ............... ]         │
-│   Recent: ( Jane D. ) ( Marco S. ) ( + chips )           │
-│   ── results ──                                          │
-│   • Jane Doe  jane@x.com  · 2 swimmers ▸                │
-│   • Marco Suarez  …                                      │
-│                                                          │
-│   ─ or ─  [ + Create new client ]                        │
-│   (inline drawer: parent + swimmer + dob + phone)        │
-└──────────────────────────────────────────────────────────┘
-            ↓
-┌──────────────────────────────────────────────────────────┐
-│  Step 2  BOOKING TYPE                                    │
-│  ───────────────────────────────────────────────────     │
-│  ( Private )  ( Semi-Private )  ( Group Class )          │
-│  Selected swimmer(s): Lily Doe (age 6) [change]          │
-│  Semi-private → add 2nd swimmer field                    │
-└──────────────────────────────────────────────────────────┘
-            ↓
-┌──────────────────────────────────────────────────────────┐
-│  Step 3  SLOT                                            │
-│  ───────────────────────────────────────────────────     │
-│  PRIVATE / SEMI:                                         │
-│   ▸ Recurring slot picker (instructor × weekday × time)  │
-│     [ Coach Sam · Tue 4:00p · 30 min · shallow ]         │
-│     [ Coach Mia · Thu 5:30p · 30 min · shallow ]         │
-│     ─ one-time slot? [ Pick custom date/time ]           │
-│                                                          │
-│   After slot chosen → show generated dates with          │
-│   checkbox per date. Default all on. Staff can           │
-│   uncheck dates that don't work for the client.          │
-│      ☑ Tue Jun 17                                        │
-│      ☑ Tue Jun 24                                        │
-│      ☐ Tue Jul 1  (skipped)                              │
-│      ☑ Tue Jul 8 …                                       │
-│   Summary: "6 lessons · first Jun 17 · last Jul 29"      │
-│                                                          │
-│  GROUP CLASS:                                            │
-│   Filter by level + day → list of active sessions with   │
-│   open seats. Pick session → confirm.                    │
-└──────────────────────────────────────────────────────────┘
-            ↓
-┌──────────────────────────────────────────────────────────┐
-│  Step 4  REVIEW & PAYMENT                                │
-│  ───────────────────────────────────────────────────     │
-│  Client, swimmer(s), instructor, dates, price/lesson,    │
-│  totals, waiver-on-file pill, notes.                     │
-│  Card on file (toggle), Send confirmation (toggle).      │
-│  [ Book ] → embedded Stripe SetupIntent if needed.       │
-└──────────────────────────────────────────────────────────┘
-```
+1. **`src/hooks/useCalendarData.ts` line 185-188** — selects `session_lesson_dates` but only pulls `id, session_id, lesson_date, is_cancelled`. The `instructor_override_id` and any override `instructor_name` are never fetched.
+2. **`src/components/admin/calendar/CalendarDayView.tsx`** — when it renders group-class blocks it uses `swim_sessions.instructors.name` directly (e.g. line 1054, line 455). It never consults the per-date override, so the column placement, the block subtitle ("Coach …"), and the tooltip all show the base instructor.
 
-A persistent left rail shows the 4 steps with current selections; staff can jump back to any completed step.
+The "Today's Instructors" column header list at the top of the day view (line 720+) has the same issue: it builds the list from `swim_sessions.instructors.name`, so Sutton won't even get a column for today unless she already teaches another base session that day.
 
----
+## The fix
 
-## Entry Points
+1. **Fetch the override.** In `useCalendarData.ts`, expand the `session_lesson_dates` select to include `instructor_override_id`, and join the instructor name:
+   ```ts
+   .select("id, session_id, lesson_date, is_cancelled, instructor_override_id, instructor_override:instructors!session_lesson_dates_instructor_override_id_fkey(name)")
+   ```
+   Update the `LessonDate` type accordingly so consumers can read `override_instructor_id` / `override_instructor_name`.
 
-- **Full-page wizard** at `/admin/private-lessons/new` (and a "Book lesson" button on `PrivateLessonsAdmin` + calendar's `PrivateLessonsPanel`).
-- **Quick-book dialog** keeps the same 4-step layout in a wider dialog (used from calendar day cell, open-slot click). Has a "Open full booking page →" link that hands off current state via query params.
+2. **Apply the override in the day view.** In `CalendarDayView.tsx`, build a lookup `Map<sessionId, { id, name }>` from today's `lessonDates` overrides. Then everywhere a group-class block resolves its instructor, prefer the override:
+   - The "Today's Instructors" column list (around line 720).
+   - The column-filter in the grid render (line 915 — `(s.instructor_name || "Instructor") === col.label` should compare against the *effective* name).
+   - The tooltip/subtitle that prints "Coach …" (line 455, 1054).
 
-Both share the same step components — only the chrome differs.
+3. **Refresh trigger.** `ReassignDialog` already calls `onDone?.()` and the existing `onRefetch` chain re-runs `useCalendarData`, so once the select includes the override the UI will update on the next refetch with no other plumbing.
 
----
+4. **Out of scope (note only).** Reassigning private/semi-private lessons is currently disabled in `InstructorDayModal` (`hasUnreassignable` blocks the button) and `performReassign` has no path for `lesson_booking_occurrences`. If you also tried to reassign a private lesson, that's a separate missing feature — not part of this fix.
 
-## Technical Plan
+## Files to change
 
-### New files
-- `src/components/admin/booking/BookingWizard.tsx` — orchestrator + step rail, drives shared state.
-- `src/components/admin/booking/steps/ClientStep.tsx` — search (`useSwimmers`-style across `lesson_bookings`, `swim_enrollments`, `marketing_contacts` by name/email/phone), recent chips, inline "Create new" drawer.
-- `src/components/admin/booking/steps/BookingTypeStep.tsx` — Private / Semi-Private / Group toggle + swimmer selection (adds 2nd swimmer field for semi).
-- `src/components/admin/booking/steps/SlotStep.tsx` — switches on type:
-  - Private/Semi: list recurring blocks via `get_public_booking_blocks` filtered by available slots from `fetchOpenSlots`. After pick, generate occurrence dates (weekly between today and `series_end`) with checkbox grid for deselect.
-  - Group: query `swim_sessions` joined with `get_session_enrollment_counts` for capacity.
-  - "Custom one-time" sub-mode reuses `useAvailableSlots`.
-- `src/components/admin/booking/steps/ReviewStep.tsx` — totals using `getPrivateLessonPrice` (June promo aware), card-on-file + confirmation toggles, submit handler.
-- `src/pages/admin/BookingNew.tsx` — full-page route wrapping `BookingWizard`.
-- `src/components/admin/booking/BookingQuickDialog.tsx` — dialog wrapper around `BookingWizard` with a "Open full page" link.
+- `src/hooks/useCalendarData.ts` — extend the `session_lesson_dates` query + `LessonDate` type.
+- `src/components/admin/calendar/CalendarDayView.tsx` — apply the override when computing the instructor for group classes (columns list, column filter, subtitle, tooltip).
 
-### Reused
-- Edge fns: `admin-create-private-booking-setup`, `admin-create-private-booking`, `admin-create-enrollment` (group).
-- Helpers: `fetchOpenSlots`, `useAvailableSlots`, `getPrivateLessonPrice`.
-- Stripe embedded SetupIntent (same as current dialog).
-
-### Slot occurrence generation
-Use selected block's `day_of_week` + `slot_minutes` + chosen series window (default = block window, capped at 12 weeks). Build dates list, render as `<Checkbox>` grid. Pass the **kept dates only** to `admin-create-private-booking` as an explicit `occurrence_dates: string[]` payload — extend the edge fn to accept that array (when present, skip its internal weekly expansion and insert exactly those dates).
-
-### Touch-points to retire / redirect
-- `AdminBookPrivateLessonDialog` → keep as thin wrapper that mounts the new wizard for one release, then remove once calendar/admin call sites are migrated.
-- Calendar `PrivateLessonsPanel` "Book Lesson" button → opens `BookingQuickDialog`.
-- `PrivateLessonsAdmin` top-right "Book lesson" → routes to `/admin/private-lessons/new`.
-
-### State shape (shared)
-```ts
-type BookingDraft = {
-  client: { id?: string; parent: {...}; swimmers: Swimmer[] };
-  type: "private" | "semi_private" | "group";
-  slot:
-    | { mode: "recurring"; blockId; instructorId; weekday; time; durationMin; poolArea; dates: string[] /* kept */ }
-    | { mode: "one_time"; instructorId; date; start; end; poolArea }
-    | { mode: "group"; sessionId };
-  payment: { collectCardOnFile: boolean; sendConfirmation: boolean; priceOverride?: number };
-};
-```
-
-### No DB schema changes required (uses existing tables and RPCs). One edge-fn tweak only: `admin-create-private-booking` accepts optional `occurrence_dates`.
-
----
-
-## Out of scope
-
-- Public/parent-facing booking flow (unchanged).
-- Editing existing bookings (still done via `PrivateLessonDetailDialog`).
-- Waiver capture inside the wizard — flag waiver status only; signing stays in existing waiver flow.
+No DB migration, no edge-function changes.
