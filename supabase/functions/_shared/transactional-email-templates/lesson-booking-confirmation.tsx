@@ -183,6 +183,22 @@ const LessonBookingConfirmationEmail = ({
           <Text style={parentInfoItem}>• All children not with an instructor in the pool may <strong>NOT</strong> touch the water at any time.</Text>
         </Section>
 
+        {isFirstPrivateLesson && (
+          <Section style={welcomeBox}>
+            <Text style={welcomeHeading}>Welcome to Aquatic Dreams — What to Expect</Text>
+            <Text style={welcomeSubheading}>Arrival & Facility Flow</Text>
+            <Text style={welcomeItem}><strong>Arrival:</strong> Enter through the double doors at the front of the building.</Text>
+            <Text style={welcomeItem}><strong>Pre-Class Prep:</strong> Restrooms and changing rooms are in the main lobby. Please ensure your child uses the restroom before class.</Text>
+            <Text style={welcomeItem}><strong>Swim Diapers:</strong> Required for all swimmers who are not fully potty-trained — no exceptions.</Text>
+            <Text style={welcomeItem}><strong>Meeting Your Instructor:</strong> Your instructor will greet your swimmer on the pool deck at their scheduled class time.</Text>
+            <Text style={welcomeItem}><strong>Pool Deck & Viewing Rules:</strong> For everyone's safety, only enrolled swimmers and instructors are allowed on the pool deck. Families are welcome to watch from the designated viewing area. Children not in class may not touch the water at any time.</Text>
+            <Text style={welcomeItem}><strong>Departure:</strong> Pool-deck restrooms are available for changing. To keep our retail store dry, all families must exit through the back door from the pool area.</Text>
+            <Text style={welcomeReminder}>⚠️ Reminder: Please do not feed your child within 30 minutes prior to their swim lesson.</Text>
+            <Text style={welcomeSignoff}>Thank you so much for choosing Aquatic Dreams. We can't wait to see you at the pool!</Text>
+            <Text style={welcomeSignoff}>With excitement,<br />The Aquatic Dreams Team</Text>
+          </Section>
+        )}
+
         <Hr style={hr} />
         <Text style={text}>
           Questions? Reach us at info@aquaticdreamsswim.com or (209) 577-3483.
