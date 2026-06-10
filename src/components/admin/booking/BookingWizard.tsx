@@ -1449,6 +1449,14 @@ function ReviewStep({
         stripe_customer_id: customerId,
         stripe_checkout_session_id: sessionId,
       };
+      const sw2 = draft.client.swimmers[1];
+      if (draft.type === "semi_private" && sw2?.first_name?.trim()) {
+        body.partner_swimmer_first_name = sw2.first_name;
+        body.partner_swimmer_last_name = sw2.last_name || null;
+        body.partner_parent_name = sw2.partner_parent_name || null;
+        body.partner_parent_email = sw2.partner_parent_email?.toLowerCase().trim() || null;
+        body.partner_parent_phone = sw2.partner_parent_phone || null;
+      }
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking", { body });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
