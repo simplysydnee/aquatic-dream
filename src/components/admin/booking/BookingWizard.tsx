@@ -405,6 +405,30 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
 
       {mode === "search" ? (
         <div className="space-y-3">
+          {hasSelectedClient && (
+            <div className="flex items-start justify-between gap-2 p-3 rounded-md border-2 border-primary bg-primary/5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-primary" />
+                  <p className="font-semibold text-sm truncate">{client.parent_first} {client.parent_last}</p>
+                </div>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  {client.parent_email}{client.parent_phone ? ` · ${client.parent_phone}` : ""}
+                </p>
+                {client.swimmers[0]?.first_name && (
+                  <p className="text-xs text-foreground/70 mt-0.5">
+                    Swimmer: {client.swimmers[0].first_name} {client.swimmers[0].last_name}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <Button variant="ghost" size="sm" onClick={() => setMode("create")}>Edit</Button>
+                <Button variant="ghost" size="sm" onClick={() => { onChange({ ...EMPTY_CLIENT, swimmers: [{ first_name: "", last_name: "", age: null, dob: null }] }); setQuery(""); }}>
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
             <Input
