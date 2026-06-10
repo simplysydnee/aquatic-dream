@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Clock, User, CreditCard, ClipboardSignature } from "lucide-react";
 import type { PrivateLessonBooking, OpenPrivateSlot } from "@/hooks/useCalendarData";
 import { cn } from "@/lib/utils";
-import AdminBookPrivateLessonDialog from "./AdminBookPrivateLessonDialog";
+import BookingQuickDialog from "@/components/admin/booking/BookingQuickDialog";
 import PrivateLessonDetailDialog from "./PrivateLessonDetailDialog";
 
 interface Props {
