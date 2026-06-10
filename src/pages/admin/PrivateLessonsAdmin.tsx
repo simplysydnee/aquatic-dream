@@ -939,18 +939,31 @@ export default function PrivateLessonsAdmin() {
                               {o.auto_charge_error && <div className="text-xs text-destructive">{o.auto_charge_error}</div>}
                             </TableCell>
                             <TableCell className="text-right">
-                              {canCharge && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={busy === `charge-${o.id}`}
-                                  onClick={() => chargeNow(detailBooking, o)}
-                                >
-                                  {busy === `charge-${o.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3 mr-1" />}
-                                  Charge ${getPrivateLessonPrice(detailBooking.lesson_type, o.occurrence_date)}
-                                </Button>
-                              )}
+                              <div className="flex justify-end gap-1">
+                                {o.status !== "cancelled" && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setRescheduleState({ booking: detailBooking, occurrenceId: o.id, mode: "one" })}
+                                    title="Move this lesson to a different open slot"
+                                  >
+                                    <CalendarClock className="w-3 h-3 mr-1" /> Move
+                                  </Button>
+                                )}
+                                {canCharge && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={busy === `charge-${o.id}`}
+                                    onClick={() => chargeNow(detailBooking, o)}
+                                  >
+                                    {busy === `charge-${o.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3 mr-1" />}
+                                    Charge ${getPrivateLessonPrice(detailBooking.lesson_type, o.occurrence_date)}
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
+
                           </TableRow>
                         );
                       })}
