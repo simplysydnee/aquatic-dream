@@ -1372,6 +1372,16 @@ export default function PrivateLessonsAdmin() {
         </DialogContent>
       </Dialog>
 
+      <ReschedulePrivateLessonDialog
+        open={!!rescheduleState}
+        onOpenChange={(o) => { if (!o) setRescheduleState(null); }}
+        booking={rescheduleState?.booking || null}
+        initialOccurrenceId={rescheduleState?.occurrenceId}
+        initialMode={rescheduleState?.mode || "one"}
+        onDone={() => { setRescheduleState(null); load(); }}
+      />
+
     </div>
   );
 }
+
