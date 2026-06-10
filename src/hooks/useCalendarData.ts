@@ -185,7 +185,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .select("id, enrollment_id, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, photo_release_accepted"),
       supabase
         .from("session_lesson_dates")
-        .select("id, session_id, lesson_date, is_cancelled")
+        .select("id, session_id, lesson_date, is_cancelled, instructor_override_id")
         .gte("lesson_date", rangeStart)
         .lte("lesson_date", rangeEnd),
       supabase
