@@ -1,41 +1,61 @@
-## Fix #1 — Lock public slot picker to one instructor
+## What I found
 
-**File:** `src/components/private-lessons/SlotPicker.tsx`
+- **Reet + Armani are double-booked at Grace, Sat 6/13, 10:30am.**
+  - Reet was moved from the original 10:00am booking to 10:30am using an occurrence-level time override.
+  - The public booking availability check was still looking only at the original booking start time, so it still thought Reet occupied 10:00am, not 10:30am.
+  - Armani then created a self-serve pending-card booking for 10:30am.
 
-- Add `selectedInstructorId` derived from current `selected` map (first slot's `instructor_id`, or `null` when empty).
-- In `toggle(s)`, reject adding a slot whose `instructor_id` differs from `selectedInstructorId`. Show a toast: "Please book all lessons with the same instructor. Clear your selection to switch." (Recurring pattern selection already filters by instructor — no change.)
-- In the rendered day grid, visually disable (greyed, not clickable) any slot from a different instructor when a selection is in progress, with a small "Different instructor" hint on hover.
-- Add a "Clear & switch instructor" button in the selection summary when `selectedInstructorId` is set.
-- No backend change needed — `create-private-booking-setup` already uses `slots[0].instructor_id`, which will now be consistent across the whole booking.
+- **Armani did sign a waiver, but has no card on file.**
+  - There is a signed agreement row for Armani.
+  - The booking row’s `waiver_signed_at` was not stamped, so admin screens can still look like “no waiver.”
+  - The booking is `pending_card` with no saved payment method. The calendar currently shows pending-card rows too much like real booked lessons.
 
-## Fix #2 — Same lock in admin BookingWizard
+- **Carson’s Saturday 3:30pm with Sophia is from the old multi-slot bug.**
+  - Saturday was not a Sophia availability slot.
+  - The old public flow allowed selecting slots across different days/instructors, then stored only the first slot’s instructor/time on the booking row.
+  - Carson’s occurrences therefore all display as Sophia at 3:30pm, even on days that were not Sophia availability.
 
-**File:** `src/components/admin/booking/BookingWizard.tsx`
+- **Karanveer is not duplicated in the database.**
+  - I found one active booking with 3 weekly occurrences: 6/13, 6/20, 6/27.
+  - If it looks duplicated on the page, that is display/list grouping, not two identical booking rows.
 
-The new "Custom time" path already picks one instructor explicitly. The "Next 7 days" list shows multiple instructors but currently allows picking one slot. Keep single-slot for one-time bookings; no change needed there. Add a small note next to the instructor filter: "All occurrences of a series must use the same instructor."
+- **There is no database-level double-booking protection right now.**
+  - Several code paths check availability in the UI, but the database can still accept overlapping lesson occurrences.
+  - Some older admin paths also create lesson bookings directly instead of going through the newer validated booking flow.
 
-## Fix #3 — Add "Booked Lessons" section to /admin/private-lessons
+## Plan to fix it
 
-**File:** `src/pages/admin/PrivateLessonsAdmin.tsx`
+### 1. Add backend double-booking protection
+- Add a database validation trigger on private lesson occurrences.
+- Prevent a non-cancelled occurrence from overlapping another non-cancelled occurrence for the same effective instructor/date/time.
+- Use the real effective values:
+  - `instructor_override_id` falls back to booking instructor
+  - `start_time_override` falls back to booking start time
+  - `end_time_override` falls back to booking end time
+- Treat recent `pending_card` holds as temporary blockers, but do not let old abandoned pending-card rows block forever.
 
-Rename the existing top section header from blocks to "Open Availability (Booking Blocks)" to clarify what those rows are. Add a new section underneath: **"Booked Lessons"**.
+### 2. Fix the public self-serve booking flow
+- Update public slot availability to subtract moved/rescheduled occurrence times, not just original booking times.
+- Enforce one instructor per booking on the backend too, not just in the UI.
+- Validate every submitted slot is still inside an open instructor booking block and not inside a blackout/closed slot.
+- Recheck conflicts when the card setup is confirmed, so an abandoned or racing checkout cannot activate on top of an already-booked slot.
 
-Booked Lessons section:
-- Tabs: **Upcoming** (default) / **Past** / **Cancelled**.
-- Source: `lesson_bookings` joined to `lesson_booking_occurrences` where `status != 'cancelled'` (Upcoming = `occurrence_date >= today`).
-- Columns: Date, Time, Child, Parent, Instructor (from occurrence override → falls back to booking), Type (Private/Semi), Payment status, Actions (open existing `PrivateLessonDetailDialog`).
-- Search box (child/parent name) and instructor filter.
-- Counts shown in tab labels.
+### 3. Fix admin booking/reschedule paths
+- Add the same effective-time conflict checks to `admin-create-private-booking` before it inserts occurrences.
+- Make rescheduling respect closed/blackout slots and open availability by default.
+- Stop older admin “add event/private lesson” paths from directly inserting private lesson bookings without the validated booking backend.
+- Keep the `/admin` Add Booking flow as the go-to path for private, semi-private, and group bookings.
 
-This makes the two-sources mismatch (blocks vs occurrences) obvious and gives a single place to spot orphaned occurrences like Carson's Sat 6/13.
+### 4. Fix waiver/card display
+- Stamp `waiver_signed_at` when the self-serve private lesson agreement is signed.
+- Show `pending_card` rows as “pending card setup,” not as confirmed scheduled lessons.
+- Hide or separate stale pending-card rows from the calendar/booked lessons so they do not look like real booked lessons.
 
-## Out of scope (per your answers)
+### 5. Fix booked-lessons list clarity
+- Keep one row per booking in the Booked Lessons table.
+- Show the occurrence count and expand details only inside the booking detail dialog.
+- Add clear badges for: confirmed, pending card setup, missing card, waiver signed, waiver needed.
 
-- No data cleanup — Carson's bad occurrences and Sophia's duplicate Tuesday block stay until you delete them manually.
-- No per-occurrence instructor override storage. Locking the picker prevents the structural mismatch going forward.
-
-## Technical notes
-
-- `lesson_booking_occurrences` already has 31 columns including `start_time_override`, `end_time_override`, `instructor_override_id`, `instructor_override_name` — the Booked Lessons rows will prefer override values when present.
-- No new RLS or migrations — both tables are already readable by admin via existing policies used elsewhere in this page.
-- No edge-function changes.
+### Out of scope for this fix
+- No cleanup/deletion/cancellation of existing Carson/Reet/Armani/Sophia data, per your earlier instruction.
+- The existing bad records will remain until you choose to manually clean them up, but the code will stop allowing new ones.
