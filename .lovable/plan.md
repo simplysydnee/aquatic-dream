@@ -1,87 +1,61 @@
-## Goals
+## Bug
 
-Two related cleanups so admins can manage a Saturday like Zoey's in one place:
+Reet was rescheduled from 10:00 → 10:30 on Sat Jun 13. The database reflects this correctly via the occurrence overrides:
 
-1. **One-time "Move swimmer to another class for this date"** — launched from the class card on the calendar day view. Original enrollment stays intact; the swimmer just shows on the destination roster for that single date.
-2. **Render private/semi-private lesson occurrences directly in the calendar grid** (currently they sit in `PrivateLessonsPanel` below the grid). One cohesive view on `/admin/calendar` and `/admin/private-lessons`.
+- `lesson_booking_occurrences.start_time_override = 10:30:00`
+- `lesson_booking_occurrences.end_time_override   = 11:00:00`
 
----
+…but the `/admin` calendar and the Private Lessons page still show reet at 10:00 with Grace.
 
-## Part 1 — One-time swimmer move (group classes)
+## Root cause
 
-### Data model
-New table `public.enrollment_date_moves`:
+`src/hooks/useCalendarData.ts` selects private lesson occurrences without the override columns and maps `start_time`, `end_time`, and `instructor_name` straight from the parent `lesson_bookings` row. It never applies the per-occurrence overrides, so any rescheduled occurrence renders at its original time/instructor.
 
-```
-id              uuid pk
-enrollment_id   uuid  → swim_enrollments(id) on delete cascade
-lesson_date     date  not null
-target_session_id uuid → swim_sessions(id) not null
-reason          text  null
-created_by      uuid  null
-created_at      timestamptz default now()
-unique (enrollment_id, lesson_date)
+```text
+lesson_bookings (base)           ──►   uses start_time / end_time / instructor
+lesson_booking_occurrences (per-date overrides) ──► IGNORED
 ```
 
-Plus required GRANTs + RLS:
-- `authenticated` + `service_role`: full access through admin role policy
-- `has_role(auth.uid(), 'admin')` policies for select/insert/update/delete
+That hook feeds:
+- `CalendarDayView` (synthetic grid events for private lessons)
+- `PrivateLessonsPanel` (Open Private Slots calculations)
 
-### Backend wiring
-- `useCalendarData` already loads `enrollments` and `lessonDates` for the visible range. Add a parallel fetch of `enrollment_date_moves` for the same range, and expose `enrollmentDateMoves` on the hook.
-- In `CalendarDayView`, when grouping enrollments per session for the selected day:
-  - Remove enrollments whose move's `target_session_id` ≠ original `session_id` (they're moved out of the origin class today).
-  - Add enrollments that have a move pointing to this session for this date (they're moved in).
-  - Tag visiting swimmers with a small "Moved from {origin instructor}" badge so admins see the context.
+## Fix
 
-### UI
-On the class card / day-modal roster, add a labeled **"Move for this date"** button (not just the tiny ⇄ icon) per swimmer.
+### 1. Fetch override columns
+In `useCalendarData.ts`, extend the `lesson_booking_occurrences` select to include:
+- `start_time_override`
+- `end_time_override`
+- `instructor_override_id`
+- `instructor_override_name`
 
-The dialog reuses `MoveSwimmerDialog`-style picker but in **one-date mode**:
-- Heading: "Move {child} — {date} only"
-- Destination select: today's eligible sessions (same day_of_week, has a non-cancelled `session_lesson_dates` row for that date, has capacity after accounting for moves).
-- Action writes/updates the `enrollment_date_moves` row.
-- Includes a **"Remove move"** button when one already exists for that date.
+### 2. Apply overrides in the mapping
+When building each `PrivateLessonBooking`, prefer the occurrence override over the booking base:
+- `start_time = (o.start_time_override || b.start_time).slice(0,5)`
+- `end_time   = (o.end_time_override   || b.end_time).slice(0,5)`
+- `instructor_id   = o.instructor_override_id   || b.instructor_id`
+- `instructor_name = o.instructor_override_name || b.instructor_name`
 
-### Out of scope for Part 1
-- Permanent moves keep using existing `MoveSwimmerDialog`.
-- Attendance rows for moved swimmers continue to use their original enrollment id; the destination class roster just shows them on that date.
+This automatically fixes:
+- The calendar grid card (correct row + instructor column)
+- Open Private Slots math (the original 10:00 slot reappears as open, 10:30 shows as taken)
+- The "Booked Lessons" badges on Private Lessons Admin that depend on the calendar data hook
 
----
+### 3. Verify Private Lessons Admin slot map
+`PrivateLessonsAdmin.tsx` already keys taken slots by `o.start_time_override || base` (line 297), so its slot grid should now also match — confirm reet renders in the 10:30 slot, not 10:00, after the hook fix.
 
-## Part 2 — Private lessons on the calendar grid
+## Files
 
-### Source of truth
-`privateLessons: PrivateLessonBooking[]` from `useCalendarData` (already filtered to the visible range and excludes cancelled).
+- `src/hooks/useCalendarData.ts` — select + mapping update (only file required)
 
-### Render in `CalendarDayView`
-- Build `privateLessonEvents` adapter that maps each `PrivateLessonBooking` for `dateStr` to the same shape used for AD pool events (start_time, end_time, instructor_name, lane assignment), tagged with `event_type: "private-lesson" | "semi-private-lesson"`.
-- Include them in the existing AD lane-assignment pipeline so they slot in with `lessonEvents` (which today only renders legacy `pool_events`-based lessons).
-- Color: same `EEEDFE/26215C` private and `FBEAF0/4B1528` semi-private tokens already in `EVENT_COLORS`.
-- Click action: open `PrivateLessonDetailDialog` (the same dialog used by `PrivateLessonsPanel`). Hoist the dialog state so it can be triggered from the grid card too.
-- Show pending-card warning badge inside the grid card (mirror the amber chip already added to the panel).
+## Out of scope
 
-### PrivateLessonsPanel
-- Keep it for the "Open slots" list (still useful), but drop the "Booked lessons" cards — the grid replaces them. Update the header from `"Private Lessons"` to `"Open Private Slots"` for the day.
+- No schema changes.
+- No edits to the reschedule dialog (it already writes overrides correctly).
+- Group-class one-time moves (already working via `enrollment_date_moves`) are not affected.
 
-### `/admin/private-lessons`
-- The Schedule tab there already has its own custom grid; no change.
-- The Bookings tab unchanged.
-- The CalendarAdmin page is where the cohesive grid lives. Confirm `/admin/private-lessons` still meets the user's mental model after the panel is trimmed; if they expected the calendar grid on `/admin/private-lessons` too, that's a separate follow-up — current plan focuses on `/admin/calendar`.
+## Validation
 
-### Filter respect
-- Honor `activeFilters` for `private-lesson` and `semi-private-lesson` exactly as legacy lesson events do.
-
----
-
-## Technical notes
-- `enrollment_date_moves` is a real schema change (Part 1); will need a migration with grants + RLS.
-- No edge function changes required for either part.
-- All edits stay in: `useCalendarData.ts`, `CalendarDayView.tsx`, `MoveSwimmerDialog.tsx` (or a new `MoveSwimmerOneDateDialog.tsx`), `PrivateLessonsPanel.tsx`, `CalendarAdmin.tsx`.
-- Capacity check in one-date move respects max_students minus (existing enrollments + moves in − moves out for that date).
-
-## Order of work
-1. Migration for `enrollment_date_moves` + RLS/GRANTs.
-2. Hook + roster recompute (Part 1 backend).
-3. One-date Move dialog + button on the class card (Part 1 UI).
-4. Private lesson grid rendering + trim panel (Part 2).
+1. Reload `/admin` on Sat Jun 13, 2026 — reet should appear in the 10:30 row under Grace, the 10:00 cell empty.
+2. `/admin/private-lessons` Schedule tab — 10:00 Grace slot shows as open, 10:30 shows reet.
+3. Slots and booking cards for non-rescheduled occurrences remain unchanged.
