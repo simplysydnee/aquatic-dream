@@ -148,6 +148,30 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
             {busy === "resend" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Mail className="w-4 h-4 mr-1" />}
             Resend confirmation
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              setBusy("reschedule");
+              try {
+                const { data, error } = await supabase
+                  .from("lesson_bookings")
+                  .select("id, child_name, parent_name, instructor_id, instructor_name, start_time, end_time, lesson_booking_occurrences(id, occurrence_date, status, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
+                  .eq("id", lesson.booking_id)
+                  .maybeSingle();
+                if (error || !data) throw new Error(error?.message || "Could not load booking");
+                setRescheduleBooking(data);
+              } catch (e: any) {
+                toast.error(e?.message || "Failed");
+              } finally {
+                setBusy(null);
+              }
+            }}
+            disabled={busy !== null}
+          >
+            {busy === "reschedule" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CalendarCog className="w-4 h-4 mr-1" />}
+            Reschedule
+          </Button>
           <Button variant="destructive" size="sm" onClick={cancelOccurrence} disabled={busy !== null}>
             {busy === "cancel" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1" />}
             Cancel lesson
@@ -155,6 +179,14 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
           <Button size="sm" onClick={onClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
+      <ReschedulePrivateLessonDialog
+        open={!!rescheduleBooking}
+        onOpenChange={(o) => { if (!o) setRescheduleBooking(null); }}
+        booking={rescheduleBooking}
+        initialOccurrenceId={lesson.occurrence_id}
+        initialMode="one"
+        onDone={() => { setRescheduleBooking(null); onChanged(); onClose(); }}
+      />
     </Dialog>
   );
 }
