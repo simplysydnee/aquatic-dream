@@ -241,6 +241,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         payment_status: o.payment_status,
         status: o.status,
         auto_charge_status: o.auto_charge_status,
+        booking_status: b?.status || "",
         waiver_token: b?.waiver_token || null,
         waiver_signed_at: b?.waiver_signed_at || null,
         recurring: !!b?.recurring,
