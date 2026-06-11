@@ -74,18 +74,27 @@ export async function fetchOpenSlots(opts: {
   });
   const blocksList = (blocks as Block[]) || [];
 
-  // Fetch existing occurrences in window
+  // Fetch existing occurrences in window (with overrides) so moved/rescheduled
+  // lessons block their NEW time, not the original time.
   const { data: occs } = await supabase
     .from("lesson_booking_occurrences")
-    .select("occurrence_date, lesson_bookings!inner(instructor_id, start_time, end_time)")
+    .select("occurrence_date, status, created_at, start_time_override, end_time_override, instructor_override_id, lesson_bookings!inner(instructor_id, start_time, end_time)")
     .gte("occurrence_date", fromIso)
     .lte("occurrence_date", toIso)
     .neq("status", "cancelled");
-  const takenSet = new Set<string>();
+  const STALE_MS = 30 * 60 * 1000;
+  const nowMs = Date.now();
+  const takenIntervals: { instructor_id: string; date: string; start: number; end: number }[] = [];
   for (const o of (occs as any[]) || []) {
+    if (o.status === "pending_card" && o.created_at && (nowMs - new Date(o.created_at).getTime()) > STALE_MS) continue;
     const b = o.lesson_bookings;
-    if (!b?.instructor_id || !b?.start_time) continue;
-    takenSet.add(`${b.instructor_id}|${o.occurrence_date}|${normTime(b.start_time)}`);
+    const instId = o.instructor_override_id || b?.instructor_id;
+    const startT = normTime(o.start_time_override || b?.start_time || "");
+    const endT = normTime(o.end_time_override || b?.end_time || "");
+    if (!instId || !startT || !endT) continue;
+    const [sh, sm] = startT.split(":").map(Number);
+    const [eh, em] = endT.split(":").map(Number);
+    takenIntervals.push({ instructor_id: instId, date: o.occurrence_date, start: sh * 60 + sm, end: eh * 60 + em });
   }
 
   // Active holds (excluding mine) — via SECURITY DEFINER RPC; slot_holds is not publicly readable.
