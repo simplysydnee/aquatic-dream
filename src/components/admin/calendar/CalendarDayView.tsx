@@ -688,14 +688,28 @@ const CalendarDayView = ({
         {/* ICS group */}
         {icsCount > 0 && (
           <div
-            className="text-center text-xs font-semibold py-1.5 border-l"
+            className="flex items-center justify-center gap-2 text-xs font-semibold py-1.5 border-l px-2"
             style={{
               backgroundColor: "#d4f0f8",
               color: "#2a5e84",
               flex: icsCount,
             }}
           >
-            I Can Swim 209 — {todayICS.length > 0 ? icsInstructors.length : 0} instructor{icsInstructors.length !== 1 ? "s" : ""} today
+            <span>I Can Swim 209</span>
+            {todayICS.length === 0 ? (
+              <span className="font-normal opacity-70">— None today</span>
+            ) : (
+              <span className="flex items-center gap-1.5 font-normal flex-wrap">
+                <span title="Instructors with classes today" className="px-1.5 py-0.5 rounded bg-white/60">
+                  {icsInstructors.length} {icsInstructors.length === 1 ? "instructor" : "instructors"}
+                </span>
+                {icsTotalSwimmers > 0 && (
+                  <span title="Confirmed swimmers across today's ICS classes" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {icsTotalSwimmers} {icsTotalSwimmers === 1 ? "swimmer" : "swimmers"}
+                  </span>
+                )}
+              </span>
+            )}
           </div>
         )}
         {/* AD group */}
