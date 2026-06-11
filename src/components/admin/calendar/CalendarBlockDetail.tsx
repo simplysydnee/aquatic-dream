@@ -54,6 +54,11 @@ interface Props {
   onEdit: () => void;
   onCheckIn?: (enrollmentId: string, sessionId: string, isCheckedIn: boolean) => void;
   onRefetch?: () => void;
+  // For one-date swimmer moves
+  allSessions?: CalendarSwimSession[];
+  allEnrollments?: CalendarEnrollment[];
+  lessonDates?: LessonDate[];
+  enrollmentDateMoves?: EnrollmentDateMove[];
 }
 
 function getInitials(name: string) {
