@@ -556,8 +556,25 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                               >
                                 <Pencil className="w-3 h-3" />
                               </button>
+                              {block.kind === "swim" && (
+                                <button
+                                  title="Move this swimmer to another class for this date only"
+                                  onClick={() => setMoveTarget(enr)}
+                                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                                >
+                                  <ArrowRightLeft className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
                           </div>
+                          {/* Visiting badge if this swimmer is normally enrolled in a different session */}
+                          {block.kind === "swim" && enr.session_id && enr.session_id !== block.session.id && (
+                            <div className="mt-1 pl-[52px]">
+                              <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-300">
+                                ↪ Visiting from another class today
+                              </Badge>
+                            </div>
+                          )}
 
                           {/* Row 2: Parent contact */}
                           <div className="mt-2 pl-[52px] space-y-1">
