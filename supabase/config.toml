@@ -61,7 +61,7 @@ project_id = "jilrijklnehbfuulykty"
   [functions.confirm-private-booking]
     verify_jwt = false
   [functions.charge-private-lesson-occurrence]
-    verify_jwt = false
+    verify_jwt = true
   [functions.cancel-private-lesson-occurrence]
     verify_jwt = false
   [functions.submit-visitor-waiver]
