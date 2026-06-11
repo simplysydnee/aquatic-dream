@@ -67,6 +67,7 @@ const CalendarAdmin = () => {
     lessonDates,
     privateLessons,
     openPrivateSlots,
+    enrollmentDateMoves,
     loading,
     refetch,
   } = useCalendarData(currentDate, view);
