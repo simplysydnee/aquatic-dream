@@ -150,7 +150,7 @@ const CalendarAdmin = () => {
       <CalendarFilterBar
         activeFilters={activeFilters}
         onToggle={toggleFilter}
-        onShowAll={() => setActiveFilters(new Set(ALL_FILTERS))}
+        onShowAll={() => { const next = new Set(ALL_FILTERS); persistFilters(next); setActiveFilters(next); }}
       />
 
       {/* Navigation */}
