@@ -142,8 +142,14 @@ export async function fetchOpenSlots(opts: {
           t = brkEnd;
           continue;
         }
-        const key = `${blk.instructor_id}|${dateStr}|${t}`;
-        if (!takenSet.has(key)) {
+        const [th, tm] = t.split(":").map(Number);
+        const [eh, em] = slotEnd.split(":").map(Number);
+        const sMin = th * 60 + tm;
+        const eMin = eh * 60 + em;
+        const overlaps = takenIntervals.some((iv) =>
+          iv.instructor_id === blk.instructor_id && iv.date === dateStr && sMin < iv.end && eMin > iv.start
+        );
+        if (!overlaps) {
           out.push({
             instructor_id: blk.instructor_id,
             instructor_name: instructorMap[blk.instructor_id] || "Instructor",
