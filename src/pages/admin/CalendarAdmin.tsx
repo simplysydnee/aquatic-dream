@@ -33,7 +33,16 @@ const CalendarAdmin = () => {
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
   const [prefillStartTime, setPrefillStartTime] = useState<string | null>(null);
-  const [activeFilters, setActiveFilters] = useState<Set<ActivityType>>(new Set(ALL_FILTERS));
+  const [activeFilters, setActiveFilters] = useState<Set<ActivityType>>(() => {
+    try {
+      const stored = localStorage.getItem("calendar-active-filters");
+      if (stored) {
+        const arr = JSON.parse(stored) as ActivityType[];
+        if (Array.isArray(arr)) return new Set(arr.filter((f) => ALL_FILTERS.includes(f)));
+      }
+    } catch { /* ignore */ }
+    return new Set(ALL_FILTERS);
+  });
   const [miniCalOpen, setMiniCalOpen] = useState(false);
   const [icsSource, setIcsSource] = useState<"airtable" | "supabase">(() => {
     return (localStorage.getItem("ics-data-source") as "airtable" | "supabase") || "airtable";
