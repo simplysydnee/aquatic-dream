@@ -197,6 +197,7 @@ Deno.serve(async (req) => {
       notes: body.notes ?? null,
       status: "pending_card",
       booking_source: "self_serve",
+      waiver_signed_at: body.agreement.waiver_accepted ? new Date().toISOString() : null,
       stripe_customer_id: customerId,
       cancellation_policy_hours: 24,
       sms_consent: smsConsent,
