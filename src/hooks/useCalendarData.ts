@@ -79,6 +79,14 @@ export interface LessonDate {
   instructor_override_name?: string | null;
 }
 
+export interface EnrollmentDateMove {
+  id: string;
+  enrollment_id: string;
+  lesson_date: string;
+  target_session_id: string;
+  reason: string | null;
+}
+
 export interface PrivateLessonBooking {
   occurrence_id: string;
   booking_id: string;
