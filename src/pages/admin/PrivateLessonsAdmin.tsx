@@ -125,7 +125,8 @@ export default function PrivateLessonsAdmin() {
       supabase.from("lesson_bookings")
         .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, start_time_override, instructor_override_id, instructor_override_name)")
         .in("lesson_type", ["private", "semi_private"])
-        .neq("status", "pending_card")
+        // Include pending_card so the slot grid marks the time as taken
+        // while we wait for the parent to save their card.
         .neq("status", "cancelled"),
     ]);
     setInstructors((ins as any[]) || []);
