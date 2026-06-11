@@ -235,8 +235,8 @@ export default function EmailLogAdmin() {
             </Select>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Search recipient</label>
-            <Input placeholder="email or template…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <label className="text-xs text-muted-foreground mb-1 block">Search</label>
+            <Input placeholder="email, parent, swimmer, instructor, template…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </CardContent>
       </Card>
