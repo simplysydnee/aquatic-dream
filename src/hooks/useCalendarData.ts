@@ -238,19 +238,26 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     // ── Map private lesson occurrences ──
     const privates: PrivateLessonBooking[] = ((privateOccRes.data as any[]) || []).map((o) => {
       const b = o.lesson_bookings;
+      const effInstructorId = o.instructor_override_id || b?.instructor_id || null;
+      const effInstructorName = o.instructor_override_name
+        || (o.instructor_override_id ? (_instructorNameMap.get(o.instructor_override_id) || null) : null)
+        || b?.instructor_name
+        || null;
+      const effStart = (o.start_time_override || b?.start_time || "").slice(0, 5);
+      const effEnd = (o.end_time_override || b?.end_time || "").slice(0, 5);
       return {
         occurrence_id: o.id,
         booking_id: o.booking_id,
         lesson_type: b?.lesson_type || "private",
-        instructor_id: b?.instructor_id || null,
-        instructor_name: b?.instructor_name || null,
+        instructor_id: effInstructorId,
+        instructor_name: effInstructorName,
         parent_name: b?.parent_name || "",
         parent_email: b?.parent_email || "",
         parent_phone: b?.parent_phone || null,
         child_name: b?.child_name || null,
         child_age: b?.child_age ?? null,
-        start_time: (b?.start_time || "").slice(0, 5),
-        end_time: (b?.end_time || "").slice(0, 5),
+        start_time: effStart,
+        end_time: effEnd,
         pool_area: b?.pool_area || "shallow",
         occurrence_date: o.occurrence_date,
         price_per_session: Number(b?.price_per_session ?? 0),
