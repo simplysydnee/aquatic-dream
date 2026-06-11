@@ -1200,12 +1200,20 @@ const CalendarDayView = ({
 
             {/* ── AD pool events (private, semi-private) — only in first AD column ── */}
             {col.group === "ad" && col.id === columns.find(c => c.group === "ad")?.id &&
-              adEvents.map((e) => {
+              adEvents.map((e: any) => {
                 const startMins = timeToMinutes(e.start_time);
                 const endMins = timeToMinutes(e.end_time);
                 const colorKey = e.event_type;
                 const dimmed = !activeFilters.has(e.event_type as ActivityType);
                 const laneInfo = adEventLanes.get(e.id);
+                const isPL = typeof e.id === "string" && e.id.startsWith("pl:");
+                const handleClick = () => {
+                  if (isPL && e.__privateLesson && onPrivateLessonClick) {
+                    onPrivateLessonClick(e.__privateLesson);
+                  } else {
+                    setDetailBlock({ kind: "event", event: e });
+                  }
+                };
 
                 return renderBlock(
                   e.id,
@@ -1215,22 +1223,24 @@ const CalendarDayView = ({
                   e.title,
                   e.instructor_name || e.pool_area,
                   dimmed,
-                  () => setDetailBlock({ kind: "event", event: e }),
+                  handleClick,
                   false,
-                  <div className="flex shrink-0 gap-0.5">
-                    <button
-                      onClick={(ev) => { ev.stopPropagation(); onEditEvent?.(e); }}
-                      className="p-0.5 rounded hover:bg-white/50"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={(ev) => { ev.stopPropagation(); setDeleteId(e.id); }}
-                      className="p-0.5 rounded hover:bg-white/50"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>,
+                  isPL ? null : (
+                    <div className="flex shrink-0 gap-0.5">
+                      <button
+                        onClick={(ev) => { ev.stopPropagation(); onEditEvent?.(e); }}
+                        className="p-0.5 rounded hover:bg-white/50"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={(ev) => { ev.stopPropagation(); setDeleteId(e.id); }}
+                        className="p-0.5 rounded hover:bg-white/50"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ),
                   <div className="space-y-1 text-xs">
                     <p className="font-semibold">{e.title}</p>
                     <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
