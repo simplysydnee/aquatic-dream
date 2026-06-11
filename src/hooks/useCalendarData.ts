@@ -156,6 +156,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
   const [lessonDates, setLessonDates] = useState<LessonDate[]>([]);
   const [privateLessons, setPrivateLessons] = useState<PrivateLessonBooking[]>([]);
   const [openPrivateSlots, setOpenPrivateSlots] = useState<OpenPrivateSlot[]>([]);
+  const [enrollmentDateMoves, setEnrollmentDateMoves] = useState<EnrollmentDateMove[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
