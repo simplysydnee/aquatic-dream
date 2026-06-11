@@ -236,7 +236,17 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     }
 
     // ── Map private lesson occurrences ──
-    const privates: PrivateLessonBooking[] = ((privateOccRes.data as any[]) || []).map((o) => {
+    // Hide stale pending_card rows (abandoned checkouts > 30 min old) so they
+    // don't appear as real bookings on the calendar.
+    const STALE_PENDING_MS = 30 * 60 * 1000;
+    const _now = Date.now();
+    const privates: PrivateLessonBooking[] = ((privateOccRes.data as any[]) || [])
+      .filter((o) => {
+        if (o.status !== "pending_card") return true;
+        const created = o.created_at ? new Date(o.created_at).getTime() : 0;
+        return (_now - created) <= STALE_PENDING_MS;
+      })
+      .map((o) => {
       const b = o.lesson_bookings;
       const effInstructorId = o.instructor_override_id || b?.instructor_id || null;
       const effInstructorName = o.instructor_override_name
