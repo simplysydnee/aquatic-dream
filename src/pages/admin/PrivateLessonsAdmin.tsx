@@ -123,7 +123,7 @@ export default function PrivateLessonsAdmin() {
         .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(200),
       supabase.from("lesson_bookings")
-        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status)")
+        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, start_time_override, instructor_override_id, instructor_override_name)")
         .in("lesson_type", ["private", "semi_private"])
         .neq("status", "pending_card")
         .neq("status", "cancelled"),
@@ -284,13 +284,16 @@ export default function PrivateLessonsAdmin() {
     for (const i of instructors) nameToId.set(i.name.trim().toLowerCase(), i.id);
     const m = new Map<string, SlotRow["booking"]>();
     for (const b of allPrivateBookings) {
-      const instructorId: string | null =
+      const baseInstructorId: string | null =
         b.instructor_id ||
         (b.instructor_name ? nameToId.get(String(b.instructor_name).trim().toLowerCase()) || null : null);
-      if (!instructorId || !b.start_time) continue;
-      const t = normTime(b.start_time);
+      if (!b.start_time) continue;
+      const baseT = normTime(b.start_time);
       for (const o of (b.lesson_booking_occurrences || [])) {
         if (o.status === "cancelled") continue;
+        const instructorId = o.instructor_override_id || baseInstructorId;
+        if (!instructorId) continue;
+        const t = o.start_time_override ? normTime(o.start_time_override) : baseT;
         m.set(`${instructorId}|${o.occurrence_date}|${t}`, {
           booking_id: b.id,
           occurrence_id: o.id,
