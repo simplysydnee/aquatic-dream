@@ -123,7 +123,7 @@ export default function PrivateLessonsAdmin() {
         .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(200),
       supabase.from("lesson_bookings")
-        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status)")
+        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, start_time_override, instructor_override_id, instructor_override_name))")
         .in("lesson_type", ["private", "semi_private"])
         .neq("status", "pending_card")
         .neq("status", "cancelled"),
