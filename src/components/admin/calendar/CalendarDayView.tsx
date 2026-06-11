@@ -120,6 +120,8 @@ interface Props {
   icsSessions: ICSSession[];
   lessonDates: LessonDate[];
   enrollmentDateMoves?: EnrollmentDateMove[];
+  privateLessons?: PrivateLessonBooking[];
+  onPrivateLessonClick?: (booking: PrivateLessonBooking) => void;
   activeFilters: Set<ActivityType>;
   onAttendanceChange: () => void;
   onEditEvent?: (event: CalendarPoolEvent) => void;
