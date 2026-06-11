@@ -148,6 +148,8 @@ const CalendarDayView = ({
   icsSessions,
   lessonDates,
   enrollmentDateMoves = [],
+  privateLessons = [],
+  onPrivateLessonClick,
   activeFilters,
   onAttendanceChange,
   onEditEvent,
