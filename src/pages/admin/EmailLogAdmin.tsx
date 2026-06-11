@@ -139,10 +139,15 @@ export default function EmailLogAdmin() {
       }
       if (search.trim()) {
         const q = search.trim().toLowerCase();
-        if (
-          !r.recipient_email?.toLowerCase().includes(q) &&
-          !r.template_name?.toLowerCase().includes(q)
-        ) return false;
+        const td = r.metadata?.templateData || {};
+        const haystacks: string[] = [
+          r.recipient_email || "",
+          r.template_name || "",
+          td.parentName, td.parent_name, td.parentEmail,
+          td.childName, td.child_name, td.swimmerName, td.swimmer_name,
+          td.instructorName, td.instructor_name,
+        ].filter(Boolean).map((s: string) => String(s).toLowerCase());
+        if (!haystacks.some((h) => h.includes(q))) return false;
       }
       return true;
     });
