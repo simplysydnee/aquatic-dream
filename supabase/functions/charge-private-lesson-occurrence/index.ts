@@ -6,15 +6,31 @@ import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
+
+const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Auth gate: only service-role (pg_cron) or a configured CRON_SECRET may invoke.
+  const authHeader = req.headers.get("Authorization") || "";
+  const bearer = authHeader.replace(/^Bearer\s+/i, "");
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const providedSecret = req.headers.get("x-cron-secret") || "";
+  const isServiceRole = !!bearer && bearer === SERVICE_ROLE;
+  const isCronSecret = !!cronSecret && providedSecret === cronSecret;
+  if (!isServiceRole && !isCronSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    SERVICE_ROLE,
   );
 
   try {
@@ -43,7 +59,9 @@ Deno.serve(async (req) => {
       .limit(50);
     if (error) throw error;
 
-    const results: any[] = [];
+    let succeeded = 0;
+    let failed = 0;
+    let skipped = 0;
     const nowMs = Date.now();
     for (const row of (due as any[]) ?? []) {
       const b = row.lesson_bookings;
@@ -57,7 +75,7 @@ Deno.serve(async (req) => {
         );
         const chargeWindowOpen = lessonStart.getTime() - 60 * 60 * 1000;
         if (nowMs < chargeWindowOpen) {
-          results.push({ id: row.id, ok: false, reason: "before_1h_window" });
+          skipped++;
           continue;
         }
       }
@@ -67,12 +85,9 @@ Deno.serve(async (req) => {
           auto_charge_attempted_at: new Date().toISOString(),
           auto_charge_error: "No payment method on file",
         }).eq("id", row.id);
-        results.push({ id: row.id, ok: false, reason: "no_pm" });
+        failed++;
         continue;
       }
-      // Authoritative: derive from lesson_type + occurrence date. Honors the
-      // June 2026 promo even on bookings created before June with a stale
-      // price_per_session snapshot.
       const dollars = getPrivateLessonPrice(b.lesson_type, row.occurrence_date);
       const amount = Math.round(dollars * 100);
       try {
@@ -94,7 +109,7 @@ Deno.serve(async (req) => {
           paid_at: pi.status === "succeeded" ? new Date().toISOString() : null,
           auto_charge_error: pi.status === "succeeded" ? null : `Status: ${pi.status}`,
         }).eq("id", row.id);
-        results.push({ id: row.id, ok: pi.status === "succeeded", status: pi.status });
+        if (pi.status === "succeeded") succeeded++; else failed++;
       } catch (e: any) {
         const msg = e?.message || "Charge failed";
         await supabase.from("lesson_booking_occurrences").update({
@@ -102,16 +117,18 @@ Deno.serve(async (req) => {
           auto_charge_attempted_at: new Date().toISOString(),
           auto_charge_error: msg,
         }).eq("id", row.id);
-        results.push({ id: row.id, ok: false, reason: msg });
+        failed++;
       }
     }
 
-    return new Response(JSON.stringify({ processed: results.length, results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Return aggregate counts only — no occurrence IDs or per-row statuses.
+    return new Response(
+      JSON.stringify({ processed: succeeded + failed + skipped, succeeded, failed, skipped }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err: any) {
     console.error("charge-private-lesson-occurrence error", err);
-    return new Response(JSON.stringify({ error: err?.message || "Internal error" }), {
+    return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
