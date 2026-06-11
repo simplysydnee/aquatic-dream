@@ -118,6 +118,7 @@ interface Props {
   agreements: EnrollmentAgreement[];
   icsSessions: ICSSession[];
   lessonDates: LessonDate[];
+  enrollmentDateMoves?: EnrollmentDateMove[];
   activeFilters: Set<ActivityType>;
   onAttendanceChange: () => void;
   onEditEvent?: (event: CalendarPoolEvent) => void;
