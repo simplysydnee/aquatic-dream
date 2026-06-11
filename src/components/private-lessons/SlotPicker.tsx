@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ChevronLeft, X } from "lucide-react";
 import { fetchInstructors, fetchOpenSlots, holdSlots, Slot } from "@/lib/privateBooking";
 import { getPrivateLessonPrice, isJunePromoDate, PRIVATE_REGULAR_PRICE } from "@/lib/privateLessonPricing";
+import { toast } from "@/hooks/use-toast";
 
 interface Props {
   sessionToken: string;
