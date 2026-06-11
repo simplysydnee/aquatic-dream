@@ -104,7 +104,9 @@ export async function fetchOpenSlots(opts: {
     p_session_token: opts.sessionToken ?? null,
   });
   for (const h of (holds as any[]) || []) {
-    takenSet.add(`${h.instructor_id}|${h.slot_date}|${normTime(h.start_time)}`);
+    const t = normTime(h.start_time);
+    const [sh, sm] = t.split(":").map(Number);
+    takenIntervals.push({ instructor_id: h.instructor_id, date: h.slot_date, start: sh * 60 + sm, end: sh * 60 + sm + 30 });
   }
 
   // Build slots
