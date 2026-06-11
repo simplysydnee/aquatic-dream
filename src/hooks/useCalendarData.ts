@@ -209,6 +209,11 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .select("*")
         .eq("is_blackout", false),
       supabase.rpc("get_active_instructors_public"),
+      supabase
+        .from("enrollment_date_moves")
+        .select("id, enrollment_id, lesson_date, target_session_id, reason")
+        .gte("lesson_date", rangeStart)
+        .lte("lesson_date", rangeEnd),
     ]);
 
     if (sessionsRes.data) setSwimSessions(sessionsRes.data);
