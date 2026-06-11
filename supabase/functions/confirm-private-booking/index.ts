@@ -45,6 +45,44 @@ Deno.serve(async (req) => {
 
     const paymentMethodId = typeof si.payment_method === "string" ? si.payment_method : si.payment_method.id;
 
+    // Re-check for slot conflicts before activating — another booking could
+    // have completed during this checkout. Cancel & refund the card setup
+    // intent if we'd be activating onto a now-taken slot.
+    const { data: pending } = await supabase
+      .from("lesson_booking_occurrences")
+      .select("id, occurrence_date, lesson_bookings!inner(instructor_id, start_time, end_time)")
+      .eq("booking_id", booking_id)
+      .eq("status", "pending_card");
+
+    for (const p of (pending as any[]) || []) {
+      const lb = p.lesson_bookings;
+      const { data: conflicts } = await supabase
+        .from("lesson_booking_occurrences")
+        .select("id, status, created_at, start_time_override, end_time_override, instructor_override_id, lesson_bookings!inner(instructor_id, start_time, end_time)")
+        .eq("occurrence_date", p.occurrence_date)
+        .neq("id", p.id)
+        .neq("status", "cancelled");
+      const hit = ((conflicts as any[]) || []).some((c) => {
+        if (c.status === "pending_card" && c.created_at && (Date.now() - new Date(c.created_at).getTime()) > 30 * 60 * 1000) return false;
+        const cInst = c.instructor_override_id || c.lesson_bookings?.instructor_id;
+        if (cInst !== lb?.instructor_id) return false;
+        const cs = (c.start_time_override || c.lesson_bookings?.start_time || "").slice(0, 5);
+        const ce = (c.end_time_override || c.lesson_bookings?.end_time || "").slice(0, 5);
+        const ps = (lb?.start_time || "").slice(0, 5);
+        const pe = (lb?.end_time || "").slice(0, 5);
+        return ps < ce && pe > cs;
+      });
+      if (hit) {
+        await supabase.from("lesson_booking_occurrences")
+          .update({ status: "cancelled", cancel_reason: "slot taken during checkout" })
+          .eq("booking_id", booking_id);
+        await supabase.from("lesson_bookings")
+          .update({ status: "cancelled" })
+          .eq("id", booking_id);
+        return j({ error: "slot_taken_during_checkout", message: "Sorry — another parent booked one of your slots while you were checking out. No card was charged. Please pick a different slot." }, 409);
+      }
+    }
+
     const { error: uErr } = await supabase.from("lesson_bookings").update({
       stripe_payment_method_id: paymentMethodId,
       status: "active",
