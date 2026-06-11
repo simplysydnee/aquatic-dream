@@ -303,6 +303,12 @@ const CalendarAdmin = () => {
         onOpenChange={setShowPrintDialog}
         defaultDate={currentDate}
       />
+
+      <PrivateLessonDetailDialog
+        lesson={activePrivateLesson}
+        onClose={() => setActivePrivateLesson(null)}
+        onChanged={refetch}
+      />
     </div>
   );
 };
