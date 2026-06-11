@@ -12,6 +12,7 @@ import PrintDayScheduleDialog from "@/components/admin/calendar/PrintDaySchedule
 import PrivateLessonsPanel from "@/components/admin/calendar/PrivateLessonsPanel";
 import PrivateLessonDetailDialog from "@/components/admin/calendar/PrivateLessonDetailDialog";
 import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
+import BookingQuickDialog from "@/components/admin/booking/BookingQuickDialog";
 import type { PrivateLessonBooking } from "@/hooks/useCalendarData";
 
 import type { ActivityType } from "@/components/admin/calendar/CalendarFilterBar";
@@ -32,6 +33,7 @@ const CalendarAdmin = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week">("day");
   const [showAddEvent, setShowAddEvent] = useState(false);
+  const [showBookLesson, setShowBookLesson] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
   const [prefillStartTime, setPrefillStartTime] = useState<string | null>(null);
@@ -123,8 +125,11 @@ const CalendarAdmin = () => {
           <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)} className="gap-1">
             <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print Schedule</span>
           </Button>
-          <Button size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
+          <Button variant="outline" size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
             <Plus className="w-4 h-4 mr-1" /> Add Event
+          </Button>
+          <Button size="sm" onClick={() => setShowBookLesson(true)}>
+            <Plus className="w-4 h-4 mr-1" /> Book Lesson
           </Button>
         </div>
       </div>
