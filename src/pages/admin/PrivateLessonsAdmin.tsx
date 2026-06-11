@@ -920,6 +920,7 @@ export default function PrivateLessonsAdmin() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
+                      <TableHead>Time</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Payment</TableHead>
                       <TableHead></TableHead>
@@ -931,9 +932,21 @@ export default function PrivateLessonsAdmin() {
                       .sort((a: any, b: any) => a.occurrence_date.localeCompare(b.occurrence_date))
                       .map((o: any) => {
                         const canCharge = o.auto_charge_status !== "succeeded" && o.status !== "cancelled" && detailBooking.stripe_payment_method_id;
+                        const fmtT = (t?: string | null) => {
+                          if (!t) return "";
+                          const [hh, mm] = t.slice(0, 5).split(":").map(Number);
+                          const period = hh >= 12 ? "PM" : "AM";
+                          const h12 = ((hh + 11) % 12) + 1;
+                          return `${h12}:${String(mm).padStart(2, "0")} ${period}`;
+                        };
+                        const st = o.start_time_override || detailBooking.start_time;
+                        const et = o.end_time_override || detailBooking.end_time;
+                        const timeStr = et ? `${fmtT(st)} – ${fmtT(et)}` : fmtT(st);
                         return (
                           <TableRow key={o.id}>
                             <TableCell>{new Date(o.occurrence_date + "T00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</TableCell>
+                            <TableCell className="text-xs whitespace-nowrap">{timeStr}</TableCell>
+
                             <TableCell className="capitalize">{o.status}</TableCell>
                             <TableCell>
                               <span className="capitalize">{o.auto_charge_status === "succeeded" ? "paid" : o.auto_charge_status}</span>
