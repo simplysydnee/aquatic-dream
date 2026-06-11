@@ -241,6 +241,7 @@ const CalendarAdmin = () => {
           agreements={agreements}
           icsSessions={icsSessions}
           lessonDates={lessonDates}
+          enrollmentDateMoves={enrollmentDateMoves}
           activeFilters={activeFilters}
           onAttendanceChange={refetch}
           onEditEvent={(event) => {
