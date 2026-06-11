@@ -1043,7 +1043,7 @@ const CalendarDayView = ({
                 const endMins = timeToMinutes(s.end_time);
                 const top = minutesToTop(startMins);
                 const height = durationHeight(startMins, endMins);
-                const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
+                const sessionEnrollments = rosterForSession(s.id);
                 const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
                 const levelColor = LEVEL_COLORS[s.swim_level] || BLOCK_COLORS["swim"];
                 const isClosed = s.registration_status === "closed";
