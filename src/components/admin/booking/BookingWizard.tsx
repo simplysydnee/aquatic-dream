@@ -200,7 +200,8 @@ export default function BookingWizard({ initialSlot, initialType, initialClient,
     if (step === "type") {
       if (!draft.type) return false;
       if (draft.type === "semi_private") {
-        return !!draft.client.swimmers[1]?.first_name?.trim();
+        const sw2 = draft.client.swimmers[1];
+        return !!(sw2?.first_name?.trim() && sw2?.last_name?.trim() && sw2?.dob);
       }
       return true;
     }
