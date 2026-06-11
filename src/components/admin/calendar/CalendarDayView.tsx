@@ -197,6 +197,20 @@ const CalendarDayView = ({
     return names.length > 0 ? names.slice(0, 5) : ["Instructor"];
   }, [todayICS]);
 
+  // Total swimmers across today's ICS sessions + per-instructor breakdown
+  const icsTotalSwimmers = useMemo(
+    () => todayICS.reduce((sum, s) => sum + (s.confirmed_bookings || 0), 0),
+    [todayICS]
+  );
+  const icsSwimmersByInstructor = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of todayICS) {
+      const n = s.instructor_name || "Instructor";
+      m.set(n, (m.get(n) || 0) + (s.confirmed_bookings || 0));
+    }
+    return m;
+  }, [todayICS]);
+
   // ── Aquatic Dreams sessions actually happening today ──
   // A class "happens today" only if there's a non-cancelled session_lesson_dates row
   // for the selected date. This filters out recurring templates outside their session period.
@@ -674,14 +688,28 @@ const CalendarDayView = ({
         {/* ICS group */}
         {icsCount > 0 && (
           <div
-            className="text-center text-xs font-semibold py-1.5 border-l"
+            className="flex items-center justify-center gap-2 text-xs font-semibold py-1.5 border-l px-2"
             style={{
               backgroundColor: "#d4f0f8",
               color: "#2a5e84",
               flex: icsCount,
             }}
           >
-            I Can Swim 209 — {todayICS.length > 0 ? icsInstructors.length : 0} instructor{icsInstructors.length !== 1 ? "s" : ""} today
+            <span>I Can Swim 209</span>
+            {todayICS.length === 0 ? (
+              <span className="font-normal opacity-70">— None today</span>
+            ) : (
+              <span className="flex items-center gap-1.5 font-normal flex-wrap">
+                <span title="Instructors with classes today" className="px-1.5 py-0.5 rounded bg-white/60">
+                  {icsInstructors.length} {icsInstructors.length === 1 ? "instructor" : "instructors"}
+                </span>
+                {icsTotalSwimmers > 0 && (
+                  <span title="Confirmed swimmers across today's ICS classes" className="px-1.5 py-0.5 rounded bg-white/60">
+                    {icsTotalSwimmers} {icsTotalSwimmers === 1 ? "swimmer" : "swimmers"}
+                  </span>
+                )}
+              </span>
+            )}
           </div>
         )}
         {/* AD group */}
@@ -740,20 +768,32 @@ const CalendarDayView = ({
         });
         adEvents.forEach((e) => e.instructor_name && names.add(e.instructor_name));
         swimLessonEvents.forEach((e) => e.instructor_name && names.add(e.instructor_name));
-        const list = [...names].sort();
-        if (list.length === 0) return null;
+        const adList = [...names].sort();
+        const icsList = [...icsSwimmersByInstructor.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        if (adList.length === 0 && icsList.length === 0) return null;
         return (
           <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b bg-muted/20">
             <span className="text-[11px] font-medium text-muted-foreground mr-1">Instructors today:</span>
-            {list.map((n) => (
+            {adList.map((n) => (
               <button
-                key={n}
+                key={`ad-${n}`}
                 onClick={() => setOpenInstructor(n)}
                 className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs hover:bg-accent hover:border-primary/50 transition-colors"
               >
                 <UserCircle2 className="w-3 h-3" />
                 {n}
               </button>
+            ))}
+            {icsList.map(([n, count]) => (
+              <span
+                key={`ics-${n}`}
+                title={`I Can Swim 209 — ${count} ${count === 1 ? "swimmer" : "swimmers"}`}
+                className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+                style={{ backgroundColor: "#d4f0f8", borderColor: "#2a5e84", color: "#2a5e84" }}
+              >
+                <UserCircle2 className="w-3 h-3" />
+                {n} <span className="font-semibold">({count})</span>
+              </span>
             ))}
           </div>
         );
