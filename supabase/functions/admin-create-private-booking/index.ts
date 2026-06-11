@@ -310,6 +310,40 @@ Deno.serve(async (req) => {
     const waiverToken =
       crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
 
+    // Conflict check: don't allow admin to insert occurrences that overlap an
+    // existing non-cancelled occurrence for the same effective instructor/time.
+    {
+      const startT = p.start_time.slice(0, 5);
+      const endT = p.end_time.slice(0, 5);
+      const { data: existing } = await supabaseAdmin
+        .from("lesson_booking_occurrences")
+        .select("occurrence_date, status, created_at, start_time_override, end_time_override, instructor_override_id, lesson_bookings!inner(instructor_id, start_time, end_time)")
+        .in("occurrence_date", dates)
+        .neq("status", "cancelled");
+      const STALE_MS = 30 * 60 * 1000;
+      const nowMs = Date.now();
+      const conflicts: string[] = [];
+      for (const d of dates) {
+        for (const row of (existing as any[]) || []) {
+          if (row.occurrence_date !== d) continue;
+          if (row.status === "pending_card" && row.created_at && (nowMs - new Date(row.created_at).getTime()) > STALE_MS) continue;
+          const lb = row.lesson_bookings;
+          const instId = row.instructor_override_id || lb?.instructor_id;
+          if (instId !== p.instructor_id) continue;
+          const cs = (row.start_time_override || lb?.start_time || "").slice(0, 5);
+          const ce = (row.end_time_override || lb?.end_time || "").slice(0, 5);
+          if (startT < ce && endT > cs) {
+            conflicts.push(`${d} ${cs}-${ce}`);
+            break;
+          }
+        }
+      }
+      if (conflicts.length) {
+        return j({ error: `This instructor already has a lesson at that time on: ${conflicts.join(", ")}` }, 409);
+      }
+    }
+
+
     // Dedupe waiver: if this swimmer already has a signed waiver on file
     // (matched by first + last name + DOB across visitor waivers, swim
     // enrollment agreements, or prior lesson bookings), inherit that

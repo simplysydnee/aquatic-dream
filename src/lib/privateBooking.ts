@@ -74,18 +74,27 @@ export async function fetchOpenSlots(opts: {
   });
   const blocksList = (blocks as Block[]) || [];
 
-  // Fetch existing occurrences in window
+  // Fetch existing occurrences in window (with overrides) so moved/rescheduled
+  // lessons block their NEW time, not the original time.
   const { data: occs } = await supabase
     .from("lesson_booking_occurrences")
-    .select("occurrence_date, lesson_bookings!inner(instructor_id, start_time, end_time)")
+    .select("occurrence_date, status, created_at, start_time_override, end_time_override, instructor_override_id, lesson_bookings!inner(instructor_id, start_time, end_time)")
     .gte("occurrence_date", fromIso)
     .lte("occurrence_date", toIso)
     .neq("status", "cancelled");
-  const takenSet = new Set<string>();
+  const STALE_MS = 30 * 60 * 1000;
+  const nowMs = Date.now();
+  const takenIntervals: { instructor_id: string; date: string; start: number; end: number }[] = [];
   for (const o of (occs as any[]) || []) {
+    if (o.status === "pending_card" && o.created_at && (nowMs - new Date(o.created_at).getTime()) > STALE_MS) continue;
     const b = o.lesson_bookings;
-    if (!b?.instructor_id || !b?.start_time) continue;
-    takenSet.add(`${b.instructor_id}|${o.occurrence_date}|${normTime(b.start_time)}`);
+    const instId = o.instructor_override_id || b?.instructor_id;
+    const startT = normTime(o.start_time_override || b?.start_time || "");
+    const endT = normTime(o.end_time_override || b?.end_time || "");
+    if (!instId || !startT || !endT) continue;
+    const [sh, sm] = startT.split(":").map(Number);
+    const [eh, em] = endT.split(":").map(Number);
+    takenIntervals.push({ instructor_id: instId, date: o.occurrence_date, start: sh * 60 + sm, end: eh * 60 + em });
   }
 
   // Active holds (excluding mine) — via SECURITY DEFINER RPC; slot_holds is not publicly readable.
@@ -95,7 +104,9 @@ export async function fetchOpenSlots(opts: {
     p_session_token: opts.sessionToken ?? null,
   });
   for (const h of (holds as any[]) || []) {
-    takenSet.add(`${h.instructor_id}|${h.slot_date}|${normTime(h.start_time)}`);
+    const t = normTime(h.start_time);
+    const [sh, sm] = t.split(":").map(Number);
+    takenIntervals.push({ instructor_id: h.instructor_id, date: h.slot_date, start: sh * 60 + sm, end: sh * 60 + sm + 30 });
   }
 
   // Build slots
@@ -131,8 +142,14 @@ export async function fetchOpenSlots(opts: {
           t = brkEnd;
           continue;
         }
-        const key = `${blk.instructor_id}|${dateStr}|${t}`;
-        if (!takenSet.has(key)) {
+        const [th, tm] = t.split(":").map(Number);
+        const [eh, em] = slotEnd.split(":").map(Number);
+        const sMin = th * 60 + tm;
+        const eMin = eh * 60 + em;
+        const overlaps = takenIntervals.some((iv) =>
+          iv.instructor_id === blk.instructor_id && iv.date === dateStr && sMin < iv.end && eMin > iv.start
+        );
+        if (!overlaps) {
           out.push({
             instructor_id: blk.instructor_id,
             instructor_name: instructorMap[blk.instructor_id] || "Instructor",

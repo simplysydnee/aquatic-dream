@@ -123,7 +123,7 @@ export default function PrivateLessonsAdmin() {
         .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(200),
       supabase.from("lesson_bookings")
-        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, start_time_override, instructor_override_id, instructor_override_name)")
+        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, created_at, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, created_at, start_time_override, instructor_override_id, instructor_override_name)")
         .in("lesson_type", ["private", "semi_private"])
         // Include pending_card so the slot grid marks the time as taken
         // while we wait for the parent to save their card.
@@ -281,6 +281,8 @@ export default function PrivateLessonsAdmin() {
   // Some admin-created bookings store only instructor_name (instructor_id is null),
   // so we resolve the id via the active instructors list before keying.
   const bookingMap = useMemo(() => {
+    const STALE_PENDING_MS = 30 * 60 * 1000;
+    const now = Date.now();
     const nameToId = new Map<string, string>();
     for (const i of instructors) nameToId.set(i.name.trim().toLowerCase(), i.id);
     const m = new Map<string, SlotRow["booking"]>();
@@ -292,6 +294,9 @@ export default function PrivateLessonsAdmin() {
       const baseT = normTime(b.start_time);
       for (const o of (b.lesson_booking_occurrences || [])) {
         if (o.status === "cancelled") continue;
+        // Skip stale pending-card holds (abandoned checkouts) so they don't
+        // permanently lock the slot in the grid.
+        if (o.status === "pending_card" && o.created_at && (now - new Date(o.created_at).getTime()) > STALE_PENDING_MS) continue;
         const instructorId = o.instructor_override_id || baseInstructorId;
         if (!instructorId) continue;
         const t = o.start_time_override ? normTime(o.start_time_override) : baseT;
