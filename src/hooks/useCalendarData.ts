@@ -97,6 +97,7 @@ export interface PrivateLessonBooking {
   price_per_session: number;
   payment_status: string;
   status: string;
+  booking_status: string;
   auto_charge_status: string;
   waiver_token: string | null;
   waiver_signed_at: string | null;
