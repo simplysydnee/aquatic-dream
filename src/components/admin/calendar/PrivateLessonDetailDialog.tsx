@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import type { PrivateLessonBooking } from "@/hooks/useCalendarData";
-import { Mail, Calendar as CalIcon, User, Clock, CreditCard, ClipboardSignature, Trash2, Loader2 } from "lucide-react";
+import { Mail, User, Clock, CreditCard, ClipboardSignature, Trash2, Loader2, CalendarCog } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
 
 interface Props {
   lesson: PrivateLessonBooking | null;
