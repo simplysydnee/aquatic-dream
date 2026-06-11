@@ -731,7 +731,7 @@ export default function PrivateLessonsAdmin() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">Current blocks</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Open Availability (Booking Blocks)</CardTitle></CardHeader>
             <CardContent>
               <Table>
                 <TableHeader><TableRow>
