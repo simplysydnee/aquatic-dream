@@ -1324,6 +1324,10 @@ const CalendarDayView = ({
         }}
         onCheckIn={handleCheckIn}
         onRefetch={onAttendanceChange}
+        allSessions={swimSessions}
+        allEnrollments={enrollments}
+        lessonDates={lessonDates}
+        enrollmentDateMoves={enrollmentDateMoves}
       />
 
       {/* ── Delete confirmation ── */}
