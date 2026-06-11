@@ -858,11 +858,12 @@ function SecondSwimmerPicker({
         </>
       ) : (
         <div className="space-y-3">
+          <p className="text-[11px] text-muted-foreground">First name, last name, and date of birth are all required for the 2nd swimmer.</p>
           <div className="grid grid-cols-12 gap-2">
-            <Input className="col-span-4" placeholder="First" value={sw.first_name} onChange={(e) => onChange({ ...sw, first_name: e.target.value })} />
-            <Input className="col-span-4" placeholder="Last" value={sw.last_name} onChange={(e) => onChange({ ...sw, last_name: e.target.value })} />
+            <Input className="col-span-4" placeholder="First *" value={sw.first_name} onChange={(e) => onChange({ ...sw, first_name: e.target.value })} />
+            <Input className="col-span-4" placeholder="Last *" value={sw.last_name} onChange={(e) => onChange({ ...sw, last_name: e.target.value })} />
             <Input className="col-span-2" type="number" placeholder="Age" value={sw.age ?? ""} onChange={(e) => onChange({ ...sw, age: e.target.value ? Number(e.target.value) : null })} />
-            <Input className="col-span-2" type="date" value={sw.dob ?? ""} onChange={(e) => onChange({ ...sw, dob: e.target.value || null })} />
+            <Input className="col-span-2" type="date" placeholder="DOB *" value={sw.dob ?? ""} onChange={(e) => onChange({ ...sw, dob: e.target.value || null })} />
           </div>
           <div className="rounded-md border bg-muted/30 p-3 space-y-2">
             <p className="text-xs font-semibold">2nd swimmer's parent (optional — cc'd on confirmation if email differs)</p>
