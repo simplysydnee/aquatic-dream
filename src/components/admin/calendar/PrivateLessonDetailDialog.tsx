@@ -37,6 +37,7 @@ const paymentBadge = (status: string) => {
 
 export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [rescheduleBooking, setRescheduleBooking] = useState<any | null>(null);
   if (!lesson) return null;
 
   const waiverUrl = lesson.waiver_token ? `${SITE}/lesson-waiver/${lesson.waiver_token}` : null;
