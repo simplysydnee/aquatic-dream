@@ -432,6 +432,54 @@ export type Database = {
           },
         ]
       }
+      enrollment_date_moves: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          enrollment_id: string
+          id: string
+          lesson_date: string
+          reason: string | null
+          target_session_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          enrollment_id: string
+          id?: string
+          lesson_date: string
+          reason?: string | null
+          target_session_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          enrollment_id?: string
+          id?: string
+          lesson_date?: string
+          reason?: string | null
+          target_session_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollment_date_moves_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "swim_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_date_moves_target_session_id_fkey"
+            columns: ["target_session_id"]
+            isOneToOne: false
+            referencedRelation: "swim_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instructor_availability: {
         Row: {
           created_at: string
