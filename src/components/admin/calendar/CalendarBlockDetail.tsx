@@ -1052,6 +1052,21 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
           </>
         )}
       </div>
+      {block?.kind === "swim" && (
+        <MoveSwimmerOneDateDialog
+          open={!!moveTarget}
+          onOpenChange={(o) => !o && setMoveTarget(null)}
+          enrollment={moveTarget}
+          originSession={block.session}
+          dateStr={block.dateStr}
+          allSessions={allSessions}
+          lessonDates={lessonDates}
+          allEnrollments={allEnrollments}
+          movesForDate={enrollmentDateMoves.filter((m) => m.lesson_date === block.dateStr)}
+          existingMove={enrollmentDateMoves.find((m) => m.enrollment_id === moveTarget?.id && m.lesson_date === block.dateStr) || null}
+          onSaved={() => { setMoveTarget(null); onRefetch?.(); }}
+        />
+      )}
     </div>
   );
 };
