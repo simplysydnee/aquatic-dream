@@ -46,6 +46,7 @@ const CalendarAdmin = () => {
     return new Set(ALL_FILTERS);
   });
   const [miniCalOpen, setMiniCalOpen] = useState(false);
+  const [activePrivateLesson, setActivePrivateLesson] = useState<PrivateLessonBooking | null>(null);
   const [icsSource, setIcsSource] = useState<"airtable" | "supabase">(() => {
     return (localStorage.getItem("ics-data-source") as "airtable" | "supabase") || "airtable";
   });
