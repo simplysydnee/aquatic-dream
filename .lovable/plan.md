@@ -1,61 +1,57 @@
-## Bug
+## Goal
 
-Reet was rescheduled from 10:00 → 10:30 on Sat Jun 13. The database reflects this correctly via the occurrence overrides:
+Bring booked private lessons back into the panel below the calendar (alongside Open Private Slots), and make it one click to change a swimmer's time or instructor — both from the panel and from the calendar grid.
 
-- `lesson_booking_occurrences.start_time_override = 10:30:00`
-- `lesson_booking_occurrences.end_time_override   = 11:00:00`
+## Current state
 
-…but the `/admin` calendar and the Private Lessons page still show reet at 10:00 with Grace.
+- Calendar grid: private lessons render as cards (good).
+- Below grid (`PrivateLessonsPanel`): only "Open slots" listed; booked lessons only show as a counter badge.
+- Reschedule UI: a full `ReschedulePrivateLessonDialog` already exists with date/time/instructor change + slot picker. It is wired in `PrivateLessonsAdmin` but NOT reachable from `/admin` calendar at all.
 
-## Root cause
+## Changes
 
-`src/hooks/useCalendarData.ts` selects private lesson occurrences without the override columns and maps `start_time`, `end_time`, and `instructor_name` straight from the parent `lesson_bookings` row. It never applies the per-occurrence overrides, so any rescheduled occurrence renders at its original time/instructor.
+### 1. PrivateLessonsPanel — show Booked + Open side by side
+File: `src/components/admin/calendar/PrivateLessonsPanel.tsx`
 
-```text
-lesson_bookings (base)           ──►   uses start_time / end_time / instructor
-lesson_booking_occurrences (per-date overrides) ──► IGNORED
-```
+- Add a "Booked Lessons" section above "Open Slots":
+  - One row per `todays[i]`, sorted by time.
+  - Row content: time, child name, instructor, payment badge.
+  - Row click → opens existing `PrivateLessonDetailDialog`.
+  - Row "Reschedule" button → opens `ReschedulePrivateLessonDialog` for that occurrence (one-date mode).
+  - Inline instructor swap shortcut: a small instructor dropdown on each row that, on change, writes `instructor_override_id` / `instructor_override_name` to `lesson_booking_occurrences` for that occurrence only and refetches. (Fast path; full reschedule dialog still available for time changes.)
+- Keep current "Open Slots" UI unchanged.
+- Update header badges to reflect both counts.
 
-That hook feeds:
-- `CalendarDayView` (synthetic grid events for private lessons)
-- `PrivateLessonsPanel` (Open Private Slots calculations)
+### 2. Reschedule entry point from the calendar grid
+File: `src/components/admin/calendar/PrivateLessonDetailDialog.tsx`
 
-## Fix
+- Add a "Reschedule" button in the footer.
+- On click, mount `ReschedulePrivateLessonDialog` with a `BookingLite` synthesized from `PrivateLessonBooking` (`booking_id`, `instructor_id`, `instructor_name`, base `start_time`/`end_time` from the booking row, single-occurrence array containing the current occurrence + its overrides).
+- We need the base booking times (not the overridden display times). Fetch `lesson_bookings` (`start_time`, `end_time`) and `lesson_booking_occurrences` (the overrides) on demand when Reschedule is clicked, then open the dialog. Closes both on success and calls `onChanged()`.
 
-### 1. Fetch override columns
-In `useCalendarData.ts`, extend the `lesson_booking_occurrences` select to include:
-- `start_time_override`
-- `end_time_override`
-- `instructor_override_id`
-- `instructor_override_name`
+### 3. Pass instructors list to the panel for inline swap
+File: `src/pages/admin/CalendarAdmin.tsx`
 
-### 2. Apply overrides in the mapping
-When building each `PrivateLessonBooking`, prefer the occurrence override over the booking base:
-- `start_time = (o.start_time_override || b.start_time).slice(0,5)`
-- `end_time   = (o.end_time_override   || b.end_time).slice(0,5)`
-- `instructor_id   = o.instructor_override_id   || b.instructor_id`
-- `instructor_name = o.instructor_override_name || b.instructor_name`
+- Pass `instructors` (already fetched via `useCalendarData`) into `PrivateLessonsPanel` so the inline instructor dropdown can render without a new query.
 
-This automatically fixes:
-- The calendar grid card (correct row + instructor column)
-- Open Private Slots math (the original 10:00 slot reappears as open, 10:30 shows as taken)
-- The "Booked Lessons" badges on Private Lessons Admin that depend on the calendar data hook
+## Behavior summary
 
-### 3. Verify Private Lessons Admin slot map
-`PrivateLessonsAdmin.tsx` already keys taken slots by `o.start_time_override || base` (line 297), so its slot grid should now also match — confirm reet renders in the 10:30 slot, not 10:00, after the hook fix.
-
-## Files
-
-- `src/hooks/useCalendarData.ts` — select + mapping update (only file required)
+| Need | Where | UI |
+|------|-------|-----|
+| See booked lessons listed | Panel below grid | New "Booked" list |
+| See open slots | Panel below grid | Existing list |
+| Quick instructor swap | Panel row | Inline dropdown (writes occurrence override) |
+| Full reschedule (date + time + instructor) | Panel row "Reschedule" button OR grid card → detail → "Reschedule" | `ReschedulePrivateLessonDialog` (one-date mode) |
+| See booked on the grid | Calendar grid | Existing cards (already render with overrides after prior fix) |
 
 ## Out of scope
 
-- No schema changes.
-- No edits to the reschedule dialog (it already writes overrides correctly).
-- Group-class one-time moves (already working via `enrollment_date_moves`) are not affected.
+- Permanent series-wide moves (existing dialog already supports "remaining" mode — surfaced only inside the reschedule dialog tab, not as a top-level shortcut).
+- Group-class moves (handled by `enrollment_date_moves`).
+- Schema changes (the override columns we need already exist).
 
-## Validation
+## Files touched
 
-1. Reload `/admin` on Sat Jun 13, 2026 — reet should appear in the 10:30 row under Grace, the 10:00 cell empty.
-2. `/admin/private-lessons` Schedule tab — 10:00 Grace slot shows as open, 10:30 shows reet.
-3. Slots and booking cards for non-rescheduled occurrences remain unchanged.
+- `src/components/admin/calendar/PrivateLessonsPanel.tsx` — add Booked list + inline instructor swap + Reschedule button
+- `src/components/admin/calendar/PrivateLessonDetailDialog.tsx` — add Reschedule button + fetch booking on demand
+- `src/pages/admin/CalendarAdmin.tsx` — pass `instructors` prop to the panel
