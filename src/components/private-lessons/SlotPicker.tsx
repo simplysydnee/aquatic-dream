@@ -110,12 +110,30 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
     return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [filteredSlots]);
 
+  const lockedInstructorId = useMemo(() => {
+    const first = Object.values(selected)[0];
+    return first ? first.instructor_id : null;
+  }, [selected]);
+  const lockedInstructorName = useMemo(() => {
+    const first = Object.values(selected)[0];
+    return first ? first.instructor_name : null;
+  }, [selected]);
+
   const toggle = (s: Slot) => {
     const k = slotKey(s);
     setSelected((prev) => {
       const next = { ...prev };
-      if (next[k]) delete next[k];
-      else next[k] = s;
+      if (next[k]) { delete next[k]; return next; }
+      const existing = Object.values(prev)[0];
+      if (existing && existing.instructor_id !== s.instructor_id) {
+        toast({
+          title: "One instructor per booking",
+          description: `You're booking with ${existing.instructor_name}. Clear your selection to switch instructors.`,
+          variant: "destructive",
+        });
+        return prev;
+      }
+      next[k] = s;
       return next;
     });
   };
