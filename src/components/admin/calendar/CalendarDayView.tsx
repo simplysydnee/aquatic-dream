@@ -9,6 +9,7 @@ import type {
   AttendanceRecord,
   EnrollmentAgreement,
   LessonDate,
+  EnrollmentDateMove,
 } from "@/hooks/useCalendarData";
 import { Lock, Plus, Pencil, Trash2, Camera } from "lucide-react";
 import {
