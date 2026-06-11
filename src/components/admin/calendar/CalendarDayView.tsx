@@ -244,13 +244,41 @@ const CalendarDayView = ({
     [swimSessions, dayName, activeSessionIdsToday]
   );
 
-  // Count confirmed swimmers across today's classes
+  // ── One-time date moves (Zoey moved from Jaclyn's class to Grace's class for one Saturday) ──
+  const movesForDate = useMemo(
+    () => enrollmentDateMoves.filter((m) => m.lesson_date === dateStr),
+    [enrollmentDateMoves, dateStr]
+  );
+  const moveByEnrollment = useMemo(() => {
+    const m = new Map<string, EnrollmentDateMove>();
+    for (const mv of movesForDate) m.set(mv.enrollment_id, mv);
+    return m;
+  }, [movesForDate]);
+
+  // Effective roster for a session on the selected date, after applying moves.
+  const rosterForSession = useCallback((sessionId: string): CalendarEnrollment[] => {
+    const base = enrollments.filter((e) => e.session_id === sessionId);
+    // Remove enrollments that have been moved OUT to a different target
+    const kept = base.filter((e) => {
+      const mv = moveByEnrollment.get(e.id);
+      return !mv || mv.target_session_id === sessionId;
+    });
+    // Add enrollments moved IN from other sessions
+    const visitors = movesForDate
+      .filter((mv) => mv.target_session_id === sessionId)
+      .map((mv) => enrollments.find((e) => e.id === mv.enrollment_id))
+      .filter((e): e is CalendarEnrollment => !!e && e.session_id !== sessionId);
+    return [...kept, ...visitors];
+  }, [enrollments, moveByEnrollment, movesForDate]);
+
+  // Count confirmed swimmers across today's classes (using effective rosters)
   const todaySwimmerCount = useMemo(() => {
-    const ids = new Set(todaySessions.map((s) => s.id));
-    return enrollments.filter(
-      (e) => e.session_id && ids.has(e.session_id) && e.status === "confirmed"
-    ).length;
-  }, [enrollments, todaySessions]);
+    let count = 0;
+    for (const s of todaySessions) {
+      count += rosterForSession(s.id).filter((e) => e.status === "confirmed").length;
+    }
+    return count;
+  }, [todaySessions, rosterForSession]);
 
   // ── Pool events for today (non-ICS) ──
   const todayEvents = useMemo(
