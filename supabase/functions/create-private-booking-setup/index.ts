@@ -64,33 +64,57 @@ Deno.serve(async (req) => {
       return j({ error: "Required agreements not accepted", step }, 400);
     }
 
-    // Validate slots are still open: no conflicting occurrences or held slots.
-    step = "check_slot_conflicts";
-    const slotKeys = body.slots.map((s) => `${s.instructor_id}|${s.slot_date}|${s.start_time}`);
+    // Enforce one instructor per booking (UI also does this, but back it on the server too).
+    step = "enforce_single_instructor";
     const uniqInstructors = [...new Set(body.slots.map((s) => s.instructor_id))];
+    if (uniqInstructors.length > 1) {
+      return j({ error: "All slots in a single booking must be with the same instructor.", step }, 400);
+    }
+
+    // Validate slots are still open: no conflicting occurrences (using EFFECTIVE
+    // times so moved/rescheduled occurrences are accounted for).
+    step = "check_slot_conflicts";
     const uniqDates = [...new Set(body.slots.map((s) => s.slot_date))];
 
     const { data: existing, error: existingErr } = await supabase
       .from("lesson_booking_occurrences")
-      .select("occurrence_date, lesson_bookings!inner(instructor_id, start_time, status)")
+      .select("occurrence_date, status, created_at, start_time_override, end_time_override, instructor_override_id, lesson_bookings!inner(instructor_id, start_time, end_time)")
       .in("occurrence_date", uniqDates)
-      .neq("status", "cancelled")
-      .neq("status", "pending_card");
+      .neq("status", "cancelled");
     if (existingErr) throw existingErr;
 
-    const taken = new Set<string>();
+    const STALE_MS = 30 * 60 * 1000;
+    const nowMs = Date.now();
+    const takenIntervals: { instructor_id: string; date: string; start: string; end: string }[] = [];
     for (const row of (existing as any[] | null) ?? []) {
       const lb = row.lesson_bookings;
-      if (!lb?.instructor_id || !lb?.start_time) continue;
-      taken.add(`${lb.instructor_id}|${row.occurrence_date}|${normalizeTime(lb.start_time)}`);
+      // Ignore stale pending_card holds (abandoned checkouts).
+      if (row.status === "pending_card") {
+        const created = row.created_at ? new Date(row.created_at).getTime() : 0;
+        if (nowMs - created > STALE_MS) continue;
+      }
+      const instId = row.instructor_override_id || lb?.instructor_id;
+      const startT = normalizeTime(row.start_time_override || lb?.start_time || "");
+      const endT = normalizeTime(row.end_time_override || lb?.end_time || "");
+      if (!instId || !startT || !endT) continue;
+      takenIntervals.push({ instructor_id: instId, date: row.occurrence_date, start: startT, end: endT });
     }
 
     // NOTE: slot_holds are advisory-only (used to gray out the live picker).
     // We deliberately do NOT block booking on them — stale holds from a
     // refresh/retry would otherwise lock the same parent out for 10 min.
-    // The lesson_booking_occurrences check above is the real double-book guard.
 
-    const conflicts = slotKeys.filter((k) => taken.has(k.replace(/\|(\d{2}:\d{2})$/, (_, t) => `|${normalizeTime(t)}`)));
+    const conflicts: string[] = [];
+    for (const s of body.slots) {
+      const sStart = normalizeTime(s.start_time);
+      const sEnd = normalizeTime(s.end_time);
+      const overlaps = takenIntervals.some((t) =>
+        t.instructor_id === s.instructor_id &&
+        t.date === s.slot_date &&
+        sStart < t.end && sEnd > t.start
+      );
+      if (overlaps) conflicts.push(`${s.instructor_id}|${s.slot_date}|${sStart}`);
+    }
     if (conflicts.length) return j({ error: "slots_taken", conflicts, step: "check_slot_conflicts" }, 409);
 
     // Lookup instructor name (first slot used as primary on the booking row).
