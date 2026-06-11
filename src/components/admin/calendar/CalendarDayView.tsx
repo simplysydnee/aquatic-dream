@@ -496,7 +496,7 @@ const CalendarDayView = ({
 
     if (showAD) {
       todaySessions.forEach((s) => {
-        const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
+        const sessionEnrollments = rosterForSession(s.id);
         const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
         items.push({
           key: `ad-${s.id}`,
