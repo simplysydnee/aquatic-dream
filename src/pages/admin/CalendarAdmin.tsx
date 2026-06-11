@@ -10,7 +10,9 @@ import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
 import PrintDayScheduleDialog from "@/components/admin/calendar/PrintDayScheduleDialog";
 import PrivateLessonsPanel from "@/components/admin/calendar/PrivateLessonsPanel";
+import PrivateLessonDetailDialog from "@/components/admin/calendar/PrivateLessonDetailDialog";
 import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
+import type { PrivateLessonBooking } from "@/hooks/useCalendarData";
 
 import type { ActivityType } from "@/components/admin/calendar/CalendarFilterBar";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +46,7 @@ const CalendarAdmin = () => {
     return new Set(ALL_FILTERS);
   });
   const [miniCalOpen, setMiniCalOpen] = useState(false);
+  const [activePrivateLesson, setActivePrivateLesson] = useState<PrivateLessonBooking | null>(null);
   const [icsSource, setIcsSource] = useState<"airtable" | "supabase">(() => {
     return (localStorage.getItem("ics-data-source") as "airtable" | "supabase") || "airtable";
   });
@@ -67,6 +70,7 @@ const CalendarAdmin = () => {
     lessonDates,
     privateLessons,
     openPrivateSlots,
+    enrollmentDateMoves,
     loading,
     refetch,
   } = useCalendarData(currentDate, view);
@@ -240,6 +244,9 @@ const CalendarAdmin = () => {
           agreements={agreements}
           icsSessions={icsSessions}
           lessonDates={lessonDates}
+          enrollmentDateMoves={enrollmentDateMoves}
+          privateLessons={privateLessons}
+          onPrivateLessonClick={(p) => setActivePrivateLesson(p)}
           activeFilters={activeFilters}
           onAttendanceChange={refetch}
           onEditEvent={(event) => {
@@ -295,6 +302,12 @@ const CalendarAdmin = () => {
         open={showPrintDialog}
         onOpenChange={setShowPrintDialog}
         defaultDate={currentDate}
+      />
+
+      <PrivateLessonDetailDialog
+        lesson={activePrivateLesson}
+        onClose={() => setActivePrivateLesson(null)}
+        onChanged={refetch}
       />
     </div>
   );

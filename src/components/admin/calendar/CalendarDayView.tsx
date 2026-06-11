@@ -9,6 +9,8 @@ import type {
   AttendanceRecord,
   EnrollmentAgreement,
   LessonDate,
+  EnrollmentDateMove,
+  PrivateLessonBooking,
 } from "@/hooks/useCalendarData";
 import { Lock, Plus, Pencil, Trash2, Camera } from "lucide-react";
 import {
@@ -117,6 +119,9 @@ interface Props {
   agreements: EnrollmentAgreement[];
   icsSessions: ICSSession[];
   lessonDates: LessonDate[];
+  enrollmentDateMoves?: EnrollmentDateMove[];
+  privateLessons?: PrivateLessonBooking[];
+  onPrivateLessonClick?: (booking: PrivateLessonBooking) => void;
   activeFilters: Set<ActivityType>;
   onAttendanceChange: () => void;
   onEditEvent?: (event: CalendarPoolEvent) => void;
@@ -142,6 +147,9 @@ const CalendarDayView = ({
   agreements,
   icsSessions,
   lessonDates,
+  enrollmentDateMoves = [],
+  privateLessons = [],
+  onPrivateLessonClick,
   activeFilters,
   onAttendanceChange,
   onEditEvent,
@@ -241,13 +249,41 @@ const CalendarDayView = ({
     [swimSessions, dayName, activeSessionIdsToday]
   );
 
-  // Count confirmed swimmers across today's classes
+  // ── One-time date moves (Zoey moved from Jaclyn's class to Grace's class for one Saturday) ──
+  const movesForDate = useMemo(
+    () => enrollmentDateMoves.filter((m) => m.lesson_date === dateStr),
+    [enrollmentDateMoves, dateStr]
+  );
+  const moveByEnrollment = useMemo(() => {
+    const m = new Map<string, EnrollmentDateMove>();
+    for (const mv of movesForDate) m.set(mv.enrollment_id, mv);
+    return m;
+  }, [movesForDate]);
+
+  // Effective roster for a session on the selected date, after applying moves.
+  const rosterForSession = useCallback((sessionId: string): CalendarEnrollment[] => {
+    const base = enrollments.filter((e) => e.session_id === sessionId);
+    // Remove enrollments that have been moved OUT to a different target
+    const kept = base.filter((e) => {
+      const mv = moveByEnrollment.get(e.id);
+      return !mv || mv.target_session_id === sessionId;
+    });
+    // Add enrollments moved IN from other sessions
+    const visitors = movesForDate
+      .filter((mv) => mv.target_session_id === sessionId)
+      .map((mv) => enrollments.find((e) => e.id === mv.enrollment_id))
+      .filter((e): e is CalendarEnrollment => !!e && e.session_id !== sessionId);
+    return [...kept, ...visitors];
+  }, [enrollments, moveByEnrollment, movesForDate]);
+
+  // Count confirmed swimmers across today's classes (using effective rosters)
   const todaySwimmerCount = useMemo(() => {
-    const ids = new Set(todaySessions.map((s) => s.id));
-    return enrollments.filter(
-      (e) => e.session_id && ids.has(e.session_id) && e.status === "confirmed"
-    ).length;
-  }, [enrollments, todaySessions]);
+    let count = 0;
+    for (const s of todaySessions) {
+      count += rosterForSession(s.id).filter((e) => e.status === "confirmed").length;
+    }
+    return count;
+  }, [todaySessions, rosterForSession]);
 
   // ── Pool events for today (non-ICS) ──
   const todayEvents = useMemo(
@@ -258,14 +294,36 @@ const CalendarDayView = ({
   const adEventsAll = todayEvents.filter(
     (e) => !["dive-session", "pool-rental", "i-can-swim", "maintenance", "swim-lesson"].includes(e.event_type)
   );
-  const lessonEvents = adEventsAll.filter(
-    (e) => e.event_type === "private-lesson" || e.event_type === "semi-private-lesson"
-  );
+
+  // ── Map new-style private lesson bookings (lesson_bookings) for this date into the grid ──
+  const privateLessonGridEvents = useMemo(() => {
+    return privateLessons
+      .filter((p) => p.occurrence_date === dateStr)
+      .map((p) => ({
+        // Synthetic CalendarPoolEvent-shaped object; id prefixed so click handlers can detect.
+        id: `pl:${p.occurrence_id}`,
+        event_type: p.lesson_type === "semi_private" ? "semi-private-lesson" : "private-lesson",
+        title: p.child_name || p.parent_name || "Private lesson",
+        event_date: p.occurrence_date,
+        start_time: p.start_time,
+        end_time: p.end_time,
+        pool_area: p.pool_area || "shallow",
+        instructor_name: p.instructor_name,
+        notes: p.booking_status === "pending_card" ? "⚠ Card on file pending" : (p.notes || null),
+        is_recurring: !!p.recurring,
+        __privateLesson: p,
+      })) as (CalendarPoolEvent & { __privateLesson?: PrivateLessonBooking })[];
+  }, [privateLessons, dateStr]);
+
+  const lessonEvents = [
+    ...adEventsAll.filter((e) => e.event_type === "private-lesson" || e.event_type === "semi-private-lesson"),
+    ...privateLessonGridEvents,
+  ];
   const walkInEvents = adEventsAll.filter(
     (e) => e.event_type !== "private-lesson" && e.event_type !== "semi-private-lesson"
   );
   // Keep adEvents for column rendering (all of them render in the AD column)
-  const adEvents = adEventsAll;
+  const adEvents = [...adEventsAll, ...privateLessonGridEvents];
   const swimLessonEvents = todayEvents.filter((e) => e.event_type === "swim-lesson");
   const diveRentalEvents = todayEvents.filter(
     (e) => ["dive-session", "pool-rental", "maintenance"].includes(e.event_type)
@@ -465,7 +523,7 @@ const CalendarDayView = ({
 
     if (showAD) {
       todaySessions.forEach((s) => {
-        const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
+        const sessionEnrollments = rosterForSession(s.id);
         const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
         items.push({
           key: `ad-${s.id}`,
@@ -495,7 +553,8 @@ const CalendarDayView = ({
         });
       });
 
-      adEvents.forEach((e) => {
+      adEvents.forEach((e: any) => {
+        const isPL = typeof e.id === "string" && e.id.startsWith("pl:");
         items.push({
           key: `event-${e.id}`,
           startMins: timeToMinutes(e.start_time),
@@ -506,7 +565,13 @@ const CalendarDayView = ({
           title: e.title,
           subtitle: e.instructor_name || e.pool_area,
           dimmed: !activeFilters.has(e.event_type as ActivityType),
-          onClick: () => setDetailBlock({ kind: "event", event: e }),
+          onClick: () => {
+            if (isPL && e.__privateLesson && onPrivateLessonClick) {
+              onPrivateLessonClick(e.__privateLesson);
+            } else {
+              setDetailBlock({ kind: "event", event: e });
+            }
+          },
         });
       });
 
@@ -1012,7 +1077,7 @@ const CalendarDayView = ({
                 const endMins = timeToMinutes(s.end_time);
                 const top = minutesToTop(startMins);
                 const height = durationHeight(startMins, endMins);
-                const sessionEnrollments = enrollments.filter((e) => e.session_id === s.id);
+                const sessionEnrollments = rosterForSession(s.id);
                 const levelInfo = LEVEL_DISPLAY[s.swim_level as SwimLevel];
                 const levelColor = LEVEL_COLORS[s.swim_level] || BLOCK_COLORS["swim"];
                 const isClosed = s.registration_status === "closed";
@@ -1135,12 +1200,20 @@ const CalendarDayView = ({
 
             {/* ── AD pool events (private, semi-private) — only in first AD column ── */}
             {col.group === "ad" && col.id === columns.find(c => c.group === "ad")?.id &&
-              adEvents.map((e) => {
+              adEvents.map((e: any) => {
                 const startMins = timeToMinutes(e.start_time);
                 const endMins = timeToMinutes(e.end_time);
                 const colorKey = e.event_type;
                 const dimmed = !activeFilters.has(e.event_type as ActivityType);
                 const laneInfo = adEventLanes.get(e.id);
+                const isPL = typeof e.id === "string" && e.id.startsWith("pl:");
+                const handleClick = () => {
+                  if (isPL && e.__privateLesson && onPrivateLessonClick) {
+                    onPrivateLessonClick(e.__privateLesson);
+                  } else {
+                    setDetailBlock({ kind: "event", event: e });
+                  }
+                };
 
                 return renderBlock(
                   e.id,
@@ -1150,22 +1223,24 @@ const CalendarDayView = ({
                   e.title,
                   e.instructor_name || e.pool_area,
                   dimmed,
-                  () => setDetailBlock({ kind: "event", event: e }),
+                  handleClick,
                   false,
-                  <div className="flex shrink-0 gap-0.5">
-                    <button
-                      onClick={(ev) => { ev.stopPropagation(); onEditEvent?.(e); }}
-                      className="p-0.5 rounded hover:bg-white/50"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={(ev) => { ev.stopPropagation(); setDeleteId(e.id); }}
-                      className="p-0.5 rounded hover:bg-white/50"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>,
+                  isPL ? null : (
+                    <div className="flex shrink-0 gap-0.5">
+                      <button
+                        onClick={(ev) => { ev.stopPropagation(); onEditEvent?.(e); }}
+                        className="p-0.5 rounded hover:bg-white/50"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={(ev) => { ev.stopPropagation(); setDeleteId(e.id); }}
+                        className="p-0.5 rounded hover:bg-white/50"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ),
                   <div className="space-y-1 text-xs">
                     <p className="font-semibold">{e.title}</p>
                     <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
@@ -1293,6 +1368,10 @@ const CalendarDayView = ({
         }}
         onCheckIn={handleCheckIn}
         onRefetch={onAttendanceChange}
+        allSessions={swimSessions}
+        allEnrollments={enrollments}
+        lessonDates={lessonDates}
+        enrollmentDateMoves={enrollmentDateMoves}
       />
 
       {/* ── Delete confirmation ── */}

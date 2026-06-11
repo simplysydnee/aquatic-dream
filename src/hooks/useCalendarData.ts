@@ -79,6 +79,14 @@ export interface LessonDate {
   instructor_override_name?: string | null;
 }
 
+export interface EnrollmentDateMove {
+  id: string;
+  enrollment_id: string;
+  lesson_date: string;
+  target_session_id: string;
+  reason: string | null;
+}
+
 export interface PrivateLessonBooking {
   occurrence_id: string;
   booking_id: string;
@@ -148,6 +156,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
   const [lessonDates, setLessonDates] = useState<LessonDate[]>([]);
   const [privateLessons, setPrivateLessons] = useState<PrivateLessonBooking[]>([]);
   const [openPrivateSlots, setOpenPrivateSlots] = useState<OpenPrivateSlot[]>([]);
+  const [enrollmentDateMoves, setEnrollmentDateMoves] = useState<EnrollmentDateMove[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -161,7 +170,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
 
     const [
       sessionsRes, enrollmentsRes, eventsRes, attendanceRes, agreementsRes, lessonDatesRes,
-      privateOccRes, blocksRes, instructorsRes,
+      privateOccRes, blocksRes, instructorsRes, movesRes,
     ] = await Promise.all([
       supabase
         .from("swim_sessions")
@@ -200,6 +209,11 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .select("*")
         .eq("is_blackout", false),
       supabase.rpc("get_active_instructors_public"),
+      supabase
+        .from("enrollment_date_moves")
+        .select("id, enrollment_id, lesson_date, target_session_id, reason")
+        .gte("lesson_date", rangeStart)
+        .lte("lesson_date", rangeEnd),
     ]);
 
     if (sessionsRes.data) setSwimSessions(sessionsRes.data);
@@ -207,6 +221,8 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     if (eventsRes.data) setPoolEvents(eventsRes.data);
     if (attendanceRes.data) setAttendance(attendanceRes.data);
     if (agreementsRes.data) setAgreements(agreementsRes.data);
+    if (movesRes.data) setEnrollmentDateMoves(movesRes.data as EnrollmentDateMove[]);
+    else setEnrollmentDateMoves([]);
     const _instructorNameMap = new Map<string, string>(
       ((instructorsRes.data as any[]) || []).map((i) => [i.id, i.name])
     );
@@ -335,7 +351,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
 
   return {
     swimSessions, enrollments, poolEvents, attendance, agreements,
-    icsSessions, lessonDates, privateLessons, openPrivateSlots,
+    icsSessions, lessonDates, privateLessons, openPrivateSlots, enrollmentDateMoves,
     loading, refetch: fetchData,
   };
 }

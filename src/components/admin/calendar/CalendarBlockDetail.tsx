@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2, Ban } from "lucide-react";
+import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2, Ban, ArrowRightLeft } from "lucide-react";
 import CancelLessonDialog from "./CancelLessonDialog";
 import type { CancelTarget } from "@/lib/lessonCancel";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { CalendarSwimSession, CalendarEnrollment, CalendarPoolEvent, AttendanceRecord, EnrollmentAgreement } from "@/hooks/useCalendarData";
+import type { CalendarSwimSession, CalendarEnrollment, CalendarPoolEvent, AttendanceRecord, EnrollmentAgreement, LessonDate, EnrollmentDateMove } from "@/hooks/useCalendarData";
+import MoveSwimmerOneDateDialog from "./MoveSwimmerOneDateDialog";
 import type { ICSSession } from "./CalendarDayView";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,6 +54,11 @@ interface Props {
   onEdit: () => void;
   onCheckIn?: (enrollmentId: string, sessionId: string, isCheckedIn: boolean) => void;
   onRefetch?: () => void;
+  // For one-date swimmer moves
+  allSessions?: CalendarSwimSession[];
+  allEnrollments?: CalendarEnrollment[];
+  lessonDates?: LessonDate[];
+  enrollmentDateMoves?: EnrollmentDateMove[];
 }
 
 function getInitials(name: string) {
@@ -74,7 +80,8 @@ function fmtICSTime(iso: string) {
   });
 }
 
-const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: Props) => {
+const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, allSessions = [], allEnrollments = [], lessonDates = [], enrollmentDateMoves = [] }: Props) => {
+  const [moveTarget, setMoveTarget] = useState<CalendarEnrollment | null>(null);
   const [showAddSwimmer, setShowAddSwimmer] = useState(false);
   const [sendingPaymentFor, setSendingPaymentFor] = useState<string | null>(null);
   const [lessonOcc, setLessonOcc] = useState<any | null>(null);
@@ -549,8 +556,25 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
                               >
                                 <Pencil className="w-3 h-3" />
                               </button>
+                              {block.kind === "swim" && (
+                                <button
+                                  title="Move this swimmer to another class for this date only"
+                                  onClick={() => setMoveTarget(enr)}
+                                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                                >
+                                  <ArrowRightLeft className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
                           </div>
+                          {/* Visiting badge if this swimmer is normally enrolled in a different session */}
+                          {block.kind === "swim" && enr.session_id && enr.session_id !== block.session.id && (
+                            <div className="mt-1 pl-[52px]">
+                              <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-300">
+                                ↪ Visiting from another class today
+                              </Badge>
+                            </div>
+                          )}
 
                           {/* Row 2: Parent contact */}
                           <div className="mt-2 pl-[52px] space-y-1">
@@ -1028,6 +1052,21 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: P
           </>
         )}
       </div>
+      {block?.kind === "swim" && (
+        <MoveSwimmerOneDateDialog
+          open={!!moveTarget}
+          onOpenChange={(o) => !o && setMoveTarget(null)}
+          enrollment={moveTarget}
+          originSession={block.session}
+          dateStr={block.dateStr}
+          allSessions={allSessions}
+          lessonDates={lessonDates}
+          allEnrollments={allEnrollments}
+          movesForDate={enrollmentDateMoves.filter((m) => m.lesson_date === block.dateStr)}
+          existingMove={enrollmentDateMoves.find((m) => m.enrollment_id === moveTarget?.id && m.lesson_date === block.dateStr) || null}
+          onSaved={() => { setMoveTarget(null); onRefetch?.(); }}
+        />
+      )}
     </div>
   );
 };
