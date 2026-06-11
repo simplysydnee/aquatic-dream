@@ -245,6 +245,8 @@ const CalendarAdmin = () => {
           icsSessions={icsSessions}
           lessonDates={lessonDates}
           enrollmentDateMoves={enrollmentDateMoves}
+          privateLessons={privateLessons}
+          onPrivateLessonClick={(p) => setActivePrivateLesson(p)}
           activeFilters={activeFilters}
           onAttendanceChange={refetch}
           onEditEvent={(event) => {
