@@ -351,7 +351,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
 
   return {
     swimSessions, enrollments, poolEvents, attendance, agreements,
-    icsSessions, lessonDates, privateLessons, openPrivateSlots,
+    icsSessions, lessonDates, privateLessons, openPrivateSlots, enrollmentDateMoves,
     loading, refetch: fetchData,
   };
 }
