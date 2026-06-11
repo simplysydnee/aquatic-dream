@@ -197,6 +197,20 @@ const CalendarDayView = ({
     return names.length > 0 ? names.slice(0, 5) : ["Instructor"];
   }, [todayICS]);
 
+  // Total swimmers across today's ICS sessions + per-instructor breakdown
+  const icsTotalSwimmers = useMemo(
+    () => todayICS.reduce((sum, s) => sum + (s.confirmed_bookings || 0), 0),
+    [todayICS]
+  );
+  const icsSwimmersByInstructor = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of todayICS) {
+      const n = s.instructor_name || "Instructor";
+      m.set(n, (m.get(n) || 0) + (s.confirmed_bookings || 0));
+    }
+    return m;
+  }, [todayICS]);
+
   // ── Aquatic Dreams sessions actually happening today ──
   // A class "happens today" only if there's a non-cancelled session_lesson_dates row
   // for the selected date. This filters out recurring templates outside their session period.
