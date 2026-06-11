@@ -553,7 +553,8 @@ const CalendarDayView = ({
         });
       });
 
-      adEvents.forEach((e) => {
+      adEvents.forEach((e: any) => {
+        const isPL = typeof e.id === "string" && e.id.startsWith("pl:");
         items.push({
           key: `event-${e.id}`,
           startMins: timeToMinutes(e.start_time),
@@ -564,7 +565,13 @@ const CalendarDayView = ({
           title: e.title,
           subtitle: e.instructor_name || e.pool_area,
           dimmed: !activeFilters.has(e.event_type as ActivityType),
-          onClick: () => setDetailBlock({ kind: "event", event: e }),
+          onClick: () => {
+            if (isPL && e.__privateLesson && onPrivateLessonClick) {
+              onPrivateLessonClick(e.__privateLesson);
+            } else {
+              setDetailBlock({ kind: "event", event: e });
+            }
+          },
         });
       });
 
