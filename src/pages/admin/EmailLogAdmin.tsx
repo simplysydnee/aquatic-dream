@@ -140,14 +140,17 @@ export default function EmailLogAdmin() {
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         const td = r.metadata?.templateData || {};
+        const html = typeof r.metadata?.html === "string" ? r.metadata.html : "";
+        const subject = typeof r.metadata?.subject === "string" ? r.metadata.subject : "";
         const haystacks: string[] = [
           r.recipient_email || "",
           r.template_name || "",
+          subject,
           td.parentName, td.parent_name, td.parentEmail,
           td.childName, td.child_name, td.swimmerName, td.swimmer_name,
           td.instructorName, td.instructor_name,
         ].filter(Boolean).map((s: string) => String(s).toLowerCase());
-        if (!haystacks.some((h) => h.includes(q))) return false;
+        if (!haystacks.some((h) => h.includes(q)) && !html.toLowerCase().includes(q)) return false;
       }
       return true;
     });
