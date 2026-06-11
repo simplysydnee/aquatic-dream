@@ -107,22 +107,19 @@ Deno.serve(async (req) => {
     )
   }
 
-  // Auth gate: certain templates accept admin-controlled freeform content and
-  // must only be sendable by an authenticated admin (or by internal callers
-  // using the service-role key). Public/anon callers can only invoke
-  // transactional templates triggered by their own form submissions.
-  const ADMIN_ONLY_TEMPLATES = new Set([
-    'admin-freeform',
-    'early-access-invite',
-    'lesson-request-reply',
-    'instructor-schedule',
+  // Templates that public/anon forms legitimately trigger from the browser.
+  // Everything else requires service-role (internal edge fn) or admin user.
+  const PUBLIC_TEMPLATES = new Set([
+    'internal-job-application-alert',
+    'lesson-request-acknowledgment',
+    'internal-lesson-request-alert',
   ])
 
   const authHeader = req.headers.get('Authorization') || ''
   const bearer = authHeader.replace(/^Bearer\s+/i, '')
   const isServiceRoleCaller = !!bearer && bearer === supabaseServiceKey
 
-  if (ADMIN_ONLY_TEMPLATES.has(templateName) && !isServiceRoleCaller) {
+  if (!PUBLIC_TEMPLATES.has(templateName) && !isServiceRoleCaller) {
     if (!bearer) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
