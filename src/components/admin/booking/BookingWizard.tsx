@@ -1069,6 +1069,9 @@ function RecurringSlotChooser({
             )}
             <span className="text-xs text-muted-foreground ml-auto">{filteredBlocks.length} slot{filteredBlocks.length === 1 ? "" : "s"}</span>
           </div>
+          <p className="text-[11px] text-muted-foreground mb-2">
+            Note: every lesson in a recurring series must use the same instructor.
+          </p>
 
           {Object.keys(groupedByDay).length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-8">
