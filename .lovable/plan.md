@@ -1,40 +1,41 @@
-## Goal
+## Fix #1 — Lock public slot picker to one instructor
 
-Make the calendar page (`/admin`) the go-to place for staff to book any lesson — private, semi-private, or group — using the same wizard as `/admin/private-lessons/new`. Improve the one-time slot picker so it loads the next 7 days of open slots across all instructors out of the box.
+**File:** `src/components/private-lessons/SlotPicker.tsx`
 
-## Changes
+- Add `selectedInstructorId` derived from current `selected` map (first slot's `instructor_id`, or `null` when empty).
+- In `toggle(s)`, reject adding a slot whose `instructor_id` differs from `selectedInstructorId`. Show a toast: "Please book all lessons with the same instructor. Clear your selection to switch." (Recurring pattern selection already filters by instructor — no change.)
+- In the rendered day grid, visually disable (greyed, not clickable) any slot from a different instructor when a selection is in progress, with a small "Different instructor" hint on hover.
+- Add a "Clear & switch instructor" button in the selection summary when `selectedInstructorId` is set.
+- No backend change needed — `create-private-booking-setup` already uses `slots[0].instructor_id`, which will now be consistent across the whole booking.
 
-### 1. `src/pages/admin/CalendarAdmin.tsx` — header CTA
-- Add a "Book Lesson" button next to "Add Event" (same row, primary style).
-- Click opens `BookingQuickDialog` (already used by `PrivateLessonsPanel`), prefilled with the currently viewed date but no slot.
-- On success → call existing `refetch()` so new bookings/occurrences appear immediately on the calendar grid.
+## Fix #2 — Same lock in admin BookingWizard
 
-### 2. `src/components/admin/booking/BookingWizard.tsx` — `OneTimeChooser`
-Replace today's "pick instructor + time inputs" form with a slot-list UI:
+**File:** `src/components/admin/booking/BookingWizard.tsx`
 
-- On mount, fetch open slots for the next 7 days using existing `fetchOpenSlots` helper from `src/lib/privateBooking.ts` (already powers the public booking flow + `PrivateLessonsPanel`).
-- Header controls:
-  - **Date** chips for the next 7 days (today → +6); clicking filters the list.
-  - **Instructor** select with an "All instructors" default.
-  - **Pool** select (kept, defaults to shallow — only used when admin manually overrides time).
-- Slot list: time + instructor + pool, sorted soonest-first; click selects (`instructorId`, `instructorName`, `date`, `startTime`, `endTime`).
-- Collapsible "Custom time" section retains today's manual date/time inputs for off-grid bookings (e.g. comp lessons outside published blocks).
-- Empty state: "No open slots in the next 7 days — use Custom time."
+The new "Custom time" path already picks one instructor explicitly. The "Next 7 days" list shows multiple instructors but currently allows picking one slot. Keep single-slot for one-time bookings; no change needed there. Add a small note next to the instructor filter: "All occurrences of a series must use the same instructor."
 
-### 3. Semi-private "Add sibling" (BookingWizard Client step)
-- Confirm + tighten existing `swimmers[1]` UI: first name, last name, and DOB are all **required** when type is `semi_private` (today DOB is optional). Parent contact stays as-is — single parent row for the whole booking, with the optional partner-parent cc fields kept on swimmer[1] as today.
-- Update `slot` step gating so semi-private can't proceed without both swimmers having `first_name`, `last_name`, `dob`.
+## Fix #3 — Add "Booked Lessons" section to /admin/private-lessons
 
-### 4. No backend changes
-- All slot/instructor data comes from existing RPCs (`get_active_instructors_public`, `get_public_booking_blocks`, `get_active_slot_holds`) already used by `fetchOpenSlots`.
-- No schema, no edge functions, no RLS work.
+**File:** `src/pages/admin/PrivateLessonsAdmin.tsx`
 
-## Out of scope
-- Changing how bookings are saved (still goes through the existing wizard → `admin-create-private-booking` / group enrollment path).
-- Rearranging the Private Lessons admin page.
-- Mobile-specific redesign of the wizard.
+Rename the existing top section header from blocks to "Open Availability (Booking Blocks)" to clarify what those rows are. Add a new section underneath: **"Booked Lessons"**.
+
+Booked Lessons section:
+- Tabs: **Upcoming** (default) / **Past** / **Cancelled**.
+- Source: `lesson_bookings` joined to `lesson_booking_occurrences` where `status != 'cancelled'` (Upcoming = `occurrence_date >= today`).
+- Columns: Date, Time, Child, Parent, Instructor (from occurrence override → falls back to booking), Type (Private/Semi), Payment status, Actions (open existing `PrivateLessonDetailDialog`).
+- Search box (child/parent name) and instructor filter.
+- Counts shown in tab labels.
+
+This makes the two-sources mismatch (blocks vs occurrences) obvious and gives a single place to spot orphaned occurrences like Carson's Sat 6/13.
+
+## Out of scope (per your answers)
+
+- No data cleanup — Carson's bad occurrences and Sophia's duplicate Tuesday block stay until you delete them manually.
+- No per-occurrence instructor override storage. Locking the picker prevents the structural mismatch going forward.
 
 ## Technical notes
-- `fetchOpenSlots({ fromDate: today, weeks: 1, sessionToken })` returns `Slot[]` already filtered against existing occurrences + active holds.
-- `BookingQuickDialog` already exposes `initialSlot` + `initialType`; pass `{ date: currentDate }` from CalendarAdmin so the date chip strip opens on the day the admin is viewing.
-- For the semi-private DOB gate, extend the existing `canAdvance("client")` check in `BookingWizard` to require `swimmers[1].dob` when `type === "semi_private"`.
+
+- `lesson_booking_occurrences` already has 31 columns including `start_time_override`, `end_time_override`, `instructor_override_id`, `instructor_override_name` — the Booked Lessons rows will prefer override values when present.
+- No new RLS or migrations — both tables are already readable by admin via existing policies used elsewhere in this page.
+- No edge-function changes.

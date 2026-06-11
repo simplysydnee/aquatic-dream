@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ChevronLeft, X } from "lucide-react";
 import { fetchInstructors, fetchOpenSlots, holdSlots, Slot } from "@/lib/privateBooking";
 import { getPrivateLessonPrice, isJunePromoDate, PRIVATE_REGULAR_PRICE } from "@/lib/privateLessonPricing";
+import { toast } from "@/hooks/use-toast";
 
 interface Props {
   sessionToken: string;
@@ -109,12 +110,30 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
     return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [filteredSlots]);
 
+  const lockedInstructorId = useMemo(() => {
+    const first = Object.values(selected)[0];
+    return first ? first.instructor_id : null;
+  }, [selected]);
+  const lockedInstructorName = useMemo(() => {
+    const first = Object.values(selected)[0];
+    return first ? first.instructor_name : null;
+  }, [selected]);
+
   const toggle = (s: Slot) => {
     const k = slotKey(s);
     setSelected((prev) => {
       const next = { ...prev };
-      if (next[k]) delete next[k];
-      else next[k] = s;
+      if (next[k]) { delete next[k]; return next; }
+      const existing = Object.values(prev)[0];
+      if (existing && existing.instructor_id !== s.instructor_id) {
+        toast({
+          title: "One instructor per booking",
+          description: `You're booking with ${existing.instructor_name}. Clear your selection to switch instructors.`,
+          variant: "destructive",
+        });
+        return prev;
+      }
+      next[k] = s;
       return next;
     });
   };
@@ -368,10 +387,18 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
                     const k = slotKey(s);
                     const isSel = !!selected[k];
                     const promo = isJunePromoDate(s.slot_date);
+                    const blockedByInstructor = !!lockedInstructorId && lockedInstructorId !== s.instructor_id && !isSel;
                     return (
-                      <button key={k} onClick={() => toggle(s)} type="button"
+                      <button
+                        key={k}
+                        onClick={() => toggle(s)}
+                        type="button"
+                        disabled={blockedByInstructor}
+                        title={blockedByInstructor ? `Different instructor — clear selection to switch to ${s.instructor_name}` : undefined}
                         className={`px-3 py-1.5 text-xs rounded-md border transition ${isSel
                           ? "bg-primary text-primary-foreground border-primary"
+                          : blockedByInstructor
+                          ? "bg-muted/40 text-muted-foreground border-dashed border-border opacity-50 cursor-not-allowed"
                           : "bg-background hover:bg-muted border-border"}`}>
                         {formatTime(s.start_time)} · {s.instructor_name}
                         {promo && (
@@ -385,6 +412,15 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
             );
           })}
         </div>
+      )}
+
+      {lockedInstructorName && !weeklyMode && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Booking with <span className="font-semibold text-foreground">{lockedInstructorName}</span>. All lessons in this booking must be with the same instructor.{" "}
+          <button type="button" onClick={() => setSelected({})} className="text-primary underline ml-1">
+            Clear selection
+          </button>
+        </p>
       )}
 
       <div className="sticky bottom-0 mt-6 bg-background/95 backdrop-blur border-t border-border pt-4">

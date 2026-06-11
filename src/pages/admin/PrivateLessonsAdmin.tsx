@@ -613,10 +613,13 @@ export default function PrivateLessonsAdmin() {
           <Plus className="w-4 h-4 mr-1" /> Book a lesson
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground mb-3">
+        <span className="font-semibold">Open Availability</span> = instructor booking blocks shown on the public site. <span className="font-semibold">Booked Lessons</span> = actual private/semi-private bookings on the calendar.
+      </p>
       <Tabs defaultValue="availability">
         <TabsList>
-          <TabsTrigger value="availability">Availability</TabsTrigger>
-          <TabsTrigger value="bookings">Bookings ({upcomingBookings.length})</TabsTrigger>
+          <TabsTrigger value="availability">Open Availability ({blocks.length})</TabsTrigger>
+          <TabsTrigger value="bookings">Booked Lessons ({upcomingBookings.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="availability" className="space-y-6 mt-4">
@@ -728,7 +731,7 @@ export default function PrivateLessonsAdmin() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">Current blocks</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Open Availability (Booking Blocks)</CardTitle></CardHeader>
             <CardContent>
               <Table>
                 <TableHeader><TableRow>
