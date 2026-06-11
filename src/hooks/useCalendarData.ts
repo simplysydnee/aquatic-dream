@@ -221,6 +221,8 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     if (eventsRes.data) setPoolEvents(eventsRes.data);
     if (attendanceRes.data) setAttendance(attendanceRes.data);
     if (agreementsRes.data) setAgreements(agreementsRes.data);
+    if (movesRes.data) setEnrollmentDateMoves(movesRes.data as EnrollmentDateMove[]);
+    else setEnrollmentDateMoves([]);
     const _instructorNameMap = new Map<string, string>(
       ((instructorsRes.data as any[]) || []).map((i) => [i.id, i.name])
     );
