@@ -294,14 +294,36 @@ const CalendarDayView = ({
   const adEventsAll = todayEvents.filter(
     (e) => !["dive-session", "pool-rental", "i-can-swim", "maintenance", "swim-lesson"].includes(e.event_type)
   );
-  const lessonEvents = adEventsAll.filter(
-    (e) => e.event_type === "private-lesson" || e.event_type === "semi-private-lesson"
-  );
+
+  // ── Map new-style private lesson bookings (lesson_bookings) for this date into the grid ──
+  const privateLessonGridEvents = useMemo(() => {
+    return privateLessons
+      .filter((p) => p.occurrence_date === dateStr)
+      .map((p) => ({
+        // Synthetic CalendarPoolEvent-shaped object; id prefixed so click handlers can detect.
+        id: `pl:${p.occurrence_id}`,
+        event_type: p.lesson_type === "semi_private" ? "semi-private-lesson" : "private-lesson",
+        title: p.child_name || p.parent_name || "Private lesson",
+        event_date: p.occurrence_date,
+        start_time: p.start_time,
+        end_time: p.end_time,
+        pool_area: p.pool_area || "shallow",
+        instructor_name: p.instructor_name,
+        notes: p.booking_status === "pending_card" ? "⚠ Card on file pending" : (p.notes || null),
+        is_recurring: !!p.recurring,
+        __privateLesson: p,
+      })) as (CalendarPoolEvent & { __privateLesson?: PrivateLessonBooking })[];
+  }, [privateLessons, dateStr]);
+
+  const lessonEvents = [
+    ...adEventsAll.filter((e) => e.event_type === "private-lesson" || e.event_type === "semi-private-lesson"),
+    ...privateLessonGridEvents,
+  ];
   const walkInEvents = adEventsAll.filter(
     (e) => e.event_type !== "private-lesson" && e.event_type !== "semi-private-lesson"
   );
   // Keep adEvents for column rendering (all of them render in the AD column)
-  const adEvents = adEventsAll;
+  const adEvents = [...adEventsAll, ...privateLessonGridEvents];
   const swimLessonEvents = todayEvents.filter((e) => e.event_type === "swim-lesson");
   const diveRentalEvents = todayEvents.filter(
     (e) => ["dive-session", "pool-rental", "maintenance"].includes(e.event_type)
