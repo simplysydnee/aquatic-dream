@@ -387,10 +387,18 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
                     const k = slotKey(s);
                     const isSel = !!selected[k];
                     const promo = isJunePromoDate(s.slot_date);
+                    const blockedByInstructor = !!lockedInstructorId && lockedInstructorId !== s.instructor_id && !isSel;
                     return (
-                      <button key={k} onClick={() => toggle(s)} type="button"
+                      <button
+                        key={k}
+                        onClick={() => toggle(s)}
+                        type="button"
+                        disabled={blockedByInstructor}
+                        title={blockedByInstructor ? `Different instructor — clear selection to switch to ${s.instructor_name}` : undefined}
                         className={`px-3 py-1.5 text-xs rounded-md border transition ${isSel
                           ? "bg-primary text-primary-foreground border-primary"
+                          : blockedByInstructor
+                          ? "bg-muted/40 text-muted-foreground border-dashed border-border opacity-50 cursor-not-allowed"
                           : "bg-background hover:bg-muted border-border"}`}>
                         {formatTime(s.start_time)} · {s.instructor_name}
                         {promo && (
@@ -404,6 +412,15 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
             );
           })}
         </div>
+      )}
+
+      {lockedInstructorName && !weeklyMode && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Booking with <span className="font-semibold text-foreground">{lockedInstructorName}</span>. All lessons in this booking must be with the same instructor.{" "}
+          <button type="button" onClick={() => setSelected({})} className="text-primary underline ml-1">
+            Clear selection
+          </button>
+        </p>
       )}
 
       <div className="sticky bottom-0 mt-6 bg-background/95 backdrop-blur border-t border-border pt-4">
