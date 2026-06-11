@@ -98,7 +98,9 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: borderColor }}>{lessonLabel}</span>
-                    {paymentBadge(p.payment_status)}
+                    {p.booking_status === "pending_card"
+                      ? <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300" title="Parent has not saved a card on file yet">⚠ Pending card</Badge>
+                      : paymentBadge(p.payment_status)}
                   </div>
                   <p className="font-semibold text-sm text-foreground leading-tight">
                     {p.child_name || p.parent_name}
