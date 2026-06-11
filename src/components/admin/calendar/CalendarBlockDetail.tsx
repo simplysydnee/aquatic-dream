@@ -80,7 +80,8 @@ function fmtICSTime(iso: string) {
   });
 }
 
-const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch }: Props) => {
+const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, allSessions = [], allEnrollments = [], lessonDates = [], enrollmentDateMoves = [] }: Props) => {
+  const [moveTarget, setMoveTarget] = useState<CalendarEnrollment | null>(null);
   const [showAddSwimmer, setShowAddSwimmer] = useState(false);
   const [sendingPaymentFor, setSendingPaymentFor] = useState<string | null>(null);
   const [lessonOcc, setLessonOcc] = useState<any | null>(null);
