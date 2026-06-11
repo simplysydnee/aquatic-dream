@@ -71,9 +71,13 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div>
             <h3 className="font-semibold text-foreground flex items-center gap-2">
-              Private Lessons
-              <Badge variant="secondary" className="text-[10px]">{todays.length} booked</Badge>
+              Open Private Slots
               <Badge variant="outline" className="text-[10px]">{slots.length} open</Badge>
+              {todays.length > 0 && (
+                <Badge variant="secondary" className="text-[10px]" title="Booked lessons appear on the calendar grid above">
+                  {todays.length} booked (on grid)
+                </Badge>
+              )}
             </h3>
             <p className="text-xs text-muted-foreground">{format(date, "EEEE, MMM d")}</p>
           </div>
@@ -82,44 +86,6 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
           </Button>
         </div>
 
-        {/* Booked lessons */}
-        {todays.length > 0 ? (
-          <div className="grid sm:grid-cols-2 gap-2 mb-3">
-            {todays.map((p) => {
-              const lessonLabel = p.lesson_type === "semi_private" ? "Semi-Private" : "Private";
-              const borderColor = p.lesson_type === "semi_private" ? "#4B1528" : "#26215C";
-              const bgColor = p.lesson_type === "semi_private" ? "#FBEAF0" : "#EEEDFE";
-              return (
-                <button
-                  key={p.occurrence_id}
-                  onClick={() => setDetail(p)}
-                  className="text-left rounded-md border-l-4 p-2.5 hover:shadow-md transition-shadow"
-                  style={{ borderLeftColor: borderColor, backgroundColor: bgColor }}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: borderColor }}>{lessonLabel}</span>
-                    {p.booking_status === "pending_card"
-                      ? <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300" title="Parent has not saved a card on file yet">⚠ Pending card</Badge>
-                      : paymentBadge(p.payment_status)}
-                  </div>
-                  <p className="font-semibold text-sm text-foreground leading-tight">
-                    {p.child_name || p.parent_name}
-                  </p>
-                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1 flex-wrap">
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {fmtTime(p.start_time)}–{fmtTime(p.end_time)}</span>
-                    {p.instructor_name && <span className="flex items-center gap-1"><User className="w-3 h-3" /> {p.instructor_name}</span>}
-                    <span className="flex items-center gap-1"><CreditCard className="w-3 h-3" /> ${p.price_per_session}</span>
-                    {!p.waiver_signed_at && (
-                      <span className="flex items-center gap-1 text-orange-600"><ClipboardSignature className="w-3 h-3" /> Waiver pending</span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground italic mb-3">No private lessons booked for this day.</p>
-        )}
 
         {/* Open slots */}
         {slots.length > 0 && (
