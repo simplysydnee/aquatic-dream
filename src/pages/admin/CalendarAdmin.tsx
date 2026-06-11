@@ -76,11 +76,16 @@ const CalendarAdmin = () => {
     setCurrentDate((d) => addDays(d, view === "week" ? dir * 7 : dir));
   };
 
+  const persistFilters = (next: Set<ActivityType>) => {
+    try { localStorage.setItem("calendar-active-filters", JSON.stringify([...next])); } catch { /* ignore */ }
+  };
+
   const toggleFilter = (type: ActivityType) => {
     setActiveFilters((prev) => {
       const next = new Set(prev);
       if (next.has(type)) next.delete(type);
       else next.add(type);
+      persistFilters(next);
       return next;
     });
   };
