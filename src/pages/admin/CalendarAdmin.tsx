@@ -314,6 +314,13 @@ const CalendarAdmin = () => {
         onClose={() => setActivePrivateLesson(null)}
         onChanged={refetch}
       />
+
+      <BookingQuickDialog
+        open={showBookLesson}
+        onOpenChange={setShowBookLesson}
+        initialSlot={{ date: format(currentDate, "yyyy-MM-dd") }}
+        onBooked={refetch}
+      />
     </div>
   );
 };
