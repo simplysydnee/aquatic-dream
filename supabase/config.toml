@@ -22,17 +22,17 @@ project_id = "jilrijklnehbfuulykty"
   [functions.send-session-payment-link]
     verify_jwt = true
   [functions.send-transactional-email]
-    verify_jwt = false
+    verify_jwt = true
   [functions.admin-create-enrollment]
     verify_jwt = true
   [functions.create-admin-phone-checkout]
     verify_jwt = true
   [functions.send-lesson-booking-confirmation]
-    verify_jwt = false
+    verify_jwt = true
   [functions.send-lesson-series-confirmation]
-    verify_jwt = false
+    verify_jwt = true
   [functions.send-lesson-occurrence-reminders]
-    verify_jwt = false
+    verify_jwt = true
   [functions.create-lesson-occurrence-checkout]
     verify_jwt = false
   [functions.cancel-enrollment-refund]
@@ -61,7 +61,7 @@ project_id = "jilrijklnehbfuulykty"
   [functions.confirm-private-booking]
     verify_jwt = false
   [functions.charge-private-lesson-occurrence]
-    verify_jwt = false
+    verify_jwt = true
   [functions.cancel-private-lesson-occurrence]
     verify_jwt = false
   [functions.submit-visitor-waiver]
