@@ -200,7 +200,8 @@ export default function BookingWizard({ initialSlot, initialType, initialClient,
     if (step === "type") {
       if (!draft.type) return false;
       if (draft.type === "semi_private") {
-        return !!draft.client.swimmers[1]?.first_name?.trim();
+        const sw2 = draft.client.swimmers[1];
+        return !!(sw2?.first_name?.trim() && sw2?.last_name?.trim() && sw2?.dob);
       }
       return true;
     }
@@ -857,11 +858,12 @@ function SecondSwimmerPicker({
         </>
       ) : (
         <div className="space-y-3">
+          <p className="text-[11px] text-muted-foreground">First name, last name, and date of birth are all required for the 2nd swimmer.</p>
           <div className="grid grid-cols-12 gap-2">
-            <Input className="col-span-4" placeholder="First" value={sw.first_name} onChange={(e) => onChange({ ...sw, first_name: e.target.value })} />
-            <Input className="col-span-4" placeholder="Last" value={sw.last_name} onChange={(e) => onChange({ ...sw, last_name: e.target.value })} />
+            <Input className="col-span-4" placeholder="First *" value={sw.first_name} onChange={(e) => onChange({ ...sw, first_name: e.target.value })} />
+            <Input className="col-span-4" placeholder="Last *" value={sw.last_name} onChange={(e) => onChange({ ...sw, last_name: e.target.value })} />
             <Input className="col-span-2" type="number" placeholder="Age" value={sw.age ?? ""} onChange={(e) => onChange({ ...sw, age: e.target.value ? Number(e.target.value) : null })} />
-            <Input className="col-span-2" type="date" value={sw.dob ?? ""} onChange={(e) => onChange({ ...sw, dob: e.target.value || null })} />
+            <Input className="col-span-2" type="date" placeholder="DOB *" value={sw.dob ?? ""} onChange={(e) => onChange({ ...sw, dob: e.target.value || null })} />
           </div>
           <div className="rounded-md border bg-muted/30 p-3 space-y-2">
             <p className="text-xs font-semibold">2nd swimmer's parent (optional — cc'd on confirmation if email differs)</p>
@@ -1178,50 +1180,191 @@ function OneTimeChooser({
     mode: "one_time",
     instructorId: "",
     date: format(new Date(), "yyyy-MM-dd"),
-    startTime: "15:00",
-    endTime: "15:30",
+    startTime: "",
+    endTime: "",
     poolArea: "shallow",
   };
   const patch = (p: Partial<SlotDraft>) => onChange({ ...cur, ...p });
+
+  // Date chips: today + next 6 days
+  const dateChips = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = addDays(today, i);
+      return { iso: format(d, "yyyy-MM-dd"), label: i === 0 ? "Today" : format(d, "EEE M/d") };
+    });
+  }, []);
+
+  const initialDate = cur.date && dateChips.some((c) => c.iso === cur.date) ? cur.date : dateChips[0].iso;
+  const [selectedDate, setSelectedDate] = useState<string>(initialDate);
+  const [instructorFilter, setInstructorFilter] = useState<string>(cur.instructorId || "all");
+  const [openSlots, setOpenSlots] = useState<Array<{ instructor_id: string; instructor_name: string; slot_date: string; start_time: string; end_time: string }>>([]);
+  const [loadingSlots, setLoadingSlots] = useState(true);
+  const [showCustom, setShowCustom] = useState(false);
+
+  // Fetch open slots for the next 7 days on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingSlots(true);
+      try {
+        const { fetchOpenSlots } = await import("@/lib/privateBooking");
+        const sessionToken = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `admin-${Date.now()}`;
+        const slots = await fetchOpenSlots({ fromDate: new Date(), weeks: 1, sessionToken });
+        if (!cancelled) setOpenSlots(slots);
+      } catch {
+        if (!cancelled) setOpenSlots([]);
+      } finally {
+        if (!cancelled) setLoadingSlots(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const visibleSlots = useMemo(() => {
+    return openSlots
+      .filter((s) => s.slot_date === selectedDate)
+      .filter((s) => instructorFilter === "all" || s.instructor_id === instructorFilter)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time) || a.instructor_name.localeCompare(b.instructor_name));
+  }, [openSlots, selectedDate, instructorFilter]);
+
+  const pickSlot = (s: { instructor_id: string; instructor_name: string; slot_date: string; start_time: string; end_time: string }) => {
+    patch({
+      instructorId: s.instructor_id,
+      instructorName: s.instructor_name,
+      date: s.slot_date,
+      startTime: s.start_time,
+      endTime: s.end_time,
+    });
+  };
+
+  const isSelected = (s: { instructor_id: string; slot_date: string; start_time: string }) =>
+    cur.instructorId === s.instructor_id && cur.date === s.slot_date && cur.startTime === s.start_time;
+
   return (
-    <div className="grid sm:grid-cols-2 gap-3">
-      <div>
+    <div className="space-y-4">
+      {/* Date chips */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {dateChips.map((c) => {
+          const active = c.iso === selectedDate;
+          const count = openSlots.filter(
+            (s) => s.slot_date === c.iso && (instructorFilter === "all" || s.instructor_id === instructorFilter),
+          ).length;
+          return (
+            <button
+              key={c.iso}
+              onClick={() => setSelectedDate(c.iso)}
+              className={cn(
+                "shrink-0 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors flex items-center gap-1.5",
+                active ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:border-primary",
+              )}
+            >
+              {c.label}
+              <Badge variant={active ? "secondary" : "outline"} className="text-[10px] h-4 px-1">{count}</Badge>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Instructor filter */}
+      <div className="flex items-center gap-2">
         <Label className="text-xs">Instructor</Label>
-        <Select value={cur.instructorId || ""} onValueChange={(v) => {
-          const name = instructors.find((i) => i.id === v)?.name;
-          patch({ instructorId: v, instructorName: name });
-        }}>
-          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+        <Select value={instructorFilter} onValueChange={setInstructorFilter}>
+          <SelectTrigger className="w-48 h-8 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
+            <SelectItem value="all">All instructors</SelectItem>
             {instructors.map((i) => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
-      <div>
-        <Label className="text-xs">Pool</Label>
-        <Select value={cur.poolArea || "shallow"} onValueChange={(v) => patch({ poolArea: v })}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="shallow">Shallow</SelectItem>
-            <SelectItem value="deep">Deep</SelectItem>
-            <SelectItem value="full">Full pool</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <Label className="text-xs">Date</Label>
-        <Input type="date" value={cur.date || ""} onChange={(e) => patch({ date: e.target.value })} />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label className="text-xs">Start</Label>
-          <Input type="time" value={cur.startTime || ""} onChange={(e) => patch({ startTime: e.target.value })} />
+
+      {/* Slot list */}
+      {loadingSlots ? (
+        <Card className="p-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></Card>
+      ) : visibleSlots.length === 0 ? (
+        <Card className="p-6 text-center text-sm text-muted-foreground">
+          No open slots for this day{instructorFilter !== "all" ? " and instructor" : ""}. Try another date or use Custom time below.
+        </Card>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-[320px] overflow-y-auto">
+          {visibleSlots.map((s, i) => {
+            const on = isSelected(s);
+            return (
+              <button
+                key={`${s.instructor_id}-${s.start_time}-${i}`}
+                onClick={() => pickSlot(s)}
+                className={cn(
+                  "text-left p-2.5 rounded-md border transition-colors",
+                  on ? "border-primary bg-primary/10 ring-1 ring-primary" : "hover:border-primary hover:bg-accent/30",
+                )}
+              >
+                <div className="text-sm font-semibold tabular-nums">{fmtTime(s.start_time)}</div>
+                <div className="text-[11px] text-muted-foreground truncate">{s.instructor_name}</div>
+              </button>
+            );
+          })}
         </div>
-        <div>
-          <Label className="text-xs">End</Label>
-          <Input type="time" value={cur.endTime || ""} onChange={(e) => patch({ endTime: e.target.value })} />
-        </div>
+      )}
+
+      {/* Custom time fallback */}
+      <div className="border-t pt-3">
+        <button
+          type="button"
+          onClick={() => setShowCustom((v) => !v)}
+          className="text-xs text-primary hover:underline"
+        >
+          {showCustom ? "Hide custom time" : "Use a custom time (off-schedule booking)"}
+        </button>
+        {showCustom && (
+          <div className="grid sm:grid-cols-2 gap-3 mt-3">
+            <div>
+              <Label className="text-xs">Instructor</Label>
+              <Select value={cur.instructorId || ""} onValueChange={(v) => {
+                const name = instructors.find((i) => i.id === v)?.name;
+                patch({ instructorId: v, instructorName: name });
+              }}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {instructors.map((i) => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Pool</Label>
+              <Select value={cur.poolArea || "shallow"} onValueChange={(v) => patch({ poolArea: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="shallow">Shallow</SelectItem>
+                  <SelectItem value="deep">Deep</SelectItem>
+                  <SelectItem value="full">Full pool</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Date</Label>
+              <Input type="date" value={cur.date || ""} onChange={(e) => patch({ date: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Start</Label>
+                <Input type="time" value={cur.startTime || ""} onChange={(e) => patch({ startTime: e.target.value })} />
+              </div>
+              <div>
+                <Label className="text-xs">End</Label>
+                <Input type="time" value={cur.endTime || ""} onChange={(e) => patch({ endTime: e.target.value })} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Confirmed selection */}
+      {cur.instructorId && cur.date && cur.startTime && (
+        <div className="p-3 rounded-md bg-primary/5 border border-primary/20 text-sm">
+          <span className="font-semibold">Selected:</span> {format(parseISO(cur.date), "EEE MMM d")} · {fmtTime(cur.startTime)}
+          {cur.endTime && `–${fmtTime(cur.endTime)}`} · {cur.instructorName || "Instructor"}
+        </div>
+      )}
     </div>
   );
 }

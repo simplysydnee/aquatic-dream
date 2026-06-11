@@ -1,57 +1,40 @@
 ## Goal
 
-Bring booked private lessons back into the panel below the calendar (alongside Open Private Slots), and make it one click to change a swimmer's time or instructor — both from the panel and from the calendar grid.
-
-## Current state
-
-- Calendar grid: private lessons render as cards (good).
-- Below grid (`PrivateLessonsPanel`): only "Open slots" listed; booked lessons only show as a counter badge.
-- Reschedule UI: a full `ReschedulePrivateLessonDialog` already exists with date/time/instructor change + slot picker. It is wired in `PrivateLessonsAdmin` but NOT reachable from `/admin` calendar at all.
+Make the calendar page (`/admin`) the go-to place for staff to book any lesson — private, semi-private, or group — using the same wizard as `/admin/private-lessons/new`. Improve the one-time slot picker so it loads the next 7 days of open slots across all instructors out of the box.
 
 ## Changes
 
-### 1. PrivateLessonsPanel — show Booked + Open side by side
-File: `src/components/admin/calendar/PrivateLessonsPanel.tsx`
+### 1. `src/pages/admin/CalendarAdmin.tsx` — header CTA
+- Add a "Book Lesson" button next to "Add Event" (same row, primary style).
+- Click opens `BookingQuickDialog` (already used by `PrivateLessonsPanel`), prefilled with the currently viewed date but no slot.
+- On success → call existing `refetch()` so new bookings/occurrences appear immediately on the calendar grid.
 
-- Add a "Booked Lessons" section above "Open Slots":
-  - One row per `todays[i]`, sorted by time.
-  - Row content: time, child name, instructor, payment badge.
-  - Row click → opens existing `PrivateLessonDetailDialog`.
-  - Row "Reschedule" button → opens `ReschedulePrivateLessonDialog` for that occurrence (one-date mode).
-  - Inline instructor swap shortcut: a small instructor dropdown on each row that, on change, writes `instructor_override_id` / `instructor_override_name` to `lesson_booking_occurrences` for that occurrence only and refetches. (Fast path; full reschedule dialog still available for time changes.)
-- Keep current "Open Slots" UI unchanged.
-- Update header badges to reflect both counts.
+### 2. `src/components/admin/booking/BookingWizard.tsx` — `OneTimeChooser`
+Replace today's "pick instructor + time inputs" form with a slot-list UI:
 
-### 2. Reschedule entry point from the calendar grid
-File: `src/components/admin/calendar/PrivateLessonDetailDialog.tsx`
+- On mount, fetch open slots for the next 7 days using existing `fetchOpenSlots` helper from `src/lib/privateBooking.ts` (already powers the public booking flow + `PrivateLessonsPanel`).
+- Header controls:
+  - **Date** chips for the next 7 days (today → +6); clicking filters the list.
+  - **Instructor** select with an "All instructors" default.
+  - **Pool** select (kept, defaults to shallow — only used when admin manually overrides time).
+- Slot list: time + instructor + pool, sorted soonest-first; click selects (`instructorId`, `instructorName`, `date`, `startTime`, `endTime`).
+- Collapsible "Custom time" section retains today's manual date/time inputs for off-grid bookings (e.g. comp lessons outside published blocks).
+- Empty state: "No open slots in the next 7 days — use Custom time."
 
-- Add a "Reschedule" button in the footer.
-- On click, mount `ReschedulePrivateLessonDialog` with a `BookingLite` synthesized from `PrivateLessonBooking` (`booking_id`, `instructor_id`, `instructor_name`, base `start_time`/`end_time` from the booking row, single-occurrence array containing the current occurrence + its overrides).
-- We need the base booking times (not the overridden display times). Fetch `lesson_bookings` (`start_time`, `end_time`) and `lesson_booking_occurrences` (the overrides) on demand when Reschedule is clicked, then open the dialog. Closes both on success and calls `onChanged()`.
+### 3. Semi-private "Add sibling" (BookingWizard Client step)
+- Confirm + tighten existing `swimmers[1]` UI: first name, last name, and DOB are all **required** when type is `semi_private` (today DOB is optional). Parent contact stays as-is — single parent row for the whole booking, with the optional partner-parent cc fields kept on swimmer[1] as today.
+- Update `slot` step gating so semi-private can't proceed without both swimmers having `first_name`, `last_name`, `dob`.
 
-### 3. Pass instructors list to the panel for inline swap
-File: `src/pages/admin/CalendarAdmin.tsx`
-
-- Pass `instructors` (already fetched via `useCalendarData`) into `PrivateLessonsPanel` so the inline instructor dropdown can render without a new query.
-
-## Behavior summary
-
-| Need | Where | UI |
-|------|-------|-----|
-| See booked lessons listed | Panel below grid | New "Booked" list |
-| See open slots | Panel below grid | Existing list |
-| Quick instructor swap | Panel row | Inline dropdown (writes occurrence override) |
-| Full reschedule (date + time + instructor) | Panel row "Reschedule" button OR grid card → detail → "Reschedule" | `ReschedulePrivateLessonDialog` (one-date mode) |
-| See booked on the grid | Calendar grid | Existing cards (already render with overrides after prior fix) |
+### 4. No backend changes
+- All slot/instructor data comes from existing RPCs (`get_active_instructors_public`, `get_public_booking_blocks`, `get_active_slot_holds`) already used by `fetchOpenSlots`.
+- No schema, no edge functions, no RLS work.
 
 ## Out of scope
+- Changing how bookings are saved (still goes through the existing wizard → `admin-create-private-booking` / group enrollment path).
+- Rearranging the Private Lessons admin page.
+- Mobile-specific redesign of the wizard.
 
-- Permanent series-wide moves (existing dialog already supports "remaining" mode — surfaced only inside the reschedule dialog tab, not as a top-level shortcut).
-- Group-class moves (handled by `enrollment_date_moves`).
-- Schema changes (the override columns we need already exist).
-
-## Files touched
-
-- `src/components/admin/calendar/PrivateLessonsPanel.tsx` — add Booked list + inline instructor swap + Reschedule button
-- `src/components/admin/calendar/PrivateLessonDetailDialog.tsx` — add Reschedule button + fetch booking on demand
-- `src/pages/admin/CalendarAdmin.tsx` — pass `instructors` prop to the panel
+## Technical notes
+- `fetchOpenSlots({ fromDate: today, weeks: 1, sessionToken })` returns `Slot[]` already filtered against existing occurrences + active holds.
+- `BookingQuickDialog` already exposes `initialSlot` + `initialType`; pass `{ date: currentDate }` from CalendarAdmin so the date chip strip opens on the day the admin is viewing.
+- For the semi-private DOB gate, extend the existing `canAdvance("client")` check in `BookingWizard` to require `swimmers[1].dob` when `type === "semi_private"`.
