@@ -768,20 +768,32 @@ const CalendarDayView = ({
         });
         adEvents.forEach((e) => e.instructor_name && names.add(e.instructor_name));
         swimLessonEvents.forEach((e) => e.instructor_name && names.add(e.instructor_name));
-        const list = [...names].sort();
-        if (list.length === 0) return null;
+        const adList = [...names].sort();
+        const icsList = [...icsSwimmersByInstructor.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        if (adList.length === 0 && icsList.length === 0) return null;
         return (
           <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b bg-muted/20">
             <span className="text-[11px] font-medium text-muted-foreground mr-1">Instructors today:</span>
-            {list.map((n) => (
+            {adList.map((n) => (
               <button
-                key={n}
+                key={`ad-${n}`}
                 onClick={() => setOpenInstructor(n)}
                 className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs hover:bg-accent hover:border-primary/50 transition-colors"
               >
                 <UserCircle2 className="w-3 h-3" />
                 {n}
               </button>
+            ))}
+            {icsList.map(([n, count]) => (
+              <span
+                key={`ics-${n}`}
+                title={`I Can Swim 209 — ${count} ${count === 1 ? "swimmer" : "swimmers"}`}
+                className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+                style={{ backgroundColor: "#d4f0f8", borderColor: "#2a5e84", color: "#2a5e84" }}
+              >
+                <UserCircle2 className="w-3 h-3" />
+                {n} <span className="font-semibold">({count})</span>
+              </span>
             ))}
           </div>
         );
