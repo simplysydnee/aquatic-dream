@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import BookingQuickDialog from "@/components/admin/booking/BookingQuickDialog";
 import PrivateLessonDetailDialog from "./PrivateLessonDetailDialog";
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
+import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
 
 interface Props {
   date: Date;
