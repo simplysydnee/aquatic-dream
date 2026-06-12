@@ -261,6 +261,12 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
         initialMode="one"
         onDone={() => { setRescheduleBooking(null); setRescheduleOccId(undefined); onRefetch(); }}
       />
+      <QuickEditLessonDialog
+        open={!!quickEdit}
+        onOpenChange={(o) => { if (!o) setQuickEdit(null); }}
+        lesson={quickEdit}
+        onSaved={() => { setQuickEdit(null); onRefetch(); }}
+      />
     </>
   );
 }
