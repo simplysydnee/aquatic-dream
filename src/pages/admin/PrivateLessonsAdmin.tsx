@@ -1424,6 +1424,12 @@ export default function PrivateLessonsAdmin() {
         initialMode={rescheduleState?.mode || "one"}
         onDone={() => { setRescheduleState(null); load(); }}
       />
+      <QuickEditLessonDialog
+        open={!!quickEdit}
+        onOpenChange={(o) => { if (!o) setQuickEdit(null); }}
+        lesson={quickEdit}
+        onSaved={() => { setQuickEdit(null); load(); }}
+      />
 
     </div>
   );
