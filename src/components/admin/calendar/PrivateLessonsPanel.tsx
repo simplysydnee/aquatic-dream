@@ -47,6 +47,7 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
   const [swapping, setSwapping] = useState<string | null>(null);
   const [rescheduleBooking, setRescheduleBooking] = useState<any | null>(null);
   const [rescheduleOccId, setRescheduleOccId] = useState<string | undefined>(undefined);
+  const [quickEdit, setQuickEdit] = useState<QuickEditLesson | null>(null);
 
   useEffect(() => {
     supabase.rpc("get_active_instructors_public").then(({ data }) => {
