@@ -204,10 +204,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .gte("occurrence_date", rangeStart)
         .lte("occurrence_date", rangeEnd)
         .neq("status", "cancelled"),
-      supabase
-        .from("instructor_booking_blocks")
-        .select("*")
-        .eq("is_blackout", false),
+      supabase.rpc("get_public_booking_blocks", { _instructor_ids: null }),
       supabase.rpc("get_active_instructors_public"),
       supabase
         .from("enrollment_date_moves")
@@ -298,7 +295,9 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
       taken.add(`${p.instructor_id}|${p.occurrence_date}|${p.start_time}`);
     }
 
-    const blocks = (blocksRes.data as any[]) || [];
+    const allBlocks = (blocksRes.data as any[]) || [];
+    const blocks = allBlocks.filter((b) => !b.is_blackout);
+    const blackouts = allBlocks.filter((b) => b.is_blackout);
     const open: OpenPrivateSlot[] = [];
     const fromD = new Date(rangeStart + "T00:00:00");
     const toD = new Date(rangeEnd + "T00:00:00");
@@ -307,14 +306,29 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
       const total = h * 60 + mm + m;
       return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
     };
+    const toMin = (t: string) => {
+      const [h, mm] = t.split(":").map(Number);
+      return h * 60 + (mm || 0);
+    };
+    const blockApplies = (blk: any, ds: string, dow: number): boolean => {
+      if (blk.kind === "weekly" && blk.day_of_week !== dow) return false;
+      if (blk.start_date && ds < blk.start_date) return false;
+      if (blk.end_date && ds > blk.end_date) return false;
+      if (blk.kind === "date_range" && blk.day_of_week !== null && blk.day_of_week !== dow) return false;
+      return true;
+    };
     for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + 1)) {
       const ds = format(d, "yyyy-MM-dd");
       const dow = d.getDay();
+      const blackoutsToday = blackouts
+        .filter((b) => blockApplies(b, ds, dow))
+        .map((b) => ({
+          instructor_id: b.instructor_id,
+          start: toMin((b.start_time as string).slice(0, 5)),
+          end: toMin((b.end_time as string).slice(0, 5)),
+        }));
       for (const blk of blocks) {
-        if (blk.kind === "weekly" && blk.day_of_week !== dow) continue;
-        if (blk.start_date && ds < blk.start_date) continue;
-        if (blk.end_date && ds > blk.end_date) continue;
-        if (blk.kind === "date_range" && blk.day_of_week !== null && blk.day_of_week !== dow) continue;
+        if (!blockApplies(blk, ds, dow)) continue;
         let t = (blk.start_time as string).slice(0, 5);
         const end = (blk.end_time as string).slice(0, 5);
         const bs = blk.break_start_time ? (blk.break_start_time as string).slice(0, 5) : null;
@@ -322,8 +336,13 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         while (addMin(t, blk.slot_minutes) <= end) {
           const se = addMin(t, blk.slot_minutes);
           if (bs && be && t < be && se > bs) { t = be; continue; }
+          const sMin = toMin(t);
+          const eMin = toMin(se);
+          const blackedOut = blackoutsToday.some(
+            (bo) => bo.instructor_id === blk.instructor_id && sMin < bo.end && eMin > bo.start,
+          );
           const key = `${blk.instructor_id}|${ds}|${t}`;
-          if (!taken.has(key)) {
+          if (!taken.has(key) && !blackedOut) {
             open.push({
               instructor_id: blk.instructor_id,
               instructor_name: instructorMap.get(blk.instructor_id) || "Instructor",
