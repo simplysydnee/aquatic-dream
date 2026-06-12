@@ -69,8 +69,9 @@ export function useAvailableBlockSlots(
 
       if (cancelled) return;
 
-      const blocks = ((blocksRes.data as any[]) || []).filter((b) => {
-        if (b.is_blackout) return false;
+      const allBlocks = (blocksRes.data as any[]) || [];
+
+      const applies = (b: any) => {
         if (b.kind === "weekly") {
           if (b.day_of_week !== dow) return false;
           if (b.start_date && dateStr < b.start_date) return false;
@@ -84,7 +85,16 @@ export function useAvailableBlockSlots(
           return true;
         }
         return false;
-      });
+      };
+
+      const blocks = allBlocks.filter((b) => !b.is_blackout && applies(b));
+      const blackoutsByInstr = new Map<string, { start: number; end: number }[]>();
+      for (const b of allBlocks) {
+        if (!b.is_blackout || !applies(b)) continue;
+        const arr = blackoutsByInstr.get(b.instructor_id) || [];
+        arr.push({ start: toMin(norm(b.start_time)), end: toMin(norm(b.end_time)) });
+        blackoutsByInstr.set(b.instructor_id, arr);
+      }
 
       setHasAnyBlock(blocks.length > 0);
 
@@ -117,15 +127,14 @@ export function useAvailableBlockSlots(
         const brkS = blk.break_start_time ? toMin(norm(blk.break_start_time)) : null;
         const brkE = blk.break_end_time ? toMin(norm(blk.break_end_time)) : null;
         const taken = takenByInstr.get(blk.instructor_id) || [];
+        const blackouts = blackoutsByInstr.get(blk.instructor_id) || [];
 
         for (let t = bStart; t + lengthMin <= bEnd; t += stepMin) {
           const slotEnd = t + lengthMin;
-          // break overlap
           if (brkS !== null && brkE !== null && t < brkE && slotEnd > brkS) continue;
-          // existing booking overlap
           if (taken.some((x) => t < x.end && slotEnd > x.start)) continue;
-          // pool event overlap
           if (blocking.some((x) => t < x.end && slotEnd > x.start)) continue;
+          if (blackouts.some((x) => t < x.end && slotEnd > x.start)) continue;
 
           const key = `${blk.instructor_id}|${t}`;
           if (seen.has(key)) continue;

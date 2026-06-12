@@ -1,41 +1,54 @@
-## Goal
+# Fix: closed private-lesson spots still bookable
 
-Make editing a single private lesson as fast as editing a Google Calendar event: open the lesson → change date, start time, end time, and instructor inline → save. No need to pre-create a booking block at that time.
+## Root cause
 
-The backend (`reschedule-private-lesson-occurrence`, `mode: "one"`) already accepts free-form date/start/end/instructor and only blocks real conflicts (pool area + overlapping lesson on same instructor). The DB double-book trigger also protects us. So this is a UI-only change plus one optional drag handler.
+Admin "Close" actions create rows in `instructor_booking_blocks` with `is_blackout = true` (e.g., Jaclyn has 5 blackout rows for Sat 6/13 from 10:30–13:00). But the entire public booking pipeline silently drops them:
 
-## What changes
+1. The `get_public_booking_blocks` RPC has `WHERE is_blackout = false`, so the client never sees blackouts.
+2. `src/lib/privateBooking.ts` and `src/hooks/useAvailableBlockSlots.ts` only build slots from non-blackout rows — there is no second pass that subtracts blackouts.
+3. The server-side `enforce_slot_hold_limits` trigger checks "does a non-blackout block cover this slot?" but never checks "does a blackout also cover it?" — so even if the UI were patched, a crafted request could still hold the slot.
+4. `prevent_lesson_occurrence_double_book` never consults blackouts either.
 
-### 1. New `QuickEditLessonDialog` component
-`src/components/admin/booking/QuickEditLessonDialog.tsx`
+Net effect: Jaclyn's 10:30, 11:00, 11:30, 12:00, 12:30 slots on Sat 6/13 are still bookable.
 
-- Inputs: Date picker, Start time `<input type="time">`, End time `<input type="time">` (auto-fills to start + current length when start changes), Instructor `<Select>` from `get_active_instructors_public`, "Notify parent" checkbox (default checked), optional reason.
-- Shows "Currently: …" summary at top.
-- Save → calls `reschedule-private-lesson-occurrence` with `mode: "one"`, free-form values, `notify` flag, `reason`.
-- On 409 conflict response, surfaces the server message inline (e.g. "Instructor already has another lesson overlapping…").
+## Plan
 
-### 2. Wire it into the 3 admin entry points
+### 1. DB migration — expose + enforce blackouts
 
-- **Calendar event click** — `PrivateLessonDetailDialog`: replace the current Reschedule button (which opens the slot-picker dialog) with a primary "Edit" button that opens `QuickEditLessonDialog`. Keep an "Advanced (move series / change all remaining)" link that opens the existing `ReschedulePrivateLessonDialog`.
-- **Private Lessons admin per-occurrence row** — `PrivateLessonsAdmin.tsx` (line ~979): replace the per-occurrence reschedule action with the quick-edit dialog. Keep "Reschedule remaining" as-is.
-- **Calendar Private Lessons panel** — `PrivateLessonsPanel.tsx`: same swap on the per-lesson Reschedule button.
+- Update `public.get_public_booking_blocks` to return **all** rows (both availability and blackout), since blackouts contain no PII (just instructor_id, date, time). The client needs them to subtract.
+- Update the `enforce_slot_hold_limits` trigger to additionally `RAISE EXCEPTION` if any matching blackout row covers (or overlaps) the requested `(instructor_id, slot_date, [start_time, end_time))`. Match logic must mirror the availability lookup: `weekly` with `day_of_week` + `start_date`/`end_date` window, OR `date_range` with date window.
+- Update `prevent_lesson_occurrence_double_book` to also reject inserts/updates whose effective `(instructor_id, occurrence_date, time range)` overlaps a blackout block. This is the last line of defense if anything bypasses the hold step.
 
-### 3. Drag-to-move on calendar
-- In the admin calendar private-lesson tile, make the tile draggable (HTML5 drag-and-drop) within the day column. On drop into a different time row, open `QuickEditLessonDialog` pre-filled with the new start time (and end = start + length). Admin still has to click Save, so it acts as a confirmation step and prevents accidental moves. Cross-day drag is out of scope for this iteration.
+### 2. Client subtraction in `src/lib/privateBooking.ts`
 
-### 4. Backend touch-ups (minor)
-- `reschedule-private-lesson-occurrence` already supports everything we need. Add `reason` to the email template payload (already present). No schema changes.
-- Confirm the conflict messages are user-friendly; no other changes.
+In `fetchOpenSlots`:
+- Split the returned blocks into `availability` (`is_blackout=false`) and `blackouts` (`is_blackout=true`).
+- After generating candidate slots from availability + breaks + existing bookings + holds, drop any slot where for the same `instructor_id` + `date`, a blackout block matches (same weekly/date_range matching as the trigger) AND overlaps the slot's `[start, end)`.
+- Apply the same to break-window comparison so blackouts behave like additional break windows.
 
-### Out of scope
-- Editing series-level fields (price, child, parent) — already handled elsewhere.
-- Drag across days/instructors.
-- Public-facing self-serve reschedule.
-- Existing Reet/Carson/Armani cleanup (per your prior instruction, leave data as is).
+### 3. Client subtraction in `src/hooks/useAvailableBlockSlots.ts`
+
+Same treatment: feed blackouts into the slot generator and skip any slot overlapped by a blackout. Remove the dead `if (b.is_blackout) return false` guard and replace with a real subtraction step.
+
+### 4. Sanity: time-off requests (optional, deferred)
+
+`time_off_requests` is not currently used by the public flow. We will NOT wire it up in this fix — the admin "Close" action already writes blackout rows, which is the source of truth. (Noting for follow-up if the admin expects approved time-off to auto-hide slots too.)
+
+### 5. Verify
+
+- After deploy, hit `/book-private-lesson` for Jaclyn / Sat 6/13 and confirm 10:30, 11:00, 11:30, 12:00, 12:30 no longer appear.
+- Confirm a remaining open slot (e.g., 10:00) still books successfully.
+- Confirm an admin-side `slot_holds` insert for a blacked-out slot fails with the trigger's new error.
 
 ## Technical notes
 
-- The existing `validateSlot` only checks pool conflicts and instructor overlap, so any time inside the pool's operating hours is allowed even if no booking block exists at that time. This matches your "Lesley wants 12:30" case where no 12:30 block exists.
-- The DB trigger `prevent_lesson_occurrence_double_book` still backs us up if two admins try to edit simultaneously.
-- "Notify parent" defaults on; when off, no email is sent (already supported via `notify: false`).
-- Drag-and-drop will be plain HTML5 (`draggable`, `onDragStart`, `onDrop` on a time-row grid). No new libs.
+- `get_public_booking_blocks` already runs as `SECURITY DEFINER`; widening to include blackouts is safe — blackout rows expose nothing more sensitive than the availability rows themselves.
+- Overlap predicate (mirroring existing trigger style): `NEW.start_time < b.end_time AND NEW.end_time > b.start_time`.
+- The `enforce_slot_hold_limits` block-matching CTE is duplicated almost verbatim for the blackout check; will keep them as a single subquery with `is_blackout` filtered per branch to minimize drift.
+- No schema changes (no new columns). No data migration. Existing blackouts will start being honored immediately on deploy.
+
+## Out of scope
+
+- Drag-to-move on the calendar (still deferred).
+- Wiring `time_off_requests` into public availability.
+- Any UI changes to how admins create blackouts (the existing "Close from slot grid" flow already writes the right rows).
