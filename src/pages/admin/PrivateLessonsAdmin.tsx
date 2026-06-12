@@ -82,6 +82,7 @@ export default function PrivateLessonsAdmin() {
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
   const [editingBlock, setEditingBlock] = useState<Block | null>(null);
   const [rescheduleState, setRescheduleState] = useState<{ booking: any; occurrenceId?: string; mode: "one" | "remaining" | "instructor" } | null>(null);
+  const [quickEdit, setQuickEdit] = useState<QuickEditLesson | null>(null);
 
   const [editDraft, setEditDraft] = useState({
     kind: "weekly" as UiKind,
