@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import BookingQuickDialog from "@/components/admin/booking/BookingQuickDialog";
 import PrivateLessonDetailDialog from "./PrivateLessonDetailDialog";
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
+import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
 
 interface Props {
   date: Date;
@@ -46,6 +47,7 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
   const [swapping, setSwapping] = useState<string | null>(null);
   const [rescheduleBooking, setRescheduleBooking] = useState<any | null>(null);
   const [rescheduleOccId, setRescheduleOccId] = useState<string | undefined>(undefined);
+  const [quickEdit, setQuickEdit] = useState<QuickEditLesson | null>(null);
 
   useEffect(() => {
     supabase.rpc("get_active_instructors_public").then(({ data }) => {
@@ -179,14 +181,24 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-[11px]"
-                    onClick={() => openReschedule(l)}
+                    onClick={() => setQuickEdit({
+                      booking_id: l.booking_id,
+                      occurrence_id: l.occurrence_id,
+                      occurrence_date: l.occurrence_date,
+                      start_time: l.start_time,
+                      end_time: l.end_time,
+                      instructor_id: l.instructor_id || null,
+                      instructor_name: l.instructor_name || null,
+                      child_name: l.child_name,
+                      parent_name: l.parent_name,
+                    })}
                   >
                     {swapping === l.occurrence_id ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
                     ) : (
                       <>
                         <CalendarCog className="w-3 h-3 mr-1" />
-                        Reschedule
+                        Edit
                       </>
                     )}
                   </Button>
@@ -248,6 +260,12 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
         initialOccurrenceId={rescheduleOccId}
         initialMode="one"
         onDone={() => { setRescheduleBooking(null); setRescheduleOccId(undefined); onRefetch(); }}
+      />
+      <QuickEditLessonDialog
+        open={!!quickEdit}
+        onOpenChange={(o) => { if (!o) setQuickEdit(null); }}
+        lesson={quickEdit}
+        onSaved={() => { setQuickEdit(null); onRefetch(); }}
       />
     </>
   );

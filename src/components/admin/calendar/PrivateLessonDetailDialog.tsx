@@ -9,6 +9,7 @@ import { Mail, User, Clock, CreditCard, ClipboardSignature, Trash2, Loader2, Cal
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
+import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
 
 interface Props {
   lesson: PrivateLessonBooking | null;
@@ -38,6 +39,7 @@ const paymentBadge = (status: string) => {
 export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [rescheduleBooking, setRescheduleBooking] = useState<any | null>(null);
+  const [quickEdit, setQuickEdit] = useState<QuickEditLesson | null>(null);
   if (!lesson) return null;
 
   const waiverUrl = lesson.waiver_token ? `${SITE}/lesson-waiver/${lesson.waiver_token}` : null;
@@ -149,7 +151,25 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
             Resend confirmation
           </Button>
           <Button
-            variant="outline"
+            size="sm"
+            onClick={() => setQuickEdit({
+              booking_id: lesson.booking_id,
+              occurrence_id: lesson.occurrence_id,
+              occurrence_date: lesson.occurrence_date,
+              start_time: lesson.start_time,
+              end_time: lesson.end_time,
+              instructor_id: lesson.instructor_id || null,
+              instructor_name: lesson.instructor_name || null,
+              child_name: lesson.child_name,
+              parent_name: lesson.parent_name,
+            })}
+            disabled={busy !== null}
+          >
+            <CalendarCog className="w-4 h-4 mr-1" />
+            Edit time / instructor
+          </Button>
+          <Button
+            variant="ghost"
             size="sm"
             onClick={async () => {
               setBusy("reschedule");
@@ -169,8 +189,8 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
             }}
             disabled={busy !== null}
           >
-            {busy === "reschedule" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CalendarCog className="w-4 h-4 mr-1" />}
-            Reschedule
+            {busy === "reschedule" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+            Move series / advanced
           </Button>
           <Button variant="destructive" size="sm" onClick={cancelOccurrence} disabled={busy !== null}>
             {busy === "cancel" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1" />}
@@ -186,6 +206,12 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
         initialOccurrenceId={lesson.occurrence_id}
         initialMode="one"
         onDone={() => { setRescheduleBooking(null); onChanged(); onClose(); }}
+      />
+      <QuickEditLessonDialog
+        open={!!quickEdit}
+        onOpenChange={(o) => { if (!o) setQuickEdit(null); }}
+        lesson={quickEdit}
+        onSaved={() => { setQuickEdit(null); onChanged(); onClose(); }}
       />
     </Dialog>
   );

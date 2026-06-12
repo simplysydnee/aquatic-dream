@@ -21,6 +21,7 @@ import { toast } from "@/hooks/use-toast";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
+import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
 
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -81,6 +82,7 @@ export default function PrivateLessonsAdmin() {
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
   const [editingBlock, setEditingBlock] = useState<Block | null>(null);
   const [rescheduleState, setRescheduleState] = useState<{ booking: any; occurrenceId?: string; mode: "one" | "remaining" | "instructor" } | null>(null);
+  const [quickEdit, setQuickEdit] = useState<QuickEditLesson | null>(null);
 
   const [editDraft, setEditDraft] = useState({
     kind: "weekly" as UiKind,
@@ -976,10 +978,20 @@ export default function PrivateLessonsAdmin() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => setRescheduleState({ booking: detailBooking, occurrenceId: o.id, mode: "one" })}
-                                    title="Move this lesson to a different open slot"
+                                    onClick={() => setQuickEdit({
+                                      booking_id: detailBooking.id,
+                                      occurrence_id: o.id,
+                                      occurrence_date: o.occurrence_date,
+                                      start_time: o.start_time_override || detailBooking.start_time,
+                                      end_time: o.end_time_override || detailBooking.end_time,
+                                      instructor_id: o.instructor_override_id || detailBooking.instructor_id || null,
+                                      instructor_name: o.instructor_override_name || detailBooking.instructor_name || null,
+                                      child_name: detailBooking.child_name,
+                                      parent_name: detailBooking.parent_name,
+                                    })}
+                                    title="Edit this lesson's date, time, or instructor"
                                   >
-                                    <CalendarClock className="w-3 h-3 mr-1" /> Move
+                                    <CalendarClock className="w-3 h-3 mr-1" /> Edit
                                   </Button>
                                 )}
                                 {canCharge && (
@@ -1411,6 +1423,12 @@ export default function PrivateLessonsAdmin() {
         initialOccurrenceId={rescheduleState?.occurrenceId}
         initialMode={rescheduleState?.mode || "one"}
         onDone={() => { setRescheduleState(null); load(); }}
+      />
+      <QuickEditLessonDialog
+        open={!!quickEdit}
+        onOpenChange={(o) => { if (!o) setQuickEdit(null); }}
+        lesson={quickEdit}
+        onSaved={() => { setQuickEdit(null); load(); }}
       />
 
     </div>
