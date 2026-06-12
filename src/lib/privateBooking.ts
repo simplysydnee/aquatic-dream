@@ -109,6 +109,26 @@ export async function fetchOpenSlots(opts: {
     takenIntervals.push({ instructor_id: h.instructor_id, date: h.slot_date, start: sh * 60 + sm, end: sh * 60 + sm + 30 });
   }
 
+  // Split availability vs blackout blocks (blackouts subtract from open slots)
+  const availabilityBlocks = blocksList.filter((b) => !b.is_blackout);
+  const blackoutBlocks = blocksList.filter((b) => b.is_blackout);
+
+  const blockAppliesOnDate = (b: Block, dateStr: string, dow: number): boolean => {
+    if (b.kind === "weekly") {
+      if (b.day_of_week !== dow) return false;
+      if (b.start_date && dateStr < b.start_date) return false;
+      if (b.end_date && dateStr > b.end_date) return false;
+      return true;
+    }
+    if (b.kind === "date_range") {
+      if (b.start_date && dateStr < b.start_date) return false;
+      if (b.end_date && dateStr > b.end_date) return false;
+      if (b.day_of_week !== null && b.day_of_week !== dow) return false;
+      return true;
+    }
+    return false;
+  };
+
   // Build slots
   const out: Slot[] = [];
   const cursor = new Date(opts.fromDate);
@@ -119,19 +139,16 @@ export async function fetchOpenSlots(opts: {
     const dateStr = isoDate(d);
     const dow = d.getDay();
 
-    for (const blk of blocksList) {
-      if (blk.is_blackout) continue;
-      if (blk.kind === "weekly") {
-        if (blk.day_of_week !== dow) continue;
-        if (blk.start_date && dateStr < blk.start_date) continue;
-        if (blk.end_date && dateStr > blk.end_date) continue;
-      }
-      if (blk.kind === "date_range") {
-        if (blk.start_date && dateStr < blk.start_date) continue;
-        if (blk.end_date && dateStr > blk.end_date) continue;
-        if (blk.day_of_week !== null && blk.day_of_week !== dow) continue;
-      }
-      // Generate slots
+    const blackoutsToday = blackoutBlocks
+      .filter((b) => blockAppliesOnDate(b, dateStr, dow))
+      .map((b) => {
+        const [sh, sm] = normTime(b.start_time).split(":").map(Number);
+        const [eh, em] = normTime(b.end_time).split(":").map(Number);
+        return { instructor_id: b.instructor_id, start: sh * 60 + sm, end: eh * 60 + em };
+      });
+
+    for (const blk of availabilityBlocks) {
+      if (!blockAppliesOnDate(blk, dateStr, dow)) continue;
       let t = normTime(blk.start_time);
       const end = normTime(blk.end_time);
       const brkStart = blk.break_start_time ? normTime(blk.break_start_time) : null;
@@ -149,7 +166,10 @@ export async function fetchOpenSlots(opts: {
         const overlaps = takenIntervals.some((iv) =>
           iv.instructor_id === blk.instructor_id && iv.date === dateStr && sMin < iv.end && eMin > iv.start
         );
-        if (!overlaps) {
+        const blackedOut = blackoutsToday.some((bo) =>
+          bo.instructor_id === blk.instructor_id && sMin < bo.end && eMin > bo.start
+        );
+        if (!overlaps && !blackedOut) {
           out.push({
             instructor_id: blk.instructor_id,
             instructor_name: instructorMap[blk.instructor_id] || "Instructor",
