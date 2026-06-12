@@ -181,14 +181,24 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-[11px]"
-                    onClick={() => openReschedule(l)}
+                    onClick={() => setQuickEdit({
+                      booking_id: l.booking_id,
+                      occurrence_id: l.occurrence_id,
+                      occurrence_date: l.occurrence_date,
+                      start_time: l.start_time,
+                      end_time: l.end_time,
+                      instructor_id: l.instructor_id || null,
+                      instructor_name: l.instructor_name || null,
+                      child_name: l.child_name,
+                      parent_name: l.parent_name,
+                    })}
                   >
                     {swapping === l.occurrence_id ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
                     ) : (
                       <>
                         <CalendarCog className="w-3 h-3 mr-1" />
-                        Reschedule
+                        Edit
                       </>
                     )}
                   </Button>
