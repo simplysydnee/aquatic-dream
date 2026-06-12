@@ -207,6 +207,12 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
         initialMode="one"
         onDone={() => { setRescheduleBooking(null); onChanged(); onClose(); }}
       />
+      <QuickEditLessonDialog
+        open={!!quickEdit}
+        onOpenChange={(o) => { if (!o) setQuickEdit(null); }}
+        lesson={quickEdit}
+        onSaved={() => { setQuickEdit(null); onChanged(); onClose(); }}
+      />
     </Dialog>
   );
 }
