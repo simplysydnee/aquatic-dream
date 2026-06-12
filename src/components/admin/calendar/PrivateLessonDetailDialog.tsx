@@ -151,7 +151,25 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
             Resend confirmation
           </Button>
           <Button
-            variant="outline"
+            size="sm"
+            onClick={() => setQuickEdit({
+              booking_id: lesson.booking_id,
+              occurrence_id: lesson.occurrence_id,
+              occurrence_date: lesson.occurrence_date,
+              start_time: lesson.start_time,
+              end_time: lesson.end_time,
+              instructor_id: lesson.instructor_id || null,
+              instructor_name: lesson.instructor_name || null,
+              child_name: lesson.child_name,
+              parent_name: lesson.parent_name,
+            })}
+            disabled={busy !== null}
+          >
+            <CalendarCog className="w-4 h-4 mr-1" />
+            Edit time / instructor
+          </Button>
+          <Button
+            variant="ghost"
             size="sm"
             onClick={async () => {
               setBusy("reschedule");
@@ -171,8 +189,8 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
             }}
             disabled={busy !== null}
           >
-            {busy === "reschedule" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CalendarCog className="w-4 h-4 mr-1" />}
-            Reschedule
+            {busy === "reschedule" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+            Move series / advanced
           </Button>
           <Button variant="destructive" size="sm" onClick={cancelOccurrence} disabled={busy !== null}>
             {busy === "cancel" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1" />}
