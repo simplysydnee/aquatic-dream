@@ -9,6 +9,7 @@ import { Mail, User, Clock, CreditCard, ClipboardSignature, Trash2, Loader2, Cal
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
+import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
 
 interface Props {
   lesson: PrivateLessonBooking | null;
