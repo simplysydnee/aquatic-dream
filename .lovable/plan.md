@@ -1,61 +1,41 @@
-## What I found
+## Goal
 
-- **Reet + Armani are double-booked at Grace, Sat 6/13, 10:30am.**
-  - Reet was moved from the original 10:00am booking to 10:30am using an occurrence-level time override.
-  - The public booking availability check was still looking only at the original booking start time, so it still thought Reet occupied 10:00am, not 10:30am.
-  - Armani then created a self-serve pending-card booking for 10:30am.
+Make editing a single private lesson as fast as editing a Google Calendar event: open the lesson → change date, start time, end time, and instructor inline → save. No need to pre-create a booking block at that time.
 
-- **Armani did sign a waiver, but has no card on file.**
-  - There is a signed agreement row for Armani.
-  - The booking row’s `waiver_signed_at` was not stamped, so admin screens can still look like “no waiver.”
-  - The booking is `pending_card` with no saved payment method. The calendar currently shows pending-card rows too much like real booked lessons.
+The backend (`reschedule-private-lesson-occurrence`, `mode: "one"`) already accepts free-form date/start/end/instructor and only blocks real conflicts (pool area + overlapping lesson on same instructor). The DB double-book trigger also protects us. So this is a UI-only change plus one optional drag handler.
 
-- **Carson’s Saturday 3:30pm with Sophia is from the old multi-slot bug.**
-  - Saturday was not a Sophia availability slot.
-  - The old public flow allowed selecting slots across different days/instructors, then stored only the first slot’s instructor/time on the booking row.
-  - Carson’s occurrences therefore all display as Sophia at 3:30pm, even on days that were not Sophia availability.
+## What changes
 
-- **Karanveer is not duplicated in the database.**
-  - I found one active booking with 3 weekly occurrences: 6/13, 6/20, 6/27.
-  - If it looks duplicated on the page, that is display/list grouping, not two identical booking rows.
+### 1. New `QuickEditLessonDialog` component
+`src/components/admin/booking/QuickEditLessonDialog.tsx`
 
-- **There is no database-level double-booking protection right now.**
-  - Several code paths check availability in the UI, but the database can still accept overlapping lesson occurrences.
-  - Some older admin paths also create lesson bookings directly instead of going through the newer validated booking flow.
+- Inputs: Date picker, Start time `<input type="time">`, End time `<input type="time">` (auto-fills to start + current length when start changes), Instructor `<Select>` from `get_active_instructors_public`, "Notify parent" checkbox (default checked), optional reason.
+- Shows "Currently: …" summary at top.
+- Save → calls `reschedule-private-lesson-occurrence` with `mode: "one"`, free-form values, `notify` flag, `reason`.
+- On 409 conflict response, surfaces the server message inline (e.g. "Instructor already has another lesson overlapping…").
 
-## Plan to fix it
+### 2. Wire it into the 3 admin entry points
 
-### 1. Add backend double-booking protection
-- Add a database validation trigger on private lesson occurrences.
-- Prevent a non-cancelled occurrence from overlapping another non-cancelled occurrence for the same effective instructor/date/time.
-- Use the real effective values:
-  - `instructor_override_id` falls back to booking instructor
-  - `start_time_override` falls back to booking start time
-  - `end_time_override` falls back to booking end time
-- Treat recent `pending_card` holds as temporary blockers, but do not let old abandoned pending-card rows block forever.
+- **Calendar event click** — `PrivateLessonDetailDialog`: replace the current Reschedule button (which opens the slot-picker dialog) with a primary "Edit" button that opens `QuickEditLessonDialog`. Keep an "Advanced (move series / change all remaining)" link that opens the existing `ReschedulePrivateLessonDialog`.
+- **Private Lessons admin per-occurrence row** — `PrivateLessonsAdmin.tsx` (line ~979): replace the per-occurrence reschedule action with the quick-edit dialog. Keep "Reschedule remaining" as-is.
+- **Calendar Private Lessons panel** — `PrivateLessonsPanel.tsx`: same swap on the per-lesson Reschedule button.
 
-### 2. Fix the public self-serve booking flow
-- Update public slot availability to subtract moved/rescheduled occurrence times, not just original booking times.
-- Enforce one instructor per booking on the backend too, not just in the UI.
-- Validate every submitted slot is still inside an open instructor booking block and not inside a blackout/closed slot.
-- Recheck conflicts when the card setup is confirmed, so an abandoned or racing checkout cannot activate on top of an already-booked slot.
+### 3. Drag-to-move on calendar
+- In the admin calendar private-lesson tile, make the tile draggable (HTML5 drag-and-drop) within the day column. On drop into a different time row, open `QuickEditLessonDialog` pre-filled with the new start time (and end = start + length). Admin still has to click Save, so it acts as a confirmation step and prevents accidental moves. Cross-day drag is out of scope for this iteration.
 
-### 3. Fix admin booking/reschedule paths
-- Add the same effective-time conflict checks to `admin-create-private-booking` before it inserts occurrences.
-- Make rescheduling respect closed/blackout slots and open availability by default.
-- Stop older admin “add event/private lesson” paths from directly inserting private lesson bookings without the validated booking backend.
-- Keep the `/admin` Add Booking flow as the go-to path for private, semi-private, and group bookings.
+### 4. Backend touch-ups (minor)
+- `reschedule-private-lesson-occurrence` already supports everything we need. Add `reason` to the email template payload (already present). No schema changes.
+- Confirm the conflict messages are user-friendly; no other changes.
 
-### 4. Fix waiver/card display
-- Stamp `waiver_signed_at` when the self-serve private lesson agreement is signed.
-- Show `pending_card` rows as “pending card setup,” not as confirmed scheduled lessons.
-- Hide or separate stale pending-card rows from the calendar/booked lessons so they do not look like real booked lessons.
+### Out of scope
+- Editing series-level fields (price, child, parent) — already handled elsewhere.
+- Drag across days/instructors.
+- Public-facing self-serve reschedule.
+- Existing Reet/Carson/Armani cleanup (per your prior instruction, leave data as is).
 
-### 5. Fix booked-lessons list clarity
-- Keep one row per booking in the Booked Lessons table.
-- Show the occurrence count and expand details only inside the booking detail dialog.
-- Add clear badges for: confirmed, pending card setup, missing card, waiver signed, waiver needed.
+## Technical notes
 
-### Out of scope for this fix
-- No cleanup/deletion/cancellation of existing Carson/Reet/Armani/Sophia data, per your earlier instruction.
-- The existing bad records will remain until you choose to manually clean them up, but the code will stop allowing new ones.
+- The existing `validateSlot` only checks pool conflicts and instructor overlap, so any time inside the pool's operating hours is allowed even if no booking block exists at that time. This matches your "Lesley wants 12:30" case where no 12:30 block exists.
+- The DB trigger `prevent_lesson_occurrence_double_book` still backs us up if two admins try to edit simultaneously.
+- "Notify parent" defaults on; when off, no email is sent (already supported via `notify: false`).
+- Drag-and-drop will be plain HTML5 (`draggable`, `onDragStart`, `onDrop` on a time-row grid). No new libs.
