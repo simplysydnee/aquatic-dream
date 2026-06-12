@@ -117,6 +117,35 @@ Deno.serve(async (req) => {
     }
     if (conflicts.length) return j({ error: "slots_taken", conflicts, step: "check_slot_conflicts" }, 409);
 
+    // Reject slots that overlap an instructor blackout (closed) block.
+    step = "check_blackouts";
+    const instructorIds = [...new Set(body.slots.map((s) => s.instructor_id))];
+    const { data: blocksData, error: blocksErr } = await supabase
+      .rpc("get_public_booking_blocks", { _instructor_ids: instructorIds });
+    if (blocksErr) throw blocksErr;
+    const blackouts = ((blocksData as any[]) || []).filter((b) => b.is_blackout);
+    const blackoutConflicts: string[] = [];
+    for (const s of body.slots) {
+      const d = new Date(s.slot_date + "T00:00:00");
+      const dow = d.getDay();
+      const sStart = normalizeTime(s.start_time);
+      const sEnd = normalizeTime(s.end_time);
+      const hit = blackouts.some((b) => {
+        if (b.instructor_id !== s.instructor_id) return false;
+        if (b.start_date && s.slot_date < b.start_date) return false;
+        if (b.end_date && s.slot_date > b.end_date) return false;
+        if (b.kind === "weekly" && b.day_of_week !== dow) return false;
+        if (b.kind === "date_range" && b.day_of_week !== null && b.day_of_week !== dow) return false;
+        const bStart = normalizeTime(b.start_time);
+        const bEnd = normalizeTime(b.end_time);
+        return sStart < bEnd && sEnd > bStart;
+      });
+      if (hit) blackoutConflicts.push(`${s.instructor_id}|${s.slot_date}|${sStart}`);
+    }
+    if (blackoutConflicts.length) {
+      return j({ error: "slot_closed", conflicts: blackoutConflicts, step: "check_blackouts" }, 409);
+    }
+
     // Lookup instructor name (first slot used as primary on the booking row).
     step = "lookup_instructor";
     const { data: instructor } = await supabase
