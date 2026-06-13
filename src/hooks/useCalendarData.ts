@@ -200,7 +200,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .lte("lesson_date", rangeEnd),
       supabase
         .from("lesson_booking_occurrences")
-        .select("id, booking_id, occurrence_date, status, payment_status, auto_charge_status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id, confirmation_email_status, confirmation_email_sent_at, confirmation_email_error, status)")
+        .select("id, booking_id, occurrence_date, status, payment_status, auto_charge_status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id, confirmation_email_status, confirmation_email_sent_at, confirmation_email_error, status, booking_source)")
         .gte("occurrence_date", rangeStart)
         .lte("occurrence_date", rangeEnd)
         .neq("status", "cancelled"),
@@ -233,13 +233,17 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     }
 
     // ── Map private lesson occurrences ──
-    // Hide stale pending_card rows (abandoned checkouts > 30 min old) so they
-    // don't appear as real bookings on the calendar.
+    // Hide stale pending_card rows (abandoned self-serve checkouts > 30 min old)
+    // so they don't appear as real bookings on the calendar.
+    // Admin-created bookings are NEVER hidden — admin manually placed the slot
+    // and it must stay visible until they explicitly cancel it.
     const STALE_PENDING_MS = 30 * 60 * 1000;
     const _now = Date.now();
     const privates: PrivateLessonBooking[] = ((privateOccRes.data as any[]) || [])
       .filter((o) => {
         if (o.status !== "pending_card") return true;
+        const src = o.lesson_bookings?.booking_source;
+        if (src === "admin" || src === "admin_manual") return true;
         const created = o.created_at ? new Date(o.created_at).getTime() : 0;
         return (_now - created) <= STALE_PENDING_MS;
       })
