@@ -1,15 +1,25 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
 import { format } from "date-fns";
 import type { PrivateLessonBooking } from "@/hooks/useCalendarData";
-import { Mail, User, Clock, CreditCard, ClipboardSignature, Trash2, Loader2, CalendarCog } from "lucide-react";
+import { Mail, User, Clock, CreditCard, ClipboardSignature, Trash2, Loader2, CalendarCog, DollarSign, Wallet, Link as LinkIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
 import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
+import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
+import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 
 interface Props {
   lesson: PrivateLessonBooking | null;
@@ -40,17 +50,28 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
   const [busy, setBusy] = useState<string | null>(null);
   const [rescheduleBooking, setRescheduleBooking] = useState<any | null>(null);
   const [quickEdit, setQuickEdit] = useState<QuickEditLesson | null>(null);
+
+  // Card setup (embedded Stripe)
+  const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
+  const [setupSessionId, setSetupSessionId] = useState<string | null>(null);
+  const stripeReady = useMemo(() => getStripe(), []);
+
+  // Manual mark-paid
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualMethod, setManualMethod] = useState<string>("cash");
+  const [manualRef, setManualRef] = useState<string>("");
+
   if (!lesson) return null;
 
   const waiverUrl = lesson.waiver_token ? `${SITE}/lesson-waiver/${lesson.waiver_token}` : null;
+  const hasCardOnFile = !!lesson.stripe_payment_method_id;
+  const isPaid = lesson.payment_status === "paid";
 
   const resendConfirmation = async () => {
     setBusy("resend");
     try {
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking", {
-        body: {
-          resend_confirmation_for: lesson.booking_id,
-        },
+        body: { resend_confirmation_for: lesson.booking_id },
       });
       if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
       toast.success("Confirmation email re-sent");
@@ -81,9 +102,133 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
     }
   };
 
+  const chargeCardOnFile = async () => {
+    if (!confirm(`Charge $${lesson.price_per_session} to the card on file?`)) return;
+    setBusy("charge");
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "admin-charge-private-lesson-occurrence",
+        {
+          body: {
+            occurrence_id: lesson.occurrence_id,
+            environment: getStripeEnvironment(),
+          },
+        },
+      );
+      if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
+      toast.success("Card charged");
+      onChanged();
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message || "Charge failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const emailCardLink = async () => {
+    setBusy("emaillink");
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-card-on-file-link", {
+        body: {
+          bookingId: lesson.booking_id,
+          environment: getStripeEnvironment(),
+          siteUrl: SITE,
+          amountLabel: `$${lesson.price_per_session}`,
+        },
+      });
+      if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
+      const link = (data as any)?.paymentLink;
+      if (link) {
+        try { await navigator.clipboard.writeText(link); } catch { /* ignore */ }
+        toast.success("Link emailed to parent and copied to clipboard");
+      } else {
+        toast.success("Link emailed to parent");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const startCardSetup = async () => {
+    setBusy("setupstart");
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-setup-card-for-booking", {
+        body: {
+          action: "start",
+          booking_id: lesson.booking_id,
+          environment: getStripeEnvironment(),
+        },
+      });
+      if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
+      setSetupClientSecret((data as any).client_secret);
+      setSetupSessionId((data as any).checkout_session_id);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not start card setup");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const finalizeCardSetup = useCallback(async () => {
+    if (!setupSessionId) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-setup-card-for-booking", {
+        body: {
+          action: "finalize",
+          booking_id: lesson.booking_id,
+          checkout_session_id: setupSessionId,
+          environment: getStripeEnvironment(),
+        },
+      });
+      if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
+      toast.success("Card saved on file");
+      setSetupClientSecret(null);
+      setSetupSessionId(null);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || "Could not save card");
+    }
+  }, [setupSessionId, lesson.booking_id, onChanged]);
+
+  const checkoutOptions = useMemo(
+    () => ({
+      fetchClientSecret: () => Promise.resolve(setupClientSecret || ""),
+      onComplete: finalizeCardSetup,
+    }),
+    [setupClientSecret, finalizeCardSetup],
+  );
+
+  const submitManual = async () => {
+    setBusy("manual");
+    try {
+      const { error } = await supabase
+        .from("lesson_booking_occurrences")
+        .update({
+          payment_status: manualMethod === "comp" ? "comp" : "paid",
+          auto_charge_status: "skipped",
+          paid_at: new Date().toISOString(),
+          payment_method: manualMethod,
+          payment_reference: manualRef || null,
+        })
+        .eq("id", lesson.occurrence_id);
+      if (error) throw error;
+      toast.success("Marked paid");
+      setManualOpen(false);
+      onChanged();
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <Dialog open={!!lesson} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {lesson.lesson_type === "semi_private" ? "Semi-Private Lesson" : "Private Lesson"}
@@ -141,6 +286,100 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
           {lesson.notes && (
             <div className="text-xs text-muted-foreground bg-muted/40 p-2 rounded">
               <p className="font-semibold mb-1">Notes</p>{lesson.notes}
+            </div>
+          )}
+
+          {/* Payment actions */}
+          {!isPaid && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payment</p>
+                <div className="flex flex-wrap gap-2">
+                  {hasCardOnFile && (
+                    <Button size="sm" onClick={chargeCardOnFile} disabled={busy !== null}>
+                      {busy === "charge" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <DollarSign className="w-4 h-4 mr-1" />}
+                      Charge ${lesson.price_per_session}
+                    </Button>
+                  )}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button size="sm" variant={hasCardOnFile ? "outline" : "default"} disabled={busy !== null}>
+                        <CreditCard className="w-4 h-4 mr-1" />
+                        {hasCardOnFile ? "Update card" : "Add card on file"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2" align="start">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={startCardSetup}
+                        disabled={busy !== null}
+                      >
+                        {busy === "setupstart" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
+                        Enter card now
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={emailCardLink}
+                        disabled={busy !== null}
+                      >
+                        {busy === "emaillink" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LinkIcon className="w-4 h-4 mr-2" />}
+                        Email link to parent
+                      </Button>
+                    </PopoverContent>
+                  </Popover>
+                  <Button size="sm" variant="ghost" onClick={() => setManualOpen(true)} disabled={busy !== null}>
+                    <Wallet className="w-4 h-4 mr-1" />
+                    Mark paid manually
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Embedded Stripe Setup */}
+          {setupClientSecret && stripeReady && (
+            <div className="border border-border rounded-lg bg-card overflow-hidden mt-2">
+              <EmbeddedCheckoutProvider stripe={stripeReady} options={checkoutOptions}>
+                <EmbeddedCheckout />
+              </EmbeddedCheckoutProvider>
+            </div>
+          )}
+
+          {/* Manual paid form */}
+          {manualOpen && (
+            <div className="border border-border rounded-lg p-3 space-y-2 bg-muted/30">
+              <p className="text-xs font-semibold">Record manual payment</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Method</Label>
+                  <Select value={manualMethod} onValueChange={setManualMethod}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="check">Check</SelectItem>
+                      <SelectItem value="zelle">Zelle</SelectItem>
+                      <SelectItem value="venmo">Venmo</SelectItem>
+                      <SelectItem value="comp">Comp</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Reference (optional)</Label>
+                  <Input value={manualRef} onChange={(e) => setManualRef(e.target.value)} placeholder="Check #, note…" />
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="ghost" onClick={() => setManualOpen(false)} disabled={busy !== null}>Cancel</Button>
+                <Button size="sm" onClick={submitManual} disabled={busy !== null}>
+                  {busy === "manual" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+                  Save
+                </Button>
+              </div>
             </div>
           )}
         </div>
