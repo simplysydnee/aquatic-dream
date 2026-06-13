@@ -296,9 +296,11 @@ export default function PrivateLessonsAdmin() {
       const baseT = normTime(b.start_time);
       for (const o of (b.lesson_booking_occurrences || [])) {
         if (o.status === "cancelled") continue;
-        // Skip stale pending-card holds (abandoned checkouts) so they don't
-        // permanently lock the slot in the grid.
-        if (o.status === "pending_card" && o.created_at && (now - new Date(o.created_at).getTime()) > STALE_PENDING_MS) continue;
+        // Skip stale pending-card holds (abandoned self-serve checkouts) so they
+        // don't permanently lock the slot in the grid. Admin-created bookings
+        // are NEVER auto-hidden — they stay until an admin cancels them.
+        const isAdminSrc = b.booking_source === "admin" || b.booking_source === "admin_manual";
+        if (!isAdminSrc && o.status === "pending_card" && o.created_at && (now - new Date(o.created_at).getTime()) > STALE_PENDING_MS) continue;
         const instructorId = o.instructor_override_id || baseInstructorId;
         if (!instructorId) continue;
         const t = o.start_time_override ? normTime(o.start_time_override) : baseT;
