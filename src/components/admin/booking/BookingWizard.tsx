@@ -398,7 +398,49 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
       (b.data || []).forEach((row) => add(row, "booking"));
       (e.data || []).forEach((row) => add(row, "enrollment"));
       (r.data || []).forEach((row) => add(row, "request"));
-      setResults(Array.from(map.values()).slice(0, 15));
+
+      // Merge pass: collapse same-parent + same-first-name entries when one
+      // side has no last name (typically a lesson_request with just child_name).
+      // The richer row (with last name) survives and absorbs missing fields.
+      const all = Array.from(map.values());
+      const byEmail = new Map<string, ClientSearchResult[]>();
+      for (const r of all) {
+        const list = byEmail.get(r.parent_email) || [];
+        list.push(r);
+        byEmail.set(r.parent_email, list);
+      }
+      const dropped = new Set<ClientSearchResult>();
+      for (const list of byEmail.values()) {
+        if (list.length < 2) continue;
+        for (let i = 0; i < list.length; i++) {
+          for (let j = i + 1; j < list.length; j++) {
+            const a = list[i], b = list[j];
+            if (dropped.has(a) || dropped.has(b)) continue;
+            const af = (a.swimmer_first || "").toLowerCase().trim();
+            const bf = (b.swimmer_first || "").toLowerCase().trim();
+            if (!af || af !== bf) continue;
+            const al = (a.swimmer_last || "").trim();
+            const bl = (b.swimmer_last || "").trim();
+            // Only merge if exactly one has a last name (or last names match).
+            const sameLast = al && bl && al.toLowerCase() === bl.toLowerCase();
+            const oneMissing = (!al && bl) || (al && !bl);
+            if (!sameLast && !oneMissing) continue;
+            const survivor = al ? a : b;
+            const loser = al ? b : a;
+            // Absorb missing fields from the loser.
+            if (!survivor.swimmer_age && loser.swimmer_age != null) survivor.swimmer_age = loser.swimmer_age;
+            if (!survivor.swimmer_dob && loser.swimmer_dob) survivor.swimmer_dob = loser.swimmer_dob;
+            if (!survivor.parent_phone && loser.parent_phone) survivor.parent_phone = loser.parent_phone;
+            if (!survivor.parent_first && loser.parent_first) survivor.parent_first = loser.parent_first;
+            if (!survivor.parent_last && loser.parent_last) survivor.parent_last = loser.parent_last;
+            if (!survivor.request_preferred_times && loser.request_preferred_times) survivor.request_preferred_times = loser.request_preferred_times;
+            if (!survivor.request_notes && loser.request_notes) survivor.request_notes = loser.request_notes;
+            if (!survivor.request_status && loser.request_status) survivor.request_status = loser.request_status;
+            dropped.add(loser);
+          }
+        }
+      }
+      setResults(all.filter((r) => !dropped.has(r)).slice(0, 15));
       setSearching(false);
     })();
     return () => { cancelled = true; };
