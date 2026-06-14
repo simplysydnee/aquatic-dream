@@ -52,10 +52,11 @@ Deno.serve(async (req) => {
     // Per-row guard below enforces the 1h-before-start-time window.
     const { data: due, error } = await supabase
       .from("lesson_booking_occurrences")
-      .select("id, booking_id, occurrence_date, status, lesson_bookings!inner(id, parent_email, parent_first_name, parent_name, child_name, stripe_customer_id, stripe_payment_method_id, price_per_session, instructor_name, lesson_type, start_time, end_time)")
+      .select("id, booking_id, occurrence_date, status, lesson_bookings!inner(id, status, parent_email, parent_first_name, parent_name, child_name, stripe_customer_id, stripe_payment_method_id, price_per_session, instructor_name, lesson_type, start_time, end_time)")
       .eq("auto_charge_status", "pending")
       .lte("occurrence_date", yyyy_mm_dd_max)
-      .neq("status", "cancelled")
+      .eq("status", "scheduled")
+      .eq("lesson_bookings.status", "active")
       .limit(50);
     if (error) throw error;
 
