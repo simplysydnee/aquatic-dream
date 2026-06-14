@@ -1,43 +1,28 @@
-## Goal
-Switch private-lesson charging to **manual only**. No card is auto-charged by cron — admins click "Charge" and confirm the amount before it runs.
+# Merge duplicate swimmer rows in the booking client picker
 
-## Changes
+## Problem
 
-### 1. Disable the hourly auto-charge cron
-Use `supabase--insert` to run:
-```sql
-select cron.unschedule(jobid) from cron.job
- where command ilike '%charge-private-lesson-occurrence%';
-```
-Also short-circuit the `charge-private-lesson-occurrence` edge function so even a manual cron POST returns `{ disabled: true, processed: 0 }` without touching any bookings — belt + suspenders in case the schedule comes back.
+In the "Who is this for?" search (`BookingWizard.tsx`), the same swimmer appears twice when one source has a last name and another doesn't:
 
-### 2. New confirm dialog component
-`src/components/admin/calendar/ChargeConfirmDialog.tsx` — shadcn `AlertDialog`:
-- Title: "Charge card on file?"
-- Body shows: **Amount $X**, **Parent name**, **Lesson date** (formatted)
-- Buttons: Cancel / Charge $X (destructive variant, with spinner while running)
-- Props: `open`, `onOpenChange`, `amount`, `parentName`, `lessonDate`, `onConfirm`
+- **Weston Reiseck** (Group enrollment) + **Weston** (Lesson Request) — same parent `kaylareiseck@gmail.com`.
+- Earlier: **Ryker Lucas** (Private booking) + **Ryker** (Lesson Request) — same parent.
 
-### 3. Wire the dialog into the two existing Charge buttons
-Both already call `admin-charge-private-lesson-occurrence` — we just gate them behind the new dialog instead of `window.confirm`.
+Cause: dedupe key is `email|first|last`. Lesson requests store the child as a single `child_name` field (often just a first name), so the `last` slot is empty and the key never collides with the booking/enrollment row that has both names.
 
-- **`src/components/admin/calendar/PrivateLessonDetailDialog.tsx`** (per-occurrence button on calendar detail, line ~300)
-  - Replace the `confirm()` call in `chargeCardOnFile` with dialog state
-  - Render `<ChargeConfirmDialog />` with the occurrence date and parent name
+Different parents (e.g. Weston Bomer with Katie Bomer / pinktrapshooter@gmail.com) stay separate — they should.
 
-- **`src/pages/admin/PrivateLessonsAdmin.tsx`** (per-occurrence row, line ~999, and booking summary)
-  - Same swap inside `chargeNow`
-  - Add a booking-level "Charge next due lesson" button on the booking summary card (top of detail view) — finds the first occurrence where `auto_charge_status !== "succeeded"` and `status !== "cancelled"`, opens the dialog for it
+## Fix
 
-### 4. UI copy cleanup
-Remove "auto-charge" wording from the admin views (Pricing tab, occurrence list header "Charged" stays, but tooltips/help text say "Manual charge only"). No behavior change beyond labels.
+Single-file change in `src/components/admin/booking/BookingWizard.tsx`, inside the search `useEffect` that builds the `map` of `ClientSearchResult` (≈ lines 367–401):
+
+1. Keep the existing insert order (booking → enrollment → request) so when keys do match the richer row wins.
+2. After all three sources are inserted, run a **merge pass** over the map values grouped by `parent_email`:
+   - For each pair where `first_name` matches (case-insensitive) and one entry's `last_name` is empty while the other's is set, drop the no-last-name entry and copy any fields it had that the survivor is missing: `swimmer_age`, `swimmer_dob`, `parent_phone`, `parent_first/last`, and the request-only context (`request_preferred_times`, `request_notes`, `request_status`) so admins still see the "Prefers:" line.
+   - Survivor's `source` stays as the booking/enrollment so the chip shows "Private"/"Group" instead of "Lesson Request", but the preserved request fields keep the lesson-request context visible.
+3. Same-parent + same-first + both have a (different) last name → leave alone, they're real siblings.
 
 ## Out of scope
-- No DB schema changes (we keep the `auto_charge_status` column as the source of truth for whether a lesson was paid).
-- Cancellation refund flow untouched.
-- Customer-facing checkout (first lesson) untouched.
 
-## Technical notes
-- The cron unschedule SQL must be run via `supabase--insert` (not migration) since `cron.job` is project-specific.
-- `admin-charge-private-lesson-occurrence` already exists and works — no edge-function changes needed for the button itself.
-- The `charge-private-lesson-occurrence` edge function gets a 4-line guard at the top of the handler returning early.
+- No DB writes, no schema changes, no merging of underlying `lesson_requests` / `lesson_bookings` / `swim_enrollments` rows.
+- No changes to Clients admin, swimmer modal, or charge logic.
+- No change to the "New" manual-entry flow.
