@@ -1,92 +1,37 @@
+## Goal
+Prevent abandoned-checkout bookings from ever being auto-charged by the hourly cron.
 
-## Order of operations
+## Problem
+The `charge-private-lesson-occurrence` edge function currently selects occurrences with:
+- `auto_charge_status = 'pending'`
+- `status <> 'cancelled'`
+- `occurrence_date <= tomorrow`
 
-1. **Charge today first** (manual one-shot)
-2. **Then schedule the cron** so this never happens again
-3. **Add verification** so we can always tell what Stripe did
+It does NOT exclude rows where the parent abandoned Stripe checkout. Those rows live in the DB as:
+- `lesson_bookings.status = 'pending_card'`
+- `lesson_booking_occurrences.status = 'pending_card'`
 
----
+There are currently 9 such occurrences sitting in the table. Today's cron run skipped them only by accident (no stored payment method) — but they still get considered every hour and recorded as "failed" attempts.
 
-## Step 1 — Charge today's lessons NOW
+## Fix
 
-Real lessons today (self-serve abandoned rows ignored — those slots are vacant):
+### 1. Edge function: `supabase/functions/charge-private-lesson-occurrence/index.ts`
+Tighten the SQL filter to only consider real, active bookings:
+- Add `o.status = 'scheduled'` (replaces the loose `neq cancelled`)
+- Add `b.status = 'active'` on the joined `lesson_bookings`
 
-| Time | Child | Card on file? | Action |
-|------|-------|---------------|--------|
-| 10:00 | Reet Pattar | ✅ | Charge $50 |
-| 10:00 | Zoey Silva | ✅ | Charge $50 |
-| 10:00 | Adrian Chacon | ✅ | Charge $50 |
-| 11:00 | Kiaan Bansal | ❌ | Skip — capture card via admin dialog |
-| 11:30 | Leonardo Mendoza | ✅ | Charge $50 |
-| 12:00 | Angelo Mendoza | ✅ | Charge $50 |
-| 12:30 | Karanveer Singh | ✅ | Charge $50 |
-| 15:30 | Carson Maldonado | ✅ | Charge $50 |
+This guarantees `pending_card` (abandoned) rows are never even fetched, let alone charged.
 
-**7 charges × $50 = $350 today.** Only Kiaan needs a card captured.
+### 2. One-time cleanup (data migration via insert tool)
+The 9 abandoned `pending_card` occurrences (and their parent bookings) are stale clutter. Two options — I'll ask which you want:
+- **A.** Leave them alone (just stop charging them — safest).
+- **B.** Hard-delete the abandoned bookings + their occurrences so they disappear from admin views.
 
-How: invoke the existing `charge-private-lesson-occurrence` edge function once via `curl_edge_functions` with `x-cron-secret`. It already enforces "≥1h before start" and idempotency (only touches `pending` rows), so re-running is safe. Each succeeded charge writes `payment_status='paid'`, `stripe_payment_intent_id`, `paid_at`.
+### 3. Verify
+- Re-deploy the function.
+- Re-run the cron call manually and confirm `processed: 0` (nothing left pending today) and that no `pending_card` rows are touched.
 
-I'll report the per-row result so you can confirm.
-
----
-
-## Step 2 — Schedule the cron (forward fix)
-
-Add a `CRON_SECRET` runtime secret, then insert a pg_cron job that runs every 15 min and POSTs to `charge-private-lesson-occurrence?env=live` with `x-cron-secret`. The function's "≥1h before lesson start" guard means each lesson is charged once, at the right moment.
-
-```sql
-select cron.schedule(
-  'charge-private-lessons-every-15-min',
-  '*/15 * * * *',
-  $$ select net.http_post(
-       url := 'https://<project>.supabase.co/functions/v1/charge-private-lesson-occurrence?env=live',
-       headers := jsonb_build_object('Content-Type','application/json','x-cron-secret','<CRON_SECRET>')
-     ); $$
-);
-```
-
-(Inserted via Supabase insert tool, not migration — embeds project-specific values per the schedule-jobs guide.)
-
----
-
-## Step 3 — In-app verification
-
-In `PrivateLessonDetailDialog.tsx`, add a **Payment** section showing:
-
-- Status badge (paid / card_on_file / unpaid / failed)
-- Amount charged + `paid_at` timestamp
-- Last auto-charge attempt time + error message (if failed)
-- PaymentIntent ID with copy button and **"View in Stripe →"** link to `https://dashboard.stripe.com/{test/}payments/{pi_id}`
-- **"Retry charge"** button when `auto_charge_status='failed'` (reuses `admin-charge-private-lesson-occurrence`)
-
-In `PrivateLessonsPanel.tsx`, the existing payment badge becomes a Stripe link when a PI exists.
-
-Tiny helper added to `src/lib/stripe.ts`: `stripeDashboardUrl(pi_id, env)`.
-
-No schema changes — all fields already exist on `lesson_booking_occurrences`.
-
----
-
-## Step 4 — Daily admin recap email
-
-New edge function `private-lesson-daily-recap`, scheduled nightly at 9pm PT via pg_cron. Queries today's occurrences and emails admin (via Resend) a summary:
-
-- ✅ Charged: count, total $, list with PI links
-- ❌ Failed: list with error reason
-- ⚠️ No card on file: action items for tomorrow
-- ⏭️ Skipped (cancelled / manual)
-
-I'll ask which admin email to send to during build (or reuse one already wired).
-
----
-
-## Files
-
-- `supabase/functions/private-lesson-daily-recap/index.ts` (new)
-- `src/components/admin/calendar/PrivateLessonDetailDialog.tsx` (Payment section + Retry)
-- `src/components/admin/calendar/PrivateLessonsPanel.tsx` (badge → Stripe link)
-- `src/lib/stripe.ts` (`stripeDashboardUrl` helper)
-- New runtime secret: `CRON_SECRET`
-- Two pg_cron schedules (charge every 15 min, recap nightly)
-
-No schema migration needed.
+## Technical notes
+- No schema change. No new columns. No migration needed for the fix itself.
+- The hourly pg_cron schedule stays as-is.
+- Admin-initiated `admin-charge-private-lesson-occurrence` is unaffected (admin explicitly picks a row).
