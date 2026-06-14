@@ -1467,6 +1467,18 @@ export default function PrivateLessonsAdmin() {
         lesson={quickEdit}
         onSaved={() => { setQuickEdit(null); load(); }}
       />
+      <ChargeConfirmDialog
+        open={!!chargeTarget}
+        onOpenChange={(o) => { if (!o) setChargeTarget(null); }}
+        amount={chargeTarget?.amount || 0}
+        parentName={chargeTarget?.booking?.parent_name || ""}
+        lessonDate={chargeTarget?.occurrence?.occurrence_date || ""}
+        onConfirm={async () => {
+          if (!chargeTarget) return;
+          await chargeNow(chargeTarget.booking, chargeTarget.occurrence);
+          setChargeTarget(null);
+        }}
+      />
 
     </div>
   );
