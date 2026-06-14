@@ -1,31 +1,92 @@
-# Add payment + card-on-file actions to the admin Private Lesson dialog
 
-The Private Lesson popover (screenshot) has no payment controls. Add three actions to `PrivateLessonDetailDialog.tsx`.
+## Order of operations
 
-## Buttons (above "Cancel lesson")
+1. **Charge today first** (manual one-shot)
+2. **Then schedule the cron** so this never happens again
+3. **Add verification** so we can always tell what Stripe did
 
-1. **Charge card on file** — shown when `lesson.stripe_payment_method_id` exists and `payment_status !== 'paid'`.
-   - New edge function `admin-charge-private-lesson-occurrence` (admin-only): off-session PaymentIntent on the stored PM for `price_per_session`, then set occurrence `payment_status='paid'`, `auto_charge_status='charged'`, `stripe_payment_intent_id`. Mirrors the existing cron `charge-private-lesson-occurrence`, scoped to one row.
+---
 
-2. **Add card on file** — always shown when no PM is saved. Two sub-actions in a small popover:
-   - **Enter card now (admin)** — opens an inline dialog with Stripe Embedded Checkout in `mode: setup` (reuses the existing `admin-create-private-booking-setup` pattern but for an existing booking). New thin edge function `admin-setup-card-for-booking` returns a setup-mode `client_secret` for the booking's Stripe customer; on completion a follow-up call attaches `stripe_payment_method_id` to `lesson_bookings` and flips occurrence `payment_status='card_on_file'`, `auto_charge_status='pending'`. Admin can collect the card with the client physically present.
-   - **Email link to parent** — calls existing `admin-card-on-file-link` and copies the URL to clipboard so admin can also text it.
+## Step 1 — Charge today's lessons NOW
 
-3. **Mark paid manually** — ghost button, confirm with method dropdown (cash/check/comp/zelle) + optional reference, writes occurrence `payment_status='paid'`, `auto_charge_status='skipped'`, `payment_method`, `payment_reference`.
+Real lessons today (self-serve abandoned rows ignored — those slots are vacant):
 
-## Files changed
+| Time | Child | Card on file? | Action |
+|------|-------|---------------|--------|
+| 10:00 | Reet Pattar | ✅ | Charge $50 |
+| 10:00 | Zoey Silva | ✅ | Charge $50 |
+| 10:00 | Adrian Chacon | ✅ | Charge $50 |
+| 11:00 | Kiaan Bansal | ❌ | Skip — capture card via admin dialog |
+| 11:30 | Leonardo Mendoza | ✅ | Charge $50 |
+| 12:00 | Angelo Mendoza | ✅ | Charge $50 |
+| 12:30 | Karanveer Singh | ✅ | Charge $50 |
+| 15:30 | Carson Maldonado | ✅ | Charge $50 |
 
-- `src/components/admin/calendar/PrivateLessonDetailDialog.tsx` — 3 buttons + handlers + embedded-setup dialog mount.
-- `src/components/admin/calendar/AdminCardOnFileDialog.tsx` *(new)* — wraps `EmbeddedCheckoutProvider` for the setup intent.
-- `supabase/functions/admin-charge-private-lesson-occurrence/index.ts` *(new)* — admin-only one-shot charge.
-- `supabase/functions/admin-setup-card-for-booking/index.ts` *(new)* — admin-only setup-mode session for an existing booking; on completion attaches PM.
-- `supabase/config.toml` — `verify_jwt = false` entries for the two new functions (auth enforced in code).
+**7 charges × $50 = $350 today.** Only Kiaan needs a card captured.
 
-## Verify
+How: invoke the existing `charge-private-lesson-occurrence` edge function once via `curl_edge_functions` with `x-cron-secret`. It already enforces "≥1h before start" and idempotency (only touches `pending` rows), so re-running is safe. Each succeeded charge writes `payment_status='paid'`, `stripe_payment_intent_id`, `paid_at`.
 
-- Kiaan (no PM): dialog shows "Add card on file" → "Enter card now" launches embedded Stripe; saving a test card flips badge to "Card on file" and the "Charge card on file" button appears.
-- Booking with PM: clicking "Charge card on file" charges $price_per_session and badge becomes "Paid".
-- "Email link to parent" still works as before.
-- "Mark paid manually" with cash records correctly.
+I'll report the per-row result so you can confirm.
 
-No schema migration needed — all columns exist on `lesson_booking_occurrences` and `lesson_bookings`.
+---
+
+## Step 2 — Schedule the cron (forward fix)
+
+Add a `CRON_SECRET` runtime secret, then insert a pg_cron job that runs every 15 min and POSTs to `charge-private-lesson-occurrence?env=live` with `x-cron-secret`. The function's "≥1h before lesson start" guard means each lesson is charged once, at the right moment.
+
+```sql
+select cron.schedule(
+  'charge-private-lessons-every-15-min',
+  '*/15 * * * *',
+  $$ select net.http_post(
+       url := 'https://<project>.supabase.co/functions/v1/charge-private-lesson-occurrence?env=live',
+       headers := jsonb_build_object('Content-Type','application/json','x-cron-secret','<CRON_SECRET>')
+     ); $$
+);
+```
+
+(Inserted via Supabase insert tool, not migration — embeds project-specific values per the schedule-jobs guide.)
+
+---
+
+## Step 3 — In-app verification
+
+In `PrivateLessonDetailDialog.tsx`, add a **Payment** section showing:
+
+- Status badge (paid / card_on_file / unpaid / failed)
+- Amount charged + `paid_at` timestamp
+- Last auto-charge attempt time + error message (if failed)
+- PaymentIntent ID with copy button and **"View in Stripe →"** link to `https://dashboard.stripe.com/{test/}payments/{pi_id}`
+- **"Retry charge"** button when `auto_charge_status='failed'` (reuses `admin-charge-private-lesson-occurrence`)
+
+In `PrivateLessonsPanel.tsx`, the existing payment badge becomes a Stripe link when a PI exists.
+
+Tiny helper added to `src/lib/stripe.ts`: `stripeDashboardUrl(pi_id, env)`.
+
+No schema changes — all fields already exist on `lesson_booking_occurrences`.
+
+---
+
+## Step 4 — Daily admin recap email
+
+New edge function `private-lesson-daily-recap`, scheduled nightly at 9pm PT via pg_cron. Queries today's occurrences and emails admin (via Resend) a summary:
+
+- ✅ Charged: count, total $, list with PI links
+- ❌ Failed: list with error reason
+- ⚠️ No card on file: action items for tomorrow
+- ⏭️ Skipped (cancelled / manual)
+
+I'll ask which admin email to send to during build (or reuse one already wired).
+
+---
+
+## Files
+
+- `supabase/functions/private-lesson-daily-recap/index.ts` (new)
+- `src/components/admin/calendar/PrivateLessonDetailDialog.tsx` (Payment section + Retry)
+- `src/components/admin/calendar/PrivateLessonsPanel.tsx` (badge → Stripe link)
+- `src/lib/stripe.ts` (`stripeDashboardUrl` helper)
+- New runtime secret: `CRON_SECRET`
+- Two pg_cron schedules (charge every 15 min, recap nightly)
+
+No schema migration needed.
