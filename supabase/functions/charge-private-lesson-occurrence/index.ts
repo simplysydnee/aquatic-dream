@@ -14,6 +14,15 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Auto-charge is permanently disabled — admins must trigger charges manually
+  // via admin-charge-private-lesson-occurrence. This guard short-circuits any
+  // accidental cron POST so no card is ever charged automatically.
+  return new Response(
+    JSON.stringify({ disabled: true, processed: 0, message: "Auto-charge disabled; use manual admin charge." }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+  // eslint-disable-next-line no-unreachable
+
   // Auth gate: only service-role (pg_cron) or a configured CRON_SECRET may invoke.
   const authHeader = req.headers.get("Authorization") || "";
   const bearer = authHeader.replace(/^Bearer\s+/i, "");

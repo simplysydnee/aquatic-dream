@@ -22,6 +22,7 @@ import { getStripeEnvironment } from "@/lib/stripe";
 import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
 import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
+import ChargeConfirmDialog from "@/components/admin/calendar/ChargeConfirmDialog";
 
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -408,18 +409,28 @@ export default function PrivateLessonsAdmin() {
     }
   };
 
+  const [chargeTarget, setChargeTarget] = useState<
+    { booking: any; occurrence: any; amount: number } | null
+  >(null);
+
+  const requestCharge = (booking: any, occurrence: any) => {
+    const amount = getPrivateLessonPrice(booking.lesson_type, occurrence.occurrence_date);
+    setChargeTarget({ booking, occurrence, amount });
+  };
+
   const chargeNow = async (booking: any, occurrence: any) => {
-    try {
-      const data: any = await callAdmin({
-        action: "charge_occurrence",
-        booking_id: booking.id,
-        occurrence_id: occurrence.id,
-        environment: getStripeEnvironment(),
-      }, `charge-${occurrence.id}`);
-      if (data?.success) toast({ title: "Card charged" });
-      else toast({ title: "Charge not completed", description: `Stripe status: ${data?.stripe_status || "unknown"}`, variant: "destructive" });
-      await load();
-    } catch {}
+    const data: any = await callAdmin({
+      action: "charge_occurrence",
+      booking_id: booking.id,
+      occurrence_id: occurrence.id,
+      environment: getStripeEnvironment(),
+    }, `charge-${occurrence.id}`);
+    if (data?.success) toast({ title: "Card charged" });
+    else {
+      toast({ title: "Charge not completed", description: `Stripe status: ${data?.stripe_status || "unknown"}`, variant: "destructive" });
+      throw new Error("charge failed");
+    }
+    await load();
   };
 
   const cancelBooking = async (booking: any) => {
@@ -937,6 +948,30 @@ export default function PrivateLessonsAdmin() {
                 Status: <span className="capitalize">{detailBooking.status}</span>
               </div>
 
+              {detailBooking.stripe_payment_method_id && (() => {
+                const nextDue = (detailBooking.lesson_booking_occurrences || [])
+                  .slice()
+                  .sort((a: any, b: any) => a.occurrence_date.localeCompare(b.occurrence_date))
+                  .find((o: any) => o.auto_charge_status !== "succeeded" && o.status !== "cancelled");
+                if (!nextDue) return null;
+                return (
+                  <div className="flex items-center justify-between border border-border rounded-md p-3 bg-muted/30">
+                    <div className="text-sm">
+                      <p className="font-medium">Next lesson to charge</p>
+                      <p className="text-xs text-muted-foreground">{nextDue.occurrence_date} · ${getPrivateLessonPrice(detailBooking.lesson_type, nextDue.occurrence_date)}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={busy === `charge-${nextDue.id}`}
+                      onClick={() => requestCharge(detailBooking, nextDue)}
+                    >
+                      {busy === `charge-${nextDue.id}` ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CreditCard className="w-4 h-4 mr-1" />}
+                      Charge next lesson
+                    </Button>
+                  </div>
+                );
+              })()}
+
               <div className="border border-border rounded-md">
                 <Table>
                   <TableHeader>
@@ -1001,7 +1036,7 @@ export default function PrivateLessonsAdmin() {
                                     size="sm"
                                     variant="outline"
                                     disabled={busy === `charge-${o.id}`}
-                                    onClick={() => chargeNow(detailBooking, o)}
+                                    onClick={() => requestCharge(detailBooking, o)}
                                   >
                                     {busy === `charge-${o.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3 mr-1" />}
                                     Charge ${getPrivateLessonPrice(detailBooking.lesson_type, o.occurrence_date)}
@@ -1431,6 +1466,18 @@ export default function PrivateLessonsAdmin() {
         onOpenChange={(o) => { if (!o) setQuickEdit(null); }}
         lesson={quickEdit}
         onSaved={() => { setQuickEdit(null); load(); }}
+      />
+      <ChargeConfirmDialog
+        open={!!chargeTarget}
+        onOpenChange={(o) => { if (!o) setChargeTarget(null); }}
+        amount={chargeTarget?.amount || 0}
+        parentName={chargeTarget?.booking?.parent_name || ""}
+        lessonDate={chargeTarget?.occurrence?.occurrence_date || ""}
+        onConfirm={async () => {
+          if (!chargeTarget) return;
+          await chargeNow(chargeTarget.booking, chargeTarget.occurrence);
+          setChargeTarget(null);
+        }}
       />
 
     </div>

@@ -20,6 +20,7 @@ import ReschedulePrivateLessonDialog from "@/components/admin/booking/Reschedule
 import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
+import ChargeConfirmDialog from "@/components/admin/calendar/ChargeConfirmDialog";
 
 interface Props {
   lesson: PrivateLessonBooking | null;
@@ -60,6 +61,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
   const [manualOpen, setManualOpen] = useState(false);
   const [manualMethod, setManualMethod] = useState<string>("cash");
   const [manualRef, setManualRef] = useState<string>("");
+  const [chargeConfirmOpen, setChargeConfirmOpen] = useState(false);
 
   if (!lesson) return null;
 
@@ -103,7 +105,6 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
   };
 
   const chargeCardOnFile = async () => {
-    if (!confirm(`Charge $${lesson.price_per_session} to the card on file?`)) return;
     setBusy("charge");
     try {
       const { data, error } = await supabase.functions.invoke(
@@ -121,6 +122,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
       onClose();
     } catch (e: any) {
       toast.error(e?.message || "Charge failed");
+      throw e;
     } finally {
       setBusy(null);
     }
@@ -297,7 +299,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payment</p>
                 <div className="flex flex-wrap gap-2">
                   {hasCardOnFile && (
-                    <Button size="sm" onClick={chargeCardOnFile} disabled={busy !== null}>
+                    <Button size="sm" onClick={() => setChargeConfirmOpen(true)} disabled={busy !== null}>
                       {busy === "charge" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <DollarSign className="w-4 h-4 mr-1" />}
                       Charge ${lesson.price_per_session}
                     </Button>
@@ -451,6 +453,14 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
         onOpenChange={(o) => { if (!o) setQuickEdit(null); }}
         lesson={quickEdit}
         onSaved={() => { setQuickEdit(null); onChanged(); onClose(); }}
+      />
+      <ChargeConfirmDialog
+        open={chargeConfirmOpen}
+        onOpenChange={setChargeConfirmOpen}
+        amount={Number(lesson.price_per_session) || 0}
+        parentName={lesson.parent_name}
+        lessonDate={lesson.occurrence_date}
+        onConfirm={chargeCardOnFile}
       />
     </Dialog>
   );
