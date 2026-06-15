@@ -39,6 +39,7 @@ import PrintDaySchedule from "./pages/admin/PrintDaySchedule";
 import CheckInAdmin from "./pages/admin/CheckInAdmin";
 import Waivers from "./pages/Waivers";
 import SmsTerms from "./pages/SmsTerms";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import InstructorLayout from "./pages/instructor/InstructorLayout";
 import InstructorAnnouncements from "./pages/instructor/InstructorAnnouncements";
 import InstructorMySchedule from "./pages/instructor/InstructorMySchedule";
