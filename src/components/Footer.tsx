@@ -58,7 +58,8 @@ const Footer = () => {
             </p>
             <div className="flex items-center gap-4 text-xs text-secondary-foreground/50">
               <Link to="/sms-terms" className="hover:text-primary transition-colors">SMS Terms</Link>
-              <Link to="/waivers" className="hover:text-primary transition-colors">Privacy</Link>
+              <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="/waivers" className="hover:text-primary transition-colors">Waivers</Link>
               <span className="font-display italic">Swim. Dive. Dream.</span>
             </div>
           </div>
