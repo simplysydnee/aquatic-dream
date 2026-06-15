@@ -200,7 +200,7 @@ const EnrollmentForm = ({ onSubmit, onBack, submitting, defaultParentFirstName, 
                 <strong>STOP</strong> to unsubscribe or <strong>HELP</strong> for help. See our{" "}
                 <Link to="/sms-terms" target="_blank" className="underline hover:text-primary">SMS Terms</Link>
                 {" "}and{" "}
-                <Link to="/waivers" target="_blank" className="underline hover:text-primary">Privacy Policy</Link>.
+                <Link to="/privacy-policy" target="_blank" className="underline hover:text-primary">Privacy Policy</Link>.
                 Consent is not a condition of enrollment.
               </p>
             </div>
