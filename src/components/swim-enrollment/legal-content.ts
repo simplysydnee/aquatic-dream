@@ -11,7 +11,7 @@ export const SMS_CONSENT_DISCLOSURE =
   "about my swimmer's lessons, schedule changes, reminders, and account " +
   "updates at the phone number I provided. Message frequency varies. " +
   "Message and data rates may apply. Reply STOP to unsubscribe or HELP for help. " +
-  "See our SMS Terms (/sms-terms) and Privacy Policy (/waivers). " +
+  "See our SMS Terms (/sms-terms) and Privacy Policy (/privacy-policy). " +
   "Consent is not a condition of enrollment.";
 
 export const LIABILITY_WAIVER_TEXT = `AQUATIC DREAMS SWIM SCHOOL

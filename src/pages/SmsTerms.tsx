@@ -27,10 +27,17 @@ const SmsTerms = () => {
 
         <h2 className="font-display text-xl font-bold mt-8 mb-2">How to Opt In</h2>
         <p>
-          You opt in by checking the "I agree to receive SMS text messages" box during online
-          enrollment at <a href="/swim-enrollment">aquaticdreamsswim.com/swim-enrollment</a> and
-          providing your mobile phone number. Consent is not a condition of enrolling your
-          swimmer — you may decline SMS and we will reach you by phone or email instead.
+          You opt in by checking the box labeled{" "}
+          <em>"I agree to receive SMS text messages from Aquatic Dreams Swim Modesto about my
+          swimmer's lessons, schedule changes, reminders, and account updates at the phone number
+          I provided"</em> during online enrollment at{" "}
+          <a href="https://aquaticdreamsswim.com/swim-enrollment">
+            https://aquaticdreamsswim.com/swim-enrollment
+          </a>{" "}
+          and providing your mobile phone number. The opt-in checkbox is unchecked by default and
+          must be actively selected by the parent or guardian. Consent is not a condition of
+          enrolling your swimmer — you may decline SMS and we will reach you by phone or email
+          instead.
         </p>
 
         <h2 className="font-display text-xl font-bold mt-8 mb-2">Message Frequency</h2>
@@ -74,8 +81,8 @@ const SmsTerms = () => {
           We do not share your mobile phone number or SMS opt-in information with third parties or
           affiliates for marketing or promotional purposes. SMS messages are sent through our
           messaging provider (TextMagic), which acts as a service processor on our behalf. See our{" "}
-          <a href="/waivers">Privacy Policy</a> for full details on how we handle your personal
-          information.
+          <a href="/privacy-policy">Privacy Policy</a> for full details on how we collect, use,
+          protect, and never sell your personal information.
         </p>
 
         <h2 className="font-display text-xl font-bold mt-8 mb-2">Contact</h2>
