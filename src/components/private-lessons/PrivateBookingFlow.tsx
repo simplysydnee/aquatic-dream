@@ -52,6 +52,19 @@ function formatTime(t: string): string {
   return `${display}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
+function formatSlotLabel(s: Slot): string {
+  const d = new Date(s.slot_date + "T00:00").toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric",
+  });
+  return `${d} · ${formatTime(s.start_time)} with ${s.instructor_name}`;
+}
+
+// Server returns "instructor_id|YYYY-MM-DD|HH:MM" — normalize both sides.
+function conflictKey(instructorId: string, date: string, startTime: string): string {
+  return `${instructorId}|${date}|${startTime.length >= 5 ? startTime.substring(0, 5) : startTime}`;
+}
+
+
 export default function PrivateBookingFlow() {
   const [step, setStep] = useState<Step>("info");
   const [sessionToken] = useState(() =>
