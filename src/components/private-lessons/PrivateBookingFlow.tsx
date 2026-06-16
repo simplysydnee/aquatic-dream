@@ -350,6 +350,7 @@ export default function PrivateBookingFlow() {
         )}
         <SlotPicker
           sessionToken={sessionToken}
+          initialSelected={slots}
           onContinue={(s) => {
             setSlots(s);
             if (activeWaiver) {
@@ -362,6 +363,7 @@ export default function PrivateBookingFlow() {
 
           onBack={() => setStep("info")}
         />
+
       </div>
     );
   }
