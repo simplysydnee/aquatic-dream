@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { format, addDays, startOfWeek, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft, Printer } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft, Printer, Send } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -52,11 +54,43 @@ const CalendarAdmin = () => {
   const [icsSource, setIcsSource] = useState<"airtable" | "supabase">(() => {
     return (localStorage.getItem("ics-data-source") as "airtable" | "supabase") || "airtable";
   });
+  const todayKey = format(new Date(), "yyyy-MM-dd");
+  const [sendingReminders, setSendingReminders] = useState(false);
+  const [remindersSentToday, setRemindersSentToday] = useState<boolean>(() => {
+    try { return localStorage.getItem(`reminders-sent-${todayKey}`) === "1"; }
+    catch { return false; }
+  });
 
   const toggleIcsSource = () => {
     const next = icsSource === "airtable" ? "supabase" : "airtable";
     setIcsSource(next);
     localStorage.setItem("ics-data-source", next);
+  };
+
+  const handleSendTodaysReminders = async () => {
+    setSendingReminders(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-send-todays-reminders");
+      if (error) throw error;
+      const sent = (data as any)?.sent ?? 0;
+      const failed = (data as any)?.failed ?? 0;
+      const errs = (data as any)?.errors ?? [];
+      if (failed > 0) {
+        toast.warning(`Sent ${sent}, failed ${failed}`, {
+          description: errs.slice(0, 3).map((e: any) => e.error).join(", "),
+        });
+      } else {
+        toast.success(`Sent ${sent} reminder${sent === 1 ? "" : "s"}`);
+      }
+      try { localStorage.setItem(`reminders-sent-${todayKey}`, "1"); } catch { /* ignore */ }
+      setRemindersSentToday(true);
+    } catch (e) {
+      toast.error("Failed to send reminders", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSendingReminders(false);
+    }
   };
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -124,6 +158,18 @@ const CalendarAdmin = () => {
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)} className="gap-1">
             <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print Schedule</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSendTodaysReminders}
+            disabled={sendingReminders || remindersSentToday}
+            className="gap-1"
+          >
+            <Send className="w-4 h-4" />
+            <span className="hidden sm:inline">
+              {remindersSentToday ? "Reminders sent" : sendingReminders ? "Sending..." : "Send today's reminders"}
+            </span>
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
             <Plus className="w-4 h-4 mr-1" /> Add Event
