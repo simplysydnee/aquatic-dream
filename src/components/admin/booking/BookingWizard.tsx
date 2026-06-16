@@ -150,12 +150,19 @@ export interface BookingWizardProps {
   initialClient?: Partial<ClientDraft>;
   /** When provided, the wizard starts on this step (only if the prefill makes it valid). */
   initialStep?: StepKey;
+  /** When true, slot + type came from a calendar click and are locked.
+   *  The wizard collapses to Client → Review and hides Type/Slot editing. */
+  lockedSlot?: boolean;
   onDone?: () => void;
   onCancel?: () => void;
   compact?: boolean; // dialog variant uses smaller paddings
 }
 
-export default function BookingWizard({ initialSlot, initialType, initialClient, initialStep, onDone, onCancel, compact }: BookingWizardProps) {
+export default function BookingWizard({ initialSlot, initialType, initialClient, initialStep, lockedSlot, onDone, onCancel, compact }: BookingWizardProps) {
+  const steps = useMemo<{ key: StepKey; label: string }[]>(
+    () => (lockedSlot ? [STEPS[0], STEPS[3]] : STEPS),
+    [lockedSlot],
+  );
   const [step, setStep] = useState<StepKey>(initialStep ?? "client");
   const [draft, setDraft] = useState<BookingDraft>({
     client: {
