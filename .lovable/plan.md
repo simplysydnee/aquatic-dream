@@ -1,57 +1,49 @@
+## Problem
 
-# Remove out-of-scope features
+Today's private lessons aren't rendering on the admin calendar because the calendar fetch is returning HTTP 400:
 
-No DB changes. No edits to `src/integrations/supabase/types.ts`. No replacement pages.
+```
+column lesson_booking_occurrences.auto_charge_status does not exist
+```
 
-## 1. Delete page files
-- `src/pages/admin/TimeOffAdmin.tsx`
-- `src/pages/admin/TimesheetsAdmin.tsx`
-- `src/pages/admin/ScheduleAdmin.tsx`
-- `src/pages/admin/JobApplicationsAdmin.tsx`
-- `src/pages/admin/JobPostingsAdmin.tsx`
-- `src/pages/admin/AnnouncementsAdmin.tsx`
-- `src/pages/admin/DiveBookingsAdmin.tsx`
-- `src/pages/admin/TripReservationsAdmin.tsx`
-- `src/pages/instructor/InstructorTimeClock.tsx`
-- `src/pages/instructor/InstructorTimeOff.tsx`
-- `src/pages/instructor/InstructorMySchedule.tsx`
-- `src/pages/instructor/InstructorOpenShifts.tsx`
-- `src/pages/instructor/InstructorAvailability.tsx`
-- `src/pages/instructor/InstructorAnnouncements.tsx`
-- `src/pages/Careers.tsx`
+The actual column is `charge_status` (and `charge_error`). The code was renamed in the database but several files still reference the old `auto_charge_*` names, so the whole occurrences query fails and the `Private Lessons` panel renders empty.
 
-## 2. Delete component files
-- `src/components/admin/schedule/PositionsManager.tsx` (and empty `schedule/` dir)
-- `src/components/careers/JobApplicationForm.tsx` (and empty `careers/` dir)
+Auto-generated `src/integrations/supabase/types.ts` already has the correct `charge_status` / `charge_error` on the `lesson_booking_occurrences` row type, so the rename is purely on the app side.
 
-## 3. Delete edge function
-- `supabase/functions/notify-schedule-published/` (also call `supabase--delete_edge_functions`)
+## Scope of the fix
 
-## 4. Trim `src/pages/admin/ReportsAdmin.tsx`
-- Keep only "No-shows" and "Enrollments" tabs.
-- Remove all shifts/time_clock_entries queries, derived state, and Hours/Schedule tabs.
-- Keep `Punch` and `SwimSession` types only if still referenced; otherwise remove.
-- Set `<Tabs defaultValue="noshows">`.
+Rename `auto_charge_status` → `charge_status` and `auto_charge_error` → `charge_error` only where they refer to the `lesson_booking_occurrences` table. Do NOT touch:
 
-## 5. Trim hooks
-- `src/hooks/useAdminBadgeCounts.ts`: drop `newApplications` field and its `job_applications` query.
-- `src/hooks/useAvailableSlots.ts`: remove `shifts` query and `hasAnyShift`; return empty `slots` with `loading=false`.
+- `src/integrations/supabase/types.ts` (auto-generated; the one remaining `auto_charge_status` there is the return type of the `get_occurrence_by_cancel_token` RPC, which is a SQL alias and stays as-is)
+- The database
+- Any other column or behavior
 
-## 6. Clean `src/App.tsx`
-- Remove imports and routes for every deleted page.
-- Instructor portal: keep only `<Route index element={<InstructorMyRoster />} />`.
+## Files to edit
 
-## 7. Clean `src/components/admin/AdminSidebar.tsx`
-- Remove nav items for deleted admin pages.
-- Remove `newApplications` from badge-count destructure.
-- Remove now-unused icon imports.
+1. `src/hooks/useCalendarData.ts`
+   - Line 109: rename interface field on `PrivateLessonBooking` (`auto_charge_status` → `charge_status`)
+   - Line 203: change the `.select(...)` string to `charge_status` instead of `auto_charge_status`
+   - Line 277: update the mapping that copies `o.auto_charge_status` to read `o.charge_status` and assign to the renamed field
 
-## 8. Clean `src/pages/instructor/InstructorLayout.tsx`
-- Keep only "My Rosters" NavLink.
-- Remove `unread` state, announcement fetch `useEffect`, realtime subscription, unused icon imports.
+2. `src/pages/admin/PrivateLessonsAdmin.tsx`
+   - Local type at line 70: rename field
+   - `.select(...)` strings at lines 123, 129, 1288: replace `auto_charge_status` with `charge_status` and `auto_charge_error` with `charge_error`
+   - Read sites at lines 314, 850, 885, 955, 991, 1009, 1246: update property reads
+   - Update payloads at lines 466, 532 that set `auto_charge_status: "skipped"` → `charge_status: "skipped"`
 
-## 9. Clean `Navbar.tsx` and `Footer.tsx`
-- Remove `/careers` links from both.
+3. `src/components/admin/calendar/PrivateLessonDetailDialog.tsx`
+   - Update payload at line 213: `auto_charge_status: "skipped"` → `charge_status: "skipped"`
 
-## Deliverable
-After execution, post a summary listing every file deleted and every file modified.
+## Verification
+
+After the edits:
+
+- Reload `/admin` and confirm the `lesson_booking_occurrences` request returns 200 instead of 400.
+- Confirm the Private Lessons panel for today shows the 10 expected lessons (8 self-serve scheduled + 2 admin scheduled). The 7 stale `pending_card` self-serve rows are intentionally hidden by existing logic and should remain hidden.
+- Spot-check `PrivateLessonsAdmin` (Card-on-file billing column, charge-now controls) to make sure the renamed reads still render and the "skipped" update still works.
+
+## Out of scope
+
+- No database changes, no RLS changes, no types.ts edits.
+- No refactor of the calendar code path or `PrivateLessonsAdmin` layout.
+- The `BookFromRequestDialog` / `useAvailableSlots` "no instructors scheduled" issue noted earlier is a separate item and not addressed here.
