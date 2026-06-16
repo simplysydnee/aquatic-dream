@@ -122,7 +122,29 @@ async function sendConfirmationEmail(bookingId: string, includeCardOnFile: boole
     if (isJunePromoDate(d)) anyJune = true;
   }
 
-  const waiverLink = (booking as any).waiver_token && !(booking as any).waiver_signed_at
+  // Backstop: if waiver_signed_at is null on the booking, double-check
+  // whether this swimmer already has a signed waiver on file via a prior
+  // lesson booking (same parent_email + child name). If so, treat as
+  // signed and suppress the waiver link in the confirmation email.
+  let waiverSignedAt: string | null = (booking as any).waiver_signed_at ?? null;
+  if (!waiverSignedAt && (booking as any).child_first_name && (booking as any).child_last_name && (booking as any).parent_email) {
+    const { data: prior } = await supabaseAdmin
+      .from("lesson_bookings")
+      .select("waiver_signed_at")
+      .ilike("parent_email", (booking as any).parent_email)
+      .ilike("child_first_name", (booking as any).child_first_name)
+      .ilike("child_last_name", (booking as any).child_last_name)
+      .neq("id", bookingId)
+      .not("waiver_signed_at", "is", null)
+      .order("waiver_signed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if ((prior as any)?.waiver_signed_at) {
+      waiverSignedAt = (prior as any).waiver_signed_at as string;
+    }
+  }
+
+  const waiverLink = (booking as any).waiver_token && !waiverSignedAt
     ? `${SITE_BASE}/lesson-waiver/${(booking as any).waiver_token}`
     : undefined;
 
