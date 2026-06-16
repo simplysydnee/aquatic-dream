@@ -12,7 +12,9 @@ interface Props {
   sessionToken: string;
   onContinue: (slots: Slot[]) => void;
   onBack: () => void;
+  initialSelected?: Slot[];
 }
+
 
 const WEEKS = 8;
 const MIN_RECURRING_WEEKS = 3;
@@ -45,12 +47,16 @@ interface RecurringPattern {
   slots: Slot[]; // open slots in window
 }
 
-export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) {
+export default function SlotPicker({ sessionToken, onContinue, onBack, initialSelected }: Props) {
   const [instructors, setInstructors] = useState<{ id: string; name: string }[]>([]);
   const [instructorId, setInstructorId] = useState<string>("any");
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<Record<string, Slot>>({});
+  const [selected, setSelected] = useState<Record<string, Slot>>(() => {
+    if (!initialSelected?.length) return {};
+    return Object.fromEntries(initialSelected.map((s) => [slotKey(s), s]));
+  });
+
   const [weeklyMode, setWeeklyMode] = useState(false);
   const [dayFilter, setDayFilter] = useState<Set<number>>(new Set());
   const [timeFilter, setTimeFilter] = useState<"all" | "am" | "pm">("all");
@@ -59,6 +65,8 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
   useEffect(() => {
     fetchInstructors().then(setInstructors);
   }, []);
+
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     setLoading(true);
@@ -69,7 +77,22 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
       instructorIds: instructorId === "any" ? undefined : [instructorId],
       sessionToken,
     }).then((s) => { setSlots(s); setLoading(false); });
-  }, [instructorId, sessionToken]);
+  }, [instructorId, sessionToken, refreshKey]);
+
+  // Silently re-fetch availability when the user returns to the tab/window —
+  // catches slots that were taken by another parent while they were away.
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState === "visible") setRefreshKey((k) => k + 1);
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, []);
+
 
   // Clear selections when switching modes to avoid mixing.
   const handleWeeklyToggle = (checked: boolean) => {
