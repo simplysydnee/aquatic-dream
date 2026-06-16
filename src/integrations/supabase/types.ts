@@ -1474,6 +1474,89 @@ export type Database = {
         }
         Relationships: []
       }
+      reminder_logs: {
+        Row: {
+          booking_id: string | null
+          channel: string
+          created_at: string
+          enrollment_id: string | null
+          error: string | null
+          id: string
+          lesson_occurrence_id: string | null
+          message: string | null
+          phone: string | null
+          reminder_kind: string
+          scheduled_at: string
+          sent_at: string | null
+          session_lesson_date_id: string | null
+          status: string
+          swimmer_name: string | null
+        }
+        Insert: {
+          booking_id?: string | null
+          channel: string
+          created_at?: string
+          enrollment_id?: string | null
+          error?: string | null
+          id?: string
+          lesson_occurrence_id?: string | null
+          message?: string | null
+          phone?: string | null
+          reminder_kind: string
+          scheduled_at?: string
+          sent_at?: string | null
+          session_lesson_date_id?: string | null
+          status: string
+          swimmer_name?: string | null
+        }
+        Update: {
+          booking_id?: string | null
+          channel?: string
+          created_at?: string
+          enrollment_id?: string | null
+          error?: string | null
+          id?: string
+          lesson_occurrence_id?: string | null
+          message?: string | null
+          phone?: string | null
+          reminder_kind?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          session_lesson_date_id?: string | null
+          status?: string
+          swimmer_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_logs_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminder_logs_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "swim_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminder_logs_lesson_occurrence_id_fkey"
+            columns: ["lesson_occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_booking_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminder_logs_session_lesson_date_id_fkey"
+            columns: ["session_lesson_date_id"]
+            isOneToOne: false
+            referencedRelation: "session_lesson_dates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resend_level_audiences: {
         Row: {
           created_at: string
