@@ -12,7 +12,7 @@ import LegalAgreements, { LegalAgreementData } from "@/components/swim-enrollmen
 import SlotPicker from "./SlotPicker";
 import PrivateCardSetup from "./PrivateCardSetup";
 import { getStripeEnvironment } from "@/lib/stripe";
-import { Slot, releaseHolds } from "@/lib/privateBooking";
+import { Slot, releaseHolds, fetchOpenSlots } from "@/lib/privateBooking";
 import { getPrivateLessonPrice, isJunePromoDate, JUNE_PROMO_ACTIVE_FOR_TODAY, PRIVATE_REGULAR_PRICE } from "@/lib/privateLessonPricing";
 import { lookupActiveWaiver, legalDataFromWaiver, backfillVisitorWaiver, ActiveWaiver } from "@/lib/swimmerWaiver";
 
