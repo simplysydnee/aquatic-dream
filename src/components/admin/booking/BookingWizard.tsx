@@ -224,21 +224,21 @@ export default function BookingWizard({ initialSlot, initialType, initialClient,
   }, [step, draft]);
 
   const goNext = () => {
-    const idx = STEPS.findIndex((s) => s.key === step);
-    if (idx < STEPS.length - 1) setStep(STEPS[idx + 1].key);
+    const idx = steps.findIndex((s) => s.key === step);
+    if (idx < steps.length - 1) setStep(steps[idx + 1].key);
   };
   const goPrev = () => {
-    const idx = STEPS.findIndex((s) => s.key === step);
-    if (idx > 0) setStep(STEPS[idx - 1].key);
+    const idx = steps.findIndex((s) => s.key === step);
+    if (idx > 0) setStep(steps[idx - 1].key);
   };
 
   return (
     <div className={cn("grid gap-6", compact ? "" : "md:grid-cols-[220px_1fr]")}>
       {/* Step rail */}
       <aside className={cn("space-y-1", compact && "flex gap-2 overflow-x-auto pb-2")}>
-        {STEPS.map((s, i) => {
+        {steps.map((s, i) => {
           const active = s.key === step;
-          const done = STEPS.findIndex((x) => x.key === step) > i;
+          const done = steps.findIndex((x) => x.key === step) > i;
           return (
             <button
               key={s.key}
