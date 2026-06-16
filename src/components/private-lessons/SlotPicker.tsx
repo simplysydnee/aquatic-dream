@@ -12,7 +12,9 @@ interface Props {
   sessionToken: string;
   onContinue: (slots: Slot[]) => void;
   onBack: () => void;
+  initialSelected?: Slot[];
 }
+
 
 const WEEKS = 8;
 const MIN_RECURRING_WEEKS = 3;
