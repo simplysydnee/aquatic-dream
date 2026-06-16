@@ -122,7 +122,29 @@ async function sendConfirmationEmail(bookingId: string, includeCardOnFile: boole
     if (isJunePromoDate(d)) anyJune = true;
   }
 
-  const waiverLink = (booking as any).waiver_token && !(booking as any).waiver_signed_at
+  // Backstop: if waiver_signed_at is null on the booking, double-check
+  // whether this swimmer already has a signed waiver on file via a prior
+  // lesson booking (same parent_email + child name). If so, treat as
+  // signed and suppress the waiver link in the confirmation email.
+  let waiverSignedAt: string | null = (booking as any).waiver_signed_at ?? null;
+  if (!waiverSignedAt && (booking as any).child_first_name && (booking as any).child_last_name && (booking as any).parent_email) {
+    const { data: prior } = await supabaseAdmin
+      .from("lesson_bookings")
+      .select("waiver_signed_at")
+      .ilike("parent_email", (booking as any).parent_email)
+      .ilike("child_first_name", (booking as any).child_first_name)
+      .ilike("child_last_name", (booking as any).child_last_name)
+      .neq("id", bookingId)
+      .not("waiver_signed_at", "is", null)
+      .order("waiver_signed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if ((prior as any)?.waiver_signed_at) {
+      waiverSignedAt = (prior as any).waiver_signed_at as string;
+    }
+  }
+
+  const waiverLink = (booking as any).waiver_token && !waiverSignedAt
     ? `${SITE_BASE}/lesson-waiver/${(booking as any).waiver_token}`
     : undefined;
 
@@ -172,7 +194,7 @@ async function sendConfirmationEmail(bookingId: string, includeCardOnFile: boole
           totalAmountDue: `$${total.toFixed(2)}`,
           amountDue: dates.length === 1 ? `$${total.toFixed(2)}` : undefined,
           waiverLink,
-          waiverSigned: !!(booking as any).waiver_signed_at,
+          waiverSigned: !!waiverSignedAt,
           icsLink: icsUrl,
           googleCalendarLink: googleUrl,
           cardOnFileNote,
@@ -356,6 +378,25 @@ Deno.serve(async (req) => {
       );
       if (signedAt) inheritedWaiverSignedAt = signedAt as string;
     }
+    // Fallback: when DOB is missing or the RPC didn't match, look up a
+    // prior lesson booking for this parent + swimmer by name. This covers
+    // quick-book flows that skip DOB so we don't re-prompt for a waiver
+    // when one is clearly already on file.
+    if (!inheritedWaiverSignedAt && p.child_first_name && p.child_last_name) {
+      const { data: prior } = await supabaseAdmin
+        .from("lesson_bookings")
+        .select("waiver_signed_at")
+        .ilike("parent_email", p.parent_email)
+        .ilike("child_first_name", p.child_first_name)
+        .ilike("child_last_name", p.child_last_name)
+        .not("waiver_signed_at", "is", null)
+        .order("waiver_signed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if ((prior as any)?.waiver_signed_at) {
+        inheritedWaiverSignedAt = (prior as any).waiver_signed_at as string;
+      }
+    }
 
     // If admin captured a card via Stripe Setup Checkout, resolve the
     // payment method now and stamp it on the booking. We never want a
@@ -431,7 +472,7 @@ Deno.serve(async (req) => {
       occurrence_date: d,
       status: "scheduled",
       payment_status: p.collect_card_on_file ? "card_on_file" : "unpaid",
-      auto_charge_status: p.collect_card_on_file ? "pending" : "skipped",
+      charge_status: p.collect_card_on_file ? "pending" : "skipped",
     }));
     const { error: oErr } = await supabaseAdmin
       .from("lesson_booking_occurrences")
