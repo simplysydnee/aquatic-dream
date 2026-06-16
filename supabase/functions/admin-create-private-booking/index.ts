@@ -356,6 +356,25 @@ Deno.serve(async (req) => {
       );
       if (signedAt) inheritedWaiverSignedAt = signedAt as string;
     }
+    // Fallback: when DOB is missing or the RPC didn't match, look up a
+    // prior lesson booking for this parent + swimmer by name. This covers
+    // quick-book flows that skip DOB so we don't re-prompt for a waiver
+    // when one is clearly already on file.
+    if (!inheritedWaiverSignedAt && p.child_first_name && p.child_last_name) {
+      const { data: prior } = await supabaseAdmin
+        .from("lesson_bookings")
+        .select("waiver_signed_at")
+        .ilike("parent_email", p.parent_email)
+        .ilike("child_first_name", p.child_first_name)
+        .ilike("child_last_name", p.child_last_name)
+        .not("waiver_signed_at", "is", null)
+        .order("waiver_signed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if ((prior as any)?.waiver_signed_at) {
+        inheritedWaiverSignedAt = (prior as any).waiver_signed_at as string;
+      }
+    }
 
     // If admin captured a card via Stripe Setup Checkout, resolve the
     // payment method now and stamp it on the booking. We never want a
@@ -431,7 +450,7 @@ Deno.serve(async (req) => {
       occurrence_date: d,
       status: "scheduled",
       payment_status: p.collect_card_on_file ? "card_on_file" : "unpaid",
-      auto_charge_status: p.collect_card_on_file ? "pending" : "skipped",
+      charge_status: p.collect_card_on_file ? "pending" : "skipped",
     }));
     const { error: oErr } = await supabaseAdmin
       .from("lesson_booking_occurrences")
