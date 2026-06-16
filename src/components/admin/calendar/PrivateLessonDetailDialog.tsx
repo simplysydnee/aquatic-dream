@@ -63,11 +63,9 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
   const [manualRef, setManualRef] = useState<string>("");
   const [chargeConfirmOpen, setChargeConfirmOpen] = useState(false);
 
-  if (!lesson) return null;
-
-  const waiverUrl = lesson.waiver_token ? `${SITE}/lesson-waiver/${lesson.waiver_token}` : null;
-  const hasCardOnFile = !!lesson.stripe_payment_method_id;
-  const isPaid = lesson.payment_status === "paid";
+  const waiverUrl = lesson?.waiver_token ? `${SITE}/lesson-waiver/${lesson.waiver_token}` : null;
+  const hasCardOnFile = !!lesson?.stripe_payment_method_id;
+  const isPaid = lesson?.payment_status === "paid";
 
   const resendConfirmation = async () => {
     setBusy("resend");
