@@ -54,12 +54,7 @@ const CalendarAdmin = () => {
   const [icsSource, setIcsSource] = useState<"airtable" | "supabase">(() => {
     return (localStorage.getItem("ics-data-source") as "airtable" | "supabase") || "airtable";
   });
-  const todayKey = format(new Date(), "yyyy-MM-dd");
   const [sendingReminders, setSendingReminders] = useState(false);
-  const [remindersSentToday, setRemindersSentToday] = useState<boolean>(() => {
-    try { return localStorage.getItem(`reminders-sent-${todayKey}`) === "1"; }
-    catch { return false; }
-  });
 
   const toggleIcsSource = () => {
     const next = icsSource === "airtable" ? "supabase" : "airtable";
@@ -82,8 +77,6 @@ const CalendarAdmin = () => {
       } else {
         toast.success(`Sent ${sent} reminder${sent === 1 ? "" : "s"}`);
       }
-      try { localStorage.setItem(`reminders-sent-${todayKey}`, "1"); } catch { /* ignore */ }
-      setRemindersSentToday(true);
     } catch (e) {
       toast.error("Failed to send reminders", {
         description: e instanceof Error ? e.message : String(e),
@@ -163,12 +156,12 @@ const CalendarAdmin = () => {
             variant="outline"
             size="sm"
             onClick={handleSendTodaysReminders}
-            disabled={sendingReminders || remindersSentToday}
+            disabled={sendingReminders}
             className="gap-1"
           >
             <Send className="w-4 h-4" />
             <span className="hidden sm:inline">
-              {remindersSentToday ? "Reminders sent" : sendingReminders ? "Sending..." : "Send today's reminders"}
+              {sendingReminders ? "Sending..." : "Send today's reminders"}
             </span>
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
