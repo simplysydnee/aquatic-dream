@@ -114,6 +114,39 @@ export default function PrivateBookingFlow() {
   };
 
 
+  // Removes any slots matching the given server-returned conflict keys
+  // ("instructor_id|date|HH:MM") from `slots` state. Returns the conflicting
+  // slot objects (for a friendly toast message).
+  const removeConflicts = (conflictKeys: string[]): Slot[] => {
+    const set = new Set(conflictKeys);
+    const removed: Slot[] = [];
+    const kept: Slot[] = [];
+    for (const s of slots) {
+      if (set.has(conflictKey(s.instructor_id, s.slot_date, s.start_time))) {
+        removed.push(s);
+      } else {
+        kept.push(s);
+      }
+    }
+    setSlots(kept);
+    return removed;
+  };
+
+  const handleSlotsTaken = (conflictKeys: string[]) => {
+    const removed = removeConflicts(conflictKeys);
+    const labels = removed.map(formatSlotLabel);
+    toast({
+      title: removed.length === 1
+        ? "That time was just booked"
+        : "Some times were just booked",
+      description: labels.length
+        ? `${labels.join(", ")} — we've removed ${removed.length === 1 ? "it" : "them"} from your cart. Please pick another time.`
+        : "Please pick different times.",
+      variant: "destructive",
+    });
+    setStep("slots");
+  };
+
   const handleLegalSubmit = async (legal: LegalAgreementData, slotsOverride?: Slot[]) => {
     if (!form.childDob) return;
     const slotsToUse = slotsOverride ?? slots;
@@ -156,19 +189,28 @@ export default function PrivateBookingFlow() {
       if (error) {
         let serverMsg = error.message;
         let serverStep: string | undefined;
+        let serverErrorCode: string | undefined;
+        let conflicts: string[] | undefined;
         try {
           const body = await (error as any).context?.json?.();
           if (body?.error) {
+            serverErrorCode = typeof body.error === "string" ? body.error : undefined;
             serverMsg = typeof body.error === "string" ? body.error : JSON.stringify(body.error);
           }
           if (body?.step) serverStep = body.step;
+          if (Array.isArray(body?.conflicts)) conflicts = body.conflicts;
         } catch { /* ignore */ }
+        // Friendly recovery for the 409 race: another parent grabbed the slot
+        // while this customer was on the legal step.
+        if (serverErrorCode === "slots_taken" || serverErrorCode === "slot_closed") {
+          handleSlotsTaken(conflicts ?? []);
+          return;
+        }
         console.error("create-private-booking-setup failed", { step: serverStep, message: serverMsg });
         throw new Error(serverStep ? `[${serverStep}] ${serverMsg}` : serverMsg);
       }
-      if ((data as any)?.error === "slots_taken") {
-        toast({ title: "Some slots were just taken", description: "Please pick different times.", variant: "destructive" });
-        setStep("slots");
+      if ((data as any)?.error === "slots_taken" || (data as any)?.error === "slot_closed") {
+        handleSlotsTaken(((data as any)?.conflicts as string[]) ?? []);
         return;
       }
       if (!data?.client_secret) throw new Error((data as any)?.error || "Could not start card setup");
@@ -189,6 +231,31 @@ export default function PrivateBookingFlow() {
       setSubmitting(false);
     }
   };
+
+  // Pre-flight: when entering the legal step, re-check live availability so
+  // we catch a stolen slot BEFORE the customer fills out the waiver. If any
+  // selected slot is no longer open, bounce back to the picker immediately.
+  useEffect(() => {
+    if (step !== "legal" || slots.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const from = new Date(); from.setHours(0, 0, 0, 0);
+        const instructorIds = [...new Set(slots.map((s) => s.instructor_id))];
+        const open = await fetchOpenSlots({ fromDate: from, weeks: 8, instructorIds, sessionToken });
+        if (cancelled) return;
+        const openKeys = new Set(open.map((s) => conflictKey(s.instructor_id, s.slot_date, s.start_time)));
+        const stolen = slots
+          .map((s) => conflictKey(s.instructor_id, s.slot_date, s.start_time))
+          .filter((k) => !openKeys.has(k));
+        if (stolen.length) handleSlotsTaken(stolen);
+      } catch { /* network blip — let the server be the source of truth */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+
 
 
   if (step === "done") {
