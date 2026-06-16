@@ -1534,9 +1534,10 @@ function GroupSlotPicker({
 // ────────────────────────────────────────────────────────────────────────
 
 function ReviewStep({
-  draft, onPatch, onNotes, onDone,
+  draft, lockedSlot, onPatch, onNotes, onDone,
 }: {
   draft: BookingDraft;
+  lockedSlot?: boolean;
   onPatch: (p: Partial<BookingDraft>) => void;
   onNotes: (v: string) => void;
   onDone?: () => void;
