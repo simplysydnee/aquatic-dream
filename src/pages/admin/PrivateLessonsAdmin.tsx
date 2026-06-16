@@ -67,7 +67,7 @@ interface SlotRow {
   parentBlockId: string;
   instructor_id: string;
   defaultLessonType: string;
-  booking?: { booking_id: string; occurrence_id: string; child_name: string; parent_name: string; payment_status: string; auto_charge_status: string; status: string; lesson_type: string };
+  booking?: { booking_id: string; occurrence_id: string; child_name: string; parent_name: string; payment_status: string; charge_status: string; status: string; lesson_type: string };
   blocked?: { block_id: string };
 }
 
@@ -120,13 +120,13 @@ export default function PrivateLessonsAdmin() {
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
       supabase.from("instructor_booking_blocks").select("*").order("created_at", { ascending: false }),
       supabase.from("lesson_bookings")
-        .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
+        .select("*, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
 
         .in("lesson_type", ["private", "semi_private"])
         .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(200),
       supabase.from("lesson_bookings")
-        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, created_at, booking_source, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, created_at, start_time_override, instructor_override_id, instructor_override_name)")
+        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, created_at, booking_source, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, created_at, start_time_override, instructor_override_id, instructor_override_name)")
         .in("lesson_type", ["private", "semi_private"])
         // Include pending_card so the slot grid marks the time as taken
         // while we wait for the parent to save their card.
@@ -311,7 +311,7 @@ export default function PrivateLessonsAdmin() {
           child_name: b.child_name || "—",
           parent_name: b.parent_name || "",
           payment_status: o.payment_status,
-          auto_charge_status: o.auto_charge_status,
+          charge_status: o.charge_status,
           status: o.status,
           lesson_type: b.lesson_type || "private",
         });
@@ -463,7 +463,7 @@ export default function PrivateLessonsAdmin() {
           status: "cancelled",
           cancelled_at: new Date().toISOString(),
           cancel_reason: "Cancelled by admin",
-          auto_charge_status: "skipped",
+          charge_status: "skipped",
         })
         .eq("id", slot.booking.occurrence_id);
       if (error) throw error;
@@ -529,7 +529,7 @@ export default function PrivateLessonsAdmin() {
           status: "cancelled",
           cancelled_at: new Date().toISOString(),
           cancel_reason: "Cancelled by admin",
-          auto_charge_status: "skipped",
+          charge_status: "skipped",
         })
         .eq("id", slot.booking.occurrence_id);
       if (error) throw error;
@@ -847,7 +847,7 @@ export default function PrivateLessonsAdmin() {
                                           <span className="text-[10px] text-muted-foreground capitalize">
                                             {s.booking.status === "pending_card"
                                               ? "Awaiting card on file"
-                                              : (s.booking.auto_charge_status === "succeeded" ? "paid" : (s.booking.payment_status || "unpaid"))}
+                                              : (s.booking.charge_status === "succeeded" ? "paid" : (s.booking.payment_status || "unpaid"))}
                                           </span>
                                         </div>
                                       ) : (
@@ -882,7 +882,7 @@ export default function PrivateLessonsAdmin() {
                   {rows.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">{emptyMsg}</TableCell></TableRow>}
                   {rows.map((b) => {
                     const occs = b.lesson_booking_occurrences || [];
-                    const paid = occs.filter((o: any) => o.auto_charge_status === "succeeded").length;
+                    const paid = occs.filter((o: any) => o.charge_status === "succeeded").length;
                     return (
                       <TableRow key={b.id}>
                         <TableCell>
@@ -952,7 +952,7 @@ export default function PrivateLessonsAdmin() {
                 const nextDue = (detailBooking.lesson_booking_occurrences || [])
                   .slice()
                   .sort((a: any, b: any) => a.occurrence_date.localeCompare(b.occurrence_date))
-                  .find((o: any) => o.auto_charge_status !== "succeeded" && o.status !== "cancelled");
+                  .find((o: any) => o.charge_status !== "succeeded" && o.status !== "cancelled");
                 if (!nextDue) return null;
                 return (
                   <div className="flex items-center justify-between border border-border rounded-md p-3 bg-muted/30">
@@ -988,7 +988,7 @@ export default function PrivateLessonsAdmin() {
                       .slice()
                       .sort((a: any, b: any) => a.occurrence_date.localeCompare(b.occurrence_date))
                       .map((o: any) => {
-                        const canCharge = o.auto_charge_status !== "succeeded" && o.status !== "cancelled" && detailBooking.stripe_payment_method_id;
+                        const canCharge = o.charge_status !== "succeeded" && o.status !== "cancelled" && detailBooking.stripe_payment_method_id;
                         const fmtT = (t?: string | null) => {
                           if (!t) return "";
                           const [hh, mm] = t.slice(0, 5).split(":").map(Number);
@@ -1006,8 +1006,8 @@ export default function PrivateLessonsAdmin() {
 
                             <TableCell className="capitalize">{o.status}</TableCell>
                             <TableCell>
-                              <span className="capitalize">{o.auto_charge_status === "succeeded" ? "paid" : o.auto_charge_status}</span>
-                              {o.auto_charge_error && <div className="text-xs text-destructive">{o.auto_charge_error}</div>}
+                              <span className="capitalize">{o.charge_status === "succeeded" ? "paid" : o.charge_status}</span>
+                              {o.charge_error && <div className="text-xs text-destructive">{o.charge_error}</div>}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
@@ -1243,7 +1243,7 @@ export default function PrivateLessonsAdmin() {
                   <div className="font-medium">{activeSlot.booking.child_name}</div>
                   <div className="text-muted-foreground">{activeSlot.booking.parent_name}</div>
                   <div className="text-xs capitalize">
-                    Payment: {activeSlot.booking.auto_charge_status === "succeeded" ? "paid" : (activeSlot.booking.payment_status || "unpaid")}
+                    Payment: {activeSlot.booking.charge_status === "succeeded" ? "paid" : (activeSlot.booking.payment_status || "unpaid")}
                   </div>
                 </div>
               ) : activeSlot.blocked ? (
@@ -1285,7 +1285,7 @@ export default function PrivateLessonsAdmin() {
                         const bookingId = activeSlot.booking!.booking_id;
                         const { data, error } = await supabase
                           .from("lesson_bookings")
-                          .select("*, lesson_booking_occurrences(id, occurrence_date, status, auto_charge_status, payment_status, auto_charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
+                          .select("*, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
                           .eq("id", bookingId)
                           .maybeSingle();
                         if (error || !data) {
