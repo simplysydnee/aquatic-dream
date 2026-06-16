@@ -31,6 +31,7 @@ export default function BookingQuickDialog({ open, onOpenChange, onBooked, initi
         <BookingWizard
           initialSlot={initialSlot}
           initialType={initialType}
+          lockedSlot={lockedSlot}
           compact
           onCancel={() => onOpenChange(false)}
           onDone={() => { onBooked(); onOpenChange(false); }}
