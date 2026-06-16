@@ -159,6 +159,18 @@ const CalendarAdmin = () => {
           <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)} className="gap-1">
             <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print Schedule</span>
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSendTodaysReminders}
+            disabled={sendingReminders || remindersSentToday}
+            className="gap-1"
+          >
+            <Send className="w-4 h-4" />
+            <span className="hidden sm:inline">
+              {remindersSentToday ? "Reminders sent" : sendingReminders ? "Sending..." : "Send today's reminders"}
+            </span>
+          </Button>
           <Button variant="outline" size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
             <Plus className="w-4 h-4 mr-1" /> Add Event
           </Button>
