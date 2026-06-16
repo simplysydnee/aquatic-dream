@@ -1,6 +1,6 @@
 // Unified admin booking wizard: Client → Type → Slot → Review.
 // Used by both the full-page route and the quick-book dialog.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, addDays, isBefore, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -1540,6 +1540,8 @@ function ReviewStep({
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [waiverOnFile, setWaiverOnFile] = useState<boolean | null>(null);
+  const [existingCardHint, setExistingCardHint] = useState<{ last4?: string | null } | null>(null);
+  const cardToggleTouched = useRef(false);
 
   useEffect(() => { getStripe().then(setStripeReady).catch(() => {}); }, []);
 
@@ -1550,6 +1552,49 @@ function ReviewStep({
     supabase.rpc("swimmer_has_waiver_on_file", { _first: sw.first_name, _last: sw.last_name, _dob: sw.dob })
       .then(({ data }) => setWaiverOnFile(!!data));
   }, [draft.client.swimmers]);
+
+  // Card on file lookup: when admin selects an existing client, check if
+  // a saved Stripe payment method already exists (on a prior booking or
+  // the parent profile). If so, default the toggle OFF and show a hint.
+  // Respects explicit admin flips via the cardToggleTouched ref.
+  useEffect(() => {
+    const email = draft.client.parent_email?.toLowerCase().trim();
+    if (!email || !email.includes("@")) { setExistingCardHint(null); return; }
+    if (cardToggleTouched.current) return;
+    let cancelled = false;
+    (async () => {
+      const [bookingRes, profileRes] = await Promise.all([
+        supabase
+          .from("lesson_bookings")
+          .select("stripe_payment_method_id")
+          .ilike("parent_email", email)
+          .not("stripe_payment_method_id", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("stripe_default_pm_id")
+          .ilike("email", email)
+          .not("stripe_default_pm_id", "is", null)
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const hasCard = !!(bookingRes.data as any)?.stripe_payment_method_id
+        || !!(profileRes.data as any)?.stripe_default_pm_id;
+      if (hasCard) {
+        setExistingCardHint({});
+        if (draft.payment.collectCardOnFile) {
+          onPatch({ payment: { ...draft.payment, collectCardOnFile: false } });
+        }
+      } else {
+        setExistingCardHint(null);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.client.parent_email]);
 
   const isGroup = draft.type === "group";
   const occurrenceDates = draft.slot?.mode === "recurring"
@@ -1810,10 +1855,18 @@ function ReviewStep({
             <Switch
               id="cof"
               checked={draft.payment.collectCardOnFile}
-              onCheckedChange={(v) => onPatch({ payment: { ...draft.payment, collectCardOnFile: v } })}
+              onCheckedChange={(v) => {
+                cardToggleTouched.current = true;
+                onPatch({ payment: { ...draft.payment, collectCardOnFile: v } });
+              }}
             />
             <Label htmlFor="cof" className="text-sm cursor-pointer">Collect card on file (charge day of each lesson)</Label>
           </div>
+          {existingCardHint && (
+            <p className="text-xs text-muted-foreground pl-10">
+              Card already on file for this client — leave off unless you need to replace it.
+            </p>
+          )}
         </div>
       )}
 
