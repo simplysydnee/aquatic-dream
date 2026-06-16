@@ -768,14 +768,14 @@ export type Database = {
       }
       lesson_booking_occurrences: {
         Row: {
-          auto_charge_attempted_at: string | null
-          auto_charge_error: string | null
-          auto_charge_status: string
           booking_id: string
           cancel_reason: string | null
           cancel_token: string | null
           cancelled_at: string | null
           cancelled_by: string | null
+          charge_attempted_at: string | null
+          charge_error: string | null
+          charge_status: string
           checked_in_at: string | null
           checked_in_by: string | null
           created_at: string
@@ -801,14 +801,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          auto_charge_attempted_at?: string | null
-          auto_charge_error?: string | null
-          auto_charge_status?: string
           booking_id: string
           cancel_reason?: string | null
           cancel_token?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          charge_attempted_at?: string | null
+          charge_error?: string | null
+          charge_status?: string
           checked_in_at?: string | null
           checked_in_by?: string | null
           created_at?: string
@@ -834,14 +834,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          auto_charge_attempted_at?: string | null
-          auto_charge_error?: string | null
-          auto_charge_status?: string
           booking_id?: string
           cancel_reason?: string | null
           cancel_token?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          charge_attempted_at?: string | null
+          charge_error?: string | null
+          charge_status?: string
           checked_in_at?: string | null
           checked_in_by?: string | null
           created_at?: string
@@ -1439,22 +1439,37 @@ export type Database = {
         Row: {
           created_at: string
           email: string | null
+          first_name: string | null
           full_name: string | null
           id: string
+          last_name: string | null
+          phone: string | null
+          stripe_customer_id: string | null
+          stripe_default_pm_id: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           email?: string | null
+          first_name?: string | null
           full_name?: string | null
           id: string
+          last_name?: string | null
+          phone?: string | null
+          stripe_customer_id?: string | null
+          stripe_default_pm_id?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           email?: string | null
+          first_name?: string | null
           full_name?: string | null
           id?: string
+          last_name?: string | null
+          phone?: string | null
+          stripe_customer_id?: string | null
+          stripe_default_pm_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -2328,12 +2343,16 @@ export type Database = {
       }
       waitlist_requests: {
         Row: {
+          booking_id: string | null
           child_age: number | null
           child_first_name: string
           child_last_name: string
           created_at: string
           id: string
+          lesson_type: string
           notes: string | null
+          offer_expires_at: string | null
+          offered_at: string | null
           parent_email: string
           parent_first_name: string
           parent_last_name: string
@@ -2345,12 +2364,16 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          booking_id?: string | null
           child_age?: number | null
           child_first_name: string
           child_last_name: string
           created_at?: string
           id?: string
+          lesson_type?: string
           notes?: string | null
+          offer_expires_at?: string | null
+          offered_at?: string | null
           parent_email: string
           parent_first_name: string
           parent_last_name: string
@@ -2362,12 +2385,16 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          booking_id?: string | null
           child_age?: number | null
           child_first_name?: string
           child_last_name?: string
           created_at?: string
           id?: string
+          lesson_type?: string
           notes?: string | null
+          offer_expires_at?: string | null
+          offered_at?: string | null
           parent_email?: string
           parent_first_name?: string
           parent_last_name?: string
@@ -2378,7 +2405,15 @@ export type Database = {
           swim_level?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_requests_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_bookings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
