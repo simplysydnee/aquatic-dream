@@ -54,12 +54,7 @@ const CalendarAdmin = () => {
   const [icsSource, setIcsSource] = useState<"airtable" | "supabase">(() => {
     return (localStorage.getItem("ics-data-source") as "airtable" | "supabase") || "airtable";
   });
-  const todayKey = format(new Date(), "yyyy-MM-dd");
   const [sendingReminders, setSendingReminders] = useState(false);
-  const [remindersSentToday, setRemindersSentToday] = useState<boolean>(() => {
-    try { return localStorage.getItem(`reminders-sent-${todayKey}`) === "1"; }
-    catch { return false; }
-  });
 
   const toggleIcsSource = () => {
     const next = icsSource === "airtable" ? "supabase" : "airtable";
