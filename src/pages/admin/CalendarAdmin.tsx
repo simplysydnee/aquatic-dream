@@ -156,12 +156,12 @@ const CalendarAdmin = () => {
             variant="outline"
             size="sm"
             onClick={handleSendTodaysReminders}
-            disabled={sendingReminders || remindersSentToday}
+            disabled={sendingReminders}
             className="gap-1"
           >
             <Send className="w-4 h-4" />
             <span className="hidden sm:inline">
-              {remindersSentToday ? "Reminders sent" : sendingReminders ? "Sending..." : "Send today's reminders"}
+              {sendingReminders ? "Sending..." : "Send today's reminders"}
             </span>
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
