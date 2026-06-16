@@ -153,7 +153,7 @@ const CalendarAdmin = () => {
             <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print Schedule</span>
           </Button>
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             onClick={handleSendTodaysReminders}
             disabled={sendingReminders}
