@@ -173,7 +173,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
   };
 
   const finalizeCardSetup = useCallback(async () => {
-    if (!setupSessionId) return;
+    if (!setupSessionId || !lesson) return;
     try {
       const { data, error } = await supabase.functions.invoke("admin-setup-card-for-booking", {
         body: {
@@ -191,7 +191,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
     } catch (e: any) {
       toast.error(e?.message || "Could not save card");
     }
-  }, [setupSessionId, lesson.booking_id, onChanged]);
+  }, [setupSessionId, lesson?.booking_id, onChanged]);
 
   const checkoutOptions = useMemo(
     () => ({
