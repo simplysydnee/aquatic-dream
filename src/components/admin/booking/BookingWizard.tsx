@@ -290,6 +290,7 @@ export default function BookingWizard({ initialSlot, initialType, initialClient,
         {step === "review" && draft.type && draft.slot && (
           <ReviewStep
             draft={draft}
+            lockedSlot={!!lockedSlot}
             onPatch={(patch) => setDraft((d) => ({ ...d, ...patch }))}
             onNotes={(v) => setDraft((d) => ({ ...d, notes: v }))}
             onDone={onDone}
