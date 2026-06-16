@@ -11,7 +11,6 @@ const navLinks = [
   { to: "/swim-enrollment", label: "Enroll" },
   { to: "/book-private-lesson", label: "Book Private" },
   { to: "/waivers", label: "Waivers" },
-  { to: "/careers", label: "Careers" },
 ];
 
 const Navbar = () => {

@@ -1,6 +1,26 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Users, Waves, MessageSquare, LogOut, CalendarDays, BookOpen, ClipboardList, Briefcase, FileText, PanelLeftClose, PanelLeft, UserCheck, Layers, CalendarClock, CalendarOff, Clock, BarChart3, Megaphone, Mail, IdCard, ChevronDown, Send, FileSignature, CheckSquare } from "lucide-react";
+import {
+  Users,
+  Waves,
+  MessageSquare,
+  LogOut,
+  CalendarDays,
+  BookOpen,
+  ClipboardList,
+  PanelLeftClose,
+  PanelLeft,
+  UserCheck,
+  Layers,
+  CalendarClock,
+  BarChart3,
+  Mail,
+  IdCard,
+  ChevronDown,
+  Send,
+  FileSignature,
+  CheckSquare,
+} from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -29,7 +49,7 @@ export function AdminSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const { signOut, user } = useAuth();
-  const { newLessonRequests, newContacts, newApplications } = useAdminBadgeCounts();
+  const { newLessonRequests, newContacts } = useAdminBadgeCounts();
   const { pathname } = useLocation();
 
   const groups: NavGroup[] = [
@@ -39,7 +59,6 @@ export function AdminSidebar() {
         { title: "Calendar", url: "/admin", icon: CalendarDays, badge: 0 },
         { title: "Check-in", url: "/admin/checkin", icon: CheckSquare, badge: 0 },
         { title: "Class Roster", url: "/admin/roster", icon: ClipboardList, badge: 0 },
-        { title: "Announcements", url: "/admin/announcements", icon: Megaphone, badge: 0 },
       ],
     },
     {
@@ -64,16 +83,6 @@ export function AdminSidebar() {
       label: "Staff",
       items: [
         { title: "Instructors", url: "/admin/instructors", icon: UserCheck, badge: 0 },
-        { title: "Schedule", url: "/admin/schedule", icon: CalendarClock, badge: 0 },
-        { title: "Time Off & Trades", url: "/admin/time-off", icon: CalendarOff, badge: 0 },
-        { title: "Timesheets", url: "/admin/timesheets", icon: Clock, badge: 0 },
-      ],
-    },
-    {
-      label: "Hiring",
-      items: [
-        { title: "Job Postings", url: "/admin/careers", icon: Briefcase, badge: 0 },
-        { title: "Applications", url: "/admin/applications", icon: FileText, badge: newApplications },
       ],
     },
     {
@@ -94,17 +103,14 @@ export function AdminSidebar() {
   const isItemActive = (url: string) =>
     url === "/admin" ? pathname === "/admin" : pathname === url || pathname.startsWith(url + "/");
 
-  // Persisted open/closed state per group
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw);
     } catch {}
-    // default: all open
     return Object.fromEntries(groups.map((g) => [g.label, true]));
   });
 
-  // Auto-expand the group that contains the active route
   useEffect(() => {
     const active = groups.find((g) => g.items.some((i) => isItemActive(i.url)));
     if (active && !openMap[active.label]) {
@@ -139,7 +145,6 @@ export function AdminSidebar() {
           const groupBadge = group.items.reduce((sum, i) => sum + (i.badge || 0), 0);
           const isOpen = openMap[group.label] ?? true;
 
-          // When entire sidebar is icon-collapsed, render flat icons (no group toggles)
           if (collapsed) {
             return (
               <SidebarGroup key={group.label}>
