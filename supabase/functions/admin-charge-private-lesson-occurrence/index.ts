@@ -81,15 +81,24 @@ Deno.serve(async (req) => {
     });
 
     const succeeded = pi.status === "succeeded";
+    // Write 1: charge record — always runs so we never lose track of a real
+    // Stripe PaymentIntent, even if the payment stamp write below fails.
     await supabaseAdmin.from("lesson_booking_occurrences").update({
-      auto_charge_status: succeeded ? "succeeded" : "failed",
-      auto_charge_attempted_at: new Date().toISOString(),
+      charge_status: succeeded ? "succeeded" : "failed",
+      charge_attempted_at: new Date().toISOString(),
       stripe_payment_intent_id: pi.id,
-      payment_status: succeeded ? "paid" : (row as any).payment_status,
-      paid_at: succeeded ? new Date().toISOString() : null,
-      payment_method: succeeded ? "card_on_file" : null,
-      auto_charge_error: succeeded ? null : `Status: ${pi.status}`,
+      charge_error: succeeded ? null : `Status: ${pi.status}`,
     }).eq("id", row.id);
+
+    // Write 2: payment stamp — only on success. Kept separate so a schema
+    // drift here can't swallow the charge record from write 1.
+    if (succeeded) {
+      await supabaseAdmin.from("lesson_booking_occurrences").update({
+        payment_status: "paid",
+        paid_at: new Date().toISOString(),
+        payment_method: "card_on_file",
+      }).eq("id", row.id);
+    }
 
     if (!succeeded) return j({ error: `Charge ${pi.status}` }, 402);
     return j({ success: true, payment_intent_id: pi.id });
