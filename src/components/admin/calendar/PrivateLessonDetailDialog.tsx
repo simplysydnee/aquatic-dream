@@ -63,11 +63,9 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
   const [manualRef, setManualRef] = useState<string>("");
   const [chargeConfirmOpen, setChargeConfirmOpen] = useState(false);
 
-  if (!lesson) return null;
-
-  const waiverUrl = lesson.waiver_token ? `${SITE}/lesson-waiver/${lesson.waiver_token}` : null;
-  const hasCardOnFile = !!lesson.stripe_payment_method_id;
-  const isPaid = lesson.payment_status === "paid";
+  const waiverUrl = lesson?.waiver_token ? `${SITE}/lesson-waiver/${lesson.waiver_token}` : null;
+  const hasCardOnFile = !!lesson?.stripe_payment_method_id;
+  const isPaid = lesson?.payment_status === "paid";
 
   const resendConfirmation = async () => {
     setBusy("resend");
@@ -175,7 +173,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
   };
 
   const finalizeCardSetup = useCallback(async () => {
-    if (!setupSessionId) return;
+    if (!setupSessionId || !lesson) return;
     try {
       const { data, error } = await supabase.functions.invoke("admin-setup-card-for-booking", {
         body: {
@@ -193,7 +191,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
     } catch (e: any) {
       toast.error(e?.message || "Could not save card");
     }
-  }, [setupSessionId, lesson.booking_id, onChanged]);
+  }, [setupSessionId, lesson?.booking_id, onChanged]);
 
   const checkoutOptions = useMemo(
     () => ({
@@ -202,6 +200,8 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
     }),
     [setupClientSecret, finalizeCardSetup],
   );
+
+  if (!lesson) return null;
 
   const submitManual = async () => {
     setBusy("manual");
