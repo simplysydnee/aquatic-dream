@@ -60,6 +60,8 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
     fetchInstructors().then(setInstructors);
   }, []);
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
   useEffect(() => {
     setLoading(true);
     const from = new Date(); from.setHours(0, 0, 0, 0);
@@ -69,7 +71,22 @@ export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) 
       instructorIds: instructorId === "any" ? undefined : [instructorId],
       sessionToken,
     }).then((s) => { setSlots(s); setLoading(false); });
-  }, [instructorId, sessionToken]);
+  }, [instructorId, sessionToken, refreshKey]);
+
+  // Silently re-fetch availability when the user returns to the tab/window —
+  // catches slots that were taken by another parent while they were away.
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState === "visible") setRefreshKey((k) => k + 1);
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, []);
+
 
   // Clear selections when switching modes to avoid mixing.
   const handleWeeklyToggle = (checked: boolean) => {
