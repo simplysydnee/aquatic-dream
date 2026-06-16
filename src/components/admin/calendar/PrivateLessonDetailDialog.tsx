@@ -210,7 +210,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
         .from("lesson_booking_occurrences")
         .update({
           payment_status: manualMethod === "comp" ? "comp" : "paid",
-          auto_charge_status: "skipped",
+          charge_status: "skipped",
           paid_at: new Date().toISOString(),
           payment_method: manualMethod,
           payment_reference: manualRef || null,

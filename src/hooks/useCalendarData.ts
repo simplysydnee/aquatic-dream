@@ -106,7 +106,7 @@ export interface PrivateLessonBooking {
   payment_status: string;
   status: string;
   booking_status: string;
-  auto_charge_status: string;
+  charge_status: string;
   waiver_token: string | null;
   waiver_signed_at: string | null;
   recurring: boolean;
@@ -200,7 +200,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .lte("lesson_date", rangeEnd),
       supabase
         .from("lesson_booking_occurrences")
-        .select("id, booking_id, occurrence_date, status, payment_status, auto_charge_status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id, confirmation_email_status, confirmation_email_sent_at, confirmation_email_error, status, booking_source)")
+        .select("id, booking_id, occurrence_date, status, payment_status, charge_status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id, confirmation_email_status, confirmation_email_sent_at, confirmation_email_error, status, booking_source)")
         .gte("occurrence_date", rangeStart)
         .lte("occurrence_date", rangeEnd)
         .neq("status", "cancelled"),
@@ -274,7 +274,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         price_per_session: Number(b?.price_per_session ?? 0),
         payment_status: o.payment_status,
         status: o.status,
-        auto_charge_status: o.auto_charge_status,
+        charge_status: o.charge_status,
         booking_status: b?.status || "",
         waiver_token: b?.waiver_token || null,
         waiver_signed_at: b?.waiver_signed_at || null,
