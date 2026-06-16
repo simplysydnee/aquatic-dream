@@ -47,12 +47,16 @@ interface RecurringPattern {
   slots: Slot[]; // open slots in window
 }
 
-export default function SlotPicker({ sessionToken, onContinue, onBack }: Props) {
+export default function SlotPicker({ sessionToken, onContinue, onBack, initialSelected }: Props) {
   const [instructors, setInstructors] = useState<{ id: string; name: string }[]>([]);
   const [instructorId, setInstructorId] = useState<string>("any");
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<Record<string, Slot>>({});
+  const [selected, setSelected] = useState<Record<string, Slot>>(() => {
+    if (!initialSelected?.length) return {};
+    return Object.fromEntries(initialSelected.map((s) => [slotKey(s), s]));
+  });
+
   const [weeklyMode, setWeeklyMode] = useState(false);
   const [dayFilter, setDayFilter] = useState<Set<number>>(new Set());
   const [timeFilter, setTimeFilter] = useState<"all" | "am" | "pm">("all");
