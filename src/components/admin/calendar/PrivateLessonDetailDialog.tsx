@@ -201,6 +201,8 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
     [setupClientSecret, finalizeCardSetup],
   );
 
+  if (!lesson) return null;
+
   const submitManual = async () => {
     setBusy("manual");
     try {
