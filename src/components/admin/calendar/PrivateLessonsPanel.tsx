@@ -246,6 +246,7 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
           poolArea: prefill.pool_area,
         } : undefined}
         initialType={prefill?.lesson_type === "semi_private" ? "semi_private" : "private"}
+        lockedSlot={!!prefill?.start_time}
         onBooked={onRefetch}
       />
       <PrivateLessonDetailDialog
