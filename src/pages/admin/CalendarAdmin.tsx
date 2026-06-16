@@ -77,8 +77,6 @@ const CalendarAdmin = () => {
       } else {
         toast.success(`Sent ${sent} reminder${sent === 1 ? "" : "s"}`);
       }
-      try { localStorage.setItem(`reminders-sent-${todayKey}`, "1"); } catch { /* ignore */ }
-      setRemindersSentToday(true);
     } catch (e) {
       toast.error("Failed to send reminders", {
         description: e instanceof Error ? e.message : String(e),
