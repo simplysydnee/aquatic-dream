@@ -1794,7 +1794,14 @@ function ReviewStep({
           )}
         </div>
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Booking</p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Booking</p>
+            {lockedSlot && (
+              <Badge variant="secondary" className="text-[10px] gap-1">
+                <Lock className="w-3 h-3" /> Locked from calendar
+              </Badge>
+            )}
+          </div>
           <p className="font-medium capitalize">{draft.type?.replace("_", "-")}</p>
           {isGroup ? (
             <>
