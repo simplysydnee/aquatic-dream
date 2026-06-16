@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   Check, ChevronLeft, ChevronRight, Loader2, Search, UserPlus, Users,
-  GraduationCap, User as UserIcon, Clock, Calendar as CalendarIcon, ShieldCheck,
+  GraduationCap, User as UserIcon, Clock, Calendar as CalendarIcon, ShieldCheck, Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
