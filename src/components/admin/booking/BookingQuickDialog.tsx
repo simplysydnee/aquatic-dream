@@ -3,13 +3,13 @@ import { Link } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
 import BookingWizard, { type BookingWizardProps } from "./BookingWizard";
 
-interface Props extends Pick<BookingWizardProps, "initialSlot" | "initialType"> {
+interface Props extends Pick<BookingWizardProps, "initialSlot" | "initialType" | "lockedSlot"> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onBooked: () => void;
 }
 
-export default function BookingQuickDialog({ open, onOpenChange, onBooked, initialSlot, initialType }: Props) {
+export default function BookingQuickDialog({ open, onOpenChange, onBooked, initialSlot, initialType, lockedSlot }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
@@ -31,6 +31,7 @@ export default function BookingQuickDialog({ open, onOpenChange, onBooked, initi
         <BookingWizard
           initialSlot={initialSlot}
           initialType={initialType}
+          lockedSlot={lockedSlot}
           compact
           onCancel={() => onOpenChange(false)}
           onDone={() => { onBooked(); onOpenChange(false); }}

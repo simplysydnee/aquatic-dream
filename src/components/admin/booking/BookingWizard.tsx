@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   Check, ChevronLeft, ChevronRight, Loader2, Search, UserPlus, Users,
-  GraduationCap, User as UserIcon, Clock, Calendar as CalendarIcon, ShieldCheck,
+  GraduationCap, User as UserIcon, Clock, Calendar as CalendarIcon, ShieldCheck, Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
@@ -150,12 +150,19 @@ export interface BookingWizardProps {
   initialClient?: Partial<ClientDraft>;
   /** When provided, the wizard starts on this step (only if the prefill makes it valid). */
   initialStep?: StepKey;
+  /** When true, slot + type came from a calendar click and are locked.
+   *  The wizard collapses to Client → Review and hides Type/Slot editing. */
+  lockedSlot?: boolean;
   onDone?: () => void;
   onCancel?: () => void;
   compact?: boolean; // dialog variant uses smaller paddings
 }
 
-export default function BookingWizard({ initialSlot, initialType, initialClient, initialStep, onDone, onCancel, compact }: BookingWizardProps) {
+export default function BookingWizard({ initialSlot, initialType, initialClient, initialStep, lockedSlot, onDone, onCancel, compact }: BookingWizardProps) {
+  const steps = useMemo<{ key: StepKey; label: string }[]>(
+    () => (lockedSlot ? [STEPS[0], STEPS[3]] : STEPS),
+    [lockedSlot],
+  );
   const [step, setStep] = useState<StepKey>(initialStep ?? "client");
   const [draft, setDraft] = useState<BookingDraft>({
     client: {
@@ -217,21 +224,21 @@ export default function BookingWizard({ initialSlot, initialType, initialClient,
   }, [step, draft]);
 
   const goNext = () => {
-    const idx = STEPS.findIndex((s) => s.key === step);
-    if (idx < STEPS.length - 1) setStep(STEPS[idx + 1].key);
+    const idx = steps.findIndex((s) => s.key === step);
+    if (idx < steps.length - 1) setStep(steps[idx + 1].key);
   };
   const goPrev = () => {
-    const idx = STEPS.findIndex((s) => s.key === step);
-    if (idx > 0) setStep(STEPS[idx - 1].key);
+    const idx = steps.findIndex((s) => s.key === step);
+    if (idx > 0) setStep(steps[idx - 1].key);
   };
 
   return (
     <div className={cn("grid gap-6", compact ? "" : "md:grid-cols-[220px_1fr]")}>
       {/* Step rail */}
       <aside className={cn("space-y-1", compact && "flex gap-2 overflow-x-auto pb-2")}>
-        {STEPS.map((s, i) => {
+        {steps.map((s, i) => {
           const active = s.key === step;
-          const done = STEPS.findIndex((x) => x.key === step) > i;
+          const done = steps.findIndex((x) => x.key === step) > i;
           return (
             <button
               key={s.key}
@@ -283,6 +290,7 @@ export default function BookingWizard({ initialSlot, initialType, initialClient,
         {step === "review" && draft.type && draft.slot && (
           <ReviewStep
             draft={draft}
+            lockedSlot={!!lockedSlot}
             onPatch={(patch) => setDraft((d) => ({ ...d, ...patch }))}
             onNotes={(v) => setDraft((d) => ({ ...d, notes: v }))}
             onDone={onDone}
@@ -1526,9 +1534,10 @@ function GroupSlotPicker({
 // ────────────────────────────────────────────────────────────────────────
 
 function ReviewStep({
-  draft, onPatch, onNotes, onDone,
+  draft, lockedSlot, onPatch, onNotes, onDone,
 }: {
   draft: BookingDraft;
+  lockedSlot?: boolean;
   onPatch: (p: Partial<BookingDraft>) => void;
   onNotes: (v: string) => void;
   onDone?: () => void;
@@ -1785,7 +1794,14 @@ function ReviewStep({
           )}
         </div>
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Booking</p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Booking</p>
+            {lockedSlot && (
+              <Badge variant="secondary" className="text-[10px] gap-1">
+                <Lock className="w-3 h-3" /> Locked from calendar
+              </Badge>
+            )}
+          </div>
           <p className="font-medium capitalize">{draft.type?.replace("_", "-")}</p>
           {isGroup ? (
             <>
