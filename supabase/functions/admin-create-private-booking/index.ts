@@ -194,7 +194,7 @@ async function sendConfirmationEmail(bookingId: string, includeCardOnFile: boole
           totalAmountDue: `$${total.toFixed(2)}`,
           amountDue: dates.length === 1 ? `$${total.toFixed(2)}` : undefined,
           waiverLink,
-          waiverSigned: !!(booking as any).waiver_signed_at,
+          waiverSigned: !!waiverSignedAt,
           icsLink: icsUrl,
           googleCalendarLink: googleUrl,
           cardOnFileNote,
