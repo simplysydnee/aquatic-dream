@@ -93,6 +93,7 @@ interface Props {
   signerFirstName?: string;
   signerLastName?: string;
   signerPhone?: string;
+  signerLabel?: string;
   showAddAnother?: boolean;
   onAddAnother?: (data: LegalAgreementData) => void;
   submitLabel?: string;
