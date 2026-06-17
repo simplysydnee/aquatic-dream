@@ -1,6 +1,6 @@
 // Unified admin booking wizard: Client → Type → Slot → Review.
 // Used by both the full-page route and the quick-book dialog.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, addDays, isBefore, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   Check, ChevronLeft, ChevronRight, Loader2, Search, UserPlus, Users,
-  GraduationCap, User as UserIcon, Clock, Calendar as CalendarIcon, ShieldCheck, Lock,
+  GraduationCap, User as UserIcon, Clock, Calendar as CalendarIcon, ShieldCheck, Lock, CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
@@ -184,7 +184,7 @@ export default function BookingWizard({ initialSlot, initialType, initialClient,
           poolArea: initialSlot.poolArea ?? "shallow",
         }
       : null,
-    payment: { collectCardOnFile: true, sendConfirmation: true, priceOverride: "" },
+    payment: { collectCardOnFile: false, sendConfirmation: true, priceOverride: "" },
     notes: "",
   });
 
@@ -330,6 +330,7 @@ interface ClientSearchResult {
   request_preferred_times?: string | null;
   request_notes?: string | null;
   request_status?: string | null;
+  hasCard?: boolean;
 }
 
 function splitName(full: string | null | undefined): { first: string; last: string } {
@@ -355,7 +356,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
       const like = `%${q}%`;
       const [b, e, r] = await Promise.all([
         supabase.from("lesson_bookings")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
+          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at,stripe_payment_method_id")
           .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},parent_phone.ilike.${like}`)
           .order("updated_at", { ascending: false })
           .limit(20),
@@ -372,6 +373,37 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
           .limit(20),
       ]);
       if (cancelled) return;
+
+      // Build set of emails with a card from bookings (stripe_payment_method_id),
+      // then merge with profiles (stripe_default_pm_id) for the same emails.
+      const cardEmails = new Set<string>();
+      (b.data || []).forEach((row: any) => {
+        if (row.stripe_payment_method_id && row.parent_email) {
+          cardEmails.add(String(row.parent_email).toLowerCase().trim());
+        }
+      });
+      const candidateEmails = Array.from(
+        new Set(
+          [
+            ...(b.data || []).map((x: any) => x.parent_email),
+            ...(e.data || []).map((x: any) => x.parent_email),
+            ...(r.data || []).map((x: any) => x.parent_email),
+          ]
+            .filter(Boolean)
+            .map((x: string) => x.toLowerCase().trim()),
+        ),
+      );
+      if (candidateEmails.length > 0) {
+        const { data: profRows } = await supabase
+          .from("profiles")
+          .select("email,stripe_default_pm_id")
+          .in("email", candidateEmails)
+          .not("stripe_default_pm_id", "is", null);
+        (profRows || []).forEach((p: any) => {
+          if (p.email) cardEmails.add(String(p.email).toLowerCase().trim());
+        });
+      }
+
       const map = new Map<string, ClientSearchResult>();
       const add = (row: any, source: "booking" | "enrollment" | "request") => {
         const email = (row.parent_email || "").toLowerCase().trim();
@@ -401,6 +433,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
           request_preferred_times: source === "request" ? row.preferred_times : null,
           request_notes: source === "request" ? row.notes : null,
           request_status: source === "request" ? row.status : null,
+          hasCard: cardEmails.has(email),
         });
       };
       (b.data || []).forEach((row) => add(row, "booking"));
@@ -444,6 +477,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
             if (!survivor.request_preferred_times && loser.request_preferred_times) survivor.request_preferred_times = loser.request_preferred_times;
             if (!survivor.request_notes && loser.request_notes) survivor.request_notes = loser.request_notes;
             if (!survivor.request_status && loser.request_status) survivor.request_status = loser.request_status;
+            if (loser.hasCard) survivor.hasCard = true;
             dropped.add(loser);
           }
         }
@@ -506,16 +540,25 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
 
       {mode === "search" ? (
         <div className="space-y-3">
-          {hasSelectedClient && (
+          {hasSelectedClient && (() => {
+            const selectedHasCard = results.some(
+              (r) => r.parent_email === client.parent_email.toLowerCase().trim() && r.hasCard,
+            );
+            return (
             <div className="flex items-start justify-between gap-2 p-3 rounded-md border-2 border-primary bg-primary/5">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Check className="w-4 h-4 text-primary" />
                   <p className="font-semibold text-sm truncate">
                     {client.swimmers[0]?.first_name
                       ? `${client.swimmers[0].first_name} ${client.swimmers[0].last_name}`
                       : `${client.parent_first} ${client.parent_last}`}
                   </p>
+                  {selectedHasCard && (
+                    <Badge variant="outline" className="text-[10px] gap-1 bg-teal-50 text-teal-800 border-teal-300">
+                      <CreditCard className="w-3 h-3" /> Card on file
+                    </Badge>
+                  )}
                 </div>
                 {client.swimmers[0]?.first_name && (
                   <p className="text-xs text-muted-foreground truncate mt-0.5">
@@ -534,7 +577,8 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
                 </Button>
               </div>
             </div>
-          )}
+            );
+          })()}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
             <Input
@@ -602,9 +646,16 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
                         </p>
                       )}
                     </div>
-                    <Badge variant="outline" className={cn("text-[10px] shrink-0", chipClass)}>
-                      {chipLabel}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <Badge variant="outline" className={cn("text-[10px]", chipClass)}>
+                        {chipLabel}
+                      </Badge>
+                      {r.hasCard && (
+                        <Badge variant="outline" className="text-[10px] gap-1 bg-teal-50 text-teal-800 border-teal-300">
+                          <CreditCard className="w-3 h-3" /> Card on file
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </button>
               );
@@ -1550,7 +1601,6 @@ function ReviewStep({
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [waiverOnFile, setWaiverOnFile] = useState<boolean | null>(null);
   const [existingCardHint, setExistingCardHint] = useState<{ last4?: string | null } | null>(null);
-  const cardToggleTouched = useRef(false);
 
   useEffect(() => { getStripe().then(setStripeReady).catch(() => {}); }, []);
 
@@ -1562,14 +1612,11 @@ function ReviewStep({
       .then(({ data }) => setWaiverOnFile(!!data));
   }, [draft.client.swimmers]);
 
-  // Card on file lookup: when admin selects an existing client, check if
-  // a saved Stripe payment method already exists (on a prior booking or
-  // the parent profile). If so, default the toggle OFF and show a hint.
-  // Respects explicit admin flips via the cardToggleTouched ref.
+  // Card on file lookup: read-only display only. Never modifies the
+  // collectCardOnFile toggle — admin controls that explicitly.
   useEffect(() => {
     const email = draft.client.parent_email?.toLowerCase().trim();
     if (!email || !email.includes("@")) { setExistingCardHint(null); return; }
-    if (cardToggleTouched.current) return;
     let cancelled = false;
     (async () => {
       const [bookingRes, profileRes] = await Promise.all([
@@ -1592,17 +1639,9 @@ function ReviewStep({
       if (cancelled) return;
       const hasCard = !!(bookingRes.data as any)?.stripe_payment_method_id
         || !!(profileRes.data as any)?.stripe_default_pm_id;
-      if (hasCard) {
-        setExistingCardHint({});
-        if (draft.payment.collectCardOnFile) {
-          onPatch({ payment: { ...draft.payment, collectCardOnFile: false } });
-        }
-      } else {
-        setExistingCardHint(null);
-      }
+      setExistingCardHint(hasCard ? {} : null);
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.client.parent_email]);
 
   const isGroup = draft.type === "group";
@@ -1871,10 +1910,7 @@ function ReviewStep({
             <Switch
               id="cof"
               checked={draft.payment.collectCardOnFile}
-              onCheckedChange={(v) => {
-                cardToggleTouched.current = true;
-                onPatch({ payment: { ...draft.payment, collectCardOnFile: v } });
-              }}
+              onCheckedChange={(v) => onPatch({ payment: { ...draft.payment, collectCardOnFile: v } })}
             />
             <Label htmlFor="cof" className="text-sm cursor-pointer">Collect card on file (charge day of each lesson)</Label>
           </div>

@@ -115,6 +115,7 @@ export interface Swimmer {
   statuses: SwimmerStatus[];
   last_activity: string; // ISO
   primary_status: SwimmerStatus;
+  has_card_on_file: boolean;
 }
 
 const normalizeName = (name: string | null | undefined) =>
@@ -252,6 +253,7 @@ export function useSwimmers() {
           statuses: [],
           last_activity: new Date(0).toISOString(),
           primary_status: { key: "past_client", label: "Past Client", tone: "muted" },
+          has_card_on_file: false,
         };
         map.set(key, s);
       } else {
@@ -354,6 +356,28 @@ export function useSwimmers() {
       target.bookings.push(b as SwimmerBooking);
     });
 
+    // Build email→hasCard map from bookings (stripe_payment_method_id)
+    // and profiles (stripe_default_pm_id), keyed by normalized email.
+    const cardEmails = new Set<string>();
+    (bookingsRes.data || []).forEach((b: any) => {
+      if (b.stripe_payment_method_id && b.parent_email) {
+        cardEmails.add(normalizeEmail(b.parent_email));
+      }
+    });
+    const dedupedEmails = Array.from(
+      new Set(Array.from(map.values()).map((s) => normalizeEmail(s.parent_email)).filter(Boolean)),
+    );
+    if (dedupedEmails.length > 0) {
+      const { data: profRows } = await supabase
+        .from("profiles")
+        .select("email,stripe_default_pm_id")
+        .in("email", dedupedEmails)
+        .not("stripe_default_pm_id", "is", null);
+      (profRows || []).forEach((p: any) => {
+        if (p.email) cardEmails.add(normalizeEmail(p.email));
+      });
+    }
+
     const list = Array.from(map.values()).map((s) => {
       // Sort bookings newest-first by series_start (fallback created_at)
       s.bookings.sort((a, b) => {
@@ -367,6 +391,7 @@ export function useSwimmers() {
         statuses,
         primary_status: primary,
         last_activity: lastActivityISO(s),
+        has_card_on_file: cardEmails.has(normalizeEmail(s.parent_email)),
       };
     });
     list.sort((a, b) => (a.last_activity < b.last_activity ? 1 : -1));
