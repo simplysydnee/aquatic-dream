@@ -229,7 +229,7 @@ export function useSwimmers() {
           `*, session:swim_sessions(id, swim_level, day_of_week, start_time, end_time, age_group, session_period_id, session_price, total_lessons, price_per_lesson, period:session_periods(name, start_date, end_date))`,
         )
         .order("created_at", { ascending: false }),
-      supabase.from("lesson_bookings").select("*, stripe_payment_method_id").order("created_at", { ascending: false }),
+      supabase.from("lesson_bookings").select("*").order("created_at", { ascending: false }),
     ]);
 
     const map = new Map<string, Swimmer>();
