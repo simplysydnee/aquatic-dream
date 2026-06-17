@@ -523,6 +523,35 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Booking confirmation SMS (best-effort; initial create only).
+    try {
+      const { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } =
+        await import("../_shared/textmagic.ts");
+      const firstDate = dates[0];
+      const { data: firstOcc } = await supabaseAdmin
+        .from("lesson_booking_occurrences")
+        .select("id")
+        .eq("booking_id", bookingId)
+        .eq("occurrence_date", firstDate)
+        .limit(1)
+        .maybeSingle();
+      const instructorFirst = (instructorName || "").split(" ")[0] || "your instructor";
+      const swimmerFirst = p.child_first_name || (p.child_name || "").split(" ")[0] || null;
+      const dateLabel = formatPTDate(firstDate);
+      const timeLabel = formatPTTime(p.start_time);
+      const message = `Your lesson with ${instructorFirst} on ${dateLabel} at ${timeLabel} is confirmed at Aquatic Dreams. See you there!`;
+      await sendAndLogBookingConfirmation(supabaseAdmin, {
+        phoneRaw: p.parent_phone,
+        message,
+        swimmer_name: swimmerFirst,
+        booking_id: bookingId,
+        lesson_occurrence_id: (firstOcc as any)?.id ?? null,
+        reminder_kind: "booking_confirmation",
+      });
+    } catch (smsErr) {
+      console.error("admin-create-private-booking SMS step failed:", smsErr instanceof Error ? smsErr.message : String(smsErr));
+    }
+
     return j({
       success: true,
       booking_id: bookingId,

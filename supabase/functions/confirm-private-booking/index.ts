@@ -102,6 +102,42 @@ Deno.serve(async (req) => {
     // Send confirmation via shared helper (card-on-file, no payment link).
     await sendPrivateBookingConfirmation(supabase, booking_id, { mode: "initial" });
 
+    // Booking confirmation SMS (best-effort; never blocks the response).
+    try {
+      const { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } =
+        await import("../_shared/textmagic.ts");
+      const { data: b } = await supabase
+        .from("lesson_bookings")
+        .select("parent_phone, child_first_name, child_name, instructor_name, start_time")
+        .eq("id", booking_id)
+        .maybeSingle();
+      const { data: firstOcc } = await supabase
+        .from("lesson_booking_occurrences")
+        .select("id, occurrence_date, start_time_override")
+        .eq("booking_id", booking_id)
+        .neq("status", "cancelled")
+        .order("occurrence_date", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (b && firstOcc) {
+        const instructorFirst = (((b as any).instructor_name as string) || "").split(" ")[0] || "your instructor";
+        const swimmerFirst = (b as any).child_first_name || ((b as any).child_name || "").split(" ")[0] || null;
+        const dateLabel = formatPTDate((firstOcc as any).occurrence_date);
+        const timeLabel = formatPTTime((firstOcc as any).start_time_override || (b as any).start_time);
+        const message = `Your lesson with ${instructorFirst} on ${dateLabel} at ${timeLabel} is confirmed at Aquatic Dreams. See you there!`;
+        await sendAndLogBookingConfirmation(supabase, {
+          phoneRaw: (b as any).parent_phone,
+          message,
+          swimmer_name: swimmerFirst,
+          booking_id,
+          lesson_occurrence_id: (firstOcc as any).id,
+          reminder_kind: "booking_confirmation",
+        });
+      }
+    } catch (smsErr) {
+      console.error("confirm-private-booking SMS step failed:", smsErr instanceof Error ? smsErr.message : String(smsErr));
+    }
+
     return j({ success: true, booking_id });
   } catch (err: any) {
     console.error("confirm-private-booking error", err);

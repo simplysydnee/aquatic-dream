@@ -93,6 +93,7 @@ interface Props {
   signerFirstName?: string;
   signerLastName?: string;
   signerPhone?: string;
+  signerLabel?: string;
   showAddAnother?: boolean;
   onAddAnother?: (data: LegalAgreementData) => void;
   submitLabel?: string;
@@ -102,7 +103,7 @@ interface Props {
   headerSubtitle?: React.ReactNode;
 }
 
-const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, signerFirstName, signerLastName, signerPhone, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
+const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, signerFirstName, signerLastName, signerPhone, signerLabel, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
   const [form, setForm] = useState({
     waiverAccepted: false,
     privacyPolicyAccepted: false,
@@ -128,6 +129,15 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         emergencyContactRelationship: "Self",
       }));
       setErrors((prev) => ({
+        ...prev,
+        emergencyContactFirstName: "",
+        emergencyContactLastName: "",
+        emergencyContactPhone: "",
+        emergencyContactRelationship: "",
+      }));
+    } else {
+      // Clear auto-filled values so the parent can type their own contact.
+      setForm((prev) => ({
         ...prev,
         emergencyContactFirstName: "",
         emergencyContactLastName: "",
@@ -288,7 +298,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onCheckedChange={(v) => fillEmergencyFromSigner(v === true)}
               />
               <Label htmlFor="same-as-signer" className="text-sm cursor-pointer leading-snug">
-                Same as person completing this form ({signerFirstName} {signerLastName})
+                {signerLabel ?? `Same as person completing this form (${signerFirstName} ${signerLastName})`}
               </Label>
             </div>
           )}
@@ -301,6 +311,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactFirstName", e.target.value)}
                 className="mt-1"
                 placeholder="First name"
+                readOnly={sameAsSigner}
               />
               {errors.emergencyContactFirstName && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactFirstName}</p>
@@ -314,6 +325,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactLastName", e.target.value)}
                 className="mt-1"
                 placeholder="Last name"
+                readOnly={sameAsSigner}
               />
               {errors.emergencyContactLastName && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactLastName}</p>
@@ -327,6 +339,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactRelationship", e.target.value)}
                 className="mt-1"
                 placeholder="e.g. Spouse, Grandparent"
+                readOnly={sameAsSigner}
               />
               {errors.emergencyContactRelationship && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactRelationship}</p>
@@ -341,6 +354,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactPhone", e.target.value)}
                 className="mt-1"
                 placeholder="(209) 555-0000"
+                readOnly={sameAsSigner}
               />
               {errors.emergencyContactPhone && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactPhone}</p>

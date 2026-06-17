@@ -317,6 +317,97 @@ async function handleCheckoutCompleted(session: any) {
     await sendEnrollmentConfirmation(e.id);
   }
 
+  // 8b. Send booking confirmation SMS (one per enrollment row, best-effort).
+  try {
+    const { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } =
+      await import("../_shared/textmagic.ts");
+    const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dowIndex = (d: string | null | undefined): number => {
+      if (!d) return 99;
+      const i = WEEKDAYS.findIndex((w) => w.toLowerCase() === d.toLowerCase());
+      return i >= 0 ? i : 99;
+    };
+    const joinDays = (days: string[]): string => {
+      if (days.length === 0) return "";
+      if (days.length === 1) return days[0];
+      if (days.length === 2) return `${days[0]} and ${days[1]}`;
+      return `${days.slice(0, -1).join(", ")}, and ${days[days.length - 1]}`;
+    };
+    for (const e of insertedEnrollments) {
+      try {
+        const { data: enr } = await supabase
+          .from("swim_enrollments")
+          .select("id, parent_phone, child_first_name, child_name, session_id")
+          .eq("id", e.id)
+          .maybeSingle();
+        if (!enr) continue;
+        const sessionId = (enr as any).session_id as string | null;
+        let sess: any = null;
+        if (sessionId) {
+          const { data } = await supabase
+            .from("swim_sessions")
+            .select("session_name, day_of_week, start_time, session_start_date, session_period_id, swim_level")
+            .eq("id", sessionId)
+            .maybeSingle();
+          sess = data;
+        }
+        let period: any = null;
+        if (sess?.session_period_id) {
+          const { data } = await supabase
+            .from("session_periods")
+            .select("name, start_date, end_date")
+            .eq("id", sess.session_period_id)
+            .maybeSingle();
+          period = data;
+        }
+        let days: string[] = sess?.day_of_week ? [sess.day_of_week] : [];
+        if (sess?.session_period_id && sess?.swim_level && sess?.start_time) {
+          const { data: siblings } = await supabase
+            .from("swim_sessions")
+            .select("day_of_week")
+            .eq("session_period_id", sess.session_period_id)
+            .eq("swim_level", sess.swim_level)
+            .eq("start_time", sess.start_time)
+            .eq("is_active", true);
+          if (siblings && siblings.length > 0) {
+            const uniq = Array.from(new Set((siblings as any[]).map((r) => r.day_of_week).filter(Boolean)));
+            uniq.sort((a, b) => dowIndex(a) - dowIndex(b));
+            if (uniq.length) days = uniq;
+          }
+        }
+        const swimmerFirst = (enr as any).child_first_name || ((enr as any).child_name || "").split(" ")[0] || "Your swimmer";
+        const sessionName = period?.name || sess?.session_name || "Swim Session";
+        const timeLabel = formatPTTime(sess?.start_time);
+        const daysLabel = joinDays(days);
+        const startDateLabel = period?.start_date
+          ? formatPTDate(period.start_date, { month: "short", day: "numeric" })
+          : (sess?.session_start_date ? formatPTDate(sess.session_start_date, { month: "short", day: "numeric" }) : "");
+        const endDateLabel = period?.end_date
+          ? formatPTDate(period.end_date, { month: "short", day: "numeric" })
+          : "";
+        let message: string;
+        if (startDateLabel && endDateLabel) {
+          message = `${swimmerFirst} is enrolled in ${sessionName}! Classes run ${startDateLabel} to ${endDateLabel}, every ${daysLabel} at ${timeLabel} at Aquatic Dreams. See you there!`;
+        } else if (startDateLabel) {
+          message = `${swimmerFirst} is enrolled in ${sessionName}! Classes start ${startDateLabel}, every ${daysLabel} at ${timeLabel} at Aquatic Dreams. See you there!`;
+        } else {
+          message = `${swimmerFirst} is enrolled in ${sessionName}! Classes every ${daysLabel} at ${timeLabel} at Aquatic Dreams. See you there!`;
+        }
+        await sendAndLogBookingConfirmation(supabase, {
+          phoneRaw: (enr as any).parent_phone,
+          message,
+          swimmer_name: swimmerFirst,
+          enrollment_id: e.id,
+          reminder_kind: "booking_confirmation",
+        });
+      } catch (perEnrErr) {
+        console.error("Enrollment SMS failed for", e.id, perEnrErr instanceof Error ? perEnrErr.message : String(perEnrErr));
+      }
+    }
+  } catch (smsErr) {
+    console.error("payments-webhook SMS block failed:", smsErr instanceof Error ? smsErr.message : String(smsErr));
+  }
+
   // 9. Sync parent contact into the matching Resend audiences (fire-and-forget)
   for (const e of insertedEnrollments) {
     supabase.functions.invoke("resend-sync-enrollment-contact", {
