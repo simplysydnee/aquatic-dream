@@ -860,7 +860,7 @@ const SessionsAdmin = () => {
                           </div>
                           <div className="flex items-center gap-1 w-[50px] shrink-0 text-sm text-muted-foreground">
                             <Users className="w-3.5 h-3.5" />
-                            {s.max_students}
+                            {(enrollmentCounts[s.id] ?? 0)}/{s.max_students}
                           </div>
                           <div className="w-[140px] shrink-0">
                             <Select
