@@ -298,7 +298,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onCheckedChange={(v) => fillEmergencyFromSigner(v === true)}
               />
               <Label htmlFor="same-as-signer" className="text-sm cursor-pointer leading-snug">
-                Same as person completing this form ({signerFirstName} {signerLastName})
+                {signerLabel ?? `Same as person completing this form (${signerFirstName} ${signerLastName})`}
               </Label>
             </div>
           )}
@@ -311,6 +311,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactFirstName", e.target.value)}
                 className="mt-1"
                 placeholder="First name"
+                readOnly={sameAsSigner}
               />
               {errors.emergencyContactFirstName && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactFirstName}</p>
@@ -324,6 +325,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactLastName", e.target.value)}
                 className="mt-1"
                 placeholder="Last name"
+                readOnly={sameAsSigner}
               />
               {errors.emergencyContactLastName && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactLastName}</p>
@@ -337,6 +339,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactRelationship", e.target.value)}
                 className="mt-1"
                 placeholder="e.g. Spouse, Grandparent"
+                readOnly={sameAsSigner}
               />
               {errors.emergencyContactRelationship && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactRelationship}</p>
@@ -351,6 +354,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactPhone", e.target.value)}
                 className="mt-1"
                 placeholder="(209) 555-0000"
+                readOnly={sameAsSigner}
               />
               {errors.emergencyContactPhone && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactPhone}</p>
