@@ -2823,6 +2823,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_public_taken_occurrences: {
+        Args: { p_from_date: string; p_to_date: string }
+        Returns: {
+          end_time: string
+          instructor_id: string
+          occurrence_date: string
+          start_time: string
+        }[]
+      }
       get_resend_audience_mappings: { Args: never; Returns: Json }
       get_session_enrollment_counts: {
         Args: { _session_ids: string[] }
