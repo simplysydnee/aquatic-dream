@@ -1,6 +1,6 @@
 // Unified admin booking wizard: Client → Type → Slot → Review.
 // Used by both the full-page route and the quick-book dialog.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, addDays, isBefore, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   Check, ChevronLeft, ChevronRight, Loader2, Search, UserPlus, Users,
-  GraduationCap, User as UserIcon, Clock, Calendar as CalendarIcon, ShieldCheck, Lock,
+  GraduationCap, User as UserIcon, Clock, Calendar as CalendarIcon, ShieldCheck, Lock, CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
@@ -184,7 +184,7 @@ export default function BookingWizard({ initialSlot, initialType, initialClient,
           poolArea: initialSlot.poolArea ?? "shallow",
         }
       : null,
-    payment: { collectCardOnFile: true, sendConfirmation: true, priceOverride: "" },
+    payment: { collectCardOnFile: false, sendConfirmation: true, priceOverride: "" },
     notes: "",
   });
 
@@ -330,6 +330,7 @@ interface ClientSearchResult {
   request_preferred_times?: string | null;
   request_notes?: string | null;
   request_status?: string | null;
+  hasCard?: boolean;
 }
 
 function splitName(full: string | null | undefined): { first: string; last: string } {
@@ -1550,7 +1551,6 @@ function ReviewStep({
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [waiverOnFile, setWaiverOnFile] = useState<boolean | null>(null);
   const [existingCardHint, setExistingCardHint] = useState<{ last4?: string | null } | null>(null);
-  const cardToggleTouched = useRef(false);
 
   useEffect(() => { getStripe().then(setStripeReady).catch(() => {}); }, []);
 
@@ -1562,14 +1562,11 @@ function ReviewStep({
       .then(({ data }) => setWaiverOnFile(!!data));
   }, [draft.client.swimmers]);
 
-  // Card on file lookup: when admin selects an existing client, check if
-  // a saved Stripe payment method already exists (on a prior booking or
-  // the parent profile). If so, default the toggle OFF and show a hint.
-  // Respects explicit admin flips via the cardToggleTouched ref.
+  // Card on file lookup: read-only display only. Never modifies the
+  // collectCardOnFile toggle — admin controls that explicitly.
   useEffect(() => {
     const email = draft.client.parent_email?.toLowerCase().trim();
     if (!email || !email.includes("@")) { setExistingCardHint(null); return; }
-    if (cardToggleTouched.current) return;
     let cancelled = false;
     (async () => {
       const [bookingRes, profileRes] = await Promise.all([
@@ -1592,17 +1589,9 @@ function ReviewStep({
       if (cancelled) return;
       const hasCard = !!(bookingRes.data as any)?.stripe_payment_method_id
         || !!(profileRes.data as any)?.stripe_default_pm_id;
-      if (hasCard) {
-        setExistingCardHint({});
-        if (draft.payment.collectCardOnFile) {
-          onPatch({ payment: { ...draft.payment, collectCardOnFile: false } });
-        }
-      } else {
-        setExistingCardHint(null);
-      }
+      setExistingCardHint(hasCard ? {} : null);
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.client.parent_email]);
 
   const isGroup = draft.type === "group";
@@ -1871,10 +1860,7 @@ function ReviewStep({
             <Switch
               id="cof"
               checked={draft.payment.collectCardOnFile}
-              onCheckedChange={(v) => {
-                cardToggleTouched.current = true;
-                onPatch({ payment: { ...draft.payment, collectCardOnFile: v } });
-              }}
+              onCheckedChange={(v) => onPatch({ payment: { ...draft.payment, collectCardOnFile: v } })}
             />
             <Label htmlFor="cof" className="text-sm cursor-pointer">Collect card on file (charge day of each lesson)</Label>
           </div>
