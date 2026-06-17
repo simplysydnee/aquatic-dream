@@ -409,7 +409,12 @@ export default function SwimmerDetailDrawer({
                               Open →
                             </Button>
                           </div>
-                          {dates.length > 0 && (
+                          {loadingLessonDates && dates.length === 0 ? (
+                            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Loading lessons…
+                            </div>
+                          ) : dates.length > 0 ? (
                             <ul className="mt-3 divide-y border-t">
                               {dates.map((d) => {
                                 let kind: LessonStatusKind;
@@ -417,9 +422,27 @@ export default function SwimmerDetailDrawer({
                                 else if (d.lesson_date > today) kind = "upcoming";
                                 else kind = attMap.get(d.lesson_date) ? "attended" : "no_show";
                                 const badge = lessonStatusBadge(kind);
+                                const isPast = kind === "attended" || kind === "no_show";
+                                const isCancelled = kind === "cancelled";
                                 return (
-                                  <li key={d.lesson_date} className="py-2 flex items-center justify-between gap-2">
-                                    <span className="text-xs text-foreground">{fmtOccDate(d.lesson_date)}</span>
+                                  <li
+                                    key={d.lesson_date}
+                                    className={cn(
+                                      "py-2 flex items-center justify-between gap-2",
+                                      isPast && "text-muted-foreground",
+                                    )}
+                                  >
+                                    <span className="inline-flex items-center gap-1.5 text-xs">
+                                      <LessonStatusIcon kind={kind} />
+                                      <span
+                                        className={cn(
+                                          kind === "upcoming" && "font-semibold text-foreground",
+                                          isCancelled && "line-through text-muted-foreground",
+                                        )}
+                                      >
+                                        {fmtOccDate(d.lesson_date)}
+                                      </span>
+                                    </span>
                                     <Badge variant="outline" className={cn("text-[10px]", badge.className)}>
                                       {badge.label}
                                     </Badge>
@@ -427,7 +450,7 @@ export default function SwimmerDetailDrawer({
                                 );
                               })}
                             </ul>
-                          )}
+                          ) : null}
                         </div>
                       );
                     })}
