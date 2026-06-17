@@ -540,16 +540,25 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
 
       {mode === "search" ? (
         <div className="space-y-3">
-          {hasSelectedClient && (
+          {hasSelectedClient && (() => {
+            const selectedHasCard = results.some(
+              (r) => r.parent_email === client.parent_email.toLowerCase().trim() && r.hasCard,
+            );
+            return (
             <div className="flex items-start justify-between gap-2 p-3 rounded-md border-2 border-primary bg-primary/5">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Check className="w-4 h-4 text-primary" />
                   <p className="font-semibold text-sm truncate">
                     {client.swimmers[0]?.first_name
                       ? `${client.swimmers[0].first_name} ${client.swimmers[0].last_name}`
                       : `${client.parent_first} ${client.parent_last}`}
                   </p>
+                  {selectedHasCard && (
+                    <Badge variant="outline" className="text-[10px] gap-1 bg-teal-50 text-teal-800 border-teal-300">
+                      <CreditCard className="w-3 h-3" /> Card on file
+                    </Badge>
+                  )}
                 </div>
                 {client.swimmers[0]?.first_name && (
                   <p className="text-xs text-muted-foreground truncate mt-0.5">
@@ -568,7 +577,8 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
                 </Button>
               </div>
             </div>
-          )}
+            );
+          })()}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
             <Input
@@ -636,9 +646,16 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
                         </p>
                       )}
                     </div>
-                    <Badge variant="outline" className={cn("text-[10px] shrink-0", chipClass)}>
-                      {chipLabel}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <Badge variant="outline" className={cn("text-[10px]", chipClass)}>
+                        {chipLabel}
+                      </Badge>
+                      {r.hasCard && (
+                        <Badge variant="outline" className="text-[10px] gap-1 bg-teal-50 text-teal-800 border-teal-300">
+                          <CreditCard className="w-3 h-3" /> Card on file
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </button>
               );
