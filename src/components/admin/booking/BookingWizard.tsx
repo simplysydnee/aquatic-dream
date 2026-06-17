@@ -1324,16 +1324,18 @@ function OneTimeChooser({
           supabase.rpc("get_active_instructors_public"),
           supabase
             .from("lesson_booking_occurrences")
-            .select("instructor_id,occurrence_date,start_time,end_time,status")
+            .select(
+              "occurrence_date,status,instructor_override_id,start_time_override,end_time_override,booking:lesson_bookings!inner(instructor_id,start_time,end_time)"
+            )
             .gte("occurrence_date", firstDate)
             .lte("occurrence_date", lastDate)
             .neq("status", "cancelled"),
           supabase
             .from("slot_holds")
-            .select("instructor_id,slot_date,start_time,end_time,expires_at")
+            .select("instructor_id,slot_date,start_time,end_time,held_until")
             .gte("slot_date", firstDate)
             .lte("slot_date", lastDate)
-            .gt("expires_at", new Date().toISOString()),
+            .gt("held_until", new Date().toISOString()),
         ]);
 
         if (cancelled) return;
@@ -1350,9 +1352,14 @@ function OneTimeChooser({
           arr.push({ start: normTime(start), end: normTime(end) });
           takenByKey.set(k, arr);
         };
-        ((occRes.data as any[]) || []).forEach((o) =>
-          addTaken(o.instructor_id, o.occurrence_date, o.start_time, o.end_time),
-        );
+        ((occRes.data as any[]) || []).forEach((o) => {
+          const instId = o.instructor_override_id ?? o.booking?.instructor_id;
+          const startT = o.start_time_override ?? o.booking?.start_time;
+          const endT = o.end_time_override ?? o.booking?.end_time;
+          if (instId && startT && endT) {
+            addTaken(instId, o.occurrence_date, startT, endT);
+          }
+        });
         ((holdRes.data as any[]) || []).forEach((h) =>
           addTaken(h.instructor_id, h.slot_date, h.start_time, h.end_time),
         );
