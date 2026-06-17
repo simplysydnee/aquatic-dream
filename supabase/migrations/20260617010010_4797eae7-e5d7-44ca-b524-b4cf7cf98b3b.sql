@@ -1,0 +1,1 @@
+CREATE POLICY "Service role can insert reminder logs" ON public.reminder_logs FOR INSERT TO service_role WITH CHECK (true); CREATE POLICY "Service role can update reminder logs" ON public.reminder_logs FOR UPDATE TO service_role USING (true) WITH CHECK (true);
