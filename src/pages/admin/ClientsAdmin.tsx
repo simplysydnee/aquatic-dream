@@ -173,13 +173,20 @@ export default function ClientsAdmin() {
   const visibleKeys = useMemo(() => visible.map((v) => v.key), [visible]);
   const commentCounts = useCommentCounts("swimmer", visibleKeys);
 
+  // Tracks the swimmer key to re-select after a refetch when an edit changes
+  // the grouping key (child_name / parent_email).
+  const [pendingSelectKey, setPendingSelectKey] = useState<string | null>(null);
+
   // Keep the open drawer's swimmer object in sync with the live list so
   // edits show up immediately (the drawer holds a snapshot, not a live ref).
   useEffect(() => {
-    if (!selected) return;
-    const fresh = swimmers.find((s) => s.key === selected.key);
+    if (!selected && !pendingSelectKey) return;
+    const lookupKey = pendingSelectKey ?? selected?.key;
+    if (!lookupKey) return;
+    const fresh = swimmers.find((s) => s.key === lookupKey);
     if (fresh && fresh !== selected) setSelected(fresh);
-  }, [swimmers, selected]);
+    if (pendingSelectKey && fresh) setPendingSelectKey(null);
+  }, [swimmers, selected, pendingSelectKey]);
 
   const siblingsOf = (s: Swimmer) =>
 
@@ -370,7 +377,10 @@ export default function ClientsAdmin() {
         onOpenRequest={openRequest}
         onOpenEnrollment={openEnrollment}
         onSelectSwimmer={openSwimmer}
-        onChanged={refetch}
+        onChanged={(newKey) => {
+          if (newKey) setPendingSelectKey(newKey);
+          refetch();
+        }}
 
       />
 

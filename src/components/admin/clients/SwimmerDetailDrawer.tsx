@@ -51,7 +51,7 @@ interface Props {
   onOpenRequest: (id: string) => void;
   onOpenEnrollment: (id: string) => void;
   onSelectSwimmer: (s: Swimmer) => void;
-  onChanged?: () => void;
+  onChanged?: (newKey?: string) => void;
 }
 
 
@@ -556,9 +556,9 @@ export default function SwimmerDetailDrawer({
           open={editOpen}
           onOpenChange={setEditOpen}
           target={editTarget}
-          onSaved={() => {
+          onSaved={(newKey) => {
             setEditOpen(false);
-            onChanged?.();
+            onChanged?.(newKey);
           }}
         />
       )}
