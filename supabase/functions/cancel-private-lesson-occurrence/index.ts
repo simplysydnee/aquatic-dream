@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       cancelled_at: new Date().toISOString(),
       cancel_reason: parsed.data.reason || (within ? "Late cancellation" : "Cancelled by customer"),
       // Within policy window → still charge as scheduled. Outside → skip charge.
-      auto_charge_status: within ? "pending" : "skipped",
+      charge_status: within ? "pending" : "skipped",
     }).eq("id", (occ as any).id);
 
     // Send confirmation email

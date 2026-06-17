@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
       booking_id: bookingId,
       occurrence_date: s.slot_date,
       payment_status: "card_on_file",
-      auto_charge_status: "pending",
+      charge_status: "pending",
       status: "pending_card",
       cancel_token: crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, ""),
     }));

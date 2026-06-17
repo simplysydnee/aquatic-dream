@@ -1,4 +1,4 @@
-// Cron-style: finds occurrences from yesterday with auto_charge_status='pending',
+// Cron-style: finds occurrences from yesterday with charge_status='pending',
 // charges $price_per_session off-session via stored payment method.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient } from "../_shared/stripe.ts";
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     const { data: due, error } = await supabase
       .from("lesson_booking_occurrences")
       .select("id, booking_id, occurrence_date, status, lesson_bookings!inner(id, status, parent_email, parent_first_name, parent_name, child_name, stripe_customer_id, stripe_payment_method_id, price_per_session, instructor_name, lesson_type, start_time, end_time)")
-      .eq("auto_charge_status", "pending")
+      .eq("charge_status", "pending")
       .lte("occurrence_date", yyyy_mm_dd_max)
       .eq("status", "scheduled")
       .eq("lesson_bookings.status", "active")
@@ -91,9 +91,9 @@ Deno.serve(async (req) => {
       }
       if (!b?.stripe_customer_id || !b?.stripe_payment_method_id) {
         await supabase.from("lesson_booking_occurrences").update({
-          auto_charge_status: "failed",
-          auto_charge_attempted_at: new Date().toISOString(),
-          auto_charge_error: "No payment method on file",
+          charge_status: "failed",
+          charge_attempted_at: new Date().toISOString(),
+          charge_error: "No payment method on file",
         }).eq("id", row.id);
         failed++;
         continue;
@@ -112,20 +112,20 @@ Deno.serve(async (req) => {
           metadata: { type: "private_lesson_charge", occurrence_id: row.id, booking_id: b.id },
         });
         await supabase.from("lesson_booking_occurrences").update({
-          auto_charge_status: pi.status === "succeeded" ? "succeeded" : "failed",
-          auto_charge_attempted_at: new Date().toISOString(),
+          charge_status: pi.status === "succeeded" ? "succeeded" : "failed",
+          charge_attempted_at: new Date().toISOString(),
           stripe_payment_intent_id: pi.id,
           payment_status: pi.status === "succeeded" ? "paid" : "unpaid",
           paid_at: pi.status === "succeeded" ? new Date().toISOString() : null,
-          auto_charge_error: pi.status === "succeeded" ? null : `Status: ${pi.status}`,
+          charge_error: pi.status === "succeeded" ? null : `Status: ${pi.status}`,
         }).eq("id", row.id);
         if (pi.status === "succeeded") succeeded++; else failed++;
       } catch (e: any) {
         const msg = e?.message || "Charge failed";
         await supabase.from("lesson_booking_occurrences").update({
-          auto_charge_status: "failed",
-          auto_charge_attempted_at: new Date().toISOString(),
-          auto_charge_error: msg,
+          charge_status: "failed",
+          charge_attempted_at: new Date().toISOString(),
+          charge_error: msg,
         }).eq("id", row.id);
         failed++;
       }
