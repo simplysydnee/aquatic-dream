@@ -103,7 +103,7 @@ interface Props {
   headerSubtitle?: React.ReactNode;
 }
 
-const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, signerFirstName, signerLastName, signerPhone, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
+const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, signerFirstName, signerLastName, signerPhone, signerLabel, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
   const [form, setForm] = useState({
     waiverAccepted: false,
     privacyPolicyAccepted: false,
@@ -129,6 +129,15 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         emergencyContactRelationship: "Self",
       }));
       setErrors((prev) => ({
+        ...prev,
+        emergencyContactFirstName: "",
+        emergencyContactLastName: "",
+        emergencyContactPhone: "",
+        emergencyContactRelationship: "",
+      }));
+    } else {
+      // Clear auto-filled values so the parent can type their own contact.
+      setForm((prev) => ({
         ...prev,
         emergencyContactFirstName: "",
         emergencyContactLastName: "",
