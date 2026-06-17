@@ -433,6 +433,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
           request_preferred_times: source === "request" ? row.preferred_times : null,
           request_notes: source === "request" ? row.notes : null,
           request_status: source === "request" ? row.status : null,
+          hasCard: cardEmails.has(email),
         });
       };
       (b.data || []).forEach((row) => add(row, "booking"));
@@ -476,6 +477,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
             if (!survivor.request_preferred_times && loser.request_preferred_times) survivor.request_preferred_times = loser.request_preferred_times;
             if (!survivor.request_notes && loser.request_notes) survivor.request_notes = loser.request_notes;
             if (!survivor.request_status && loser.request_status) survivor.request_status = loser.request_status;
+            if (loser.hasCard) survivor.hasCard = true;
             dropped.add(loser);
           }
         }
