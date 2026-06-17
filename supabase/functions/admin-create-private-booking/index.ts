@@ -9,6 +9,11 @@ import { getPrivateLessonPrice, isJunePromoDate } from "../_shared/private-lesso
 import { buildSessionCalendarLinks } from "../_shared/calendar-links.ts";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
 import { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } from "../_shared/textmagic.ts";
+import {
+  validateOccurrencesAgainstBlocks,
+  formatAvailabilityError,
+  type BookingBlock,
+} from "../_shared/availability.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
