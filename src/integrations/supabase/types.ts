@@ -1859,6 +1859,83 @@ export type Database = {
           },
         ]
       }
+      sms_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          last_direction: string | null
+          last_message_at: string | null
+          last_message_preview: string | null
+          parent_name: string | null
+          parent_phone: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_direction?: string | null
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          parent_name?: string | null
+          parent_phone: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_direction?: string | null
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          parent_name?: string | null
+          parent_phone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sms_messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          direction: string
+          error: string | null
+          id: string
+          sent_by: string | null
+          status: string
+          textmagic_message_id: string | null
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          direction: string
+          error?: string | null
+          id?: string
+          sent_by?: string | null
+          status: string
+          textmagic_message_id?: string | null
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          direction?: string
+          error?: string | null
+          id?: string
+          sent_by?: string | null
+          status?: string
+          textmagic_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "sms_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppressed_emails: {
         Row: {
           created_at: string
