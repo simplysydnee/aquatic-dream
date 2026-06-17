@@ -1306,16 +1306,94 @@ function OneTimeChooser({
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [showCustom, setShowCustom] = useState(false);
 
-  // Fetch open slots for the next 7 days on mount
+  // Load slots directly from booking blocks (same source as RecurringChooser),
+  // expand across the 7 date chips ignoring start_date/end_date so admins see
+  // every weekday-matching slot, then subtract real conflicts only (existing
+  // occurrences + active slot holds for those dates).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoadingSlots(true);
       try {
-        const { fetchOpenSlots } = await import("@/lib/privateBooking");
-        const sessionToken = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `admin-${Date.now()}`;
-        const slots = await fetchOpenSlots({ fromDate: new Date(), weeks: 1, sessionToken });
-        if (!cancelled) setOpenSlots(slots);
+        const dateRange = dateChips.map((c) => c.iso);
+        const firstDate = dateRange[0];
+        const lastDate = dateRange[dateRange.length - 1];
+
+        const [blockRes, instRes, occRes, holdRes] = await Promise.all([
+          supabase.rpc("get_public_booking_blocks", { _instructor_ids: null }),
+          supabase.rpc("get_active_instructors_public"),
+          supabase
+            .from("lesson_booking_occurrences")
+            .select("instructor_id,occurrence_date,start_time,end_time,status")
+            .gte("occurrence_date", firstDate)
+            .lte("occurrence_date", lastDate)
+            .neq("status", "cancelled"),
+          supabase
+            .from("slot_holds")
+            .select("instructor_id,slot_date,start_time,end_time,expires_at")
+            .gte("slot_date", firstDate)
+            .lte("slot_date", lastDate)
+            .gt("expires_at", new Date().toISOString()),
+        ]);
+
+        if (cancelled) return;
+
+        const nameById = new Map<string, string>(
+          ((instRes.data as any[]) || []).map((i) => [i.id, i.name as string]),
+        );
+
+        // Build taken-interval set keyed by instructor+date for fast overlap checks.
+        const takenByKey = new Map<string, Array<{ start: string; end: string }>>();
+        const addTaken = (instructorId: string, date: string, start: string, end: string) => {
+          const k = `${instructorId}|${date}`;
+          const arr = takenByKey.get(k) || [];
+          arr.push({ start: normTime(start), end: normTime(end) });
+          takenByKey.set(k, arr);
+        };
+        ((occRes.data as any[]) || []).forEach((o) =>
+          addTaken(o.instructor_id, o.occurrence_date, o.start_time, o.end_time),
+        );
+        ((holdRes.data as any[]) || []).forEach((h) =>
+          addTaken(h.instructor_id, h.slot_date, h.start_time, h.end_time),
+        );
+        const isTaken = (instructorId: string, date: string, start: string, end: string) => {
+          const arr = takenByKey.get(`${instructorId}|${date}`);
+          if (!arr) return false;
+          return arr.some((t) => start < t.end && end > t.start);
+        };
+
+        const raw = (blockRes.data as any[]) || [];
+        const out: Array<{ instructor_id: string; instructor_name: string; slot_date: string; start_time: string; end_time: string }> = [];
+
+        for (const dateStr of dateRange) {
+          const dow = new Date(`${dateStr}T00:00:00`).getDay();
+          for (const b of raw) {
+            if (b.is_blackout) continue;
+            if (b.day_of_week == null || b.day_of_week !== dow) continue;
+            // NOTE: intentionally NOT filtering by b.start_date / b.end_date —
+            // admin one-time view shows all weekday-matching slots.
+            let t = normTime(b.start_time);
+            const end = normTime(b.end_time);
+            const brkS = b.break_start_time ? normTime(b.break_start_time) : null;
+            const brkE = b.break_end_time ? normTime(b.break_end_time) : null;
+            while (addMinutes(t, b.slot_minutes) <= end) {
+              const slotEnd = addMinutes(t, b.slot_minutes);
+              if (brkS && brkE && t < brkE && slotEnd > brkS) { t = brkE; continue; }
+              if (!isTaken(b.instructor_id, dateStr, t, slotEnd)) {
+                out.push({
+                  instructor_id: b.instructor_id,
+                  instructor_name: nameById.get(b.instructor_id) || "Instructor",
+                  slot_date: dateStr,
+                  start_time: t,
+                  end_time: slotEnd,
+                });
+              }
+              t = slotEnd;
+            }
+          }
+        }
+
+        setOpenSlots(out);
       } catch {
         if (!cancelled) setOpenSlots([]);
       } finally {
@@ -1323,7 +1401,7 @@ function OneTimeChooser({
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [selectedDate, dateChips]);
 
   const visibleSlots = useMemo(() => {
     return openSlots
