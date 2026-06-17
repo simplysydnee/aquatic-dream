@@ -126,8 +126,8 @@ Deno.serve(async (req) => {
     await supabaseAdmin.from("lesson_booking_occurrences")
       .update({
         payment_status: "card_on_file",
-        auto_charge_status: "pending",
-        auto_charge_error: null,
+        charge_status: "pending",
+        charge_error: null,
       })
       .eq("booking_id", booking.id)
       .neq("status", "cancelled")

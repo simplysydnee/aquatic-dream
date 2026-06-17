@@ -61,11 +61,11 @@ Deno.serve(async (req) => {
           cancelled_at: new Date().toISOString(),
           cancelled_by: userData.user.id,
           cancel_reason: reason || "Cancelled by admin",
-          auto_charge_status: "skipped",
+          charge_status: "skipped",
         })
         .eq("booking_id", booking_id)
         .neq("status", "cancelled")
-        .neq("auto_charge_status", "succeeded");
+        .neq("charge_status", "succeeded");
       if (oErr) throw oErr;
 
       const { error: bErr } = await supabaseAdmin
@@ -82,12 +82,12 @@ Deno.serve(async (req) => {
 
       const { data: occ, error: oErr } = await supabaseAdmin
         .from("lesson_booking_occurrences")
-        .select("id, booking_id, occurrence_date, status, auto_charge_status, lesson_bookings!inner(id, parent_email, parent_name, child_name, stripe_customer_id, stripe_payment_method_id, price_per_session)")
+        .select("id, booking_id, occurrence_date, status, charge_status, lesson_bookings!inner(id, parent_email, parent_name, child_name, stripe_customer_id, stripe_payment_method_id, price_per_session)")
         .eq("id", occurrence_id)
         .maybeSingle();
       if (oErr) throw oErr;
       if (!occ) return j({ error: "Occurrence not found" }, 404);
-      if ((occ as any).auto_charge_status === "succeeded") {
+      if ((occ as any).charge_status === "succeeded") {
         return j({ error: "Already charged" }, 400);
       }
       const b: any = (occ as any).lesson_bookings;
@@ -115,20 +115,20 @@ Deno.serve(async (req) => {
           },
         });
         await supabaseAdmin.from("lesson_booking_occurrences").update({
-          auto_charge_status: pi.status === "succeeded" ? "succeeded" : "failed",
-          auto_charge_attempted_at: new Date().toISOString(),
+          charge_status: pi.status === "succeeded" ? "succeeded" : "failed",
+          charge_attempted_at: new Date().toISOString(),
           stripe_payment_intent_id: pi.id,
           payment_status: pi.status === "succeeded" ? "paid" : "unpaid",
           paid_at: pi.status === "succeeded" ? new Date().toISOString() : null,
-          auto_charge_error: pi.status === "succeeded" ? null : `Status: ${pi.status}`,
+          charge_error: pi.status === "succeeded" ? null : `Status: ${pi.status}`,
         }).eq("id", (occ as any).id);
         return j({ success: pi.status === "succeeded", stripe_status: pi.status });
       } catch (e: any) {
         const msg = e?.message || "Charge failed";
         await supabaseAdmin.from("lesson_booking_occurrences").update({
-          auto_charge_status: "failed",
-          auto_charge_attempted_at: new Date().toISOString(),
-          auto_charge_error: msg,
+          charge_status: "failed",
+          charge_attempted_at: new Date().toISOString(),
+          charge_error: msg,
         }).eq("id", (occ as any).id);
         return j({ error: msg }, 400);
       }
