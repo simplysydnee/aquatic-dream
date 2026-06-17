@@ -508,7 +508,12 @@ export default function SwimmerDetailDrawer({
                               {` · $${Number(b.price_per_session ?? 0).toFixed(2)}/lesson`}
                             </div>
                           </div>
-                          {occs.length === 0 ? (
+                          {loadingOccurrences && occs.length === 0 ? (
+                            <div className="p-3 flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Loading lessons…
+                            </div>
+                          ) : occs.length === 0 ? (
                             <div className="p-3 text-xs text-muted-foreground italic">
                               No scheduled lessons yet.
                             </div>
@@ -523,13 +528,31 @@ export default function SwimmerDetailDrawer({
                                 else attKind = o.checked_in_at ? "attended" : "no_show";
                                 const attBadge = lessonStatusBadge(attKind);
                                 const tip = paymentStatusTooltip(o.payment_status);
+                                const isPast = attKind === "attended" || attKind === "no_show";
                                 return (
-                                  <li key={o.id} className="p-3 flex items-center justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-medium truncate">{fmtOccDate(o.occurrence_date)}</div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {fmtTime(b.start_time)}–{fmtTime(b.end_time)}
-                                        {b.instructor_name ? ` · ${b.instructor_name}` : ""}
+                                  <li
+                                    key={o.id}
+                                    className={cn(
+                                      "p-3 flex items-center justify-between gap-2",
+                                      isPast && "text-muted-foreground",
+                                    )}
+                                  >
+                                    <div className="min-w-0 flex items-start gap-2">
+                                      <LessonStatusIcon kind={attKind} className="mt-0.5 shrink-0" />
+                                      <div className="min-w-0">
+                                        <div
+                                          className={cn(
+                                            "text-sm truncate",
+                                            attKind === "upcoming" ? "font-semibold text-foreground" : "font-medium",
+                                            isCancelled && "line-through text-muted-foreground",
+                                          )}
+                                        >
+                                          {fmtOccDate(o.occurrence_date)}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {fmtTime(b.start_time)}–{fmtTime(b.end_time)}
+                                          {b.instructor_name ? ` · ${b.instructor_name}` : ""}
+                                        </div>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
