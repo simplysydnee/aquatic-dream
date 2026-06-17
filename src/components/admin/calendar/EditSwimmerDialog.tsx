@@ -129,7 +129,7 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
       const childFilter = escapeIlike(origChild);
       const emailFilter = escapeIlike(origEmail);
 
-      const queries: Promise<{ error: unknown } | { error: null }>[] = [];
+      const queries: PromiseLike<{ error: unknown }>[] = [];
 
       if (origChild && origEmail) {
         queries.push(
