@@ -30,10 +30,30 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   target: EditTarget | null;
-  onSaved: () => void;
+  /**
+   * Called after a successful save. Receives the swimmer-grouping key
+   * (`normalized(child_name)|normalized(parent_email)`) of the saved swimmer
+   * so callers can re-select the swimmer after refetch even if the key changed.
+   */
+  onSaved: (newKey?: string) => void;
 }
 
 const emailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+
+// Match swimmerKey() in useSwimmers.ts so the parent page can re-select.
+const normalizeName = (name: string | null | undefined) =>
+  (name || "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+const normalizeEmail = (email: string | null | undefined) =>
+  (email || "").trim().toLowerCase();
+const buildSwimmerKey = (childName: string, parentEmail: string) =>
+  `${normalizeName(childName)}|${normalizeEmail(parentEmail)}`;
+
+// Escape PostgREST ilike wildcards so the filter is an exact case-insensitive match.
+const escapeIlike = (v: string) => v.replace(/[\\%_]/g, (m) => `\\${m}`);
 
 const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
   const { toast } = useToast();
@@ -66,51 +86,105 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
       toast({ title: "Valid parent email required", variant: "destructive" });
       return;
     }
-    if (target.kind === "swim_enrollment" && !childName.trim()) {
+    if (!childName.trim()) {
       toast({ title: "Swimmer name required", variant: "destructive" });
+      return;
+    }
+
+    const ageNum = childAge.trim() ? parseInt(childAge, 10) : null;
+    if (childAge.trim() && (Number.isNaN(ageNum!) || ageNum! < 0 || ageNum! > 99)) {
+      toast({ title: "Invalid age", variant: "destructive" });
       return;
     }
 
     setSaving(true);
     try {
-      if (target.kind === "lesson_booking") {
-        const { error } = await supabase
-          .from("lesson_bookings")
-          .update({
-            child_name: childName.trim() || null,
-            parent_name: parentName.trim(),
-            parent_email: parentEmail.trim(),
-            parent_phone: parentPhone.trim() || null,
-          })
-          .eq("id", target.id);
-        if (error) throw error;
-      } else {
-        const ageNum = childAge.trim() ? parseInt(childAge, 10) : null;
-        if (childAge.trim() && (Number.isNaN(ageNum!) || ageNum! < 0 || ageNum! > 99)) {
-          toast({ title: "Invalid age", variant: "destructive" });
-          setSaving(false);
-          return;
-        }
-        const update: Record<string, unknown> = {
-          child_name: childName.trim(),
-          parent_name: parentName.trim(),
-          parent_email: parentEmail.trim(),
-          parent_phone: parentPhone.trim() || null,
-        };
-        if (ageNum != null) update.child_age = ageNum;
-        const { error } = await supabase
-          .from("swim_enrollments")
-          .update(update)
-          .eq("id", target.id);
-        if (error) throw error;
+      // Original identity used to find every row belonging to this swimmer.
+      const origChild = (target.child_name || "").trim();
+      const origEmail = (target.parent_email || "").trim();
+
+      const newChild = childName.trim();
+      const newParentName = parentName.trim();
+      const newParentEmail = parentEmail.trim();
+      const newParentPhone = parentPhone.trim() || null;
+
+      const enrollmentUpdate: Record<string, unknown> = {
+        child_name: newChild,
+        parent_name: newParentName,
+        parent_email: newParentEmail,
+        parent_phone: newParentPhone,
+      };
+      if (ageNum != null) enrollmentUpdate.child_age = ageNum;
+
+      const bookingUpdate: Record<string, unknown> = {
+        child_name: newChild,
+        parent_name: newParentName,
+        parent_email: newParentEmail,
+        parent_phone: newParentPhone,
+      };
+
+      // Update every row for this swimmer in both tables. Scope by the
+      // pre-edit child_name + parent_email (case-insensitive exact match) so
+      // siblings under the same parent are not touched.
+      const childFilter = escapeIlike(origChild);
+      const emailFilter = escapeIlike(origEmail);
+
+      const queries: PromiseLike<{ error: unknown }>[] = [];
+
+      if (origChild && origEmail) {
+        queries.push(
+          supabase
+            .from("swim_enrollments")
+            .update(enrollmentUpdate)
+            .ilike("child_name", childFilter)
+            .ilike("parent_email", emailFilter)
+            .then(({ error }) => ({ error })),
+        );
+        queries.push(
+          supabase
+            .from("lesson_bookings")
+            .update(bookingUpdate)
+            .ilike("child_name", childFilter)
+            .ilike("parent_email", emailFilter)
+            .then(({ error }) => ({ error })),
+        );
       }
+
+      // Always also update the targeted row by id as a safety net (covers
+      // bookings whose child_name is null/parent-name and wouldn't match the
+      // ilike scope above).
+      if (target.kind === "lesson_booking") {
+        queries.push(
+          supabase
+            .from("lesson_bookings")
+            .update(bookingUpdate)
+            .eq("id", target.id)
+            .then(({ error }) => ({ error })),
+        );
+      } else {
+        queries.push(
+          supabase
+            .from("swim_enrollments")
+            .update(enrollmentUpdate)
+            .eq("id", target.id)
+            .then(({ error }) => ({ error })),
+        );
+      }
+
+      const results = await Promise.all(queries);
+      const firstError = results.find((r) => r.error)?.error as
+        | { message?: string }
+        | undefined;
+      if (firstError) throw firstError;
+
       setSaved(true);
       toast({ title: "Swimmer info updated", description: "Changes saved successfully." });
-      onSaved();
+      onSaved(buildSwimmerKey(newChild, newParentEmail));
       // auto-close after a moment
       setTimeout(() => onOpenChange(false), 900);
-    } catch (e: any) {
-      toast({ title: "Save failed", description: e?.message, variant: "destructive" });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : (e as { message?: string })?.message;
+      toast({ title: "Save failed", description: msg, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -131,7 +205,7 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
         ) : (
           <div className="space-y-3 py-2">
             <div>
-              <Label htmlFor="es-child">Swimmer name{target.kind === "swim_enrollment" ? " *" : ""}</Label>
+              <Label htmlFor="es-child">Swimmer name *</Label>
               <Input id="es-child" value={childName} onChange={(e) => setChildName(e.target.value)} />
             </div>
             {target.kind === "swim_enrollment" && (

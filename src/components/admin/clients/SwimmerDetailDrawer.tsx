@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil, Info, DollarSign, MessageSquare, StickyNote, ShieldCheck, HelpCircle } from "lucide-react";
+import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil, Info, DollarSign, MessageSquare, StickyNote, ShieldCheck, HelpCircle, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import type { Swimmer } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "./SwimmerStatusBadges";
 import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
@@ -51,7 +51,7 @@ interface Props {
   onOpenRequest: (id: string) => void;
   onOpenEnrollment: (id: string) => void;
   onSelectSwimmer: (s: Swimmer) => void;
-  onChanged?: () => void;
+  onChanged?: (newKey?: string) => void;
 }
 
 
@@ -71,13 +71,26 @@ type LessonStatusKind = "attended" | "no_show" | "cancelled" | "upcoming";
 const lessonStatusBadge = (kind: LessonStatusKind) => {
   switch (kind) {
     case "attended":
-      return { label: "Attended", className: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+      return { label: "Completed", className: "bg-emerald-100 text-emerald-800 border-emerald-200" };
     case "no_show":
       return { label: "No-show", className: "bg-rose-100 text-rose-800 border-rose-200" };
     case "cancelled":
       return { label: "Cancelled", className: "bg-muted text-muted-foreground border-border" };
     case "upcoming":
-      return { label: "Booked", className: "bg-sky-100 text-sky-800 border-sky-200" };
+      return { label: "Upcoming", className: "bg-sky-100 text-sky-800 border-sky-200" };
+  }
+};
+
+const LessonStatusIcon = ({ kind, className }: { kind: LessonStatusKind; className?: string }) => {
+  switch (kind) {
+    case "attended":
+      return <CheckCircle2 className={cn("h-3.5 w-3.5 text-emerald-600", className)} />;
+    case "no_show":
+      return <XCircle className={cn("h-3.5 w-3.5 text-rose-600", className)} />;
+    case "cancelled":
+      return <XCircle className={cn("h-3.5 w-3.5 text-muted-foreground", className)} />;
+    case "upcoming":
+      return <Calendar className={cn("h-3.5 w-3.5 text-sky-600", className)} />;
   }
 };
 
@@ -102,6 +115,8 @@ export default function SwimmerDetailDrawer({
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
   const [lessonDates, setLessonDates] = useState<LessonDateRow[]>([]);
+  const [loadingOccurrences, setLoadingOccurrences] = useState(false);
+  const [loadingLessonDates, setLoadingLessonDates] = useState(false);
 
   const bookingIds = swimmer ? swimmer.bookings.map((b) => b.id) : [];
   const bookingIdsKey = bookingIds.join(",");
@@ -117,20 +132,26 @@ export default function SwimmerDetailDrawer({
       setOccurrences([]);
       setAttendance([]);
       setLessonDates([]);
+      setLoadingOccurrences(false);
+      setLoadingLessonDates(false);
       return;
     }
     let cancelled = false;
     if (bookingIds.length) {
+      setLoadingOccurrences(true);
       supabase
         .from("lesson_booking_occurrences")
         .select("id, booking_id, occurrence_date, payment_status, status, cancelled_at, checked_in_at")
         .in("booking_id", bookingIds)
         .order("occurrence_date", { ascending: true })
         .then(({ data }) => {
-          if (!cancelled && data) setOccurrences(data as Occurrence[]);
+          if (cancelled) return;
+          if (data) setOccurrences(data as Occurrence[]);
+          setLoadingOccurrences(false);
         });
     } else {
       setOccurrences([]);
+      setLoadingOccurrences(false);
     }
     if (enrollmentIds.length) {
       supabase
@@ -144,16 +165,20 @@ export default function SwimmerDetailDrawer({
       setAttendance([]);
     }
     if (sessionIds.length) {
+      setLoadingLessonDates(true);
       supabase
         .from("session_lesson_dates")
         .select("session_id, lesson_date, is_cancelled")
         .in("session_id", sessionIds)
         .order("lesson_date", { ascending: true })
         .then(({ data }) => {
-          if (!cancelled && data) setLessonDates(data as LessonDateRow[]);
+          if (cancelled) return;
+          if (data) setLessonDates(data as LessonDateRow[]);
+          setLoadingLessonDates(false);
         });
     } else {
       setLessonDates([]);
+      setLoadingLessonDates(false);
     }
     return () => {
       cancelled = true;
@@ -384,7 +409,12 @@ export default function SwimmerDetailDrawer({
                               Open →
                             </Button>
                           </div>
-                          {dates.length > 0 && (
+                          {loadingLessonDates && dates.length === 0 ? (
+                            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Loading lessons…
+                            </div>
+                          ) : dates.length > 0 ? (
                             <ul className="mt-3 divide-y border-t">
                               {dates.map((d) => {
                                 let kind: LessonStatusKind;
@@ -392,9 +422,27 @@ export default function SwimmerDetailDrawer({
                                 else if (d.lesson_date > today) kind = "upcoming";
                                 else kind = attMap.get(d.lesson_date) ? "attended" : "no_show";
                                 const badge = lessonStatusBadge(kind);
+                                const isPast = kind === "attended" || kind === "no_show";
+                                const isCancelled = kind === "cancelled";
                                 return (
-                                  <li key={d.lesson_date} className="py-2 flex items-center justify-between gap-2">
-                                    <span className="text-xs text-foreground">{fmtOccDate(d.lesson_date)}</span>
+                                  <li
+                                    key={d.lesson_date}
+                                    className={cn(
+                                      "py-2 flex items-center justify-between gap-2",
+                                      isPast && "text-muted-foreground",
+                                    )}
+                                  >
+                                    <span className="inline-flex items-center gap-1.5 text-xs">
+                                      <LessonStatusIcon kind={kind} />
+                                      <span
+                                        className={cn(
+                                          kind === "upcoming" && "font-semibold text-foreground",
+                                          isCancelled && "line-through text-muted-foreground",
+                                        )}
+                                      >
+                                        {fmtOccDate(d.lesson_date)}
+                                      </span>
+                                    </span>
                                     <Badge variant="outline" className={cn("text-[10px]", badge.className)}>
                                       {badge.label}
                                     </Badge>
@@ -402,7 +450,7 @@ export default function SwimmerDetailDrawer({
                                 );
                               })}
                             </ul>
-                          )}
+                          ) : null}
                         </div>
                       );
                     })}
@@ -460,7 +508,12 @@ export default function SwimmerDetailDrawer({
                               {` · $${Number(b.price_per_session ?? 0).toFixed(2)}/lesson`}
                             </div>
                           </div>
-                          {occs.length === 0 ? (
+                          {loadingOccurrences && occs.length === 0 ? (
+                            <div className="p-3 flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Loading lessons…
+                            </div>
+                          ) : occs.length === 0 ? (
                             <div className="p-3 text-xs text-muted-foreground italic">
                               No scheduled lessons yet.
                             </div>
@@ -475,13 +528,31 @@ export default function SwimmerDetailDrawer({
                                 else attKind = o.checked_in_at ? "attended" : "no_show";
                                 const attBadge = lessonStatusBadge(attKind);
                                 const tip = paymentStatusTooltip(o.payment_status);
+                                const isPast = attKind === "attended" || attKind === "no_show";
                                 return (
-                                  <li key={o.id} className="p-3 flex items-center justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-medium truncate">{fmtOccDate(o.occurrence_date)}</div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {fmtTime(b.start_time)}–{fmtTime(b.end_time)}
-                                        {b.instructor_name ? ` · ${b.instructor_name}` : ""}
+                                  <li
+                                    key={o.id}
+                                    className={cn(
+                                      "p-3 flex items-center justify-between gap-2",
+                                      isPast && "text-muted-foreground",
+                                    )}
+                                  >
+                                    <div className="min-w-0 flex items-start gap-2">
+                                      <LessonStatusIcon kind={attKind} className="mt-0.5 shrink-0" />
+                                      <div className="min-w-0">
+                                        <div
+                                          className={cn(
+                                            "text-sm truncate",
+                                            attKind === "upcoming" ? "font-semibold text-foreground" : "font-medium",
+                                            isCancelled && "line-through text-muted-foreground",
+                                          )}
+                                        >
+                                          {fmtOccDate(o.occurrence_date)}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {fmtTime(b.start_time)}–{fmtTime(b.end_time)}
+                                          {b.instructor_name ? ` · ${b.instructor_name}` : ""}
+                                        </div>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
@@ -556,9 +627,9 @@ export default function SwimmerDetailDrawer({
           open={editOpen}
           onOpenChange={setEditOpen}
           target={editTarget}
-          onSaved={() => {
+          onSaved={(newKey) => {
             setEditOpen(false);
-            onChanged?.();
+            onChanged?.(newKey);
           }}
         />
       )}

@@ -139,20 +139,27 @@ function computeStatuses(s: Omit<Swimmer, "statuses" | "primary_status" | "last_
   const today = todayISO();
   const statuses: SwimmerStatus[] = [];
 
-  // Lesson request statuses (open ones)
-  const openRequest = s.requests.find((r) => r.status !== "scheduled" && r.status !== "closed");
-  if (openRequest) {
-    if (openRequest.status === "new") {
-      statuses.push({ key: "lesson_requested_new", label: "Lesson Requested · New", tone: "warn" });
-    } else if (openRequest.status === "contacted") {
-      statuses.push({ key: "lesson_requested_contacted", label: "Lesson Requested · Contacted", tone: "info" });
+  // Bookings (computed first so we can suppress request badges when a booking is active)
+  const hasActiveBooking = s.bookings.some(
+    (b) => (b.series_end ? b.series_end >= today : b.recurring) && b.status !== "cancelled",
+  );
+
+  // Lesson request statuses (open ones) — suppressed entirely when a booking is active
+  if (!hasActiveBooking) {
+    const openRequest = s.requests.find((r) => r.status !== "scheduled" && r.status !== "closed");
+    if (openRequest) {
+      if (openRequest.status === "new") {
+        statuses.push({ key: "lesson_requested_new", label: "Lesson Requested · New", tone: "warn" });
+      } else if (openRequest.status === "contacted") {
+        statuses.push({ key: "lesson_requested_contacted", label: "Lesson Requested · Contacted", tone: "info" });
+      } else {
+        statuses.push({ key: "lesson_requested_scheduled", label: `Lesson Requested · ${openRequest.status}`, tone: "info" });
+      }
     } else {
-      statuses.push({ key: "lesson_requested_scheduled", label: `Lesson Requested · ${openRequest.status}`, tone: "info" });
-    }
-  } else {
-    const scheduled = s.requests.find((r) => r.status === "scheduled");
-    if (scheduled) {
-      statuses.push({ key: "lesson_requested_scheduled", label: "Lesson Requested · Scheduled", tone: "info" });
+      const scheduled = s.requests.find((r) => r.status === "scheduled");
+      if (scheduled) {
+        statuses.push({ key: "lesson_requested_scheduled", label: "Lesson Requested · Scheduled", tone: "info" });
+      }
     }
   }
 
@@ -181,10 +188,6 @@ function computeStatuses(s: Omit<Swimmer, "statuses" | "primary_status" | "last_
   if (hasUpcomingEnroll && !hasActiveEnroll)
     statuses.push({ key: "enrolled_upcoming", label: "Enrolled · Upcoming", tone: "success" });
 
-  // Bookings
-  const hasActiveBooking = s.bookings.some(
-    (b) => (b.series_end ? b.series_end >= today : b.recurring) && b.status !== "cancelled",
-  );
   if (hasActiveBooking) statuses.push({ key: "booking_active", label: "Booking Active", tone: "success" });
 
   if (hasUnpaid) statuses.push({ key: "unpaid", label: "Unpaid", tone: "danger" });
