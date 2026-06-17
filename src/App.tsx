@@ -30,6 +30,8 @@ import PrivateLessonsAdmin from "./pages/admin/PrivateLessonsAdmin";
 import BookingNew from "./pages/admin/BookingNew";
 import PrintDaySchedule from "./pages/admin/PrintDaySchedule";
 import CheckInAdmin from "./pages/admin/CheckInAdmin";
+import MessagesAdmin from "./pages/admin/MessagesAdmin";
+
 import Waivers from "./pages/Waivers";
 import SmsTerms from "./pages/SmsTerms";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -90,6 +92,7 @@ const App = () => (
               <Route path="private-lessons" element={<PrivateLessonsAdmin />} />
               <Route path="private-lessons/new" element={<BookingNew />} />
               <Route path="users" element={<UsersAdmin />} />
+              <Route path="messages" element={<MessagesAdmin />} />
             </Route>
 
             {/* Instructor portal */}

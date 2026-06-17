@@ -1,7 +1,7 @@
 import { Navigate, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { ClipboardList, LogOut, Loader2 } from "lucide-react";
+import { ClipboardList, LogOut, Loader2, MessageSquare } from "lucide-react";
 
 export default function InstructorLayout() {
   const { user, isInstructor, isAdmin, loading, signOut } = useAuth();
@@ -39,6 +39,9 @@ export default function InstructorLayout() {
         <nav className="max-w-6xl mx-auto px-4 pb-2 flex flex-wrap gap-1">
           <NavLink to="/instructor" end className={({ isActive }) => `${linkBase} ${isActive ? active : ""}`}>
             <ClipboardList className="w-4 h-4" /> My Rosters
+          </NavLink>
+          <NavLink to="/admin/messages" className={({ isActive }) => `${linkBase} ${isActive ? active : ""}`}>
+            <MessageSquare className="w-4 h-4" /> Messages
           </NavLink>
         </nav>
       </header>

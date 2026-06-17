@@ -72,6 +72,11 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = true
   [functions.admin-setup-card-for-booking]
     verify_jwt = true
+  [functions.receive-inbound-sms]
+    verify_jwt = false
+  [functions.send-sms-message]
+    verify_jwt = false
+
 
 
 
