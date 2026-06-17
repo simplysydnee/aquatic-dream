@@ -8,6 +8,7 @@ import { z } from "npm:zod@3.23.8";
 import { getPrivateLessonPrice, isJunePromoDate } from "../_shared/private-lesson-pricing.ts";
 import { buildSessionCalendarLinks } from "../_shared/calendar-links.ts";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
+import { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } from "../_shared/textmagic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -525,8 +526,7 @@ Deno.serve(async (req) => {
 
     // Booking confirmation SMS (best-effort; initial create only).
     try {
-      const { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } =
-        await import("../_shared/textmagic.ts");
+      console.log("[sms] admin-create-private-booking start", bookingId);
       const firstDate = dates[0];
       const { data: firstOcc } = await supabaseAdmin
         .from("lesson_booking_occurrences")
@@ -540,7 +540,7 @@ Deno.serve(async (req) => {
       const dateLabel = formatPTDate(firstDate);
       const timeLabel = formatPTTime(p.start_time);
       const message = `Your lesson with ${instructorFirst} on ${dateLabel} at ${timeLabel} is confirmed at Aquatic Dreams. See you there!`;
-      await sendAndLogBookingConfirmation(supabaseAdmin, {
+      const result = await sendAndLogBookingConfirmation(supabaseAdmin, {
         phoneRaw: p.parent_phone,
         message,
         swimmer_name: swimmerFirst,
@@ -548,6 +548,7 @@ Deno.serve(async (req) => {
         lesson_occurrence_id: (firstOcc as any)?.id ?? null,
         reminder_kind: "booking_confirmation",
       });
+      console.log("[sms] admin-create-private-booking result", bookingId, JSON.stringify(result));
     } catch (smsErr) {
       console.error("admin-create-private-booking SMS step failed:", smsErr instanceof Error ? smsErr.message : String(smsErr));
     }

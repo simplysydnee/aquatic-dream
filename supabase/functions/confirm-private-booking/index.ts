@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
 import { sendPrivateBookingConfirmation } from "../_shared/send-private-booking-confirmation.ts";
+import { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } from "../_shared/textmagic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,8 +105,7 @@ Deno.serve(async (req) => {
 
     // Booking confirmation SMS (best-effort; never blocks the response).
     try {
-      const { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } =
-        await import("../_shared/textmagic.ts");
+      console.log("[sms] confirm-private-booking start", booking_id);
       const { data: b } = await supabase
         .from("lesson_bookings")
         .select("parent_phone, child_first_name, child_name, instructor_name, start_time")
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
         const dateLabel = formatPTDate((firstOcc as any).occurrence_date);
         const timeLabel = formatPTTime((firstOcc as any).start_time_override || (b as any).start_time);
         const message = `Your lesson with ${instructorFirst} on ${dateLabel} at ${timeLabel} is confirmed at Aquatic Dreams. See you there!`;
-        await sendAndLogBookingConfirmation(supabase, {
+        const result = await sendAndLogBookingConfirmation(supabase, {
           phoneRaw: (b as any).parent_phone,
           message,
           swimmer_name: swimmerFirst,
@@ -133,6 +133,9 @@ Deno.serve(async (req) => {
           lesson_occurrence_id: (firstOcc as any).id,
           reminder_kind: "booking_confirmation",
         });
+        console.log("[sms] confirm-private-booking result", booking_id, JSON.stringify(result));
+      } else {
+        console.log("[sms] confirm-private-booking skipped — missing booking or firstOcc", booking_id, { hasBooking: !!b, hasFirstOcc: !!firstOcc });
       }
     } catch (smsErr) {
       console.error("confirm-private-booking SMS step failed:", smsErr instanceof Error ? smsErr.message : String(smsErr));

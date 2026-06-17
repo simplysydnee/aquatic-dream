@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { type StripeEnv, verifyWebhook } from "../_shared/stripe.ts";
 import { sendEnrollmentConfirmation as sendConfirmationHelper } from "../_shared/send-enrollment-confirmation.ts";
+import { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } from "../_shared/textmagic.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -319,8 +320,7 @@ async function handleCheckoutCompleted(session: any) {
 
   // 8b. Send booking confirmation SMS (one per enrollment row, best-effort).
   try {
-    const { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } =
-      await import("../_shared/textmagic.ts");
+    console.log("[sms] payments-webhook block start, enrollments:", insertedEnrollments.length);
     const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const dowIndex = (d: string | null | undefined): number => {
       if (!d) return 99;
@@ -335,12 +335,13 @@ async function handleCheckoutCompleted(session: any) {
     };
     for (const e of insertedEnrollments) {
       try {
+        console.log("[sms] payments-webhook enrollment", e.id);
         const { data: enr } = await supabase
           .from("swim_enrollments")
           .select("id, parent_phone, child_first_name, child_name, session_id")
           .eq("id", e.id)
           .maybeSingle();
-        if (!enr) continue;
+        if (!enr) { console.log("[sms] payments-webhook skip — no enrollment row", e.id); continue; }
         const sessionId = (enr as any).session_id as string | null;
         let sess: any = null;
         if (sessionId) {
@@ -393,13 +394,14 @@ async function handleCheckoutCompleted(session: any) {
         } else {
           message = `${swimmerFirst} is enrolled in ${sessionName}! Classes every ${daysLabel} at ${timeLabel} at Aquatic Dreams. See you there!`;
         }
-        await sendAndLogBookingConfirmation(supabase, {
+        const result = await sendAndLogBookingConfirmation(supabase, {
           phoneRaw: (enr as any).parent_phone,
           message,
           swimmer_name: swimmerFirst,
           enrollment_id: e.id,
           reminder_kind: "booking_confirmation",
         });
+        console.log("[sms] payments-webhook enrollment result", e.id, JSON.stringify(result));
       } catch (perEnrErr) {
         console.error("Enrollment SMS failed for", e.id, perEnrErr instanceof Error ? perEnrErr.message : String(perEnrErr));
       }
