@@ -151,6 +151,36 @@ Deno.serve(async (req) => {
       return j({ error: "slot_closed", conflicts: blackoutConflicts, step: "check_blackouts" }, 409);
     }
 
+    // Availability guard: every requested slot must fall inside a
+    // non-blackout instructor_booking_blocks window. Reuses the blocks
+    // we just fetched for the blackout check.
+    step = "check_availability";
+    {
+      const proposed = body.slots.map((s) => ({
+        instructor_id: s.instructor_id,
+        date: s.slot_date,
+        start_time: s.start_time,
+        end_time: s.end_time,
+      }));
+      const failures = validateOccurrencesAgainstBlocks(
+        proposed,
+        ((blocksData as any[]) || []) as BookingBlock[],
+      );
+      if (failures.length) {
+        return j(
+          {
+            error: formatAvailabilityError(failures),
+            code: "instructor_unavailable",
+            failures,
+            step: "check_availability",
+          },
+          422,
+        );
+      }
+    }
+
+
+
     // Lookup instructor name (first slot used as primary on the booking row).
     step = "lookup_instructor";
     const { data: instructor } = await supabase
