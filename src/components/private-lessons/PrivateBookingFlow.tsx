@@ -335,6 +335,10 @@ export default function PrivateBookingFlow() {
           onSubmit={handleLegalSubmit}
           onBack={() => setStep("slots")}
           submitting={submitting}
+          signerFirstName={form.parentFirstName}
+          signerLastName={form.parentLastName}
+          signerPhone={form.parentPhone}
+          signerLabel="Same as parent information"
         />
       </div>
     );
