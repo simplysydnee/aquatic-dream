@@ -356,7 +356,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
       const like = `%${q}%`;
       const [b, e, r] = await Promise.all([
         supabase.from("lesson_bookings")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
+          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at,stripe_payment_method_id")
           .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},parent_phone.ilike.${like}`)
           .order("updated_at", { ascending: false })
           .limit(20),
@@ -373,6 +373,37 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
           .limit(20),
       ]);
       if (cancelled) return;
+
+      // Build set of emails with a card from bookings (stripe_payment_method_id),
+      // then merge with profiles (stripe_default_pm_id) for the same emails.
+      const cardEmails = new Set<string>();
+      (b.data || []).forEach((row: any) => {
+        if (row.stripe_payment_method_id && row.parent_email) {
+          cardEmails.add(String(row.parent_email).toLowerCase().trim());
+        }
+      });
+      const candidateEmails = Array.from(
+        new Set(
+          [
+            ...(b.data || []).map((x: any) => x.parent_email),
+            ...(e.data || []).map((x: any) => x.parent_email),
+            ...(r.data || []).map((x: any) => x.parent_email),
+          ]
+            .filter(Boolean)
+            .map((x: string) => x.toLowerCase().trim()),
+        ),
+      );
+      if (candidateEmails.length > 0) {
+        const { data: profRows } = await supabase
+          .from("profiles")
+          .select("email,stripe_default_pm_id")
+          .in("email", candidateEmails)
+          .not("stripe_default_pm_id", "is", null);
+        (profRows || []).forEach((p: any) => {
+          if (p.email) cardEmails.add(String(p.email).toLowerCase().trim());
+        });
+      }
+
       const map = new Map<string, ClientSearchResult>();
       const add = (row: any, source: "booking" | "enrollment" | "request") => {
         const email = (row.parent_email || "").toLowerCase().trim();
