@@ -1,25 +1,37 @@
-## Fix: rename `auto_charge_*` → `charge_*` in 5 remaining edge functions
+# SMS Inbox — Build & Deploy
 
-DB columns were renamed to `charge_status`, `charge_attempted_at`, `charge_error`. These 5 edge functions still reference the old names and break at runtime (public booking shows "Could not find the 'auto_charge_status' column").
+Migration and `TEXTMAGIC_INBOUND_SECRET` are already in place. Clicking **Implement plan** will execute all 8 items below and deploy both edge functions.
 
-### Files (verified via ripgrep)
+## Files
 
-1. `supabase/functions/create-private-booking-setup/index.ts`
-2. `supabase/functions/admin-setup-card-for-booking/index.ts`
-3. `supabase/functions/cancel-private-lesson-occurrence/index.ts`
-4. `supabase/functions/admin-manage-private-booking/index.ts`
-5. `supabase/functions/charge-private-lesson-occurrence/index.ts`
+1. **`supabase/functions/receive-inbound-sms/index.ts`** (new)
+   Public webhook. Validates `?token=` against `TEXTMAGIC_INBOUND_SECRET`. Accepts JSON or form-encoded. Normalizes phone, finds-or-creates a conversation (name lookup against `lesson_bookings` then `swim_enrollments` with `+1xxxxxxxxxx` / `xxxxxxxxxx` / E.164 variants), inserts the inbound message, updates conversation preview. Always returns 200.
 
-### Rename (applied everywhere — column names, filters, property access, comments)
+2. **`supabase/functions/send-sms-message/index.ts`** (new)
+   Verifies JWT in-code via `getClaims`. Allows `admin` OR `instructor` via `has_role` RPC. Zod-validates `{ conversation_id? | phone?, body (1..1000) }` (XOR). Resolves/creates conversation, sends via `sendSms()`, logs outbound row, updates conversation preview on success.
 
-- `auto_charge_status` → `charge_status`
-- `auto_charge_attempted_at` → `charge_attempted_at`
-- `auto_charge_error` → `charge_error`
+3. **`supabase/config.toml`** — add `verify_jwt = false` for both new functions (auth handled in code for `send-sms-message`).
 
-Pure rename. No logic changes. No DB migrations. No other files touched.
+4. **`src/components/admin/ProtectedRoute.tsx`** — keep admin-only by default, allow instructors at `/admin/messages` only.
 
-### Redeploy
+5. **`src/pages/admin/MessagesAdmin.tsx`** (new) — two-pane inbox:
+   - Left: search + conversation list ordered by `last_message_at desc`
+   - Right: thread bubbles (inbound left, outbound right), sticky composer, Cmd/Ctrl+Enter to send
+   - Realtime: subscribes to `sms_conversations` (all events) and `sms_messages` INSERT filtered by active conversation
+   - Self-guards: hidden if not admin/instructor
 
-All 5 functions via `supabase--deploy_edge_functions`.
+6. **`src/App.tsx`** — import `MessagesAdmin`, add `<Route path="messages" />` under `/admin`.
 
-> Please click **Implement plan** to approve — that's what flips me to build mode so I can run the rename and redeploy.
+7. **`src/components/admin/AdminSidebar.tsx`** — add **Messages** under Operations group (`MessageSquare` icon).
+
+8. **`src/pages/instructor/InstructorLayout.tsx`** — add `NavLink` to `/admin/messages`.
+
+## Deploy
+- `receive-inbound-sms`
+- `send-sms-message`
+
+## Webhook URL (already given)
+```
+https://jilrijklnehbfuulykty.supabase.co/functions/v1/receive-inbound-sms?token=V2US7qk0sV1KSvLjM3_yVP14noX9VJPJ
+```
+POST, `application/x-www-form-urlencoded`.
