@@ -74,28 +74,25 @@ export async function fetchOpenSlots(opts: {
   });
   const blocksList = (blocks as Block[]) || [];
 
-  // Fetch existing occurrences in window (with overrides) so moved/rescheduled
-  // lessons block their NEW time, not the original time.
-  const { data: occs } = await supabase
-    .from("lesson_booking_occurrences")
-    .select("occurrence_date, status, created_at, start_time_override, end_time_override, instructor_override_id, lesson_bookings!inner(instructor_id, start_time, end_time)")
-    .gte("occurrence_date", fromIso)
-    .lte("occurrence_date", toIso)
-    .neq("status", "cancelled");
-  const STALE_MS = 30 * 60 * 1000;
-  const nowMs = Date.now();
+  // Fetch existing taken occurrences via SECURITY DEFINER RPC.
+  // The RPC resolves instructor/start/end overrides server-side, filters
+  // cancelled and stale pending_card rows, and is callable by anon —
+  // unlike a direct select on lesson_booking_occurrences, which RLS blocks
+  // for the public booking page.
+  const { data: occs } = await supabase.rpc("get_public_taken_occurrences", {
+    p_from_date: fromIso,
+    p_to_date: toIso,
+  });
   const takenIntervals: { instructor_id: string; date: string; start: number; end: number }[] = [];
   for (const o of (occs as any[]) || []) {
-    if (o.status === "pending_card" && o.created_at && (nowMs - new Date(o.created_at).getTime()) > STALE_MS) continue;
-    const b = o.lesson_bookings;
-    const instId = o.instructor_override_id || b?.instructor_id;
-    const startT = normTime(o.start_time_override || b?.start_time || "");
-    const endT = normTime(o.end_time_override || b?.end_time || "");
-    if (!instId || !startT || !endT) continue;
+    const startT = normTime(o.start_time || "");
+    const endT = normTime(o.end_time || "");
+    if (!o.instructor_id || !startT || !endT) continue;
     const [sh, sm] = startT.split(":").map(Number);
     const [eh, em] = endT.split(":").map(Number);
-    takenIntervals.push({ instructor_id: instId, date: o.occurrence_date, start: sh * 60 + sm, end: eh * 60 + em });
+    takenIntervals.push({ instructor_id: o.instructor_id, date: o.occurrence_date, start: sh * 60 + sm, end: eh * 60 + em });
   }
+
 
   // Active holds (excluding mine) — via SECURITY DEFINER RPC; slot_holds is not publicly readable.
   const { data: holds } = await supabase.rpc("get_active_slot_holds", {
