@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Mail, Phone, User as UserIcon, SlidersHorizontal, X, MessageSquare } from "lucide-react";
+import { Search, Mail, Phone, User as UserIcon, SlidersHorizontal, X, MessageSquare, CreditCard } from "lucide-react";
 import { useSwimmers, type Swimmer, type SwimmerStatusKey } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "@/components/admin/clients/SwimmerStatusBadges";
 import SwimmerDetailDrawer from "@/components/admin/clients/SwimmerDetailDrawer";
@@ -327,6 +327,12 @@ export default function ClientsAdmin() {
                   <Badge variant="secondary" className="gap-1 text-[10px] h-5">
                     <MessageSquare className="h-3 w-3" />
                     {commentCounts[s.key]}
+                  </Badge>
+                )}
+                {s.has_card_on_file && (
+                  <Badge variant="outline" className="gap-1 text-[10px] h-5 bg-teal-50 text-teal-800 border-teal-300">
+                    <CreditCard className="h-3 w-3" />
+                    Card on file
                   </Badge>
                 )}
               </div>
