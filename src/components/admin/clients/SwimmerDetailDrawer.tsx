@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil, Info, DollarSign, MessageSquare, StickyNote, ShieldCheck, HelpCircle } from "lucide-react";
+import { Mail, Phone, User, BookOpen, Waves, Calendar, Pencil, Info, DollarSign, MessageSquare, StickyNote, ShieldCheck, HelpCircle, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import type { Swimmer } from "@/hooks/useSwimmers";
 import SwimmerStatusBadges from "./SwimmerStatusBadges";
 import InternalCommentsPanel from "@/components/admin/InternalCommentsPanel";
@@ -71,13 +71,26 @@ type LessonStatusKind = "attended" | "no_show" | "cancelled" | "upcoming";
 const lessonStatusBadge = (kind: LessonStatusKind) => {
   switch (kind) {
     case "attended":
-      return { label: "Attended", className: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+      return { label: "Completed", className: "bg-emerald-100 text-emerald-800 border-emerald-200" };
     case "no_show":
       return { label: "No-show", className: "bg-rose-100 text-rose-800 border-rose-200" };
     case "cancelled":
       return { label: "Cancelled", className: "bg-muted text-muted-foreground border-border" };
     case "upcoming":
-      return { label: "Booked", className: "bg-sky-100 text-sky-800 border-sky-200" };
+      return { label: "Upcoming", className: "bg-sky-100 text-sky-800 border-sky-200" };
+  }
+};
+
+const LessonStatusIcon = ({ kind, className }: { kind: LessonStatusKind; className?: string }) => {
+  switch (kind) {
+    case "attended":
+      return <CheckCircle2 className={cn("h-3.5 w-3.5 text-emerald-600", className)} />;
+    case "no_show":
+      return <XCircle className={cn("h-3.5 w-3.5 text-rose-600", className)} />;
+    case "cancelled":
+      return <XCircle className={cn("h-3.5 w-3.5 text-muted-foreground", className)} />;
+    case "upcoming":
+      return <Calendar className={cn("h-3.5 w-3.5 text-sky-600", className)} />;
   }
 };
 
