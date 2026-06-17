@@ -4,6 +4,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
 import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
+import {
+  validateOccurrencesAgainstBlocks,
+  formatAvailabilityError,
+  type BookingBlock,
+} from "../_shared/availability.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -145,6 +150,36 @@ Deno.serve(async (req) => {
     if (blackoutConflicts.length) {
       return j({ error: "slot_closed", conflicts: blackoutConflicts, step: "check_blackouts" }, 409);
     }
+
+    // Availability guard: every requested slot must fall inside a
+    // non-blackout instructor_booking_blocks window. Reuses the blocks
+    // we just fetched for the blackout check.
+    step = "check_availability";
+    {
+      const proposed = body.slots.map((s) => ({
+        instructor_id: s.instructor_id,
+        date: s.slot_date,
+        start_time: s.start_time,
+        end_time: s.end_time,
+      }));
+      const failures = validateOccurrencesAgainstBlocks(
+        proposed,
+        ((blocksData as any[]) || []) as BookingBlock[],
+      );
+      if (failures.length) {
+        return j(
+          {
+            error: formatAvailabilityError(failures),
+            code: "instructor_unavailable",
+            failures,
+            step: "check_availability",
+          },
+          422,
+        );
+      }
+    }
+
+
 
     // Lookup instructor name (first slot used as primary on the booking row).
     step = "lookup_instructor";

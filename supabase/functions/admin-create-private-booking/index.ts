@@ -9,6 +9,11 @@ import { getPrivateLessonPrice, isJunePromoDate } from "../_shared/private-lesso
 import { buildSessionCalendarLinks } from "../_shared/calendar-links.ts";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
 import { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } from "../_shared/textmagic.ts";
+import {
+  validateOccurrencesAgainstBlocks,
+  formatAvailabilityError,
+  type BookingBlock,
+} from "../_shared/availability.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -359,8 +364,35 @@ Deno.serve(async (req) => {
             conflicts.push(`${d} ${cs}-${ce}`);
             break;
           }
-        }
+    }
+
+    // Availability guard: every proposed date must fall inside a
+    // non-blackout instructor_booking_blocks window for this instructor.
+    {
+      const { data: blocksData, error: blocksErr } = await supabaseAdmin
+        .rpc("get_public_booking_blocks", { _instructor_ids: [p.instructor_id] });
+      if (blocksErr) throw blocksErr;
+      const blocks = ((blocksData as any[]) || []) as BookingBlock[];
+      const proposed = dates.map((d) => ({
+        instructor_id: p.instructor_id,
+        date: d,
+        start_time: p.start_time,
+        end_time: p.end_time,
+      }));
+      const failures = validateOccurrencesAgainstBlocks(proposed, blocks);
+      if (failures.length) {
+        return j(
+          {
+            error: formatAvailabilityError(failures),
+            code: "instructor_unavailable",
+            failures,
+          },
+          422,
+        );
       }
+    }
+
+
       if (conflicts.length) {
         return j({ error: `This instructor already has a lesson at that time on: ${conflicts.join(", ")}` }, 409);
       }
