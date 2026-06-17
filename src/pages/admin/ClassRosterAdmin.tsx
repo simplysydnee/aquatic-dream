@@ -377,9 +377,14 @@ const ClassRosterAdmin = () => {
                    <Badge variant="outline" className={`text-xs ${ageGroup === "preschool-3-5" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-teal-50 text-teal-700 border-teal-200"}`}>
                      {ageGroup === "preschool-3-5" ? "Preschool" : "School-Age"}
                    </Badge>
-                   <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
-                     {periodLabel}
-                   </Badge>
+                    <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                      {periodLabel}
+                    </Badge>
+                    {first.registration_status === "closed" && (
+                      <Badge variant="outline" className="text-xs border-amber-400 text-amber-700">
+                        Closed
+                      </Badge>
+                    )}
                 </div>
                 <div className="flex items-center gap-3">
                   <Select

@@ -111,6 +111,7 @@ const SessionsAdmin = () => {
   const [periods, setPeriods] = useState<SessionPeriod[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [enrollmentCounts, setEnrollmentCounts] = useState<Record<string, number>>({});
   const [filterAgeGroup, setFilterAgeGroup] = useState<string>("all");
   const [manageDatesOpen, setManageDatesOpen] = useState(false);
   const [manageDatesSlot, setManageDatesSlot] = useState<{ sessionIds: string[]; startDate: string; endDate: string; label: string; daysOfWeek: string } | null>(null);
@@ -154,7 +155,22 @@ const SessionsAdmin = () => {
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
       supabase.from("session_periods").select("id, name, start_date, end_date, is_active").order("start_date"),
     ]);
-    if (sessRes.data) setSessions(sessRes.data as Session[]);
+    if (sessRes.data) {
+      setSessions(sessRes.data as Session[]);
+      const sessionIds = sessRes.data.map((s: Session) => s.id);
+      if (sessionIds.length > 0) {
+        const { data: counts } = await supabase.rpc("get_session_enrollment_counts", {
+          _session_ids: sessionIds,
+        });
+        const map: Record<string, number> = {};
+        if (counts) {
+          for (const row of counts as { session_id: string; enrolled_count: number }[]) {
+            map[row.session_id] = row.enrolled_count;
+          }
+        }
+        setEnrollmentCounts(map);
+      }
+    }
     if (instrRes.data) setInstructors(instrRes.data);
     if (periodRes.data) setPeriods(periodRes.data);
     setLoading(false);
@@ -844,7 +860,7 @@ const SessionsAdmin = () => {
                           </div>
                           <div className="flex items-center gap-1 w-[50px] shrink-0 text-sm text-muted-foreground">
                             <Users className="w-3.5 h-3.5" />
-                            {s.max_students}
+                            {(enrollmentCounts[s.id] ?? 0)}/{s.max_students}
                           </div>
                           <div className="w-[140px] shrink-0">
                             <Select
