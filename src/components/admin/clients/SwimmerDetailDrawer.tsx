@@ -115,6 +115,8 @@ export default function SwimmerDetailDrawer({
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
   const [lessonDates, setLessonDates] = useState<LessonDateRow[]>([]);
+  const [loadingOccurrences, setLoadingOccurrences] = useState(false);
+  const [loadingLessonDates, setLoadingLessonDates] = useState(false);
 
   const bookingIds = swimmer ? swimmer.bookings.map((b) => b.id) : [];
   const bookingIdsKey = bookingIds.join(",");
@@ -130,20 +132,26 @@ export default function SwimmerDetailDrawer({
       setOccurrences([]);
       setAttendance([]);
       setLessonDates([]);
+      setLoadingOccurrences(false);
+      setLoadingLessonDates(false);
       return;
     }
     let cancelled = false;
     if (bookingIds.length) {
+      setLoadingOccurrences(true);
       supabase
         .from("lesson_booking_occurrences")
         .select("id, booking_id, occurrence_date, payment_status, status, cancelled_at, checked_in_at")
         .in("booking_id", bookingIds)
         .order("occurrence_date", { ascending: true })
         .then(({ data }) => {
-          if (!cancelled && data) setOccurrences(data as Occurrence[]);
+          if (cancelled) return;
+          if (data) setOccurrences(data as Occurrence[]);
+          setLoadingOccurrences(false);
         });
     } else {
       setOccurrences([]);
+      setLoadingOccurrences(false);
     }
     if (enrollmentIds.length) {
       supabase
@@ -157,16 +165,20 @@ export default function SwimmerDetailDrawer({
       setAttendance([]);
     }
     if (sessionIds.length) {
+      setLoadingLessonDates(true);
       supabase
         .from("session_lesson_dates")
         .select("session_id, lesson_date, is_cancelled")
         .in("session_id", sessionIds)
         .order("lesson_date", { ascending: true })
         .then(({ data }) => {
-          if (!cancelled && data) setLessonDates(data as LessonDateRow[]);
+          if (cancelled) return;
+          if (data) setLessonDates(data as LessonDateRow[]);
+          setLoadingLessonDates(false);
         });
     } else {
       setLessonDates([]);
+      setLoadingLessonDates(false);
     }
     return () => {
       cancelled = true;
