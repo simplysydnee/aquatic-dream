@@ -46,6 +46,24 @@ const LEVEL_STRIPE: Record<string, string> = {
   green: "#16a34a",
 };
 
+const PRIVATE_STRIPE = "#26215C";
+const SEMI_PRIVATE_STRIPE = "#4B1528";
+
+interface PrivateOccurrence {
+  id: string;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  lesson_type: string;
+  start_time: string;
+  end_time: string;
+  pool_area: string | null;
+  child_name: string;
+  child_age: number | null;
+  parent_name: string;
+  parent_phone: string | null;
+  notes: string | null;
+}
+
 function fmtTime(t: string) {
   const [h, m] = t.split(":");
   const hour = parseInt(h);
@@ -67,6 +85,7 @@ export default function PrintDaySchedule() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [lessonDates, setLessonDates] = useState<{ session_id: string; is_cancelled: boolean }[]>([]);
+  const [privateOccs, setPrivateOccs] = useState<PrivateOccurrence[]>([]);
   const [loading, setLoading] = useState(true);
 
   const dayName = format(new Date(date + "T12:00:00"), "EEEE");
@@ -74,7 +93,7 @@ export default function PrintDaySchedule() {
 
   useEffect(() => {
     (async () => {
-      const [s, e, a, ld] = await Promise.all([
+      const [s, e, a, ld, po] = await Promise.all([
         supabase
           .from("swim_sessions")
           .select(
@@ -94,11 +113,38 @@ export default function PrintDaySchedule() {
           .from("session_lesson_dates")
           .select("session_id, is_cancelled")
           .eq("lesson_date", date),
+        supabase
+          .from("lesson_booking_occurrences")
+          .select("id, status, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_phone, child_name, child_age, start_time, end_time, pool_area, notes, status)")
+          .eq("occurrence_date", date)
+          .neq("status", "cancelled"),
       ]);
       if (s.data) setSessions(s.data as Session[]);
       if (e.data) setEnrollments(e.data as Enrollment[]);
       if (a.data) setAgreements(a.data as Agreement[]);
       if (ld.data) setLessonDates(ld.data as any);
+      if (po.data) {
+        const mapped: PrivateOccurrence[] = (po.data as any[])
+          .filter((o) => o.lesson_bookings && o.lesson_bookings.status !== "cancelled")
+          .map((o) => {
+            const b = o.lesson_bookings;
+            return {
+              id: o.id,
+              instructor_id: o.instructor_override_id || b.instructor_id || null,
+              instructor_name: o.instructor_override_name || b.instructor_name || null,
+              lesson_type: b.lesson_type || "private",
+              start_time: (o.start_time_override || b.start_time || "").slice(0, 8),
+              end_time: (o.end_time_override || b.end_time || "").slice(0, 8),
+              pool_area: b.pool_area || null,
+              child_name: b.child_name || "",
+              child_age: b.child_age ?? null,
+              parent_name: b.parent_name || "",
+              parent_phone: b.parent_phone || null,
+              notes: b.notes || null,
+            };
+          });
+        setPrivateOccs(mapped);
+      }
       setLoading(false);
     })();
   }, [date]);
@@ -119,32 +165,55 @@ export default function PrintDaySchedule() {
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [sessions, activeIds, dayName, instructorId]);
 
+  const todayPrivate = useMemo(() => {
+    return privateOccs
+      .filter((p) => instructorId === "all" || p.instructor_id === instructorId)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [privateOccs, instructorId]);
+
   const agreementByEnrollment = useMemo(() => {
     const m = new Map<string, Agreement>();
     for (const a of agreements) if (a.enrollment_id) m.set(a.enrollment_id, a);
     return m;
   }, [agreements]);
 
-  // Group by instructor; hide instructors with zero enrolled swimmers across the day
+  type Item =
+    | { kind: "group"; start_time: string; session: Session }
+    | { kind: "private"; start_time: string; occ: PrivateOccurrence };
+
+  // Group by instructor; include group sessions and private/semi-private occurrences
   const grouped = useMemo(() => {
-    const m = new Map<string, { name: string; sessions: Session[] }>();
+    const m = new Map<string, { name: string; items: Item[] }>();
     for (const s of todaySessions) {
       const key = s.instructor_id || "unassigned";
       const name = s.instructors?.name || "Unassigned";
-      if (!m.has(key)) m.set(key, { name, sessions: [] });
-      m.get(key)!.sessions.push(s);
+      if (!m.has(key)) m.set(key, { name, items: [] });
+      m.get(key)!.items.push({ kind: "group", start_time: s.start_time, session: s });
+    }
+    for (const p of todayPrivate) {
+      const key = p.instructor_id || "unassigned";
+      const name = p.instructor_name || "Unassigned";
+      if (!m.has(key)) m.set(key, { name, items: [] });
+      m.get(key)!.items.push({ kind: "private", start_time: p.start_time, occ: p });
     }
     return [...m.values()]
       .map((g) => {
-        const totalSwimmers = g.sessions.reduce(
-          (sum, s) => sum + enrollments.filter((e) => e.session_id === s.id).length,
-          0
-        );
-        return { ...g, totalSwimmers };
+        const items = [...g.items].sort((a, b) => a.start_time.localeCompare(b.start_time));
+        let classCount = 0;
+        let swimmerCount = 0;
+        for (const it of items) {
+          classCount++;
+          if (it.kind === "group") {
+            swimmerCount += enrollments.filter((e) => e.session_id === it.session.id).length;
+          } else {
+            swimmerCount += 1;
+          }
+        }
+        return { name: g.name, items, classCount, totalSwimmers: swimmerCount };
       })
       .filter((g) => g.totalSwimmers > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [todaySessions, enrollments]);
+  }, [todaySessions, todayPrivate, enrollments]);
 
   useEffect(() => {
     if (!loading && grouped.length > 0) {
@@ -248,7 +317,7 @@ export default function PrintDaySchedule() {
         </div>
       ) : (
         grouped.map((g) => {
-          const classCount = g.sessions.length;
+          const classCount = g.classCount;
           return (
             <section key={g.name} className="instructor-page">
               <div className="ipage-head">
@@ -285,86 +354,129 @@ export default function PrintDaySchedule() {
                   </tr>
                 </thead>
                 <tbody>
-                  {g.sessions.flatMap((s) => {
-                    const sEnr = enrollments.filter((e) => e.session_id === s.id);
-                    const level = LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level;
-                    const stripe = LEVEL_STRIPE[s.swim_level] || "#999";
-                    const isFull = sEnr.length >= s.max_students;
-                    const ageLabel =
-                      s.age_group === "preschool-3-5"
-                        ? "Preschool 3–5"
-                        : s.age_group === "school-age-6-12"
-                        ? "School-Age 6–12"
-                        : s.age_group || "";
-                    const rowCount = Math.max(sEnr.length, 1);
+                  {g.items.flatMap((it) => {
+                    if (it.kind === "group") {
+                      const s = it.session;
+                      const sEnr = enrollments.filter((e) => e.session_id === s.id);
+                      const level = LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level;
+                      const stripe = LEVEL_STRIPE[s.swim_level] || "#999";
+                      const isFull = sEnr.length >= s.max_students;
+                      const ageLabel =
+                        s.age_group === "preschool-3-5"
+                          ? "Preschool 3–5"
+                          : s.age_group === "school-age-6-12"
+                          ? "School-Age 6–12"
+                          : s.age_group || "";
+                      const rowCount = Math.max(sEnr.length, 1);
 
-                    const rows: JSX.Element[] = [];
-                    for (let i = 0; i < rowCount; i++) {
-                      const e = sEnr[i];
-                      const ag = e ? agreementByEnrollment.get(e.id) : undefined;
-                      rows.push(
-                        <tr key={`${s.id}-${i}`} className={i === 0 ? "class-group-first" : ""}>
-                          {i === 0 && (
-                            <>
-                              <td
-                                className="time-cell"
-                                rowSpan={rowCount}
-                                style={{ borderLeftColor: stripe }}
-                              >
-                                {fmtTime(s.start_time)}<br />
-                                <span style={{ fontWeight: 400, color: "#666" }}>
-                                  {fmtTime(s.end_time)}
-                                </span>
-                                <div>
-                                  <span className={`cap ${isFull ? "full" : ""}`}>
-                                    {sEnr.length}/{s.max_students}
+                      const rows: JSX.Element[] = [];
+                      for (let i = 0; i < rowCount; i++) {
+                        const e = sEnr[i];
+                        const ag = e ? agreementByEnrollment.get(e.id) : undefined;
+                        rows.push(
+                          <tr key={`${s.id}-${i}`} className={i === 0 ? "class-group-first" : ""}>
+                            {i === 0 && (
+                              <>
+                                <td
+                                  className="time-cell"
+                                  rowSpan={rowCount}
+                                  style={{ borderLeftColor: stripe }}
+                                >
+                                  {fmtTime(s.start_time)}<br />
+                                  <span style={{ fontWeight: 400, color: "#666" }}>
+                                    {fmtTime(s.end_time)}
                                   </span>
-                                </div>
+                                  <div>
+                                    <span className={`cap ${isFull ? "full" : ""}`}>
+                                      {sEnr.length}/{s.max_students}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="class-cell" rowSpan={rowCount}>
+                                  <div className="lvl">{level}</div>
+                                  {s.session_name && (
+                                    <div style={{ fontSize: "7.5pt", color: "#555" }}>{s.session_name}</div>
+                                  )}
+                                  <div className="ag">{ageLabel}</div>
+                                </td>
+                              </>
+                            )}
+                            {e ? (
+                              <>
+                                <td className="swimmer-cell">
+                                  {e.child_name} <span className="age">({e.child_age})</span>
+                                </td>
+                                <td>
+                                  {firstName(e.parent_name)}
+                                  <div style={{ color: "#555" }}>{e.parent_phone || "—"}</div>
+                                </td>
+                                <td>
+                                  {ag ? (
+                                    <>
+                                      {ag.emergency_contact_name}
+                                      {ag.emergency_contact_relationship
+                                        ? ` (${ag.emergency_contact_relationship})`
+                                        : ""}
+                                      <div style={{ color: "#555" }}>{ag.emergency_contact_phone}</div>
+                                    </>
+                                  ) : (
+                                    <span style={{ color: "#aaa" }}>Not on file</span>
+                                  )}
+                                </td>
+                                <td className={e.medical_notes ? "medical" : ""}>
+                                  {e.medical_notes || "—"}
+                                </td>
+                              </>
+                            ) : (
+                              <td colSpan={4} style={{ color: "#aaa", fontStyle: "italic" }}>
+                                No swimmers enrolled
                               </td>
-                              <td className="class-cell" rowSpan={rowCount}>
-                                <div className="lvl">{level}</div>
-                                {s.session_name && (
-                                  <div style={{ fontSize: "7.5pt", color: "#555" }}>{s.session_name}</div>
-                                )}
-                                <div className="ag">{ageLabel}</div>
-                              </td>
-                            </>
-                          )}
-                          {e ? (
-                            <>
-                              <td className="swimmer-cell">
-                                {e.child_name} <span className="age">({e.child_age})</span>
-                              </td>
-                              <td>
-                                {firstName(e.parent_name)}
-                                <div style={{ color: "#555" }}>{e.parent_phone || "—"}</div>
-                              </td>
-                              <td>
-                                {ag ? (
-                                  <>
-                                    {ag.emergency_contact_name}
-                                    {ag.emergency_contact_relationship
-                                      ? ` (${ag.emergency_contact_relationship})`
-                                      : ""}
-                                    <div style={{ color: "#555" }}>{ag.emergency_contact_phone}</div>
-                                  </>
-                                ) : (
-                                  <span style={{ color: "#aaa" }}>Not on file</span>
-                                )}
-                              </td>
-                              <td className={e.medical_notes ? "medical" : ""}>
-                                {e.medical_notes || "—"}
-                              </td>
-                            </>
-                          ) : (
-                            <td colSpan={4} style={{ color: "#aaa", fontStyle: "italic" }}>
-                              No swimmers enrolled
-                            </td>
-                          )}
-                        </tr>
-                      );
+                            )}
+                          </tr>
+                        );
+                      }
+                      return rows;
                     }
-                    return rows;
+
+                    // private / semi-private occurrence
+                    const p = it.occ;
+                    const isSemi = p.lesson_type === "semi_private" || p.lesson_type === "semi-private";
+                    const stripe = isSemi ? SEMI_PRIVATE_STRIPE : PRIVATE_STRIPE;
+                    const typeLabel = isSemi ? "Semi-private lesson" : "Private lesson";
+                    const cap = isSemi ? "1/2" : "1/1";
+                    const poolLabel = p.pool_area
+                      ? p.pool_area.charAt(0).toUpperCase() + p.pool_area.slice(1) + " pool"
+                      : "";
+                    return [
+                      <tr key={p.id} className="class-group-first">
+                        <td
+                          className="time-cell"
+                          style={{ borderLeftColor: stripe }}
+                        >
+                          {fmtTime(p.start_time)}<br />
+                          <span style={{ fontWeight: 400, color: "#666" }}>{fmtTime(p.end_time)}</span>
+                          <div>
+                            <span className="cap">{cap}</span>
+                          </div>
+                        </td>
+                        <td className="class-cell">
+                          <div className="lvl">{typeLabel}</div>
+                          {poolLabel && (
+                            <div style={{ fontSize: "7.5pt", color: "#555" }}>{poolLabel}</div>
+                          )}
+                        </td>
+                        <td className="swimmer-cell">
+                          {p.child_name}
+                          {p.child_age != null && <span className="age"> ({p.child_age})</span>}
+                        </td>
+                        <td>
+                          {firstName(p.parent_name)}
+                          <div style={{ color: "#555" }}>{p.parent_phone || "—"}</div>
+                        </td>
+                        <td><span style={{ color: "#aaa" }}>—</span></td>
+                        <td>{p.notes || "—"}</td>
+                      </tr>,
+                    ];
                   })}
                 </tbody>
               </table>

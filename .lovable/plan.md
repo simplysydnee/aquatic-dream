@@ -1,37 +1,29 @@
-# SMS Inbox — Build & Deploy
+## Goal
+Extend the daily print schedule to include private and semi-private lesson occurrences for the selected day, formatted identically to the existing group schedule.
 
-Migration and `TEXTMAGIC_INBOUND_SECRET` are already in place. Clicking **Implement plan** will execute all 8 items below and deploy both edge functions.
+## Scope
+- File: `src/pages/admin/PrintDaySchedule.tsx` (only)
+- No DB, RLS, edge function, or other UI changes
+- The "Print Schedule" dialog already passes `date` and `instructor`; no dialog changes needed
 
-## Files
+## What to add
+1. Fetch private/semi-private occurrences for the selected date:
+   - `lesson_booking_occurrences` joined to `lesson_bookings` where `occurrence_date = date`, `status != 'cancelled'`
+   - Honor instructor filter using occurrence `instructor_override_id` if present, else `lesson_bookings.instructor_id`
+   - Honor time overrides (`start_time_override`/`end_time_override`) when present
+2. Merge each occurrence into the existing per-instructor grouping (so an instructor's page shows their group classes plus their private/semi-private lessons in one chronological table).
+3. Render each private/semi-private as a row in the same `table.sched`:
+   - Time: occurrence start/end, with a capacity pill showing `1/1` (private) or `n/2` (semi-private)
+   - Class: "Private lesson" or "Semi-private lesson" + pool area as the sub line; no age-group line
+   - Swimmer: `child_name (age)`
+   - Parent: first name + phone
+   - Emergency: dash (not collected for private bookings) — render as "—"
+   - Notes: `lesson_bookings.notes` (shown in red only if it looks medical? keep neutral — display as plain notes)
+   - Left border stripe color: distinct tokens already used elsewhere — `#26215C` for private, `#4B1528` for semi-private (matches calendar legend)
+4. Sort each instructor's combined rows by start time. Update the header subtitle counts ("X classes · Y swimmers") to include private/semi-private occurrences and their swimmers.
+5. Instructors who only have private/semi-private lessons (no group classes) should now also get a printed page — they're currently filtered out.
 
-1. **`supabase/functions/receive-inbound-sms/index.ts`** (new)
-   Public webhook. Validates `?token=` against `TEXTMAGIC_INBOUND_SECRET`. Accepts JSON or form-encoded. Normalizes phone, finds-or-creates a conversation (name lookup against `lesson_bookings` then `swim_enrollments` with `+1xxxxxxxxxx` / `xxxxxxxxxx` / E.164 variants), inserts the inbound message, updates conversation preview. Always returns 200.
-
-2. **`supabase/functions/send-sms-message/index.ts`** (new)
-   Verifies JWT in-code via `getClaims`. Allows `admin` OR `instructor` via `has_role` RPC. Zod-validates `{ conversation_id? | phone?, body (1..1000) }` (XOR). Resolves/creates conversation, sends via `sendSms()`, logs outbound row, updates conversation preview on success.
-
-3. **`supabase/config.toml`** — add `verify_jwt = false` for both new functions (auth handled in code for `send-sms-message`).
-
-4. **`src/components/admin/ProtectedRoute.tsx`** — keep admin-only by default, allow instructors at `/admin/messages` only.
-
-5. **`src/pages/admin/MessagesAdmin.tsx`** (new) — two-pane inbox:
-   - Left: search + conversation list ordered by `last_message_at desc`
-   - Right: thread bubbles (inbound left, outbound right), sticky composer, Cmd/Ctrl+Enter to send
-   - Realtime: subscribes to `sms_conversations` (all events) and `sms_messages` INSERT filtered by active conversation
-   - Self-guards: hidden if not admin/instructor
-
-6. **`src/App.tsx`** — import `MessagesAdmin`, add `<Route path="messages" />` under `/admin`.
-
-7. **`src/components/admin/AdminSidebar.tsx`** — add **Messages** under Operations group (`MessageSquare` icon).
-
-8. **`src/pages/instructor/InstructorLayout.tsx`** — add `NavLink` to `/admin/messages`.
-
-## Deploy
-- `receive-inbound-sms`
-- `send-sms-message`
-
-## Webhook URL (already given)
-```
-https://jilrijklnehbfuulykty.supabase.co/functions/v1/receive-inbound-sms?token=V2US7qk0sV1KSvLjM3_yVP14noX9VJPJ
-```
-POST, `application/x-www-form-urlencoded`.
+## Out of scope
+- No new "lesson type" column; type is shown in the Class cell to keep column layout identical to group prints
+- No changes to PrintDayScheduleDialog (instructor list already includes all active instructors)
+- No changes to group-lesson rendering logic
