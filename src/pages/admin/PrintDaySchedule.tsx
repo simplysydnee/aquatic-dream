@@ -177,26 +177,43 @@ export default function PrintDaySchedule() {
     return m;
   }, [agreements]);
 
-  // Group by instructor; hide instructors with zero enrolled swimmers across the day
+  type Item =
+    | { kind: "group"; start_time: string; session: Session }
+    | { kind: "private"; start_time: string; occ: PrivateOccurrence };
+
+  // Group by instructor; include group sessions and private/semi-private occurrences
   const grouped = useMemo(() => {
-    const m = new Map<string, { name: string; sessions: Session[] }>();
+    const m = new Map<string, { name: string; items: Item[] }>();
     for (const s of todaySessions) {
       const key = s.instructor_id || "unassigned";
       const name = s.instructors?.name || "Unassigned";
-      if (!m.has(key)) m.set(key, { name, sessions: [] });
-      m.get(key)!.sessions.push(s);
+      if (!m.has(key)) m.set(key, { name, items: [] });
+      m.get(key)!.items.push({ kind: "group", start_time: s.start_time, session: s });
+    }
+    for (const p of todayPrivate) {
+      const key = p.instructor_id || "unassigned";
+      const name = p.instructor_name || "Unassigned";
+      if (!m.has(key)) m.set(key, { name, items: [] });
+      m.get(key)!.items.push({ kind: "private", start_time: p.start_time, occ: p });
     }
     return [...m.values()]
       .map((g) => {
-        const totalSwimmers = g.sessions.reduce(
-          (sum, s) => sum + enrollments.filter((e) => e.session_id === s.id).length,
-          0
-        );
-        return { ...g, totalSwimmers };
+        const items = [...g.items].sort((a, b) => a.start_time.localeCompare(b.start_time));
+        let classCount = 0;
+        let swimmerCount = 0;
+        for (const it of items) {
+          classCount++;
+          if (it.kind === "group") {
+            swimmerCount += enrollments.filter((e) => e.session_id === it.session.id).length;
+          } else {
+            swimmerCount += 1;
+          }
+        }
+        return { name: g.name, items, classCount, totalSwimmers: swimmerCount };
       })
       .filter((g) => g.totalSwimmers > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [todaySessions, enrollments]);
+  }, [todaySessions, todayPrivate, enrollments]);
 
   useEffect(() => {
     if (!loading && grouped.length > 0) {
