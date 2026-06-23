@@ -85,6 +85,7 @@ export default function PrintDaySchedule() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [lessonDates, setLessonDates] = useState<{ session_id: string; is_cancelled: boolean }[]>([]);
+  const [privateOccs, setPrivateOccs] = useState<PrivateOccurrence[]>([]);
   const [loading, setLoading] = useState(true);
 
   const dayName = format(new Date(date + "T12:00:00"), "EEEE");
@@ -92,7 +93,7 @@ export default function PrintDaySchedule() {
 
   useEffect(() => {
     (async () => {
-      const [s, e, a, ld] = await Promise.all([
+      const [s, e, a, ld, po] = await Promise.all([
         supabase
           .from("swim_sessions")
           .select(
@@ -112,11 +113,38 @@ export default function PrintDaySchedule() {
           .from("session_lesson_dates")
           .select("session_id, is_cancelled")
           .eq("lesson_date", date),
+        supabase
+          .from("lesson_booking_occurrences")
+          .select("id, status, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_phone, child_name, child_age, start_time, end_time, pool_area, notes, status)")
+          .eq("occurrence_date", date)
+          .neq("status", "cancelled"),
       ]);
       if (s.data) setSessions(s.data as Session[]);
       if (e.data) setEnrollments(e.data as Enrollment[]);
       if (a.data) setAgreements(a.data as Agreement[]);
       if (ld.data) setLessonDates(ld.data as any);
+      if (po.data) {
+        const mapped: PrivateOccurrence[] = (po.data as any[])
+          .filter((o) => o.lesson_bookings && o.lesson_bookings.status !== "cancelled")
+          .map((o) => {
+            const b = o.lesson_bookings;
+            return {
+              id: o.id,
+              instructor_id: o.instructor_override_id || b.instructor_id || null,
+              instructor_name: o.instructor_override_name || b.instructor_name || null,
+              lesson_type: b.lesson_type || "private",
+              start_time: (o.start_time_override || b.start_time || "").slice(0, 8),
+              end_time: (o.end_time_override || b.end_time || "").slice(0, 8),
+              pool_area: b.pool_area || null,
+              child_name: b.child_name || "",
+              child_age: b.child_age ?? null,
+              parent_name: b.parent_name || "",
+              parent_phone: b.parent_phone || null,
+              notes: b.notes || null,
+            };
+          });
+        setPrivateOccs(mapped);
+      }
       setLoading(false);
     })();
   }, [date]);
@@ -136,6 +164,12 @@ export default function PrintDaySchedule() {
       )
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [sessions, activeIds, dayName, instructorId]);
+
+  const todayPrivate = useMemo(() => {
+    return privateOccs
+      .filter((p) => instructorId === "all" || p.instructor_id === instructorId)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [privateOccs, instructorId]);
 
   const agreementByEnrollment = useMemo(() => {
     const m = new Map<string, Agreement>();
