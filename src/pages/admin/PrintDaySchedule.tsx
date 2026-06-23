@@ -46,6 +46,24 @@ const LEVEL_STRIPE: Record<string, string> = {
   green: "#16a34a",
 };
 
+const PRIVATE_STRIPE = "#26215C";
+const SEMI_PRIVATE_STRIPE = "#4B1528";
+
+interface PrivateOccurrence {
+  id: string;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  lesson_type: string;
+  start_time: string;
+  end_time: string;
+  pool_area: string | null;
+  child_name: string;
+  child_age: number | null;
+  parent_name: string;
+  parent_phone: string | null;
+  notes: string | null;
+}
+
 function fmtTime(t: string) {
   const [h, m] = t.split(":");
   const hour = parseInt(h);
