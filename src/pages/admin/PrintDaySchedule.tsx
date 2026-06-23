@@ -317,7 +317,7 @@ export default function PrintDaySchedule() {
         </div>
       ) : (
         grouped.map((g) => {
-          const classCount = g.sessions.length;
+          const classCount = g.classCount;
           return (
             <section key={g.name} className="instructor-page">
               <div className="ipage-head">
@@ -354,86 +354,129 @@ export default function PrintDaySchedule() {
                   </tr>
                 </thead>
                 <tbody>
-                  {g.sessions.flatMap((s) => {
-                    const sEnr = enrollments.filter((e) => e.session_id === s.id);
-                    const level = LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level;
-                    const stripe = LEVEL_STRIPE[s.swim_level] || "#999";
-                    const isFull = sEnr.length >= s.max_students;
-                    const ageLabel =
-                      s.age_group === "preschool-3-5"
-                        ? "Preschool 3–5"
-                        : s.age_group === "school-age-6-12"
-                        ? "School-Age 6–12"
-                        : s.age_group || "";
-                    const rowCount = Math.max(sEnr.length, 1);
+                  {g.items.flatMap((it) => {
+                    if (it.kind === "group") {
+                      const s = it.session;
+                      const sEnr = enrollments.filter((e) => e.session_id === s.id);
+                      const level = LEVEL_DISPLAY[s.swim_level as SwimLevel]?.name || s.swim_level;
+                      const stripe = LEVEL_STRIPE[s.swim_level] || "#999";
+                      const isFull = sEnr.length >= s.max_students;
+                      const ageLabel =
+                        s.age_group === "preschool-3-5"
+                          ? "Preschool 3–5"
+                          : s.age_group === "school-age-6-12"
+                          ? "School-Age 6–12"
+                          : s.age_group || "";
+                      const rowCount = Math.max(sEnr.length, 1);
 
-                    const rows: JSX.Element[] = [];
-                    for (let i = 0; i < rowCount; i++) {
-                      const e = sEnr[i];
-                      const ag = e ? agreementByEnrollment.get(e.id) : undefined;
-                      rows.push(
-                        <tr key={`${s.id}-${i}`} className={i === 0 ? "class-group-first" : ""}>
-                          {i === 0 && (
-                            <>
-                              <td
-                                className="time-cell"
-                                rowSpan={rowCount}
-                                style={{ borderLeftColor: stripe }}
-                              >
-                                {fmtTime(s.start_time)}<br />
-                                <span style={{ fontWeight: 400, color: "#666" }}>
-                                  {fmtTime(s.end_time)}
-                                </span>
-                                <div>
-                                  <span className={`cap ${isFull ? "full" : ""}`}>
-                                    {sEnr.length}/{s.max_students}
+                      const rows: JSX.Element[] = [];
+                      for (let i = 0; i < rowCount; i++) {
+                        const e = sEnr[i];
+                        const ag = e ? agreementByEnrollment.get(e.id) : undefined;
+                        rows.push(
+                          <tr key={`${s.id}-${i}`} className={i === 0 ? "class-group-first" : ""}>
+                            {i === 0 && (
+                              <>
+                                <td
+                                  className="time-cell"
+                                  rowSpan={rowCount}
+                                  style={{ borderLeftColor: stripe }}
+                                >
+                                  {fmtTime(s.start_time)}<br />
+                                  <span style={{ fontWeight: 400, color: "#666" }}>
+                                    {fmtTime(s.end_time)}
                                   </span>
-                                </div>
+                                  <div>
+                                    <span className={`cap ${isFull ? "full" : ""}`}>
+                                      {sEnr.length}/{s.max_students}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="class-cell" rowSpan={rowCount}>
+                                  <div className="lvl">{level}</div>
+                                  {s.session_name && (
+                                    <div style={{ fontSize: "7.5pt", color: "#555" }}>{s.session_name}</div>
+                                  )}
+                                  <div className="ag">{ageLabel}</div>
+                                </td>
+                              </>
+                            )}
+                            {e ? (
+                              <>
+                                <td className="swimmer-cell">
+                                  {e.child_name} <span className="age">({e.child_age})</span>
+                                </td>
+                                <td>
+                                  {firstName(e.parent_name)}
+                                  <div style={{ color: "#555" }}>{e.parent_phone || "—"}</div>
+                                </td>
+                                <td>
+                                  {ag ? (
+                                    <>
+                                      {ag.emergency_contact_name}
+                                      {ag.emergency_contact_relationship
+                                        ? ` (${ag.emergency_contact_relationship})`
+                                        : ""}
+                                      <div style={{ color: "#555" }}>{ag.emergency_contact_phone}</div>
+                                    </>
+                                  ) : (
+                                    <span style={{ color: "#aaa" }}>Not on file</span>
+                                  )}
+                                </td>
+                                <td className={e.medical_notes ? "medical" : ""}>
+                                  {e.medical_notes || "—"}
+                                </td>
+                              </>
+                            ) : (
+                              <td colSpan={4} style={{ color: "#aaa", fontStyle: "italic" }}>
+                                No swimmers enrolled
                               </td>
-                              <td className="class-cell" rowSpan={rowCount}>
-                                <div className="lvl">{level}</div>
-                                {s.session_name && (
-                                  <div style={{ fontSize: "7.5pt", color: "#555" }}>{s.session_name}</div>
-                                )}
-                                <div className="ag">{ageLabel}</div>
-                              </td>
-                            </>
-                          )}
-                          {e ? (
-                            <>
-                              <td className="swimmer-cell">
-                                {e.child_name} <span className="age">({e.child_age})</span>
-                              </td>
-                              <td>
-                                {firstName(e.parent_name)}
-                                <div style={{ color: "#555" }}>{e.parent_phone || "—"}</div>
-                              </td>
-                              <td>
-                                {ag ? (
-                                  <>
-                                    {ag.emergency_contact_name}
-                                    {ag.emergency_contact_relationship
-                                      ? ` (${ag.emergency_contact_relationship})`
-                                      : ""}
-                                    <div style={{ color: "#555" }}>{ag.emergency_contact_phone}</div>
-                                  </>
-                                ) : (
-                                  <span style={{ color: "#aaa" }}>Not on file</span>
-                                )}
-                              </td>
-                              <td className={e.medical_notes ? "medical" : ""}>
-                                {e.medical_notes || "—"}
-                              </td>
-                            </>
-                          ) : (
-                            <td colSpan={4} style={{ color: "#aaa", fontStyle: "italic" }}>
-                              No swimmers enrolled
-                            </td>
-                          )}
-                        </tr>
-                      );
+                            )}
+                          </tr>
+                        );
+                      }
+                      return rows;
                     }
-                    return rows;
+
+                    // private / semi-private occurrence
+                    const p = it.occ;
+                    const isSemi = p.lesson_type === "semi_private" || p.lesson_type === "semi-private";
+                    const stripe = isSemi ? SEMI_PRIVATE_STRIPE : PRIVATE_STRIPE;
+                    const typeLabel = isSemi ? "Semi-private lesson" : "Private lesson";
+                    const cap = isSemi ? "1/2" : "1/1";
+                    const poolLabel = p.pool_area
+                      ? p.pool_area.charAt(0).toUpperCase() + p.pool_area.slice(1) + " pool"
+                      : "";
+                    return [
+                      <tr key={p.id} className="class-group-first">
+                        <td
+                          className="time-cell"
+                          style={{ borderLeftColor: stripe }}
+                        >
+                          {fmtTime(p.start_time)}<br />
+                          <span style={{ fontWeight: 400, color: "#666" }}>{fmtTime(p.end_time)}</span>
+                          <div>
+                            <span className="cap">{cap}</span>
+                          </div>
+                        </td>
+                        <td className="class-cell">
+                          <div className="lvl">{typeLabel}</div>
+                          {poolLabel && (
+                            <div style={{ fontSize: "7.5pt", color: "#555" }}>{poolLabel}</div>
+                          )}
+                        </td>
+                        <td className="swimmer-cell">
+                          {p.child_name}
+                          {p.child_age != null && <span className="age"> ({p.child_age})</span>}
+                        </td>
+                        <td>
+                          {firstName(p.parent_name)}
+                          <div style={{ color: "#555" }}>{p.parent_phone || "—"}</div>
+                        </td>
+                        <td><span style={{ color: "#aaa" }}>—</span></td>
+                        <td>{p.notes || "—"}</td>
+                      </tr>,
+                    ];
                   })}
                 </tbody>
               </table>
