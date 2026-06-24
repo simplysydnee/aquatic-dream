@@ -1,29 +1,51 @@
-## Goal
-Extend the daily print schedule to include private and semi-private lesson occurrences for the selected day, formatted identically to the existing group schedule.
+## Diagnosis
 
-## Scope
-- File: `src/pages/admin/PrintDaySchedule.tsx` (only)
-- No DB, RLS, edge function, or other UI changes
-- The "Print Schedule" dialog already passes `date` and `instructor`; no dialog changes needed
+The swimmer the user is trying to check in is **Arthur Sidell** (private lesson booking `13a988b9…`, parent `copemcj@gmail.com`, 3:30pm today).
 
-## What to add
-1. Fetch private/semi-private occurrences for the selected date:
-   - `lesson_booking_occurrences` joined to `lesson_bookings` where `occurrence_date = date`, `status != 'cancelled'`
-   - Honor instructor filter using occurrence `instructor_override_id` if present, else `lesson_bookings.instructor_id`
-   - Honor time overrides (`start_time_override`/`end_time_override`) when present
-2. Merge each occurrence into the existing per-instructor grouping (so an instructor's page shows their group classes plus their private/semi-private lessons in one chronological table).
-3. Render each private/semi-private as a row in the same `table.sched`:
-   - Time: occurrence start/end, with a capacity pill showing `1/1` (private) or `n/2` (semi-private)
-   - Class: "Private lesson" or "Semi-private lesson" + pool area as the sub line; no age-group line
-   - Swimmer: `child_name (age)`
-   - Parent: first name + phone
-   - Emergency: dash (not collected for private bookings) — render as "—"
-   - Notes: `lesson_bookings.notes` (shown in red only if it looks medical? keep neutral — display as plain notes)
-   - Left border stripe color: distinct tokens already used elsewhere — `#26215C` for private, `#4B1528` for semi-private (matches calendar legend)
-4. Sort each instructor's combined rows by start time. Update the header subtitle counts ("X classes · Y swimmers") to include private/semi-private occurrences and their swimmers.
-5. Instructors who only have private/semi-private lessons (no group classes) should now also get a printed page — they're currently filtered out.
+CheckInAdmin gates the check-in button on `bookings_waiver_status(...).has_waiver`. For this booking it returns **false**, so the UI shows "Waiver missing" and pops the waiver dialog instead of checking him in.
 
-## Out of scope
-- No new "lesson type" column; type is shown in the Class cell to keep column layout identical to group prints
-- No changes to PrintDayScheduleDialog (instructor list already includes all active instructors)
-- No changes to group-lesson rendering logic
+A valid visitor waiver for Arthur **does exist**:
+- visitor_waiver `29f38564…` signed 2026-06-08 by `copemcj@gmail.com`, swimmers: `[{first_name: "Arthur", last_name: "Sidell", dob: "2023-03-22"}]`.
+
+Why the matching fails:
+
+1. `lesson_bookings.child_dob` for this row is **NULL**, and `lesson_bookings.child_first_name` / `child_last_name` / `child_name` were saved with **extra whitespace** (`"Arthur  Sidell "` — double internal space, trailing space).
+2. `bookings_waiver_status` only calls `swimmer_has_waiver_on_file` when first+last+**dob** are all present on the booking. With dob NULL it short-circuits to `false`.
+3. The insert-time auto-linker `link_visitor_waiver` matches by `lower(trim(child_name))`. `trim()` removes leading/trailing spaces but not the internal double space, so `"arthur  sidell"` ≠ `"arthur sidell"` and no link/stamp happened.
+4. `waiver_signed_at` on the booking is therefore NULL, and the on-file fallback never matches, so the check-in screen treats him as un-waivered.
+
+The waiver itself is fine. The booking row is just dirty (whitespace + missing dob) so the matchers can't find it.
+
+## Fix (two parts)
+
+### 1. Immediate data fix (unblocks today's check-in)
+
+One-row update on the booking, plus a link row so the waiver is correctly associated going forward:
+
+- Normalize `child_first_name`, `child_last_name`, `child_name` (collapse internal whitespace, trim).
+- Set `child_dob = 2023-03-22` from the visitor waiver swimmer entry.
+- Set `waiver_signed_at = 2026-06-08 21:05:51+00` (visitor waiver's `signed_at`) so the existing check-in logic flips to "waiver on file".
+- Insert into `visitor_waiver_links (visitor_waiver_id, lesson_booking_id, swimmer_name, matched_by='manual')` for auditability.
+
+After this, `bookings_waiver_status` returns `has_waiver = true` and the check-in button works.
+
+### 2. Hardening so this stops happening (small, surgical SQL)
+
+Update two SECURITY DEFINER functions in a migration so future bookings with messy data still match:
+
+- `swimmer_has_waiver_on_file(_first, _last, _dob)`: change the equality checks from `lower(trim(...))` to `lower(regexp_replace(trim(...), '\s+', ' ', 'g'))` on both sides so double spaces don't break matching. Keep the dob requirement.
+- `link_visitor_waiver(_waiver_id)`: same whitespace-collapse normalization on the `_name` comparison so the insert-time auto-link catches bookings with stray spaces.
+
+No schema changes, no RLS changes, no frontend changes. CheckInAdmin keeps reading from the same RPCs.
+
+### Out of scope
+
+- Not loosening the dob requirement in `bookings_waiver_status` (would risk false positives across unrelated swimmers with the same name).
+- Not changing how bookings get created — the upstream form that allowed a double-space child_name and a null dob is a separate cleanup.
+- No changes to enrollment flow, Stripe, RLS, or reminders.
+
+## Verification
+
+1. Re-run `bookings_waiver_status` for `13a988b9…` → expect `has_waiver = true`.
+2. Refresh `/admin/check-in`, find Arthur Sidell at 3:30pm → "Waiver missing" badge gone, "Check in" works without the waiver dialog.
+3. Spot-check `link_visitor_waiver` on the existing waiver to confirm the new normalization auto-links bookings with double-space names.
