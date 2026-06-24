@@ -1,0 +1,1 @@
+ALTER VIEW public.session_periods_public SET (security_invoker = true);
