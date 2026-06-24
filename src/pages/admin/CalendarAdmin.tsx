@@ -166,6 +166,14 @@ const CalendarAdmin = () => {
               {sendingReminders ? "Sending..." : "Send today's reminders"}
             </span>
           </Button>
+          <Button
+            size="sm"
+            onClick={() => setShowChargeAll(true)}
+            className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            <CreditCard className="w-4 h-4" />
+            <span className="hidden sm:inline">Charge all</span>
+          </Button>
           <Button variant="outline" size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
             <Plus className="w-4 h-4 mr-1" /> Add Event
           </Button>
