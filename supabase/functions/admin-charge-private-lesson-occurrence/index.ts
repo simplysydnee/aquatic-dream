@@ -50,11 +50,17 @@ Deno.serve(async (req) => {
 
     const { data: row, error: rErr } = await supabaseAdmin
       .from("lesson_booking_occurrences")
-      .select("id, booking_id, occurrence_date, payment_status, lesson_bookings!inner(id, parent_name, child_name, lesson_type, stripe_customer_id, stripe_payment_method_id, price_per_session)")
+      .select("id, booking_id, occurrence_date, payment_status, charge_status, stripe_payment_intent_id, lesson_bookings!inner(id, parent_name, child_name, lesson_type, stripe_customer_id, stripe_payment_method_id, price_per_session)")
       .eq("id", occurrence_id)
       .maybeSingle();
     if (rErr || !row) return j({ error: "Occurrence not found" }, 404);
     if (row.payment_status === "paid") return j({ error: "Already paid" }, 400);
+    if (row.charge_status === "succeeded" || row.stripe_payment_intent_id) {
+      return j({
+        error: "already_charged",
+        payment_intent_id: row.stripe_payment_intent_id ?? null,
+      }, 409);
+    }
 
     const b: any = (row as any).lesson_bookings;
     if (!b?.stripe_customer_id || !b?.stripe_payment_method_id) {
@@ -78,7 +84,10 @@ Deno.serve(async (req) => {
         booking_id: b.id,
         charged_by: userData.user.id,
       },
+    }, {
+      idempotencyKey: `occ_${occurrence_id}`,
     });
+
 
     const succeeded = pi.status === "succeeded";
     // Write 1: charge record — always runs so we never lose track of a real

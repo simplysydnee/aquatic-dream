@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format, addDays, startOfWeek, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft, Printer, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft, Printer, Send, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,6 +11,7 @@ import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
 import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
 import PrintDayScheduleDialog from "@/components/admin/calendar/PrintDayScheduleDialog";
+import ChargeAllDialog from "@/components/admin/calendar/ChargeAllDialog";
 import PrivateLessonsPanel from "@/components/admin/calendar/PrivateLessonsPanel";
 import PrivateLessonDetailDialog from "@/components/admin/calendar/PrivateLessonDetailDialog";
 import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
@@ -37,6 +38,7 @@ const CalendarAdmin = () => {
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [showBookLesson, setShowBookLesson] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [showChargeAll, setShowChargeAll] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
   const [prefillStartTime, setPrefillStartTime] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<Set<ActivityType>>(() => {
@@ -163,6 +165,14 @@ const CalendarAdmin = () => {
             <span className="hidden sm:inline">
               {sendingReminders ? "Sending..." : "Send today's reminders"}
             </span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setShowChargeAll(true)}
+            className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            <CreditCard className="w-4 h-4" />
+            <span className="hidden sm:inline">Charge all</span>
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setPrefillStartTime(null); setShowAddEvent(true); }}>
             <Plus className="w-4 h-4 mr-1" /> Add Event
@@ -346,6 +356,12 @@ const CalendarAdmin = () => {
         open={showPrintDialog}
         onOpenChange={setShowPrintDialog}
         defaultDate={currentDate}
+      />
+
+      <ChargeAllDialog
+        open={showChargeAll}
+        onOpenChange={setShowChargeAll}
+        date={currentDate}
       />
 
       <PrivateLessonDetailDialog
