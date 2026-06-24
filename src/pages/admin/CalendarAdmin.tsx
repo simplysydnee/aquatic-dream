@@ -38,6 +38,7 @@ const CalendarAdmin = () => {
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [showBookLesson, setShowBookLesson] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [showChargeAll, setShowChargeAll] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarPoolEvent | null>(null);
   const [prefillStartTime, setPrefillStartTime] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<Set<ActivityType>>(() => {
