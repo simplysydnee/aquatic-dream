@@ -1,12 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Printer } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown, Printer } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -14,17 +23,23 @@ interface Props {
   defaultDate: Date;
 }
 
-interface Instructor { id: string; name: string }
+interface Instructor {
+  id: string;
+  name: string;
+}
 
 export default function PrintDayScheduleDialog({ open, onOpenChange, defaultDate }: Props) {
   const [date, setDate] = useState(format(defaultDate, "yyyy-MM-dd"));
-  const [instructorId, setInstructorId] = useState("all");
   const [instructors, setInstructors] = useState<Instructor[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [scheduledIds, setScheduledIds] = useState<Set<string>>(new Set());
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     setDate(format(defaultDate, "yyyy-MM-dd"));
   }, [defaultDate, open]);
 
+  // Load active instructors when dialog opens
   useEffect(() => {
     if (!open) return;
     supabase
@@ -37,8 +52,90 @@ export default function PrintDayScheduleDialog({ open, onOpenChange, defaultDate
       });
   }, [open]);
 
+  // Compute scheduled instructors for the selected date and default-select them
+  useEffect(() => {
+    if (!open || !date) return;
+    let cancelled = false;
+    (async () => {
+      const dayName = format(new Date(date + "T12:00:00"), "EEEE").toLowerCase();
+      const [sessRes, datesRes, occRes] = await Promise.all([
+        supabase
+          .from("swim_sessions")
+          .select("id, day_of_week, instructor_id, is_active")
+          .eq("is_active", true),
+        supabase
+          .from("session_lesson_dates")
+          .select("session_id, is_cancelled")
+          .eq("lesson_date", date),
+        supabase
+          .from("lesson_booking_occurrences")
+          .select("status, instructor_override_id, lesson_bookings!inner(instructor_id, status)")
+          .eq("occurrence_date", date)
+          .neq("status", "cancelled"),
+      ]);
+
+      if (cancelled) return;
+
+      const activeSessionIds = new Set(
+        (datesRes.data || [])
+          .filter((d: any) => !d.is_cancelled)
+          .map((d: any) => d.session_id),
+      );
+      const ids = new Set<string>();
+      for (const s of (sessRes.data || []) as any[]) {
+        if (
+          s.instructor_id &&
+          activeSessionIds.has(s.id) &&
+          (s.day_of_week || "").toLowerCase().includes(dayName)
+        ) {
+          ids.add(s.instructor_id);
+        }
+      }
+      for (const o of (occRes.data || []) as any[]) {
+        const b = o.lesson_bookings;
+        if (b && b.status === "cancelled") continue;
+        const iid = o.instructor_override_id || b?.instructor_id;
+        if (iid) ids.add(iid);
+      }
+      setScheduledIds(ids);
+      setSelectedIds(new Set(ids));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, date]);
+
+  const allInstructorIds = useMemo(() => instructors.map((i) => i.id), [instructors]);
+
+  const toggle = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const triggerLabel = useMemo(() => {
+    if (selectedIds.size === 0) return "No instructors selected";
+    if (instructors.length > 0 && selectedIds.size === instructors.length) {
+      return `All instructors (${selectedIds.size})`;
+    }
+    if (selectedIds.size === 1) {
+      const id = [...selectedIds][0];
+      return instructors.find((i) => i.id === id)?.name || "1 instructor";
+    }
+    return `${selectedIds.size} instructors`;
+  }, [selectedIds, instructors]);
+
   const handlePrint = () => {
-    const url = `/admin/print-day-schedule?date=${date}&instructor=${instructorId}`;
+    let param: string;
+    if (instructors.length > 0 && selectedIds.size === instructors.length) {
+      param = "all";
+    } else {
+      param = [...selectedIds].join(",");
+    }
+    const url = `/admin/print-day-schedule?date=${date}&instructor=${encodeURIComponent(param)}`;
     window.open(url, "_blank");
     onOpenChange(false);
   };
@@ -51,7 +148,7 @@ export default function PrintDayScheduleDialog({ open, onOpenChange, defaultDate
             <Printer className="w-4 h-4" /> Print Daily Schedule
           </DialogTitle>
           <DialogDescription>
-            Roster + parent &amp; emergency contact info for the selected instructor.
+            Roster + parent &amp; emergency contact info. Defaults to instructors scheduled on the selected date.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
@@ -60,18 +157,91 @@ export default function PrintDayScheduleDialog({ open, onOpenChange, defaultDate
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div>
-            <Label>Instructor</Label>
-            <Select value={instructorId} onValueChange={setInstructorId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All instructors</SelectItem>
-                {instructors.map((i) => (
-                  <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Instructors</Label>
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={pickerOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  <span className="truncate">{triggerLabel}</span>
+                  <ChevronsUpDown className="w-3.5 h-3.5 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[60]" align="start">
+                <div className="flex gap-1 p-2 border-b">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => setSelectedIds(new Set(allInstructorIds))}
+                  >
+                    Select all
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => setSelectedIds(new Set())}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => setSelectedIds(new Set(scheduledIds))}
+                  >
+                    Reset to scheduled
+                  </Button>
+                </div>
+                <Command>
+                  <CommandInput placeholder="Search instructor…" className="text-xs h-8" />
+                  <CommandList>
+                    <CommandEmpty>No instructors found.</CommandEmpty>
+                    <CommandGroup>
+                      {instructors.map((inst) => {
+                        const isSelected = selectedIds.has(inst.id);
+                        const isScheduled = scheduledIds.has(inst.id);
+                        return (
+                          <CommandItem
+                            key={inst.id}
+                            value={inst.name}
+                            onSelect={() => toggle(inst.id)}
+                            className="text-xs"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-3.5 w-3.5",
+                                isSelected ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                            <span className="flex-1 truncate">{inst.name}</span>
+                            {isScheduled && (
+                              <span className="ml-2 text-[10px] text-muted-foreground">
+                                scheduled
+                              </span>
+                            )}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
-          <Button onClick={handlePrint} className="w-full gap-2">
+          <Button
+            onClick={handlePrint}
+            className="w-full gap-2"
+            disabled={selectedIds.size === 0}
+          >
             <Printer className="w-4 h-4" /> Open Print View
           </Button>
         </div>
