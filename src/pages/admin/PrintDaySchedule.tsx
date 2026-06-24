@@ -79,7 +79,11 @@ function firstName(full: string) {
 export default function PrintDaySchedule() {
   const [params] = useSearchParams();
   const date = params.get("date") || format(new Date(), "yyyy-MM-dd");
-  const instructorId = params.get("instructor") || "all";
+  const instructorParam = params.get("instructor") || "all";
+  const allowedInstructorIds = useMemo(() => {
+    if (instructorParam === "all") return null;
+    return new Set(instructorParam.split(",").map((s) => s.trim()).filter(Boolean));
+  }, [instructorParam]);
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
