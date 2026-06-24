@@ -79,7 +79,11 @@ function firstName(full: string) {
 export default function PrintDaySchedule() {
   const [params] = useSearchParams();
   const date = params.get("date") || format(new Date(), "yyyy-MM-dd");
-  const instructorId = params.get("instructor") || "all";
+  const instructorParam = params.get("instructor") || "all";
+  const allowedInstructorIds = useMemo(() => {
+    if (instructorParam === "all") return null;
+    return new Set(instructorParam.split(",").map((s) => s.trim()).filter(Boolean));
+  }, [instructorParam]);
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -160,16 +164,17 @@ export default function PrintDaySchedule() {
         (s) =>
           s.day_of_week.toLowerCase().includes(dayName.toLowerCase()) &&
           activeIds.has(s.id) &&
-          (instructorId === "all" || s.instructor_id === instructorId)
+          (allowedInstructorIds === null ||
+            (s.instructor_id !== null && allowedInstructorIds.has(s.instructor_id)))
       )
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [sessions, activeIds, dayName, instructorId]);
+  }, [sessions, activeIds, dayName, allowedInstructorIds]);
 
   const todayPrivate = useMemo(() => {
     return privateOccs
-      .filter((p) => instructorId === "all" || p.instructor_id === instructorId)
+      .filter((p) => allowedInstructorIds === null || (p.instructor_id !== null && allowedInstructorIds.has(p.instructor_id)))
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [privateOccs, instructorId]);
+  }, [privateOccs, allowedInstructorIds]);
 
   const agreementByEnrollment = useMemo(() => {
     const m = new Map<string, Agreement>();
