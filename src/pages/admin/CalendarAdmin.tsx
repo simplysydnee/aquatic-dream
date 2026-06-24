@@ -358,6 +358,12 @@ const CalendarAdmin = () => {
         defaultDate={currentDate}
       />
 
+      <ChargeAllDialog
+        open={showChargeAll}
+        onOpenChange={setShowChargeAll}
+        date={currentDate}
+      />
+
       <PrivateLessonDetailDialog
         lesson={activePrivateLesson}
         onClose={() => setActivePrivateLesson(null)}
