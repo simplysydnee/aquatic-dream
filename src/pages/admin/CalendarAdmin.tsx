@@ -11,6 +11,7 @@ import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
 import CalendarWeekView from "@/components/admin/calendar/CalendarWeekView";
 import AddPoolEventDialog from "@/components/admin/calendar/AddPoolEventDialog";
 import PrintDayScheduleDialog from "@/components/admin/calendar/PrintDayScheduleDialog";
+import ChargeAllDialog from "@/components/admin/calendar/ChargeAllDialog";
 import PrivateLessonsPanel from "@/components/admin/calendar/PrivateLessonsPanel";
 import PrivateLessonDetailDialog from "@/components/admin/calendar/PrivateLessonDetailDialog";
 import CalendarFilterBar from "@/components/admin/calendar/CalendarFilterBar";
