@@ -21,7 +21,15 @@ import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
-type Step = "returning" | "assess" | "session" | "info" | "legal" | "payment" | "full" | "done";
+type Step = "returning" | "assess" | "level_choice" | "session" | "info" | "legal" | "payment" | "full" | "done";
+
+const LEVEL_ORDER: SwimLevel[] = ["white", "red", "yellow", "blue", "green"] as unknown as SwimLevel[];
+const LEVEL_LABEL: Record<string, string> = { white: "White", red: "Red", yellow: "Yellow", blue: "Blue", green: "Green" };
+function nextLevel(l: SwimLevel): SwimLevel | null {
+  const i = (LEVEL_ORDER as string[]).indexOf(l as unknown as string);
+  if (i < 0 || i >= LEVEL_ORDER.length - 1) return null;
+  return LEVEL_ORDER[i + 1];
+}
 
 function ageFromDob(dob: string | null | undefined): number {
   if (!dob) return 0;
