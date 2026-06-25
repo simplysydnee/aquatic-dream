@@ -13,6 +13,7 @@ interface Props {
   swimLevel?: string
   sessionName?: string
   privateLessonPriceUsd?: number
+  promoLabel?: string
 }
 
 const WaitlistConfirmation = ({
@@ -21,6 +22,7 @@ const WaitlistConfirmation = ({
   swimLevel,
   sessionName,
   privateLessonPriceUsd = 50,
+  promoLabel = 'Summer Special',
 }: Props) => (
   <Html lang="en" dir="ltr">
     <Head />
@@ -50,7 +52,7 @@ const WaitlistConfirmation = ({
           <Text style={promoTitle}>Option 1 — Want a private lesson instead?</Text>
           <Text style={promoText}>
             If you'd rather not wait, you can choose to book a private lesson on your own
-            at <strong>${privateLessonPriceUsd}/lesson</strong> (June promo). Nothing is
+            at <strong>${privateLessonPriceUsd}/lesson</strong> ({promoLabel}). Nothing is
             booked unless you complete checkout yourself.
           </Text>
           <Section style={{ textAlign: 'center', margin: '16px 0 4px' }}>

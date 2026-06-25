@@ -1,7 +1,7 @@
 // Shared helper to build & send the private/semi-private lesson confirmation email.
 // Used by confirm-private-booking (initial send) and resend-private-booking-confirmation (manual resend).
 import { buildSessionCalendarLinks } from "./calendar-links.ts";
-import { getPrivateLessonPrice, isJunePromoDate } from "./private-lesson-pricing.ts";
+import { getPrivateLessonPrice, isPromoDate, PRIVATE_PROMO_PRICE, PRIVATE_REGULAR_PRICE, PROMO_LABEL } from "./private-lesson-pricing.ts";
 
 interface SendOpts {
   mode: "initial" | "resend";
@@ -97,7 +97,7 @@ export async function sendPrivateBookingConfirmation(
 
   const totalAmountDue = allSame
     ? `$${total.toFixed(2)} (charged $${perPrices[0].toFixed(0)} the day of each lesson)`
-    : `$${total.toFixed(2)} total — June lessons $50 each, other lessons $65 each, charged the day of each lesson`;
+    : `$${total.toFixed(2)} total — promo lessons $${PRIVATE_PROMO_PRICE} each, other lessons $${PRIVATE_REGULAR_PRICE} each, charged the day of each lesson`;
 
   let chargeNotice: string;
   if (isSemi) {
@@ -105,19 +105,19 @@ export async function sendPrivateBookingConfirmation(
       `Your card on file will be charged $${perPrices[0].toFixed(0)} the day of each semi-private lesson. ` +
       `Nothing to pay now — just show up.`;
   } else {
-    const hasJune = occList.some((o: any) => isJunePromoDate(o.occurrence_date));
-    const hasPostJune = occList.some((o: any) => !isJunePromoDate(o.occurrence_date));
-    if (hasJune && hasPostJune) {
+    const hasPromo = occList.some((o: any) => isPromoDate(o.occurrence_date));
+    const hasRegular = occList.some((o: any) => !isPromoDate(o.occurrence_date));
+    if (hasPromo && hasRegular) {
       chargeNotice =
-        "Your card on file will be charged $50 the day of each June lesson and $65 for any lesson after June. " +
+        `Your card on file will be charged $${PRIVATE_PROMO_PRICE} the day of each promo lesson and $${PRIVATE_REGULAR_PRICE} for any non-promo lesson. ` +
         "Nothing to pay now — just show up.";
-    } else if (hasJune) {
+    } else if (hasPromo) {
       chargeNotice =
-        "Your card on file will be charged $50 the day of each lesson (June special — normally $65). " +
+        `Your card on file will be charged $${PRIVATE_PROMO_PRICE} the day of each lesson (${PROMO_LABEL} — normally $${PRIVATE_REGULAR_PRICE}). ` +
         "Nothing to pay now — just show up.";
     } else {
       chargeNotice =
-        "Your card on file will be charged $65 the day of each lesson. " +
+        `Your card on file will be charged $${PRIVATE_REGULAR_PRICE} the day of each lesson. ` +
         "Nothing to pay now — just show up.";
     }
   }

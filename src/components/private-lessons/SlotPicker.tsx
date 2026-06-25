@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ChevronLeft, X } from "lucide-react";
 import { fetchInstructors, fetchOpenSlots, holdSlots, Slot } from "@/lib/privateBooking";
-import { getPrivateLessonPrice, isJunePromoDate, PRIVATE_REGULAR_PRICE } from "@/lib/privateLessonPricing";
+import { getPrivateLessonPrice, isPromoDate, PRIVATE_REGULAR_PRICE, PRIVATE_PROMO_PRICE, PROMO_LABEL } from "@/lib/privateLessonPricing";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {
@@ -409,7 +409,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack, initialSe
                   {daySlots.map((s) => {
                     const k = slotKey(s);
                     const isSel = !!selected[k];
-                    const promo = isJunePromoDate(s.slot_date);
+                    const promo = isPromoDate(s.slot_date);
                     const blockedByInstructor = !!lockedInstructorId && lockedInstructorId !== s.instructor_id && !isSel;
                     return (
                       <button
@@ -425,7 +425,7 @@ export default function SlotPicker({ sessionToken, onContinue, onBack, initialSe
                           : "bg-background hover:bg-muted border-border"}`}>
                         {formatTime(s.start_time)} · {s.instructor_name}
                         {promo && (
-                          <span className={`ml-1.5 font-semibold ${isSel ? "text-primary-foreground" : "text-coral"}`}>$50</span>
+                          <span className={`ml-1.5 font-semibold ${isSel ? "text-primary-foreground" : "text-coral"}`}>${PRIVATE_PROMO_PRICE}</span>
                         )}
                       </button>
                     );
@@ -464,10 +464,10 @@ export default function SlotPicker({ sessionToken, onContinue, onBack, initialSe
                   ${total} total
                   <span className="block text-xs text-muted-foreground font-normal">
                     {allPromo
-                      ? "$50 June Special — charged after each lesson"
+                      ? `$${PRIVATE_PROMO_PRICE} ${PROMO_LABEL} — charged after each lesson`
                       : anyPromo
-                      ? "June lessons $50, others $65 — charged after each lesson"
-                      : "$65 charged after each lesson"}
+                      ? `Promo lessons $${PRIVATE_PROMO_PRICE}, others $${PRIVATE_REGULAR_PRICE} — charged after each lesson`
+                      : `$${PRIVATE_REGULAR_PRICE} charged after each lesson`}
                   </span>
                 </span>
               );

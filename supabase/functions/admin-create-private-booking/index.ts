@@ -5,7 +5,7 @@
 // Also supports `resend_confirmation_for: <booking_id>` to re-send for an existing booking.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
-import { getPrivateLessonPrice, isJunePromoDate } from "../_shared/private-lesson-pricing.ts";
+import { getPrivateLessonPrice, isPromoDate, PRIVATE_PROMO_PRICE, PRIVATE_REGULAR_PRICE, PROMO_LABEL } from "../_shared/private-lesson-pricing.ts";
 import { buildSessionCalendarLinks } from "../_shared/calendar-links.ts";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
 import { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } from "../_shared/textmagic.ts";
@@ -113,7 +113,7 @@ async function sendConfirmationEmail(bookingId: string, includeCardOnFile: boole
   const endTime = ((booking as any).end_time as string).slice(0, 5);
   const lessonTimeLabel = `${fmtTime(startTime)} – ${fmtTime(endTime)}`;
 
-  // Per-date schedule with per-date pricing (June promo aware)
+  // Per-date schedule with per-date pricing (promo aware)
   const scheduleList = dates.map((d) => ({
     date: fmtDate(d),
     time: lessonTimeLabel,
@@ -121,11 +121,11 @@ async function sendConfirmationEmail(bookingId: string, includeCardOnFile: boole
 
   // Total price across dates
   let total = 0;
-  let anyJune = false;
+  let anyPromo = false;
   for (const d of dates) {
     const p = getPrivateLessonPrice((booking as any).lesson_type, d);
     total += p;
-    if (isJunePromoDate(d)) anyJune = true;
+    if (isPromoDate(d)) anyPromo = true;
   }
 
   // Backstop: if waiver_signed_at is null on the booking, double-check
@@ -176,8 +176,8 @@ async function sendConfirmationEmail(bookingId: string, includeCardOnFile: boole
     ? "We'll charge your card on file the day of each lesson (no charge today). Reply to this email if you need to update your payment method."
     : undefined;
 
-  const promoNote = anyJune && (booking as any).lesson_type === "private"
-    ? "🎉 June Promo Applied — private lessons are $50 (regular $65) for June dates."
+  const promoNote = anyPromo && (booking as any).lesson_type === "private"
+    ? `🎉 ${PROMO_LABEL} Applied — private lessons are $${PRIVATE_PROMO_PRICE} (regular $${PRIVATE_REGULAR_PRICE}) for eligible dates.`
     : undefined;
 
   let invokeFailure: string | null = null;

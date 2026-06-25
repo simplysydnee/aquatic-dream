@@ -19,7 +19,7 @@ import {
 import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2, ChevronDown, ChevronRight, Pencil, CalendarClock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getStripeEnvironment } from "@/lib/stripe";
-import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
+import { getPrivateLessonPrice, isPromoDate, PRIVATE_PROMO_PRICE, PRIVATE_REGULAR_PRICE, PROMO_LABEL } from "@/lib/privateLessonPricing";
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
 import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
 import ChargeConfirmDialog from "@/components/admin/calendar/ChargeConfirmDialog";
@@ -658,7 +658,7 @@ export default function PrivateLessonsAdmin() {
                 <Select value={draft.default_lesson_type} onValueChange={(v) => setDraft({ ...draft, default_lesson_type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="private">Private ($65)</SelectItem>
+                    <SelectItem value="private">Private (${PRIVATE_REGULAR_PRICE})</SelectItem>
                     <SelectItem value="semi_private">Semi-Private ($45)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1096,7 +1096,7 @@ export default function PrivateLessonsAdmin() {
                 <Select value={editDraft.default_lesson_type} onValueChange={(v) => setEditDraft({ ...editDraft, default_lesson_type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="private">Private ($65)</SelectItem>
+                    <SelectItem value="private">Private (${PRIVATE_REGULAR_PRICE})</SelectItem>
                     <SelectItem value="semi_private">Semi-Private ($45)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1393,13 +1393,13 @@ export default function PrivateLessonsAdmin() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="private">
-                      Private (${getPrivateLessonPrice("private", bookingSlot.date)}{isJunePromoDate(bookingSlot.date) ? " · June Special" : ""})
+                      Private (${getPrivateLessonPrice("private", bookingSlot.date)}{isPromoDate(bookingSlot.date) ? ` · ${PROMO_LABEL}` : ""})
                     </SelectItem>
                     <SelectItem value="semi_private">Semi-Private ($45)</SelectItem>
                   </SelectContent>
                 </Select>
-                {bookForm.lesson_type === "private" && isJunePromoDate(bookingSlot.date) && (
-                  <p className="text-xs text-coral font-semibold mt-1">June promo — $50 per lesson (normally $65)</p>
+                {bookForm.lesson_type === "private" && isPromoDate(bookingSlot.date) && (
+                  <p className="text-xs text-coral font-semibold mt-1">{PROMO_LABEL} — ${PRIVATE_PROMO_PRICE} per lesson (normally ${PRIVATE_REGULAR_PRICE})</p>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2">
