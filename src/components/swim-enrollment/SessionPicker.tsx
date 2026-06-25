@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, PRICING } from "./types";
 import LevelFullScreen from "./LevelFullScreen";
 
+type EmptyReason = "none" | "already-enrolled";
+
 interface SlotInfo {
   assignSessionId: string;
   periodName: string;
@@ -77,6 +79,7 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
   const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [emptyReason, setEmptyReason] = useState<EmptyReason>("none");
 
   const ageGroup = getAgeGroup(childAge);
   const levelInfo = LEVEL_DISPLAY[level];
@@ -86,12 +89,8 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
       setLoading(true);
       try {
         const today = todayPacificISO();
-        console.log("SessionPicker query params", {
-          childAge,
-          ageGroup,
-          swimLevel: level,
-          excludePeriodIds: excludePeriodIds || [],
-        });
+        setSelectedIds(new Set());
+        setEmptyReason("none");
         const [periodsRes, sessionsRes] = await Promise.all([
           (supabase as any).from("session_periods_public").select("*").eq("is_active", true).gte("end_date", today).order("start_date"),
           supabase.from("swim_sessions").select("id, swim_level, day_of_week, start_time, end_time, max_students, is_active, session_name, session_start_date, session_end_date, age_group, price_per_lesson, total_lessons, session_price, instructor_id, registration_status, session_period_id")
@@ -106,20 +105,25 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
 
         if (sessions.length === 0) {
           setSlots([]);
+          setEmptyReason("none");
           setLoading(false);
           return;
         }
 
         const activePeriodIds = new Set(periods.map(p => p.id));
         const excludeSet = new Set(excludePeriodIds || []);
-        const activeSessions = sessions.filter(s =>
+        const sessionsInActivePeriods = sessions.filter(s =>
           s.session_period_id
           && activePeriodIds.has(s.session_period_id)
+        );
+        const activeSessions = sessionsInActivePeriods.filter(s =>
+          s.session_period_id
           && !excludeSet.has(s.session_period_id)
         );
 
         if (activeSessions.length === 0) {
           setSlots([]);
+          setEmptyReason(excludeSet.size > 0 && sessionsInActivePeriods.length > 0 ? "already-enrolled" : "none");
           setLoading(false);
           return;
         }
@@ -195,9 +199,11 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
         });
 
         setSlots(result);
+        setEmptyReason("none");
       } catch (err) {
         console.error("Error fetching sessions:", err);
         setSlots([]);
+        setEmptyReason("none");
       } finally {
         setLoading(false);
       }
@@ -218,7 +224,8 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
     [slots],
   );
 
-  const levelFull = !loading && (slots.length === 0 || slots.every(s => s.spots_left <= 0));
+  const alreadyEnrolledInAvailablePeriods = !loading && emptyReason === "already-enrolled";
+  const levelFull = !loading && !alreadyEnrolledInAvailablePeriods && (slots.length === 0 || slots.every(s => s.spots_left <= 0));
 
   return (
     <motion.div
@@ -259,6 +266,30 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
         <div className="flex justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
+      ) : alreadyEnrolledInAvailablePeriods ? (
+        <Card className="p-6 sm:p-8 border-2 border-primary/20">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-display text-2xl font-bold text-foreground">
+                You are already enrolled for the available {getGroupName(level, ageGroup)} sessions
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                We hide sessions you already booked so you do not reserve the same session again. If you need to change a class time, please call or email us.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 mt-6">
+            <Button variant="ghost" onClick={onBack} className="w-full sm:w-auto">
+              <ChevronLeft className="mr-1 w-4 h-4" /> Back
+            </Button>
+            <Button asChild className="w-full sm:w-auto bg-primary text-primary-foreground">
+              <a href="tel:+12095773483">Call us</a>
+            </Button>
+          </div>
+        </Card>
       ) : slots.length === 0 || slots.every(s => s.spots_left <= 0) ? (
         <LevelFullScreen level={level} childAge={childAge} ageGroup={ageGroup} onBack={onBack} />
       ) : (
