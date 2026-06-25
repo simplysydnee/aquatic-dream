@@ -1685,7 +1685,20 @@ function ReviewStep({
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [waiverOnFile, setWaiverOnFile] = useState<boolean | null>(null);
-  const [existingCardHint, setExistingCardHint] = useState<{ last4?: string | null } | null>(null);
+  const [existingCardHint, setExistingCardHint] = useState<{
+    found: boolean;
+    brand?: string;
+    last4?: string;
+    exp_month?: number;
+    exp_year?: number;
+    source_booking_id?: string;
+    source_child_name?: string | null;
+    source_instructor_name?: string | null;
+  } | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  // Admin override: "reuse" (default when card found), "new" (collect fresh),
+  // "none" (skip card / bill in person). Resets when email changes.
+  const [cardChoice, setCardChoice] = useState<"reuse" | "new" | "none">("reuse");
 
   useEffect(() => { getStripe().then(setStripeReady).catch(() => {}); }, []);
 
@@ -1697,37 +1710,32 @@ function ReviewStep({
       .then(({ data }) => setWaiverOnFile(!!data));
   }, [draft.client.swimmers]);
 
-  // Card on file lookup: read-only display only. Never modifies the
-  // collectCardOnFile toggle — admin controls that explicitly.
+  // Card on file lookup — validates against Stripe (attached + not expired).
   useEffect(() => {
     const email = draft.client.parent_email?.toLowerCase().trim();
-    if (!email || !email.includes("@")) { setExistingCardHint(null); return; }
+    setExistingCardHint(null);
+    setCardChoice("reuse");
+    if (!email || !email.includes("@")) return;
     let cancelled = false;
+    setLookupLoading(true);
     (async () => {
-      const [bookingRes, profileRes] = await Promise.all([
-        supabase
-          .from("lesson_bookings")
-          .select("stripe_payment_method_id")
-          .ilike("parent_email", email)
-          .not("stripe_payment_method_id", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("profiles")
-          .select("stripe_default_pm_id")
-          .ilike("email", email)
-          .not("stripe_default_pm_id", "is", null)
-          .limit(1)
-          .maybeSingle(),
-      ]);
-      if (cancelled) return;
-      const hasCard = !!(bookingRes.data as any)?.stripe_payment_method_id
-        || !!(profileRes.data as any)?.stripe_default_pm_id;
-      setExistingCardHint(hasCard ? {} : null);
+      try {
+        const { data, error } = await supabase.functions.invoke("lookup-parent-card-on-file", {
+          body: { parent_email: email, environment: getStripeEnvironment() },
+        });
+        if (cancelled) return;
+        if (error || !data || (data as any).error) {
+          setExistingCardHint({ found: false });
+        } else {
+          setExistingCardHint(data as any);
+        }
+      } finally {
+        if (!cancelled) setLookupLoading(false);
+      }
     })();
     return () => { cancelled = true; };
   }, [draft.client.parent_email]);
+
 
   const isGroup = draft.type === "group";
   const occurrenceDates = draft.slot?.mode === "recurring"
