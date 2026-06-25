@@ -55,7 +55,7 @@ const ManualBookingEmail = ({
         <Section style={chargeNoticeBox}>
           <Text style={chargeNoticeHeading}>💳 No charge today</Text>
           <Text style={chargeNoticeText}>
-            We'll automatically charge <strong>{amountDue || '$50'}</strong> on the day of the lesson using the card you save below.
+            We'll automatically charge <strong>{amountDue || '$65'}</strong> on the day of the lesson using the card you save below.
           </Text>
         </Section>
 
@@ -123,7 +123,7 @@ export const template = {
     lessonDate: 'Saturday, June 13, 2026',
     lessonTime: '11:00 AM – 11:30 AM',
     instructorName: 'Grace Cavanaugh',
-    amountDue: '$50',
+    amountDue: '$65',
     paymentLink: 'https://checkout.stripe.com/c/pay/cs_test_example',
   },
 } satisfies TemplateEntry

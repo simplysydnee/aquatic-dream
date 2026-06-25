@@ -1,10 +1,11 @@
 // Public edge function: parent hits a full session, lands on the friendly
 // "session full" screen. We save a waitlist row, email the parent a friendly
-// confirmation (with the $50 private-lesson option), and email the owner an
+// confirmation (with the promo private-lesson option), and email the owner an
 // internal alert so they can act on the demand.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { PRIVATE_PROMO_PRICE, PROMO_LABEL } from "../_shared/private-lesson-pricing.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -117,7 +118,8 @@ serve(async (req) => {
               childFirstName: body.childFirstName,
               swimLevel: body.swimLevel || undefined,
               sessionName: sessionName || undefined,
-              privateLessonPriceUsd: 50,
+              privateLessonPriceUsd: PRIVATE_PROMO_PRICE,
+              promoLabel: PROMO_LABEL,
             },
           },
         },

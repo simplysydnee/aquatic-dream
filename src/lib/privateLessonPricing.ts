@@ -1,21 +1,25 @@
 // Single source of truth for private/semi-private lesson pricing.
-// June 2026 promo: private lessons are $50 (normally $65) for any
-// occurrence dated 2026-06-01 through 2026-06-30. Semi-private is
-// always $45. Charge-time logic in edge functions mirrors this.
+// Promo: private lessons are $50 (normally $65) for any occurrence
+// dated within [PROMO_START_DATE, PROMO_END_DATE]. Semi-private is
+// always $45. To extend, shorten, or end the promo, change
+// PROMO_END_DATE (and PROMO_START_DATE if needed) here AND in
+// supabase/functions/_shared/private-lesson-pricing.ts. To rename
+// the badge wording, change PROMO_LABEL in the same two files.
 
 export const PRIVATE_REGULAR_PRICE = 65;
-export const PRIVATE_JUNE_PROMO_PRICE = 50;
+export const PRIVATE_PROMO_PRICE = 50;
 export const SEMI_PRIVATE_PRICE = 45;
 
-export const JUNE_PROMO_START = "2026-06-01";
-export const JUNE_PROMO_END = "2026-06-30";
+export const PROMO_START_DATE = "2026-06-01";
+export const PROMO_END_DATE = "2026-08-31";
+export const PROMO_LABEL = "Summer Special";
 
 export type LessonType = "private" | "semi_private";
 
-export function isJunePromoDate(dateISO: string): boolean {
+export function isPromoDate(dateISO: string): boolean {
   if (!dateISO) return false;
   const d = dateISO.slice(0, 10);
-  return d >= JUNE_PROMO_START && d <= JUNE_PROMO_END;
+  return d >= PROMO_START_DATE && d <= PROMO_END_DATE;
 }
 
 export function getPrivateLessonPrice(
@@ -23,8 +27,8 @@ export function getPrivateLessonPrice(
   occurrenceDateISO: string,
 ): number {
   if (lessonType === "semi_private") return SEMI_PRIVATE_PRICE;
-  return isJunePromoDate(occurrenceDateISO)
-    ? PRIVATE_JUNE_PROMO_PRICE
+  return isPromoDate(occurrenceDateISO)
+    ? PRIVATE_PROMO_PRICE
     : PRIVATE_REGULAR_PRICE;
 }
 
@@ -36,4 +40,12 @@ function todayISO(): string {
   return `${y}-${m}-${d}`;
 }
 
-export const JUNE_PROMO_ACTIVE_FOR_TODAY = isJunePromoDate(todayISO());
+export const PROMO_ACTIVE_FOR_TODAY = isPromoDate(todayISO());
+
+export function promoCopy() {
+  return {
+    badge: `★ ${PROMO_LABEL}`,
+    headline: `$${PRIVATE_PROMO_PRICE} per lesson (normally $${PRIVATE_REGULAR_PRICE})`,
+    endsOn: PROMO_END_DATE,
+  };
+}

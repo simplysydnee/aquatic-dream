@@ -2,19 +2,24 @@ import { Link } from "react-router-dom";
 import SEO from "@/components/SEO";
 import PrivateBookingFlow from "@/components/private-lessons/PrivateBookingFlow";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
-import { JUNE_PROMO_ACTIVE_FOR_TODAY } from "@/lib/privateLessonPricing";
+import {
+  PROMO_ACTIVE_FOR_TODAY,
+  PROMO_LABEL,
+  PRIVATE_PROMO_PRICE,
+  PRIVATE_REGULAR_PRICE,
+} from "@/lib/privateLessonPricing";
 
 const BookPrivateLesson = () => {
-  const promo = JUNE_PROMO_ACTIVE_FOR_TODAY;
+  const promo = PROMO_ACTIVE_FOR_TODAY;
   return (
     <main className="min-h-screen bg-background">
       <SEO
         title={promo
-          ? "Book a Private Swim Lesson — $50 June Special | Aquatic Dreams"
+          ? `Book a Private Swim Lesson — $${PRIVATE_PROMO_PRICE} ${PROMO_LABEL} | Aquatic Dreams`
           : "Book a Private Swim Lesson — Aquatic Dreams Modesto"}
         description={promo
-          ? "June Special: $50 per 30-minute private swim lesson at Aquatic Dreams in Modesto. Pick your instructor, day, and time. Charged the day of each lesson."
-          : "Book a private swim lesson at Aquatic Dreams in Modesto. Pick your instructor, day, and time. $65 per 30-minute lesson, charged the day of class."}
+          ? `${PROMO_LABEL}: $${PRIVATE_PROMO_PRICE} per 30-minute private swim lesson at Aquatic Dreams in Modesto. Pick your instructor, day, and time. Charged the day of each lesson.`
+          : `Book a private swim lesson at Aquatic Dreams in Modesto. Pick your instructor, day, and time. $${PRIVATE_REGULAR_PRICE} per 30-minute lesson, charged the day of class.`}
         path="/book-private-lesson"
       />
       <PaymentTestModeBanner />
@@ -29,18 +34,18 @@ const BookPrivateLesson = () => {
           </h1>
           {promo && (
             <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full bg-coral/15 border border-coral/30 text-sm font-semibold text-foreground">
-              <span className="text-coral">★ June Special</span>
+              <span className="text-coral">★ {PROMO_LABEL}</span>
               <span className="text-muted-foreground">·</span>
-              <span><span className="line-through text-muted-foreground mr-1">$65</span><span>$50 per lesson</span></span>
+              <span><span className="line-through text-muted-foreground mr-1">${PRIVATE_REGULAR_PRICE}</span><span>${PRIVATE_PROMO_PRICE} per lesson</span></span>
             </div>
           )}
           <p className="text-muted-foreground max-w-2xl">
             Pick your instructor, day, and time. We'll save a card on file —
             {promo ? (
-              <> <strong className="text-foreground">$50 is charged the day of each June lesson</strong> (normally $65),
+              <> <strong className="text-foreground">${PRIVATE_PROMO_PRICE} is charged the day of each lesson</strong> (normally ${PRIVATE_REGULAR_PRICE}),
               so you only pay for what you book.</>
             ) : (
-              <> <strong className="text-foreground"> $65 is charged the day of each lesson</strong>,
+              <> <strong className="text-foreground"> ${PRIVATE_REGULAR_PRICE} is charged the day of each lesson</strong>,
               so you only pay for what you book.</>
             )}
           </p>
