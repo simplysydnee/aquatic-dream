@@ -189,18 +189,16 @@ const SwimEnrollment = () => {
     }
     setFlow("case1");
     setLevel(lvl);
+    setPriorLevel(lvl);
     setChildDob(s.dob || "");
     setChildAge(ageFromDob(s.dob));
-    // Stash the child name fields by synthesizing into enrollmentData later.
-    // For now, we set the per-child state used by SessionPicker/proceedToPayment.
+    setExcludePeriodIds(Array.isArray(s.enrolled_period_ids) ? s.enrolled_period_ids : []);
     setEnrollmentData(null);
-    // Save first/last on a transient holder via state hack: we read these in
-    // handleSessionSelect when synthesizing the EnrollmentFormData.
     setReturningLookup((prev) => prev ? { ...prev, swimmers: [{ ...s }, ...prev.swimmers.filter(x => x !== s)] } : prev);
-    setStep("session");
+    setStep("level_choice");
     toast({
       title: `Re-enrolling ${s.first_name}`,
-      description: "Pick a session and you'll go straight to checkout.",
+      description: "Confirm the level and pick your next session.",
     });
   };
 
