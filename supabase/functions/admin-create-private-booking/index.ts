@@ -682,6 +682,8 @@ Deno.serve(async (req) => {
       email_sent: emailSent,
       email_error: emailError,
       waiver_link: `${SITE_BASE}/lesson-waiver/${waiverToken}`,
+      card_on_file_source: cardOnFileSourceUsed,
+      reused_card: reuseInfo,
     });
   } catch (err: any) {
     console.error("admin-create-private-booking error", err);
