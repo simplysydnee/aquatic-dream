@@ -2666,6 +2666,7 @@ export type Database = {
           has_waiver: boolean
         }[]
       }
+      check_session_periods_public_access: { Args: never; Returns: Json }
       claim_open_shift: {
         Args: { _shift_id: string }
         Returns: {
