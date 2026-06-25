@@ -2033,18 +2033,57 @@ function ReviewStep({
             />
             <Label htmlFor="cof" className="text-sm cursor-pointer">Collect card on file (charge day of each lesson)</Label>
           </div>
-          {existingCardHint && (
+          {draft.payment.collectCardOnFile && lookupLoading && (
+            <p className="text-xs text-muted-foreground pl-10">Checking for existing card on file…</p>
+          )}
+          {draft.payment.collectCardOnFile && existingCardHint?.found && cardChoice === "reuse" && (
+            <div className="ml-10 rounded-md border border-green-300 bg-green-50 p-3 space-y-2">
+              <p className="text-sm font-medium text-green-900">
+                Using card on file
+              </p>
+              <p className="text-xs text-green-800">
+                {(existingCardHint.brand || "Card").toUpperCase()} ending in {existingCardHint.last4}
+                {existingCardHint.exp_month && existingCardHint.exp_year &&
+                  ` · exp ${String(existingCardHint.exp_month).padStart(2, "0")}/${String(existingCardHint.exp_year).slice(-2)}`}
+                {existingCardHint.source_child_name && ` · from ${existingCardHint.source_child_name} booking`}
+              </p>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs"
+                  onClick={() => setCardChoice("new")}>
+                  Use a different card
+                </Button>
+                <Button type="button" size="sm" variant="ghost" className="h-7 text-xs"
+                  onClick={() => setCardChoice("none")}>
+                  Skip card / bill in person
+                </Button>
+              </div>
+            </div>
+          )}
+          {draft.payment.collectCardOnFile && existingCardHint?.found && cardChoice !== "reuse" && (
             <p className="text-xs text-muted-foreground pl-10">
-              Card already on file for this client — leave off unless you need to replace it.
+              {cardChoice === "new" ? "Will collect a new card after this step." : "No card will be collected."}{" "}
+              <button type="button" className="underline" onClick={() => setCardChoice("reuse")}>
+                Reuse card on file instead
+              </button>
             </p>
+          )}
+          {draft.payment.collectCardOnFile && existingCardHint && !existingCardHint.found && (
+            <p className="text-xs text-muted-foreground pl-10">No valid card on file — new card will be collected.</p>
           )}
         </div>
       )}
 
       <Button onClick={handleBook} disabled={submitting} className="w-full" size="lg">
         {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-        {isGroup ? "Create enrollment" : draft.payment.collectCardOnFile ? "Continue to card on file" : "Create booking"}
+        {isGroup
+          ? "Create enrollment"
+          : !draft.payment.collectCardOnFile || cardChoice === "none"
+          ? "Create booking"
+          : existingCardHint?.found && cardChoice === "reuse"
+          ? "Create booking · reuse card on file"
+          : "Continue to card on file"}
       </Button>
+
     </Card>
   );
 }
