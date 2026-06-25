@@ -31,6 +31,7 @@ interface SlotInfo {
 interface Props {
   level: SwimLevel;
   childAge: number;
+  excludePeriodIds?: string[];
   onSelect: (sessionIds: string[]) => void;
   onBack: () => void;
 }
