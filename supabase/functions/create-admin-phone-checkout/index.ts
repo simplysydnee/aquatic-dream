@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
       }],
       mode: 'payment',
       ui_mode: 'embedded_page',
+      payment_method_types: ['card'],
       expires_at: Math.floor(Date.now() / 1000) + 23 * 60 * 60,
       return_url: (returnUrl || 'https://aquaticdreamsswim.com/admin') + '?phone_paid=1&session_id={CHECKOUT_SESSION_ID}',
       customer_email: enrollment.parent_email || undefined,
