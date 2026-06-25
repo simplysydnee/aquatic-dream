@@ -1,33 +1,47 @@
-## Goal
+## Why this plan (not a direct fix)
 
-Let admins backfill missing DOB on existing swimmer records via inline edit on the Clients drawer. (New enrollment + lesson-request forms already require DOB, so going forward no new NULL rows will be created — no form changes needed.)
+I audited both edge functions, the client checkout component, and the database. **There is no code path in `create-checkout`, `create-pending-enrollment`, or the client checkout that behaves differently for a parent who has prior `swim_enrollments` rows.**
 
-Also fix the Flynn Grisby vs Grigsby data issue so he shows up under the same spelling as his sibling.
+- Neither edge function queries `swim_enrollments` by parent email or runs a duplicate/"already enrolled" guard.
+- `isFirstTime` is taken straight from the radio button on the form ("Yes, first time" / "No, returning swimmer"), not derived from the database.
+- `create-checkout` does not resolve or create a Stripe Customer; it just passes `customer_email` to the embedded session. No "existing customer" branch can fail.
+- Returning swimmers are charged the full `session_price` per row — no $0 returning-fee lookup exists server-side.
+- Session 2 data is healthy: period `b2222222…` (2026-07-13 → 2026-08-05) is active; every session has 8 remaining lessons, capacity 3, zero confirmed enrollments. None of the 409 branches (`is full`, `no remaining classes`) would trigger.
+- Edge-function logs show **zero** invocations of `create-checkout` or `create-pending-enrollment` in the recent window, and `pending_enrollments` / `swim_enrollments` have no rows in the last 6–12 hours. So the failing attempt either never reached the server, hit a different function, or happened outside the log window with no captured error text.
 
-## Scope of changes
+Shipping a "fix" now without the actual error message risks breaking the working path. The fastest route to a real root cause is to capture the exact failure on the next attempt.
 
-### 1. `src/components/admin/calendar/EditSwimmerDialog.tsx`
-- Add a **DOB** field (date picker, same pattern as `LessonRequestForm.tsx`) to the dialog for **both** target kinds (`lesson_booking` and `swim_enrollment`). Currently it shows `Age` only for enrollment and nothing for bookings.
-- Pre-fill from a new `child_dob` field on the `EditTarget` type.
-- On save, write `child_dob` (ISO `yyyy-MM-dd`) to whichever rows are being updated:
-  - `swim_enrollments`: set `child_dob`
-  - `lesson_bookings`: set `child_dob`
-- DOB stays optional in the dialog (so admins can save other edits without it), but when present it backfills every matching row for that swimmer just like name/email do today.
-- When DOB is filled, also auto-populate `child_age` on enrollment rows from the DOB (only when age is currently null) so the two stay consistent.
+## What this plan does
 
-### 2. `src/components/admin/clients/SwimmerDetailDrawer.tsx`
-- The drawer already wires up `EditSwimmerDialog` via the existing "Edit info" affordance. Pass `child_dob` through in the `EditTarget` payload it constructs, and refresh after save (the existing `onSaved` flow already triggers a refetch).
-- No layout change — the existing `DOB: —` row will then display the new value after save.
+Add lightweight instrumentation and a visible client-side error surface so the next time any parent hits the bug, we get the literal failure message, the function name, the HTTP status, and the parent/session context. No behavior changes on the happy path.
 
-### 3. Data fix — Flynn Grigsby typo
-- One-off `UPDATE` on `swim_enrollments` row `98b4fd8c-dd0d-4313-97ec-27268054d644`:
-  - `child_name`: `Flynn Grigsby` → `Flynn Grisby`
-  - `parent_name`: `Jordynn Grigsby` → `Jordynn Grisby`
-- This makes Flynn appear under the same "Grisby" search as Miles.
-- **Need confirmation:** is "Grisby" the correct family spelling? (Both sibling rows use it; Flynn's row is the outlier.) If you say so I'll run the update; otherwise the alternative is to correct Miles in the opposite direction.
+### 1. Surface the real error in the checkout UI
+
+File: `src/components/swim-enrollment/EnrollmentCheckout.tsx`
+
+- In `fetchClientSecret`, when `error || !data?.clientSecret`, also `console.error("[checkout] fetchClientSecret failed", { message, status: (error as any)?.context?.status, data })` and render the message inline in a red alert above the embedded checkout so it isn't swallowed by Stripe's iframe generic "merchant" message.
+- Same treatment for the fallback `handleReserve` path (logs `[checkout] reserve failed`).
+- Keep the existing "session full → onSessionFull" branch unchanged.
+
+### 2. Structured logging in both edge functions
+
+Files: `supabase/functions/create-checkout/index.ts`, `supabase/functions/create-pending-enrollment/index.ts`
+
+At the top of the `try` block, after `await req.json()`, add one `console.log("[create-checkout] start", { parentEmail, children: [{ childName, isFirstTime, sessionIds }], environment })` (and the analogous line in `create-pending-enrollment`). At each early-return error branch — capacity, sessions-not-found, no-remaining-classes, session-fee-mismatch, pending-insert-failure, stripe-no-client-secret — include the same context so a single log row root-causes the failure. No new branches, no behavior changes.
+
+### 3. Wider log query after next failed attempt
+
+Once the parent retries, query `function_edge_logs` filtered to these two function IDs with `status_code >= 400` over the prior 2 hours, plus the matching `postgres_logs` window, to retrieve the exact error and stack.
+
+### 4. Optional Playwright reproduction (only if step 1–3 do not surface the error)
+
+If a parent reports the bug again after instrumentation ships and we still see no server log, drive `/swim-enrollment` end-to-end in Playwright against a Session 2 Yellow class with "No, returning swimmer" selected, capturing screenshots at every step plus the Network panel for the `create-checkout` call.
 
 ## Out of scope
-- No changes to enrollment or lesson-request forms (they already require DOB).
-- No changes to RLS, edge functions, or any schema. `child_dob` columns already exist on `swim_enrollments` and `lesson_bookings`.
-- No bulk backfill tool — admins will fill DOB in as they encounter "—" rows in the drawer.
-- No change to Clients-page search behavior beyond what the typo fix resolves.
+
+- No edits to Stripe customer logic, returning-fee logic, or any enrollment guard — the audit shows none exist on the server today.
+- No schema changes, no RLS changes, no webhook changes.
+
+## Deliverable after approval
+
+Three small edits (one frontend file, two edge functions) plus the exact log query I'll run as soon as the next failed attempt comes in.
