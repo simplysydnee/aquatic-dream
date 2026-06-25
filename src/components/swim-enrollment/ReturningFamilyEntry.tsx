@@ -95,10 +95,12 @@ const ReturningFamilyEntry = ({
       className="max-w-xl mx-auto"
     >
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">
-        Welcome back!
+        {phase === "results" ? "Welcome back!" : "Let's get started"}
       </h3>
       <p className="text-muted-foreground text-sm mb-6">
-        Have you enrolled a swimmer with us before? Returning families skip the paperwork.
+        {phase === "results"
+          ? "We found your info. Pick a swimmer to re-enroll or add a new one."
+          : "Have you enrolled a swimmer with us before? Returning families skip the paperwork."}
       </p>
 
       {phase === "choose" && (
