@@ -438,15 +438,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    // If admin captured a card via Stripe Setup Checkout, resolve the
-    // payment method now and stamp it on the booking. We never want a
-    // "card_on_file" booking row without a real card attached.
+    // Card resolution. Three sources, in priority order:
+    //   1) "new"   → admin completed Stripe Setup Checkout for this booking;
+    //                use that session's PaymentMethod.
+    //   2) "reuse" → reuse a prior valid PM for this parent. When
+    //                card_on_file_source is "reuse" we require a match
+    //                (409 if none qualifies). When omitted, we attempt the
+    //                lookup as a convenience and fall through cleanly.
+    //   3) "none"  → no card; bill-in-person / comp.
     let stripePaymentMethodId: string | null = null;
     let stripeCustomerId: string | null = p.stripe_customer_id || null;
-    if (p.collect_card_on_file && p.stripe_checkout_session_id) {
-      const env = (p.stripe_environment || "live") as StripeEnv;
+    let cardOnFileSourceUsed: "new" | "reuse" | "none" = "none";
+    let reuseInfo: { source_booking_id: string; brand: string; last4: string; exp_month: number; exp_year: number } | null = null;
+
+    const explicitSource = p.card_on_file_source;
+    const hasCheckoutSession = !!p.stripe_checkout_session_id;
+    const wantsCard = explicitSource ? explicitSource !== "none" : !!p.collect_card_on_file;
+
+    const env = (p.stripe_environment || "live") as StripeEnv;
+
+    if (wantsCard && (explicitSource === "new" || (!explicitSource && hasCheckoutSession))) {
+      if (!hasCheckoutSession) {
+        return j({ error: "card_on_file_source=new requires stripe_checkout_session_id" }, 400);
+      }
       const stripe = createStripeClient(env);
-      const cs = await stripe.checkout.sessions.retrieve(p.stripe_checkout_session_id);
+      const cs = await stripe.checkout.sessions.retrieve(p.stripe_checkout_session_id!);
       if (cs.status !== "complete" || !cs.setup_intent) {
         return j({ error: `Card setup not complete: ${cs.status}` }, 400);
       }
@@ -459,9 +475,76 @@ Deno.serve(async (req) => {
       if (!stripeCustomerId) {
         stripeCustomerId = typeof cs.customer === "string" ? cs.customer : (cs.customer?.id ?? null);
       }
-    } else if (p.collect_card_on_file && !p.stripe_checkout_session_id) {
-      return j({ error: "Card on file required but no Stripe checkout session was provided" }, 400);
+      cardOnFileSourceUsed = "new";
+    } else if (wantsCard && (explicitSource === "reuse" || !explicitSource)) {
+      // Attempt to reuse an existing valid PM for this parent.
+      const emailKey = p.parent_email.toLowerCase().trim();
+      const { data: priorRows } = await supabaseAdmin
+        .from("lesson_bookings")
+        .select("id, stripe_customer_id, stripe_payment_method_id, updated_at")
+        .ilike("parent_email", emailKey)
+        .not("stripe_customer_id", "is", null)
+        .not("stripe_payment_method_id", "is", null)
+        .neq("status", "cancelled")
+        .order("updated_at", { ascending: false })
+        .limit(10);
+      const candidates = ((priorRows as any[]) || []) as Array<{
+        id: string;
+        stripe_customer_id: string;
+        stripe_payment_method_id: string;
+      }>;
+      const seen = new Set<string>();
+      const ordered = candidates.filter((c) => {
+        if (seen.has(c.stripe_payment_method_id)) return false;
+        seen.add(c.stripe_payment_method_id);
+        return true;
+      });
+      if (ordered.length > 0) {
+        const stripe = createStripeClient(env);
+        const now = new Date();
+        const nowY = now.getUTCFullYear();
+        const nowM = now.getUTCMonth() + 1;
+        for (const c of ordered) {
+          try {
+            const pm = await stripe.paymentMethods.retrieve(c.stripe_payment_method_id);
+            if (pm.type !== "card" || !pm.card) continue;
+            const pmCustomer = typeof pm.customer === "string" ? pm.customer : pm.customer?.id ?? null;
+            if (!pmCustomer || pmCustomer !== c.stripe_customer_id) continue;
+            const expY = pm.card.exp_year;
+            const expM = pm.card.exp_month;
+            if (expY < nowY || (expY === nowY && expM < nowM)) continue;
+            stripePaymentMethodId = c.stripe_payment_method_id;
+            stripeCustomerId = c.stripe_customer_id;
+            cardOnFileSourceUsed = "reuse";
+            reuseInfo = {
+              source_booking_id: c.id,
+              brand: pm.card.brand,
+              last4: pm.card.last4,
+              exp_month: expM,
+              exp_year: expY,
+            };
+            break;
+          } catch (e) {
+            console.warn("admin-create-private-booking: reuse candidate skipped", c.stripe_payment_method_id, e instanceof Error ? e.message : String(e));
+            continue;
+          }
+        }
+      }
+      if (!stripePaymentMethodId) {
+        if (explicitSource === "reuse") {
+          return j({ error: "No valid reusable card on file for this parent", code: "no_reusable_pm" }, 409);
+        }
+        // Omitted source + no reusable PM + no checkout session: the legacy
+        // behavior errored out. We now treat this as "no card" and let the
+        // admin re-trigger the explicit card-collection flow if needed.
+        // (Bill-in-person path will fall through.)
+      }
     }
+
+    // Effective card-on-file flag for occurrence rows: only true when we
+    // actually stamped a PaymentMethod.
+    const effectiveCardOnFile = !!stripePaymentMethodId;
+
 
     const { data: booking, error: bErr } = await supabaseAdmin
       .from("lesson_bookings")
