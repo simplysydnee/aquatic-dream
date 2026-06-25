@@ -54,7 +54,10 @@ export default function EnrollmentCheckout({
     [confirmed, hasFirstTimers, payAhead, buildPayload],
   );
 
+  const [lastError, setLastError] = useState<string | null>(null);
+
   const fetchClientSecret = useCallback(async (): Promise<string> => {
+    setLastError(null);
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: {
         payload,
@@ -65,14 +68,18 @@ export default function EnrollmentCheckout({
     });
     if (error || !data?.clientSecret) {
       const msg = String(error?.message || data?.error || "Failed to create checkout session");
-      // Server says capacity is gone — show the friendly waitlist screen
-      // instead of letting Stripe surface a generic "merchant" error.
+      // eslint-disable-next-line no-console
+      console.error("[checkout] fetchClientSecret failed", {
+        message: msg,
+        status: (error as { context?: { status?: number } } | null)?.context?.status,
+        data,
+        customerEmail,
+      });
       if (/is full|sold out|capacity/i.test(msg) && onSessionFull) {
         onSessionFull();
-        // Throw a benign error so the EmbeddedCheckout provider stops trying
-        // to mount; the parent already navigated away.
         throw new Error("Session full — redirecting to waitlist");
       }
+      setLastError(msg);
       throw new Error(msg);
     }
     return data.clientSecret;
