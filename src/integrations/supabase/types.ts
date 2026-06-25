@@ -2910,6 +2910,7 @@ export type Database = {
         }[]
       }
       get_resend_audience_mappings: { Args: never; Returns: Json }
+      get_returning_family_by_email: { Args: { _email: string }; Returns: Json }
       get_session_enrollment_counts: {
         Args: { _session_ids: string[] }
         Returns: {

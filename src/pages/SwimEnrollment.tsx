@@ -12,6 +12,7 @@ import EnrollmentCheckout from "@/components/swim-enrollment/EnrollmentCheckout"
 import SessionFullFallback from "@/components/swim-enrollment/SessionFullFallback";
 import LessonRequestForm from "@/components/swim-enrollment/LessonRequestForm";
 import PrivateBookingFlow from "@/components/private-lessons/PrivateBookingFlow";
+import ReturningFamilyEntry, { type ReturningFamilyLookup, type ReturningSwimmer } from "@/components/swim-enrollment/ReturningFamilyEntry";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { SwimLevel, PRICING } from "@/components/swim-enrollment/types";
 import { WAIVER_VERSION, TOS_VERSION, PRIVACY_POLICY_VERSION } from "@/components/swim-enrollment/legal-content";
@@ -20,7 +21,25 @@ import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
-type Step = "assess" | "session" | "info" | "legal" | "payment" | "full" | "done";
+type Step = "returning" | "assess" | "session" | "info" | "legal" | "payment" | "full" | "done";
+
+function ageFromDob(dob: string | null | undefined): number {
+  if (!dob) return 0;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return 0;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+  return age;
+}
+
+function normalizeLevel(v: string | null | undefined): SwimLevel | null {
+  if (!v) return null;
+  const key = v.trim().toLowerCase();
+  const valid: SwimLevel[] = ["white", "red", "yellow", "blue", "green"] as unknown as SwimLevel[];
+  return (valid as string[]).includes(key) ? (key as SwimLevel) : null;
+}
 
 const ENROLLMENT_STORAGE_KEY = "swim_enrollment_state";
 
@@ -44,7 +63,7 @@ const SwimEnrollment = () => {
   const isRequest = searchParams.get("type") === "request";
   const isDone = searchParams.get("step") === "done";
 
-  const [step, setStep] = useState<Step>(isDone ? "done" : "assess");
+  const [step, setStep] = useState<Step>(isDone ? "done" : "returning");
   // Current child being enrolled (in-progress state)
   const [level, setLevel] = useState<SwimLevel | null>(null);
   const [childAge, setChildAge] = useState(0);
@@ -56,6 +75,11 @@ const SwimEnrollment = () => {
   const [completedChildren, setCompletedChildren] = useState<ChildEnrollment[]>([]);
   const [sharedParent, setSharedParent] = useState<{ firstName: string; lastName: string; email: string; phone: string } | null>(null);
   const [sharedEmergency, setSharedEmergency] = useState<{ firstName: string; lastName: string; phone: string; relationship: string } | null>(null);
+
+  // Returning-family flow state
+  const [returningLookup, setReturningLookup] = useState<ReturningFamilyLookup | null>(null);
+  // "case1" = picked an existing swimmer; after session selection we skip the info form.
+  const [flow, setFlow] = useState<"new" | "case1" | "case2">("new");
 
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
@@ -74,9 +98,15 @@ const SwimEnrollment = () => {
   const [confirmedChildren, setConfirmedChildren] = useState<ChildEnrollment[]>([]);
   const { toast } = useToast();
 
-  const allSteps = ["Assessment", "Session", "Details", "Agreements", "Payment", "Confirmed"];
-  const stepKeys = ["assess", "session", "info", "legal", "payment", "done"];
-  const stepIndex = stepKeys.indexOf(step);
+  // Progress indicator adapts to the chosen flow. Case 1 (existing swimmer) is
+  // a 2-step happy path: pick a session, then pay.
+  const allSteps = flow === "case1"
+    ? ["Session", "Payment", "Confirmed"]
+    : ["Assessment", "Session", "Details", "Agreements", "Payment", "Confirmed"];
+  const stepKeys = flow === "case1"
+    ? ["session", "payment", "done"]
+    : ["assess", "session", "info", "legal", "payment", "done"];
+  const stepIndex = Math.max(0, stepKeys.indexOf(step));
 
   // Restore state from localStorage when returning from Stripe
   useEffect(() => {
@@ -104,8 +134,101 @@ const SwimEnrollment = () => {
     setStep("session");
   };
 
-  const handleSessionSelect = (ids: string[]) => {
+  // --- Returning family entry handlers ---
+
+  const handleStartNew = () => {
+    setFlow("new");
+    setReturningLookup(null);
+    setStep("assess");
+  };
+
+  const handleReturningLookup = (result: ReturningFamilyLookup) => {
+    setReturningLookup(result);
+    if (result.parent) {
+      setSharedParent({
+        firstName: result.parent.first_name || "",
+        lastName: result.parent.last_name || "",
+        email: result.email,
+        phone: result.parent.phone || "",
+      });
+    }
+    if (result.emergency && result.emergency.first_name) {
+      setSharedEmergency({
+        firstName: result.emergency.first_name || "",
+        lastName: result.emergency.last_name || "",
+        phone: result.emergency.phone || "",
+        relationship: result.emergency.relationship || "",
+      });
+    }
+  };
+
+  const handlePickExistingSwimmer = (s: ReturningSwimmer, _lookup: ReturningFamilyLookup) => {
+    // Case 1: existing swimmer — pre-fill child info and skip assessment.
+    const lvl = normalizeLevel(s.last_level);
+    if (!lvl) {
+      // No usable prior level — fall back to running them through assessment,
+      // but keep parent/emergency pre-fill so paperwork is still skipped later.
+      setFlow("case2");
+      setChildDob(s.dob || "");
+      setStep("assess");
+      toast({
+        title: `Welcome back, ${s.first_name}`,
+        description: "We need a quick level check before picking a session.",
+      });
+      return;
+    }
+    setFlow("case1");
+    setLevel(lvl);
+    setChildDob(s.dob || "");
+    setChildAge(ageFromDob(s.dob));
+    // Stash the child name fields by synthesizing into enrollmentData later.
+    // For now, we set the per-child state used by SessionPicker/proceedToPayment.
+    setEnrollmentData(null);
+    // Save first/last on a transient holder via state hack: we read these in
+    // handleSessionSelect when synthesizing the EnrollmentFormData.
+    setReturningLookup((prev) => prev ? { ...prev, swimmers: [{ ...s }, ...prev.swimmers.filter(x => x !== s)] } : prev);
+    setStep("session");
+    toast({
+      title: `Re-enrolling ${s.first_name}`,
+      description: "Pick a session and you'll go straight to checkout.",
+    });
+  };
+
+  const handleAddNewSwimmerForReturning = (_lookup: ReturningFamilyLookup) => {
+    // Case 2: known parent, brand-new child. Parent block pre-fills via
+    // sharedParent; emergency contact still collected per-swimmer.
+    setFlow("case2");
+    setStep("assess");
+  };
+
+  const handleSessionSelect = async (ids: string[]) => {
     setSessionIds(ids);
+
+    if (flow === "case1" && returningLookup) {
+      // Synthesize an EnrollmentFormData from the saved parent + chosen swimmer
+      // and skip the info form entirely. handleInfoSubmit will then check for
+      // an active waiver and either skip legal or render it pre-filled.
+      const swimmer = returningLookup.swimmers[0];
+      const parent = returningLookup.parent;
+      const synthetic: EnrollmentFormData = {
+        parentFirstName: parent?.first_name || "",
+        parentLastName: parent?.last_name || "",
+        parentEmail: returningLookup.email,
+        parentPhone: parent?.phone || "",
+        childFirstName: swimmer?.first_name || "",
+        childLastName: swimmer?.last_name || "",
+        notes: "",
+        isFirstTime: "no",
+        hasMedical: "no",
+        medicalNotes: "",
+        smsConsent: false,
+        parentName: `${parent?.first_name || ""} ${parent?.last_name || ""}`.trim(),
+        childName: `${swimmer?.first_name || ""} ${swimmer?.last_name || ""}`.trim(),
+      };
+      await handleInfoSubmit(synthetic);
+      return;
+    }
+
     setStep("info");
   };
 
@@ -416,39 +539,56 @@ const SwimEnrollment = () => {
         </div>
 
         {/* Mobile progress */}
-        <div className="sm:hidden mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-foreground">
-              Step {stepIndex + 1}: {allSteps[stepIndex]}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {stepIndex + 1} of {allSteps.length}
-            </span>
+        {step !== "returning" && (
+          <div className="sm:hidden mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-foreground">
+                Step {stepIndex + 1}: {allSteps[stepIndex]}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {stepIndex + 1} of {allSteps.length}
+              </span>
+            </div>
+            <Progress value={((stepIndex + 1) / allSteps.length) * 100} className="h-2" />
           </div>
-          <Progress value={((stepIndex + 1) / allSteps.length) * 100} className="h-2" />
-        </div>
+        )}
 
         {/* Desktop step circles */}
-        <div className="hidden sm:flex items-center justify-center gap-2 max-w-xl mx-auto mb-8">
-          {allSteps.map((label, i) => (
-            <div key={label} className="flex items-center gap-2 flex-1">
-              <div className="flex flex-col items-center flex-1">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${i <= stepIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                  {i + 1}
+        {step !== "returning" && (
+          <div className="hidden sm:flex items-center justify-center gap-2 max-w-xl mx-auto mb-8">
+            {allSteps.map((label, i) => (
+              <div key={label} className="flex items-center gap-2 flex-1">
+                <div className="flex flex-col items-center flex-1">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${i <= stepIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    {i + 1}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">{label}</span>
                 </div>
-                <span className="text-xs text-muted-foreground mt-1">{label}</span>
+                {i < allSteps.length - 1 && (
+                  <div className={`h-0.5 flex-1 -mt-6 ${i < stepIndex ? "bg-primary" : "bg-muted"}`} />
+                )}
               </div>
-              {i < allSteps.length - 1 && (
-                <div className={`h-0.5 flex-1 -mt-6 ${i < stepIndex ? "bg-primary" : "bg-muted"}`} />
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="pb-16">
+          {step === "returning" && (
+            <ReturningFamilyEntry
+              onStartNew={handleStartNew}
+              onLookupComplete={handleReturningLookup}
+              onPickExisting={handlePickExistingSwimmer}
+              onAddNewForReturning={handleAddNewSwimmerForReturning}
+            />
+          )}
           {step === "assess" && <SwimAssessment onComplete={handleAssessmentComplete} />}
           {step === "session" && level && (
-            <SessionPicker level={level} childAge={childAge} onSelect={handleSessionSelect} onBack={() => setStep("assess")} />
+            <SessionPicker
+              level={level}
+              childAge={childAge}
+              onSelect={handleSessionSelect}
+              onBack={() => setStep(flow === "case1" ? "returning" : "assess")}
+            />
           )}
           {step === "info" && (
             <EnrollmentForm
