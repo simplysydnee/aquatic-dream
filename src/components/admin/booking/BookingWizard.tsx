@@ -1791,10 +1791,18 @@ function ReviewStep({
     }
   };
 
-  const finalizePrivate = useCallback(async (sessionId: string | null, customerId: string | null) => {
+  const finalizePrivate = useCallback(async (
+    sessionId: string | null,
+    customerId: string | null,
+    sourceOverride?: "reuse" | "new" | "none",
+  ) => {
     setStage("finalizing");
     try {
       const sw = draft.client.swimmers[0];
+      const source = sourceOverride
+        ?? (sessionId ? "new" : (draft.payment.collectCardOnFile
+          ? (existingCardHint?.found && cardChoice === "reuse" ? "reuse" : "none")
+          : "none"));
       const body: any = {
         instructor_id: draft.slot!.instructorId,
         lesson_type: draft.type === "semi_private" ? "semi_private" : "private",
@@ -1818,7 +1826,8 @@ function ReviewStep({
         occurrence_dates: occurrenceDates,
         price_per_session: draft.payment.priceOverride ? Number(draft.payment.priceOverride) : undefined,
         send_confirmation: draft.payment.sendConfirmation,
-        collect_card_on_file: draft.payment.collectCardOnFile,
+        collect_card_on_file: source !== "none",
+        card_on_file_source: source,
         stripe_environment: getStripeEnvironment(),
         stripe_customer_id: customerId,
         stripe_checkout_session_id: sessionId,
@@ -1834,17 +1843,33 @@ function ReviewStep({
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking", { body });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast.success(`Booking created — ${(data as any)?.occurrences ?? occurrenceDates.length} lesson(s)`);
+      const used = (data as any)?.card_on_file_source;
+      const occ = (data as any)?.occurrences ?? occurrenceDates.length;
+      toast.success(
+        used === "reuse"
+          ? `Booking created — ${occ} lesson(s) · card on file reused`
+          : `Booking created — ${occ} lesson(s)`,
+      );
       onDone?.();
     } catch (e: any) {
       toast.error(e?.message || "Failed to create booking");
       setStage("review");
     }
-  }, [draft, occurrenceDates, onDone]);
+  }, [draft, occurrenceDates, onDone, existingCardHint, cardChoice]);
 
   const handleBook = async () => {
     if (isGroup) { submitGroup(); return; }
-    if (!draft.payment.collectCardOnFile) { finalizePrivate(null, null); return; }
+    // No card requested.
+    if (!draft.payment.collectCardOnFile || cardChoice === "none") {
+      finalizePrivate(null, null, "none");
+      return;
+    }
+    // Reuse existing card on file — no Stripe Checkout needed.
+    if (existingCardHint?.found && cardChoice === "reuse") {
+      finalizePrivate(null, null, "reuse");
+      return;
+    }
+    // Fall through: collect a new card via Setup Checkout.
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking-setup", {
@@ -1868,6 +1893,7 @@ function ReviewStep({
       setSubmitting(false);
     }
   };
+
 
   const handleCardComplete = useCallback(() => {
     if (!checkoutSessionId) return;
