@@ -49,6 +49,11 @@ function normalizeLevel(v: string | null | undefined): SwimLevel | null {
   return (valid as string[]).includes(key) ? (key as SwimLevel) : null;
 }
 
+function ageGroupForLevel(level: SwimLevel): "preschool-3-5" | "school-age-6-12" {
+  if (level === "white" || level === "red") return "preschool-3-5";
+  return "school-age-6-12";
+}
+
 const ENROLLMENT_STORAGE_KEY = "swim_enrollment_state";
 
 interface ChildEnrollment {
@@ -191,7 +196,8 @@ const SwimEnrollment = () => {
     setLevel(lvl);
     setPriorLevel(lvl);
     setChildDob(s.dob || "");
-    setChildAge(ageFromDob(s.dob));
+    const computedAge = ageFromDob(s.dob);
+    setChildAge(computedAge === 0 ? (ageGroupForLevel(lvl) === "preschool-3-5" ? 3 : 8) : computedAge);
     setExcludePeriodIds(Array.isArray(s.enrolled_period_ids) ? s.enrolled_period_ids : []);
     setEnrollmentData(null);
     setReturningLookup((prev) => prev ? { ...prev, swimmers: [{ ...s }, ...prev.swimmers.filter(x => x !== s)] } : prev);
