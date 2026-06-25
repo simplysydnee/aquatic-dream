@@ -111,10 +111,10 @@ const SwimEnrollment = () => {
   // Progress indicator adapts to the chosen flow. Case 1 (existing swimmer) is
   // a 2-step happy path: pick a session, then pay.
   const allSteps = flow === "case1"
-    ? ["Session", "Payment", "Confirmed"]
+    ? ["Level", "Session", "Payment", "Confirmed"]
     : ["Assessment", "Session", "Details", "Agreements", "Payment", "Confirmed"];
   const stepKeys = flow === "case1"
-    ? ["session", "payment", "done"]
+    ? ["level_choice", "session", "payment", "done"]
     : ["assess", "session", "info", "legal", "payment", "done"];
   const stepIndex = Math.max(0, stepKeys.indexOf(step));
 
