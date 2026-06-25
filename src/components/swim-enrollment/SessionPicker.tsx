@@ -104,8 +104,12 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
           return;
         }
 
-        const activePeriodIds = new Set(periods.map(p => p.id));
-        const activeSessions = sessions.filter(s => s.session_period_id && activePeriodIds.has(s.session_period_id));
+        const excludeSet = new Set(excludePeriodIds || []);
+        const activeSessions = sessions.filter(s =>
+          s.session_period_id
+          && activePeriodIds.has(s.session_period_id)
+          && !excludeSet.has(s.session_period_id)
+        );
 
         if (activeSessions.length === 0) {
           setSlots([]);
