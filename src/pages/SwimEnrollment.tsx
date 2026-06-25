@@ -590,12 +590,55 @@ const SwimEnrollment = () => {
             />
           )}
           {step === "assess" && <SwimAssessment onComplete={handleAssessmentComplete} />}
+          {step === "level_choice" && priorLevel && (() => {
+            const up = nextLevel(priorLevel);
+            const swimmerName = returningLookup?.swimmers[0]?.first_name || "your swimmer";
+            return (
+              <div className="max-w-xl mx-auto">
+                <h3 className="font-display text-2xl font-bold text-foreground mb-1">Same level or moving up?</h3>
+                <p className="text-muted-foreground text-sm mb-6">
+                  {swimmerName} last enrolled in <strong>{LEVEL_LABEL[priorLevel as unknown as string]}</strong>. Stay here or move up for the next session?
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setLevel(priorLevel); setStep("session"); }}
+                    className="border border-border rounded-lg p-5 text-left hover:border-primary hover:bg-primary/5 transition-colors"
+                  >
+                    <div className="font-semibold text-foreground mb-1">Stay in {LEVEL_LABEL[priorLevel as unknown as string]}</div>
+                    <div className="text-xs text-muted-foreground">Continue at the same level for the next session.</div>
+                  </button>
+                  {up ? (
+                    <button
+                      type="button"
+                      onClick={() => { setLevel(up); setStep("session"); }}
+                      className="border border-border rounded-lg p-5 text-left hover:border-primary hover:bg-primary/5 transition-colors"
+                    >
+                      <div className="font-semibold text-foreground mb-1">Move up to {LEVEL_LABEL[up as unknown as string]}</div>
+                      <div className="text-xs text-muted-foreground">Your instructor can reassess on day one if needed.</div>
+                    </button>
+                  ) : (
+                    <div className="border border-dashed border-border rounded-lg p-5 text-left opacity-60">
+                      <div className="font-semibold text-foreground mb-1">Top level reached</div>
+                      <div className="text-xs text-muted-foreground">Green is our highest group level.</div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-6">
+                  <Button variant="ghost" onClick={() => setStep("returning")}>
+                    Back
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
           {step === "session" && level && (
             <SessionPicker
               level={level}
               childAge={childAge}
+              excludePeriodIds={flow === "case1" ? excludePeriodIds : undefined}
               onSelect={handleSessionSelect}
-              onBack={() => setStep(flow === "case1" ? "returning" : "assess")}
+              onBack={() => setStep(flow === "case1" ? "level_choice" : "assess")}
             />
           )}
           {step === "info" && (
