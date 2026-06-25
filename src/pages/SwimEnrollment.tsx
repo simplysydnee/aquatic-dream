@@ -539,39 +539,56 @@ const SwimEnrollment = () => {
         </div>
 
         {/* Mobile progress */}
-        <div className="sm:hidden mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-foreground">
-              Step {stepIndex + 1}: {allSteps[stepIndex]}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {stepIndex + 1} of {allSteps.length}
-            </span>
+        {step !== "returning" && (
+          <div className="sm:hidden mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-foreground">
+                Step {stepIndex + 1}: {allSteps[stepIndex]}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {stepIndex + 1} of {allSteps.length}
+              </span>
+            </div>
+            <Progress value={((stepIndex + 1) / allSteps.length) * 100} className="h-2" />
           </div>
-          <Progress value={((stepIndex + 1) / allSteps.length) * 100} className="h-2" />
-        </div>
+        )}
 
         {/* Desktop step circles */}
-        <div className="hidden sm:flex items-center justify-center gap-2 max-w-xl mx-auto mb-8">
-          {allSteps.map((label, i) => (
-            <div key={label} className="flex items-center gap-2 flex-1">
-              <div className="flex flex-col items-center flex-1">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${i <= stepIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                  {i + 1}
+        {step !== "returning" && (
+          <div className="hidden sm:flex items-center justify-center gap-2 max-w-xl mx-auto mb-8">
+            {allSteps.map((label, i) => (
+              <div key={label} className="flex items-center gap-2 flex-1">
+                <div className="flex flex-col items-center flex-1">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${i <= stepIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    {i + 1}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1">{label}</span>
                 </div>
-                <span className="text-xs text-muted-foreground mt-1">{label}</span>
+                {i < allSteps.length - 1 && (
+                  <div className={`h-0.5 flex-1 -mt-6 ${i < stepIndex ? "bg-primary" : "bg-muted"}`} />
+                )}
               </div>
-              {i < allSteps.length - 1 && (
-                <div className={`h-0.5 flex-1 -mt-6 ${i < stepIndex ? "bg-primary" : "bg-muted"}`} />
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="pb-16">
+          {step === "returning" && (
+            <ReturningFamilyEntry
+              onStartNew={handleStartNew}
+              onLookupComplete={handleReturningLookup}
+              onPickExisting={handlePickExistingSwimmer}
+              onAddNewForReturning={handleAddNewSwimmerForReturning}
+            />
+          )}
           {step === "assess" && <SwimAssessment onComplete={handleAssessmentComplete} />}
           {step === "session" && level && (
-            <SessionPicker level={level} childAge={childAge} onSelect={handleSessionSelect} onBack={() => setStep("assess")} />
+            <SessionPicker
+              level={level}
+              childAge={childAge}
+              onSelect={handleSessionSelect}
+              onBack={() => setStep(flow === "case1" ? "returning" : "assess")}
+            />
           )}
           {step === "info" && (
             <EnrollmentForm
