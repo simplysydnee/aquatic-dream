@@ -218,6 +218,7 @@ export default function EnrollmentCheckout({
                 Change
               </Button>
             </div>
+          )}
           {lastError && (
             <div className="mb-3 text-sm rounded-lg border border-red-300 bg-red-50 text-red-900 p-3">
               <p className="font-semibold mb-1">Checkout error</p>
