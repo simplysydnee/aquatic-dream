@@ -90,7 +90,7 @@ export default function AdminBookPrivateLessonDialog({ open, onOpenChange, prefi
     () => getPrivateLessonPrice(lessonType, date),
     [lessonType, date],
   );
-  const junePromo = isJunePromoDate(date);
+  const junePromo = isPromoDate(date);
 
   const reset = () => {
     setStep("form");

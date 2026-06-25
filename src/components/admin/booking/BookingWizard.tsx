@@ -18,7 +18,7 @@ import {
   GraduationCap, User as UserIcon, Clock, Calendar as CalendarIcon, ShieldCheck, Lock, CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
+import { getPrivateLessonPrice, isPromoDate, PROMO_LABEL } from "@/lib/privateLessonPricing";
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { LEVEL_DISPLAY } from "@/components/swim-enrollment/types";
@@ -1952,8 +1952,8 @@ function ReviewStep({
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-semibold">Price</p>
-            {occurrenceDates.some(isJunePromoDate) && draft.type === "private" && (
-              <Badge variant="secondary" className="text-[10px]">June promo applied</Badge>
+            {occurrenceDates.some(isPromoDate) && draft.type === "private" && (
+              <Badge variant="secondary" className="text-[10px]">{PROMO_LABEL} applied</Badge>
             )}
           </div>
           <div className="grid grid-cols-2 gap-3">

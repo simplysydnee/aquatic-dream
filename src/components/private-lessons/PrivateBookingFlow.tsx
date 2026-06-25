@@ -13,7 +13,7 @@ import SlotPicker from "./SlotPicker";
 import PrivateCardSetup from "./PrivateCardSetup";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { Slot, releaseHolds, fetchOpenSlots } from "@/lib/privateBooking";
-import { getPrivateLessonPrice, isJunePromoDate, JUNE_PROMO_ACTIVE_FOR_TODAY, PRIVATE_REGULAR_PRICE } from "@/lib/privateLessonPricing";
+import { getPrivateLessonPrice, isPromoDate, PROMO_ACTIVE_FOR_TODAY, PROMO_LABEL, PRIVATE_PROMO_PRICE, PRIVATE_REGULAR_PRICE } from "@/lib/privateLessonPricing";
 import { lookupActiveWaiver, legalDataFromWaiver, backfillVisitorWaiver, ActiveWaiver } from "@/lib/swimmerWaiver";
 
 import { z } from "zod";
@@ -317,14 +317,14 @@ export default function PrivateBookingFlow() {
             {slots.length} lesson{slots.length === 1 ? "" : "s"} selected ·{" "}
             {anyPromo && <span className="line-through text-muted-foreground mr-1">${slots.length * PRIVATE_REGULAR_PRICE}</span>}
             <span>${total} total</span>
-            {anyPromo && <span className="ml-2 text-xs text-coral font-semibold uppercase tracking-wide">June Special</span>}
+            {anyPromo && <span className="ml-2 text-xs text-coral font-semibold uppercase tracking-wide">{PROMO_LABEL}</span>}
           </p>
           <ul className="text-xs text-muted-foreground space-y-0.5 max-h-32 overflow-y-auto">
             {slots.map((s, i) => (
               <li key={i}>
                 {new Date(s.slot_date + "T00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                 {" · "}{formatTime(s.start_time)} · {s.instructor_name}
-                {isJunePromoDate(s.slot_date) && <span className="ml-1 text-coral font-semibold">· $50</span>}
+                {isPromoDate(s.slot_date) && <span className="ml-1 text-coral font-semibold">· ${PRIVATE_PROMO_PRICE}</span>}
               </li>
             ))}
           </ul>
@@ -376,15 +376,15 @@ export default function PrivateBookingFlow() {
   return (
     <form onSubmit={handleInfoSubmit} className="max-w-lg mx-auto space-y-4">
       <h3 className="font-display text-2xl font-bold text-foreground mb-1">Book a private lesson</h3>
-      {JUNE_PROMO_ACTIVE_FOR_TODAY ? (
+      {PROMO_ACTIVE_FOR_TODAY ? (
         <p className="text-muted-foreground text-sm mb-4">
           <span className="inline-flex items-center gap-1.5 mr-2 px-2 py-0.5 rounded-full bg-coral/15 border border-coral/30 text-xs font-semibold text-foreground">
-            ★ June Special · <span className="line-through text-muted-foreground">$65</span> $50
+            ★ {PROMO_LABEL} · <span className="line-through text-muted-foreground">${PRIVATE_REGULAR_PRICE}</span> ${PRIVATE_PROMO_PRICE}
           </span>
           per 30-minute lesson. Card on file required; charged the day of each lesson. Cancel free up to 24 hours before — late cancellations and no-shows are charged in full.
         </p>
       ) : (
-        <p className="text-muted-foreground text-sm mb-4">$65 per 30-minute lesson. Card on file required; charged the day of each lesson. Cancel free up to 24 hours before — late cancellations and no-shows are charged in full.</p>
+        <p className="text-muted-foreground text-sm mb-4">${PRIVATE_REGULAR_PRICE} per 30-minute lesson. Card on file required; charged the day of each lesson. Cancel free up to 24 hours before — late cancellations and no-shows are charged in full.</p>
       )}
 
       <div>
