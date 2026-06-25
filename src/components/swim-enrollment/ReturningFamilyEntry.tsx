@@ -13,6 +13,7 @@ export interface ReturningSwimmer {
   dob: string | null;
   last_level: string | null;
   last_enrolled_at: string | null;
+  enrolled_period_ids: string[];
 }
 
 export interface ReturningFamilyLookup {
