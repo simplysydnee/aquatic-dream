@@ -12,6 +12,7 @@ import EnrollmentCheckout from "@/components/swim-enrollment/EnrollmentCheckout"
 import SessionFullFallback from "@/components/swim-enrollment/SessionFullFallback";
 import LessonRequestForm from "@/components/swim-enrollment/LessonRequestForm";
 import PrivateBookingFlow from "@/components/private-lessons/PrivateBookingFlow";
+import ReturningFamilyEntry, { type ReturningFamilyLookup, type ReturningSwimmer } from "@/components/swim-enrollment/ReturningFamilyEntry";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { SwimLevel, PRICING } from "@/components/swim-enrollment/types";
 import { WAIVER_VERSION, TOS_VERSION, PRIVACY_POLICY_VERSION } from "@/components/swim-enrollment/legal-content";
@@ -20,7 +21,25 @@ import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
-type Step = "assess" | "session" | "info" | "legal" | "payment" | "full" | "done";
+type Step = "returning" | "assess" | "session" | "info" | "legal" | "payment" | "full" | "done";
+
+function ageFromDob(dob: string | null | undefined): number {
+  if (!dob) return 0;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return 0;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+  return age;
+}
+
+function normalizeLevel(v: string | null | undefined): SwimLevel | null {
+  if (!v) return null;
+  const key = v.trim().toLowerCase();
+  const valid: SwimLevel[] = ["white", "red", "yellow", "blue", "green"] as unknown as SwimLevel[];
+  return (valid as string[]).includes(key) ? (key as SwimLevel) : null;
+}
 
 const ENROLLMENT_STORAGE_KEY = "swim_enrollment_state";
 
