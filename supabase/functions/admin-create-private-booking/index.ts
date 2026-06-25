@@ -594,8 +594,8 @@ Deno.serve(async (req) => {
       booking_id: bookingId,
       occurrence_date: d,
       status: "scheduled",
-      payment_status: p.collect_card_on_file ? "card_on_file" : "unpaid",
-      charge_status: p.collect_card_on_file ? "pending" : "skipped",
+      payment_status: effectiveCardOnFile ? "card_on_file" : "unpaid",
+      charge_status: effectiveCardOnFile ? "pending" : "skipped",
     }));
     const { error: oErr } = await supabaseAdmin
       .from("lesson_booking_occurrences")
