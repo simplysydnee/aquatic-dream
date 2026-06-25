@@ -46,6 +46,13 @@ const CreateSchema = z.object({
   price_per_session: z.number().positive().optional(),
   send_confirmation: z.boolean().default(true),
   collect_card_on_file: z.boolean().default(true),
+  // Card-on-file source resolution:
+  //   "reuse"  - server must reuse an existing valid PM for this parent
+  //              (validated against Stripe); 409 if none qualify.
+  //   "new"    - new Setup Checkout was completed; use the session id below.
+  //   "none"   - no card collected (bill-in-person / comp).
+  //   omitted  - server runs the lookup itself and reuses if valid.
+  card_on_file_source: z.enum(["reuse", "new", "none"]).optional(),
   // Card-on-file resolution (set by client after embedded Setup Checkout completes)
   stripe_environment: z.enum(["sandbox", "live"]).optional(),
   stripe_customer_id: z.string().optional().nullable(),
