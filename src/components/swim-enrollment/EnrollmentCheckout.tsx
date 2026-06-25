@@ -93,25 +93,36 @@ export default function EnrollmentCheckout({
 
   const handleReserve = useCallback(async () => {
     setReserving(true);
+    setLastError(null);
     try {
-      const built = buildPayload({ payAheadForFirstTimers: false }) as any;
+      const built = buildPayload({ payAheadForFirstTimers: false }) as unknown;
       const { data, error } = await supabase.functions.invoke("create-pending-enrollment", {
         body: { payload: built, environment: getStripeEnvironment() },
       });
       if (error || !data?.success) {
-        throw new Error(error?.message || data?.error || "Failed to reserve seat");
+        const msg = String(error?.message || data?.error || "Failed to reserve seat");
+        // eslint-disable-next-line no-console
+        console.error("[checkout] reserve failed", {
+          message: msg,
+          status: (error as { context?: { status?: number } } | null)?.context?.status,
+          data,
+          customerEmail,
+        });
+        throw new Error(msg);
       }
       setReserved(true);
     } catch (e) {
+      const msg = (e as Error).message;
+      setLastError(msg);
       toast({
         title: "Could not reserve your seat",
-        description: (e as Error).message,
+        description: msg,
         variant: "destructive",
       });
     } finally {
       setReserving(false);
     }
-  }, [buildPayload]);
+  }, [buildPayload, customerEmail]);
 
   if (CHECKOUT_FALLBACK && reserved) {
     return (
