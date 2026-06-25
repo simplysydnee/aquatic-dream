@@ -175,6 +175,7 @@ serve(async (req) => {
       const used = countMap[sid] || 0;
       const wanted = requestedMap[sid] || 0;
       if (used + wanted > s.max_students) {
+        console.error("[create-checkout] capacity exceeded", { sessionId: sid, used, wanted, max: s.max_students });
         return new Response(JSON.stringify({ error: `Session ${sid} is full` }), {
           status: 409,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
