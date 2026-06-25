@@ -101,6 +101,7 @@ serve(async (req) => {
       .in("id", uniqueSessionIds);
 
     if (sessErr || !sessions || sessions.length !== uniqueSessionIds.length) {
+      console.error("[create-checkout] sessions not found", { sessErr, uniqueSessionIds, found: sessions?.length });
       return new Response(JSON.stringify({ error: "One or more sessions not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
