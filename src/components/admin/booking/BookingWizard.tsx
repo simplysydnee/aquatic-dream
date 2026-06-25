@@ -1685,7 +1685,20 @@ function ReviewStep({
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [waiverOnFile, setWaiverOnFile] = useState<boolean | null>(null);
-  const [existingCardHint, setExistingCardHint] = useState<{ last4?: string | null } | null>(null);
+  const [existingCardHint, setExistingCardHint] = useState<{
+    found: boolean;
+    brand?: string;
+    last4?: string;
+    exp_month?: number;
+    exp_year?: number;
+    source_booking_id?: string;
+    source_child_name?: string | null;
+    source_instructor_name?: string | null;
+  } | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  // Admin override: "reuse" (default when card found), "new" (collect fresh),
+  // "none" (skip card / bill in person). Resets when email changes.
+  const [cardChoice, setCardChoice] = useState<"reuse" | "new" | "none">("reuse");
 
   useEffect(() => { getStripe().then(setStripeReady).catch(() => {}); }, []);
 
@@ -1697,37 +1710,32 @@ function ReviewStep({
       .then(({ data }) => setWaiverOnFile(!!data));
   }, [draft.client.swimmers]);
 
-  // Card on file lookup: read-only display only. Never modifies the
-  // collectCardOnFile toggle — admin controls that explicitly.
+  // Card on file lookup — validates against Stripe (attached + not expired).
   useEffect(() => {
     const email = draft.client.parent_email?.toLowerCase().trim();
-    if (!email || !email.includes("@")) { setExistingCardHint(null); return; }
+    setExistingCardHint(null);
+    setCardChoice("reuse");
+    if (!email || !email.includes("@")) return;
     let cancelled = false;
+    setLookupLoading(true);
     (async () => {
-      const [bookingRes, profileRes] = await Promise.all([
-        supabase
-          .from("lesson_bookings")
-          .select("stripe_payment_method_id")
-          .ilike("parent_email", email)
-          .not("stripe_payment_method_id", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("profiles")
-          .select("stripe_default_pm_id")
-          .ilike("email", email)
-          .not("stripe_default_pm_id", "is", null)
-          .limit(1)
-          .maybeSingle(),
-      ]);
-      if (cancelled) return;
-      const hasCard = !!(bookingRes.data as any)?.stripe_payment_method_id
-        || !!(profileRes.data as any)?.stripe_default_pm_id;
-      setExistingCardHint(hasCard ? {} : null);
+      try {
+        const { data, error } = await supabase.functions.invoke("lookup-parent-card-on-file", {
+          body: { parent_email: email, environment: getStripeEnvironment() },
+        });
+        if (cancelled) return;
+        if (error || !data || (data as any).error) {
+          setExistingCardHint({ found: false });
+        } else {
+          setExistingCardHint(data as any);
+        }
+      } finally {
+        if (!cancelled) setLookupLoading(false);
+      }
     })();
     return () => { cancelled = true; };
   }, [draft.client.parent_email]);
+
 
   const isGroup = draft.type === "group";
   const occurrenceDates = draft.slot?.mode === "recurring"
@@ -1783,10 +1791,18 @@ function ReviewStep({
     }
   };
 
-  const finalizePrivate = useCallback(async (sessionId: string | null, customerId: string | null) => {
+  const finalizePrivate = useCallback(async (
+    sessionId: string | null,
+    customerId: string | null,
+    sourceOverride?: "reuse" | "new" | "none",
+  ) => {
     setStage("finalizing");
     try {
       const sw = draft.client.swimmers[0];
+      const source = sourceOverride
+        ?? (sessionId ? "new" : (draft.payment.collectCardOnFile
+          ? (existingCardHint?.found && cardChoice === "reuse" ? "reuse" : "none")
+          : "none"));
       const body: any = {
         instructor_id: draft.slot!.instructorId,
         lesson_type: draft.type === "semi_private" ? "semi_private" : "private",
@@ -1810,7 +1826,8 @@ function ReviewStep({
         occurrence_dates: occurrenceDates,
         price_per_session: draft.payment.priceOverride ? Number(draft.payment.priceOverride) : undefined,
         send_confirmation: draft.payment.sendConfirmation,
-        collect_card_on_file: draft.payment.collectCardOnFile,
+        collect_card_on_file: source !== "none",
+        card_on_file_source: source,
         stripe_environment: getStripeEnvironment(),
         stripe_customer_id: customerId,
         stripe_checkout_session_id: sessionId,
@@ -1826,17 +1843,33 @@ function ReviewStep({
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking", { body });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast.success(`Booking created — ${(data as any)?.occurrences ?? occurrenceDates.length} lesson(s)`);
+      const used = (data as any)?.card_on_file_source;
+      const occ = (data as any)?.occurrences ?? occurrenceDates.length;
+      toast.success(
+        used === "reuse"
+          ? `Booking created — ${occ} lesson(s) · card on file reused`
+          : `Booking created — ${occ} lesson(s)`,
+      );
       onDone?.();
     } catch (e: any) {
       toast.error(e?.message || "Failed to create booking");
       setStage("review");
     }
-  }, [draft, occurrenceDates, onDone]);
+  }, [draft, occurrenceDates, onDone, existingCardHint, cardChoice]);
 
   const handleBook = async () => {
     if (isGroup) { submitGroup(); return; }
-    if (!draft.payment.collectCardOnFile) { finalizePrivate(null, null); return; }
+    // No card requested.
+    if (!draft.payment.collectCardOnFile || cardChoice === "none") {
+      finalizePrivate(null, null, "none");
+      return;
+    }
+    // Reuse existing card on file — no Stripe Checkout needed.
+    if (existingCardHint?.found && cardChoice === "reuse") {
+      finalizePrivate(null, null, "reuse");
+      return;
+    }
+    // Fall through: collect a new card via Setup Checkout.
     setSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking-setup", {
@@ -1860,6 +1893,7 @@ function ReviewStep({
       setSubmitting(false);
     }
   };
+
 
   const handleCardComplete = useCallback(() => {
     if (!checkoutSessionId) return;
@@ -1999,18 +2033,57 @@ function ReviewStep({
             />
             <Label htmlFor="cof" className="text-sm cursor-pointer">Collect card on file (charge day of each lesson)</Label>
           </div>
-          {existingCardHint && (
+          {draft.payment.collectCardOnFile && lookupLoading && (
+            <p className="text-xs text-muted-foreground pl-10">Checking for existing card on file…</p>
+          )}
+          {draft.payment.collectCardOnFile && existingCardHint?.found && cardChoice === "reuse" && (
+            <div className="ml-10 rounded-md border border-green-300 bg-green-50 p-3 space-y-2">
+              <p className="text-sm font-medium text-green-900">
+                Using card on file
+              </p>
+              <p className="text-xs text-green-800">
+                {(existingCardHint.brand || "Card").toUpperCase()} ending in {existingCardHint.last4}
+                {existingCardHint.exp_month && existingCardHint.exp_year &&
+                  ` · exp ${String(existingCardHint.exp_month).padStart(2, "0")}/${String(existingCardHint.exp_year).slice(-2)}`}
+                {existingCardHint.source_child_name && ` · from ${existingCardHint.source_child_name} booking`}
+              </p>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs"
+                  onClick={() => setCardChoice("new")}>
+                  Use a different card
+                </Button>
+                <Button type="button" size="sm" variant="ghost" className="h-7 text-xs"
+                  onClick={() => setCardChoice("none")}>
+                  Skip card / bill in person
+                </Button>
+              </div>
+            </div>
+          )}
+          {draft.payment.collectCardOnFile && existingCardHint?.found && cardChoice !== "reuse" && (
             <p className="text-xs text-muted-foreground pl-10">
-              Card already on file for this client — leave off unless you need to replace it.
+              {cardChoice === "new" ? "Will collect a new card after this step." : "No card will be collected."}{" "}
+              <button type="button" className="underline" onClick={() => setCardChoice("reuse")}>
+                Reuse card on file instead
+              </button>
             </p>
+          )}
+          {draft.payment.collectCardOnFile && existingCardHint && !existingCardHint.found && (
+            <p className="text-xs text-muted-foreground pl-10">No valid card on file — new card will be collected.</p>
           )}
         </div>
       )}
 
       <Button onClick={handleBook} disabled={submitting} className="w-full" size="lg">
         {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-        {isGroup ? "Create enrollment" : draft.payment.collectCardOnFile ? "Continue to card on file" : "Create booking"}
+        {isGroup
+          ? "Create enrollment"
+          : !draft.payment.collectCardOnFile || cardChoice === "none"
+          ? "Create booking"
+          : existingCardHint?.found && cardChoice === "reuse"
+          ? "Create booking · reuse card on file"
+          : "Continue to card on file"}
       </Button>
+
     </Card>
   );
 }
