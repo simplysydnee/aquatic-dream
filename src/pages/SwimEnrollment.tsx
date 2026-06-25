@@ -88,6 +88,8 @@ const SwimEnrollment = () => {
   const [returningLookup, setReturningLookup] = useState<ReturningFamilyLookup | null>(null);
   // "case1" = picked an existing swimmer; after session selection we skip the info form.
   const [flow, setFlow] = useState<"new" | "case1" | "case2">("new");
+  const [excludePeriodIds, setExcludePeriodIds] = useState<string[]>([]);
+  const [priorLevel, setPriorLevel] = useState<SwimLevel | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
