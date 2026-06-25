@@ -218,6 +218,14 @@ export default function EnrollmentCheckout({
                 Change
               </Button>
             </div>
+          {lastError && (
+            <div className="mb-3 text-sm rounded-lg border border-red-300 bg-red-50 text-red-900 p-3">
+              <p className="font-semibold mb-1">Checkout error</p>
+              <p className="whitespace-pre-wrap break-words">{lastError}</p>
+              <p className="text-xs mt-2 opacity-80">
+                Please screenshot this message and send it to Aquatic Dreams so we can finish your enrollment.
+              </p>
+            </div>
           )}
           <div className="rounded-lg border border-border overflow-hidden min-w-0">
             <EmbeddedCheckoutProvider
