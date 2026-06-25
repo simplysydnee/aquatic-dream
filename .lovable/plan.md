@@ -1,45 +1,26 @@
-## Goal
+## Verification plan: returning family Yellow swimmer repro
 
-For returning families re-enrolling an existing swimmer (Case 1):
-1. Don't show session periods the swimmer is already enrolled in (e.g. if they're in Session 1, only Session 2 shows).
-2. Before the session picker, ask the parent whether they want to stay at the same level or move up to the next one.
+Run a Playwright script against the live preview to confirm the `session_periods_public` grants fix resolves the "Sea Scouts is full" message for a returning Yellow (school-age) swimmer with missing DOB.
 
-## Changes
+### Steps
 
-### 1. Extend the returning-family lookup (DB)
+1. Launch headless Chromium at 1280x1800 against `https://id-preview--06567201-0872-4d52-b1f6-790fb7d7ed1f.lovable.app/enroll`.
+2. Choose "Returning swimmer" entry path.
+3. Enter the email of a known returning family that has a Yellow-level swimmer with `dob = NULL` (query DB first to pick a valid test family — read-only `supabase--read_query` against `swim_enrollments` + `swimmers` to find one).
+4. Select that swimmer from the returning list.
+5. On the level choice step, pick "Stay at the same level" (Yellow / Sea Scouts).
+6. Capture screenshot of the SessionPicker screen.
+7. Assert one of:
+   - Session 2 row renders with a bookable CTA (pass), or
+   - "Sea Scouts is full for this session" still shows (fail — need further diagnosis).
+8. Also print the DOM text of the picker container and any visible session period names for the record.
+9. Report back with the screenshot path, the rendered text, and a clear pass/fail.
 
-Update `public.get_returning_family_by_email(_email)` so each swimmer in the returned `swimmers` array also includes `enrolled_period_ids: uuid[]` — the distinct `session_period_id`s from active enrollments (`status IN ('confirmed','enrolled','pending_payment')`) joined through `swim_sessions`.
+### If it fails
 
-### 2. Frontend types
+Re-check live as `anon`:
+- `curl` the REST endpoint for `session_periods_public` with the anon key.
+- Run `public.check_session_periods_public_access()` via `supabase--read_query`.
+- Inspect SessionPicker's network call in Playwright (log responses) to see whether the rows arrive but get filtered client-side (age group, capacity, enrolled_period_ids).
 
-`src/components/swim-enrollment/ReturningFamilyEntry.tsx`
-- Add `enrolled_period_ids: string[]` to `ReturningSwimmer`.
-
-### 3. Add level-choice step
-
-`src/pages/SwimEnrollment.tsx`
-- New step `"level_choice"` in the `Step` union, inserted between picking a returning swimmer and `"session"`.
-- New small inline component `ReturningLevelChoice` (or inline JSX) that shows:
-  - "Continue at **{currentLevelName}**"
-  - "Move up to **{nextLevelName}**" (only when there is a next level; Green has no move-up)
-- Level order: `white → red → yellow → blue → green`.
-- On select, set `level` to the chosen value then advance to `"session"`.
-- Track `excludePeriodIds: string[]` in state, sourced from the picked swimmer's `enrolled_period_ids`. Pass into `SessionPicker`.
-- `handlePickExistingSwimmer`: instead of jumping straight to `"session"`, jump to `"level_choice"` when a `last_level` is known. Store `excludePeriodIds`.
-
-### 4. Filter session periods in `SessionPicker`
-
-`src/components/swim-enrollment/SessionPicker.tsx`
-- Accept new optional prop `excludePeriodIds?: string[]`.
-- After computing `activeSessions`, drop any whose `session_period_id` is in `excludePeriodIds`.
-- If everything is filtered out, show a friendly empty state ("You're already enrolled in every open session at this level — try moving up a level") with a Back button that returns to the level choice.
-
-### 5. Progress indicator
-
-For `flow === "case1"`, the steps become: **Level → Session → Payment → Confirmed** (was Session → Payment → Confirmed). `stepKeys` updated to match.
-
-## Out of scope
-
-- No changes to admin views.
-- No changes to Case 2 (new swimmer / known parent) or the new-family flow.
-- Move-up does NOT re-run the skill assessment; it's an explicit parent choice and the instructor can reassign later per existing policy.
+No code changes proposed — this plan is verification only. If the repro fails I will return with findings before changing anything.
