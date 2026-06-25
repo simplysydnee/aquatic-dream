@@ -134,8 +134,101 @@ const SwimEnrollment = () => {
     setStep("session");
   };
 
-  const handleSessionSelect = (ids: string[]) => {
+  // --- Returning family entry handlers ---
+
+  const handleStartNew = () => {
+    setFlow("new");
+    setReturningLookup(null);
+    setStep("assess");
+  };
+
+  const handleReturningLookup = (result: ReturningFamilyLookup) => {
+    setReturningLookup(result);
+    if (result.parent) {
+      setSharedParent({
+        firstName: result.parent.first_name || "",
+        lastName: result.parent.last_name || "",
+        email: result.email,
+        phone: result.parent.phone || "",
+      });
+    }
+    if (result.emergency && result.emergency.first_name) {
+      setSharedEmergency({
+        firstName: result.emergency.first_name || "",
+        lastName: result.emergency.last_name || "",
+        phone: result.emergency.phone || "",
+        relationship: result.emergency.relationship || "",
+      });
+    }
+  };
+
+  const handlePickExistingSwimmer = (s: ReturningSwimmer, _lookup: ReturningFamilyLookup) => {
+    // Case 1: existing swimmer — pre-fill child info and skip assessment.
+    const lvl = normalizeLevel(s.last_level);
+    if (!lvl) {
+      // No usable prior level — fall back to running them through assessment,
+      // but keep parent/emergency pre-fill so paperwork is still skipped later.
+      setFlow("case2");
+      setChildDob(s.dob || "");
+      setStep("assess");
+      toast({
+        title: `Welcome back, ${s.first_name}`,
+        description: "We need a quick level check before picking a session.",
+      });
+      return;
+    }
+    setFlow("case1");
+    setLevel(lvl);
+    setChildDob(s.dob || "");
+    setChildAge(ageFromDob(s.dob));
+    // Stash the child name fields by synthesizing into enrollmentData later.
+    // For now, we set the per-child state used by SessionPicker/proceedToPayment.
+    setEnrollmentData(null);
+    // Save first/last on a transient holder via state hack: we read these in
+    // handleSessionSelect when synthesizing the EnrollmentFormData.
+    setReturningLookup((prev) => prev ? { ...prev, swimmers: [{ ...s }, ...prev.swimmers.filter(x => x !== s)] } : prev);
+    setStep("session");
+    toast({
+      title: `Re-enrolling ${s.first_name}`,
+      description: "Pick a session and you'll go straight to checkout.",
+    });
+  };
+
+  const handleAddNewSwimmerForReturning = (_lookup: ReturningFamilyLookup) => {
+    // Case 2: known parent, brand-new child. Parent block pre-fills via
+    // sharedParent; emergency contact still collected per-swimmer.
+    setFlow("case2");
+    setStep("assess");
+  };
+
+  const handleSessionSelect = async (ids: string[]) => {
     setSessionIds(ids);
+
+    if (flow === "case1" && returningLookup) {
+      // Synthesize an EnrollmentFormData from the saved parent + chosen swimmer
+      // and skip the info form entirely. handleInfoSubmit will then check for
+      // an active waiver and either skip legal or render it pre-filled.
+      const swimmer = returningLookup.swimmers[0];
+      const parent = returningLookup.parent;
+      const synthetic: EnrollmentFormData = {
+        parentFirstName: parent?.first_name || "",
+        parentLastName: parent?.last_name || "",
+        parentEmail: returningLookup.email,
+        parentPhone: parent?.phone || "",
+        childFirstName: swimmer?.first_name || "",
+        childLastName: swimmer?.last_name || "",
+        notes: "",
+        isFirstTime: "no",
+        hasMedical: "no",
+        medicalNotes: "",
+        smsConsent: false,
+        parentName: `${parent?.first_name || ""} ${parent?.last_name || ""}`.trim(),
+        childName: `${swimmer?.first_name || ""} ${swimmer?.last_name || ""}`.trim(),
+      };
+      await handleInfoSubmit(synthetic);
+      return;
+    }
+
     setStep("info");
   };
 
