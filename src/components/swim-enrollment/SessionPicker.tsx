@@ -197,7 +197,7 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
       }
     }
     fetchSessions();
-  }, [level, ageGroup]);
+  }, [level, ageGroup, excludePeriodIds]);
 
   // Group by period
   const grouped = slots.reduce<Record<string, SlotInfo[]>>((acc, s) => {
