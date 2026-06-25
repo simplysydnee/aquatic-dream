@@ -135,6 +135,7 @@ serve(async (req) => {
       const fullDollars = Number(s.session_price) || (totalLessons * perLesson);
       const remaining = remainingMap[s.id] ?? totalLessons;
       if (remaining <= 0) {
+        console.error("[create-checkout] no remaining classes", { sessionId: s.id });
         return new Response(JSON.stringify({ error: `Session ${s.id} has no remaining classes` }), {
           status: 409,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
