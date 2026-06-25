@@ -3,15 +3,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format, parseISO } from "date-fns";
+import { CalendarIcon, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type EditTarget =
   | {
       kind: "lesson_booking";
       id: string;
       child_name: string | null;
+      child_dob?: string | null;
       parent_name: string;
       parent_email: string;
       parent_phone: string | null;
@@ -21,6 +26,7 @@ export type EditTarget =
       id: string;
       child_name: string;
       child_age: number | null;
+      child_dob?: string | null;
       parent_name: string;
       parent_email: string;
       parent_phone: string | null;
@@ -40,7 +46,6 @@ interface Props {
 
 const emailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
-// Match swimmerKey() in useSwimmers.ts so the parent page can re-select.
 const normalizeName = (name: string | null | undefined) =>
   (name || "")
     .toLowerCase()
@@ -52,13 +57,21 @@ const normalizeEmail = (email: string | null | undefined) =>
 const buildSwimmerKey = (childName: string, parentEmail: string) =>
   `${normalizeName(childName)}|${normalizeEmail(parentEmail)}`;
 
-// Escape PostgREST ilike wildcards so the filter is an exact case-insensitive match.
 const escapeIlike = (v: string) => v.replace(/[\\%_]/g, (m) => `\\${m}`);
+
+const ageFromDob = (dob: Date): number => {
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  return age;
+};
 
 const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
   const { toast } = useToast();
   const [childName, setChildName] = useState("");
   const [childAge, setChildAge] = useState<string>("");
+  const [childDob, setChildDob] = useState<Date | undefined>(undefined);
   const [parentName, setParentName] = useState("");
   const [parentEmail, setParentEmail] = useState("");
   const [parentPhone, setParentPhone] = useState("");
@@ -72,6 +85,7 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
     setParentEmail(target.parent_email || "");
     setParentPhone(target.parent_phone || "");
     setChildAge(target.kind === "swim_enrollment" && target.child_age != null ? String(target.child_age) : "");
+    setChildDob(target.child_dob ? parseISO(target.child_dob) : undefined);
     setSaved(false);
   }, [target, open]);
 
@@ -99,7 +113,6 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
 
     setSaving(true);
     try {
-      // Original identity used to find every row belonging to this swimmer.
       const origChild = (target.child_name || "").trim();
       const origEmail = (target.parent_email || "").trim();
 
@@ -107,6 +120,8 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
       const newParentName = parentName.trim();
       const newParentEmail = parentEmail.trim();
       const newParentPhone = parentPhone.trim() || null;
+      const dobIso = childDob ? format(childDob, "yyyy-MM-dd") : null;
+      const derivedAge = childDob ? ageFromDob(childDob) : null;
 
       const enrollmentUpdate: Record<string, unknown> = {
         child_name: newChild,
@@ -115,6 +130,8 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
         parent_phone: newParentPhone,
       };
       if (ageNum != null) enrollmentUpdate.child_age = ageNum;
+      else if (derivedAge != null) enrollmentUpdate.child_age = derivedAge;
+      if (dobIso) enrollmentUpdate.child_dob = dobIso;
 
       const bookingUpdate: Record<string, unknown> = {
         child_name: newChild,
@@ -122,10 +139,8 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
         parent_email: newParentEmail,
         parent_phone: newParentPhone,
       };
+      if (dobIso) bookingUpdate.child_dob = dobIso;
 
-      // Update every row for this swimmer in both tables. Scope by the
-      // pre-edit child_name + parent_email (case-insensitive exact match) so
-      // siblings under the same parent are not touched.
       const childFilter = escapeIlike(origChild);
       const emailFilter = escapeIlike(origEmail);
 
@@ -150,9 +165,6 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
         );
       }
 
-      // Always also update the targeted row by id as a safety net (covers
-      // bookings whose child_name is null/parent-name and wouldn't match the
-      // ilike scope above).
       if (target.kind === "lesson_booking") {
         queries.push(
           supabase
@@ -180,7 +192,6 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
       setSaved(true);
       toast({ title: "Swimmer info updated", description: "Changes saved successfully." });
       onSaved(buildSwimmerKey(newChild, newParentEmail));
-      // auto-close after a moment
       setTimeout(() => onOpenChange(false), 900);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : (e as { message?: string })?.message;
@@ -208,10 +219,46 @@ const EditSwimmerDialog = ({ open, onOpenChange, target, onSaved }: Props) => {
               <Label htmlFor="es-child">Swimmer name *</Label>
               <Input id="es-child" value={childName} onChange={(e) => setChildName(e.target.value)} />
             </div>
+            <div>
+              <Label htmlFor="es-dob">Date of birth</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="es-dob"
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      "mt-1 w-full justify-start text-left font-normal",
+                      !childDob && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {childDob ? format(childDob, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={childDob}
+                    onSelect={setChildDob}
+                    disabled={(date) => date > new Date() || date < new Date("1920-01-01")}
+                    captionLayout="dropdown-buttons"
+                    fromYear={1920}
+                    toYear={new Date().getFullYear()}
+                    defaultMonth={childDob ?? new Date(new Date().getFullYear() - 8, 0)}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
             {target.kind === "swim_enrollment" && (
               <div>
                 <Label htmlFor="es-age">Age</Label>
                 <Input id="es-age" inputMode="numeric" value={childAge} onChange={(e) => setChildAge(e.target.value)} />
+                {childDob && !childAge.trim() && (
+                  <p className="text-xs text-muted-foreground mt-1">Will auto-fill to {ageFromDob(childDob)} from DOB.</p>
+                )}
               </div>
             )}
             <div>
