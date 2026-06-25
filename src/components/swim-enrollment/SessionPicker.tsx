@@ -31,6 +31,7 @@ interface SlotInfo {
 interface Props {
   level: SwimLevel;
   childAge: number;
+  excludePeriodIds?: string[];
   onSelect: (sessionIds: string[]) => void;
   onBack: () => void;
 }
@@ -72,7 +73,7 @@ function todayPacificISO(): string {
   return fmt.format(new Date()); // en-CA produces YYYY-MM-DD
 }
 
-const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
+const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: Props) => {
   const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -104,7 +105,12 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
         }
 
         const activePeriodIds = new Set(periods.map(p => p.id));
-        const activeSessions = sessions.filter(s => s.session_period_id && activePeriodIds.has(s.session_period_id));
+        const excludeSet = new Set(excludePeriodIds || []);
+        const activeSessions = sessions.filter(s =>
+          s.session_period_id
+          && activePeriodIds.has(s.session_period_id)
+          && !excludeSet.has(s.session_period_id)
+        );
 
         if (activeSessions.length === 0) {
           setSlots([]);
@@ -191,7 +197,7 @@ const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
       }
     }
     fetchSessions();
-  }, [level, ageGroup]);
+  }, [level, ageGroup, excludePeriodIds]);
 
   // Group by period
   const grouped = slots.reduce<Record<string, SlotInfo[]>>((acc, s) => {

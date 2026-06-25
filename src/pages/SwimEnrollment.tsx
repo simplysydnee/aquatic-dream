@@ -21,7 +21,15 @@ import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
-type Step = "returning" | "assess" | "session" | "info" | "legal" | "payment" | "full" | "done";
+type Step = "returning" | "assess" | "level_choice" | "session" | "info" | "legal" | "payment" | "full" | "done";
+
+const LEVEL_ORDER: SwimLevel[] = ["white", "red", "yellow", "blue", "green"] as unknown as SwimLevel[];
+const LEVEL_LABEL: Record<string, string> = { white: "White", red: "Red", yellow: "Yellow", blue: "Blue", green: "Green" };
+function nextLevel(l: SwimLevel): SwimLevel | null {
+  const i = (LEVEL_ORDER as string[]).indexOf(l as unknown as string);
+  if (i < 0 || i >= LEVEL_ORDER.length - 1) return null;
+  return LEVEL_ORDER[i + 1];
+}
 
 function ageFromDob(dob: string | null | undefined): number {
   if (!dob) return 0;
@@ -80,6 +88,8 @@ const SwimEnrollment = () => {
   const [returningLookup, setReturningLookup] = useState<ReturningFamilyLookup | null>(null);
   // "case1" = picked an existing swimmer; after session selection we skip the info form.
   const [flow, setFlow] = useState<"new" | "case1" | "case2">("new");
+  const [excludePeriodIds, setExcludePeriodIds] = useState<string[]>([]);
+  const [priorLevel, setPriorLevel] = useState<SwimLevel | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
@@ -101,10 +111,10 @@ const SwimEnrollment = () => {
   // Progress indicator adapts to the chosen flow. Case 1 (existing swimmer) is
   // a 2-step happy path: pick a session, then pay.
   const allSteps = flow === "case1"
-    ? ["Session", "Payment", "Confirmed"]
+    ? ["Level", "Session", "Payment", "Confirmed"]
     : ["Assessment", "Session", "Details", "Agreements", "Payment", "Confirmed"];
   const stepKeys = flow === "case1"
-    ? ["session", "payment", "done"]
+    ? ["level_choice", "session", "payment", "done"]
     : ["assess", "session", "info", "legal", "payment", "done"];
   const stepIndex = Math.max(0, stepKeys.indexOf(step));
 
@@ -179,18 +189,16 @@ const SwimEnrollment = () => {
     }
     setFlow("case1");
     setLevel(lvl);
+    setPriorLevel(lvl);
     setChildDob(s.dob || "");
     setChildAge(ageFromDob(s.dob));
-    // Stash the child name fields by synthesizing into enrollmentData later.
-    // For now, we set the per-child state used by SessionPicker/proceedToPayment.
+    setExcludePeriodIds(Array.isArray(s.enrolled_period_ids) ? s.enrolled_period_ids : []);
     setEnrollmentData(null);
-    // Save first/last on a transient holder via state hack: we read these in
-    // handleSessionSelect when synthesizing the EnrollmentFormData.
     setReturningLookup((prev) => prev ? { ...prev, swimmers: [{ ...s }, ...prev.swimmers.filter(x => x !== s)] } : prev);
-    setStep("session");
+    setStep("level_choice");
     toast({
       title: `Re-enrolling ${s.first_name}`,
-      description: "Pick a session and you'll go straight to checkout.",
+      description: "Confirm the level and pick your next session.",
     });
   };
 
@@ -582,12 +590,55 @@ const SwimEnrollment = () => {
             />
           )}
           {step === "assess" && <SwimAssessment onComplete={handleAssessmentComplete} />}
+          {step === "level_choice" && priorLevel && (() => {
+            const up = nextLevel(priorLevel);
+            const swimmerName = returningLookup?.swimmers[0]?.first_name || "your swimmer";
+            return (
+              <div className="max-w-xl mx-auto">
+                <h3 className="font-display text-2xl font-bold text-foreground mb-1">Same level or moving up?</h3>
+                <p className="text-muted-foreground text-sm mb-6">
+                  {swimmerName} last enrolled in <strong>{LEVEL_LABEL[priorLevel as unknown as string]}</strong>. Stay here or move up for the next session?
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setLevel(priorLevel); setStep("session"); }}
+                    className="border border-border rounded-lg p-5 text-left hover:border-primary hover:bg-primary/5 transition-colors"
+                  >
+                    <div className="font-semibold text-foreground mb-1">Stay in {LEVEL_LABEL[priorLevel as unknown as string]}</div>
+                    <div className="text-xs text-muted-foreground">Continue at the same level for the next session.</div>
+                  </button>
+                  {up ? (
+                    <button
+                      type="button"
+                      onClick={() => { setLevel(up); setStep("session"); }}
+                      className="border border-border rounded-lg p-5 text-left hover:border-primary hover:bg-primary/5 transition-colors"
+                    >
+                      <div className="font-semibold text-foreground mb-1">Move up to {LEVEL_LABEL[up as unknown as string]}</div>
+                      <div className="text-xs text-muted-foreground">Your instructor can reassess on day one if needed.</div>
+                    </button>
+                  ) : (
+                    <div className="border border-dashed border-border rounded-lg p-5 text-left opacity-60">
+                      <div className="font-semibold text-foreground mb-1">Top level reached</div>
+                      <div className="text-xs text-muted-foreground">Green is our highest group level.</div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-6">
+                  <Button variant="ghost" onClick={() => setStep("returning")}>
+                    Back
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
           {step === "session" && level && (
             <SessionPicker
               level={level}
               childAge={childAge}
+              excludePeriodIds={flow === "case1" ? excludePeriodIds : undefined}
               onSelect={handleSessionSelect}
-              onBack={() => setStep(flow === "case1" ? "returning" : "assess")}
+              onBack={() => setStep(flow === "case1" ? "level_choice" : "assess")}
             />
           )}
           {step === "info" && (
