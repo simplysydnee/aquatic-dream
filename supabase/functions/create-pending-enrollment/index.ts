@@ -200,7 +200,11 @@ serve(async (req) => {
       emailsSent: sendResults,
     }, 200);
   } catch (e) {
-    console.error("create-pending-enrollment error:", e);
+    console.error("[create-pending-enrollment] uncaught error", {
+      message: (e as Error).message,
+      stack: (e as Error).stack,
+      name: (e as Error).name,
+    });
     return json({ error: (e as Error).message }, 500);
   }
 });
