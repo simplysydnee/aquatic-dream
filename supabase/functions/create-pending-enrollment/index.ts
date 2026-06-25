@@ -27,8 +27,19 @@ serve(async (req) => {
     const { payload, environment } = await req.json();
 
     if (!payload || !Array.isArray(payload.children) || payload.children.length === 0) {
+      console.error("[create-pending-enrollment] invalid payload", { hasPayload: !!payload });
       return json({ error: "Invalid payload: children required" }, 400);
     }
+
+    console.log("[create-pending-enrollment] start", {
+      parentEmail: payload.children[0]?.parentEmail,
+      environment,
+      children: payload.children.map((c: { childName?: string; isFirstTime?: boolean; sessionIds?: string[] }) => ({
+        childName: c.childName,
+        isFirstTime: c.isFirstTime,
+        sessionIds: c.sessionIds,
+      })),
+    });
 
     // Validate session ids + capacity
     const allSessionIds: string[] = [];
