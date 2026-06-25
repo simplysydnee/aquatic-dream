@@ -54,11 +54,22 @@ serve(async (req) => {
 
     // Validate payload
     if (!payload || typeof payload !== "object" || !Array.isArray(payload.children) || payload.children.length === 0) {
+      console.error("[create-checkout] invalid payload", { customerEmail, hasPayload: !!payload });
       return new Response(JSON.stringify({ error: "Invalid payload: children required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    console.log("[create-checkout] start", {
+      parentEmail: customerEmail ?? payload.children[0]?.parentEmail,
+      environment,
+      children: payload.children.map((c: { childName?: string; isFirstTime?: boolean; sessionIds?: string[] }) => ({
+        childName: c.childName,
+        isFirstTime: c.isFirstTime,
+        sessionIds: c.sessionIds,
+      })),
+    });
 
     const typedPayload = payload as CheckoutPayload;
 
