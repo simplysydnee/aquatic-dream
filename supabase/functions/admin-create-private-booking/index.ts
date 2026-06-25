@@ -616,7 +616,7 @@ Deno.serve(async (req) => {
     let emailError: string | undefined;
     if (p.send_confirmation) {
       try {
-        if (p.collect_card_on_file) {
+        if (effectiveCardOnFile) {
           await sendConfirmationEmail(bookingId, true);
         } else {
           const env = (p.stripe_environment || "live") as StripeEnv;
