@@ -54,7 +54,10 @@ export default function EnrollmentCheckout({
     [confirmed, hasFirstTimers, payAhead, buildPayload],
   );
 
+  const [lastError, setLastError] = useState<string | null>(null);
+
   const fetchClientSecret = useCallback(async (): Promise<string> => {
+    setLastError(null);
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: {
         payload,
@@ -65,14 +68,18 @@ export default function EnrollmentCheckout({
     });
     if (error || !data?.clientSecret) {
       const msg = String(error?.message || data?.error || "Failed to create checkout session");
-      // Server says capacity is gone — show the friendly waitlist screen
-      // instead of letting Stripe surface a generic "merchant" error.
+      // eslint-disable-next-line no-console
+      console.error("[checkout] fetchClientSecret failed", {
+        message: msg,
+        status: (error as { context?: { status?: number } } | null)?.context?.status,
+        data,
+        customerEmail,
+      });
       if (/is full|sold out|capacity/i.test(msg) && onSessionFull) {
         onSessionFull();
-        // Throw a benign error so the EmbeddedCheckout provider stops trying
-        // to mount; the parent already navigated away.
         throw new Error("Session full — redirecting to waitlist");
       }
+      setLastError(msg);
       throw new Error(msg);
     }
     return data.clientSecret;
@@ -86,25 +93,36 @@ export default function EnrollmentCheckout({
 
   const handleReserve = useCallback(async () => {
     setReserving(true);
+    setLastError(null);
     try {
-      const built = buildPayload({ payAheadForFirstTimers: false }) as any;
+      const built = buildPayload({ payAheadForFirstTimers: false }) as unknown;
       const { data, error } = await supabase.functions.invoke("create-pending-enrollment", {
         body: { payload: built, environment: getStripeEnvironment() },
       });
       if (error || !data?.success) {
-        throw new Error(error?.message || data?.error || "Failed to reserve seat");
+        const msg = String(error?.message || data?.error || "Failed to reserve seat");
+        // eslint-disable-next-line no-console
+        console.error("[checkout] reserve failed", {
+          message: msg,
+          status: (error as { context?: { status?: number } } | null)?.context?.status,
+          data,
+          customerEmail,
+        });
+        throw new Error(msg);
       }
       setReserved(true);
     } catch (e) {
+      const msg = (e as Error).message;
+      setLastError(msg);
       toast({
         title: "Could not reserve your seat",
-        description: (e as Error).message,
+        description: msg,
         variant: "destructive",
       });
     } finally {
       setReserving(false);
     }
-  }, [buildPayload]);
+  }, [buildPayload, customerEmail]);
 
   if (CHECKOUT_FALLBACK && reserved) {
     return (
@@ -199,6 +217,15 @@ export default function EnrollmentCheckout({
               <Button type="button" variant="link" size="sm" onClick={() => setConfirmed(false)}>
                 Change
               </Button>
+            </div>
+          )}
+          {lastError && (
+            <div className="mb-3 text-sm rounded-lg border border-red-300 bg-red-50 text-red-900 p-3">
+              <p className="font-semibold mb-1">Checkout error</p>
+              <p className="whitespace-pre-wrap break-words">{lastError}</p>
+              <p className="text-xs mt-2 opacity-80">
+                Please screenshot this message and send it to Aquatic Dreams so we can finish your enrollment.
+              </p>
             </div>
           )}
           <div className="rounded-lg border border-border overflow-hidden min-w-0">

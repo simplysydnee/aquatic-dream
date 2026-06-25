@@ -54,11 +54,22 @@ serve(async (req) => {
 
     // Validate payload
     if (!payload || typeof payload !== "object" || !Array.isArray(payload.children) || payload.children.length === 0) {
+      console.error("[create-checkout] invalid payload", { customerEmail, hasPayload: !!payload });
       return new Response(JSON.stringify({ error: "Invalid payload: children required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    console.log("[create-checkout] start", {
+      parentEmail: customerEmail ?? payload.children[0]?.parentEmail,
+      environment,
+      children: payload.children.map((c: { childName?: string; isFirstTime?: boolean; sessionIds?: string[] }) => ({
+        childName: c.childName,
+        isFirstTime: c.isFirstTime,
+        sessionIds: c.sessionIds,
+      })),
+    });
 
     const typedPayload = payload as CheckoutPayload;
 
@@ -90,6 +101,7 @@ serve(async (req) => {
       .in("id", uniqueSessionIds);
 
     if (sessErr || !sessions || sessions.length !== uniqueSessionIds.length) {
+      console.error("[create-checkout] sessions not found", { sessErr, uniqueSessionIds, found: sessions?.length });
       return new Response(JSON.stringify({ error: "One or more sessions not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -123,6 +135,7 @@ serve(async (req) => {
       const fullDollars = Number(s.session_price) || (totalLessons * perLesson);
       const remaining = remainingMap[s.id] ?? totalLessons;
       if (remaining <= 0) {
+        console.error("[create-checkout] no remaining classes", { sessionId: s.id });
         return new Response(JSON.stringify({ error: `Session ${s.id} has no remaining classes` }), {
           status: 409,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -162,6 +175,7 @@ serve(async (req) => {
       const used = countMap[sid] || 0;
       const wanted = requestedMap[sid] || 0;
       if (used + wanted > s.max_students) {
+        console.error("[create-checkout] capacity exceeded", { sessionId: sid, used, wanted, max: s.max_students });
         return new Response(JSON.stringify({ error: `Session ${sid} is full` }), {
           status: 409,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -316,7 +330,11 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("create-checkout error:", error);
+    console.error("[create-checkout] uncaught error", {
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+      name: (error as Error).name,
+    });
     return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
