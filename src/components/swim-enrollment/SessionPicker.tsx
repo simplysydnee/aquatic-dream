@@ -73,7 +73,7 @@ function todayPacificISO(): string {
   return fmt.format(new Date()); // en-CA produces YYYY-MM-DD
 }
 
-const SessionPicker = ({ level, childAge, onSelect, onBack }: Props) => {
+const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: Props) => {
   const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
