@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, ChevronLeft } from "lucide-react";
 import { format } from "date-fns";
-import { getPrivateLessonPrice, isJunePromoDate } from "@/lib/privateLessonPricing";
+import { getPrivateLessonPrice, isPromoDate } from "@/lib/privateLessonPricing";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 
