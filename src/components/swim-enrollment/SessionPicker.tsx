@@ -308,8 +308,10 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
             </Button>
           </div>
         </Card>
+      ) : wrongAgeGroup ? (
+        <LevelFullScreen level={level} childAge={childAge} ageGroup={ageGroup} onBack={onBack} reason="age-mismatch" />
       ) : slots.length === 0 || slots.every(s => s.spots_left <= 0) ? (
-        <LevelFullScreen level={level} childAge={childAge} ageGroup={ageGroup} onBack={onBack} />
+        <LevelFullScreen level={level} childAge={childAge} ageGroup={ageGroup} onBack={onBack} reason="full" />
       ) : (
         <div className="space-y-8">
           {Object.entries(grouped).map(([key, groupSlots]) => {
