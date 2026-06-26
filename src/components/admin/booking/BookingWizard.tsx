@@ -76,6 +76,14 @@ interface GroupSession {
   enrolled: number;
   session_start_date: string | null;
   session_end_date: string | null;
+  session_period_id: string | null;
+}
+
+interface SessionPeriod {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
 }
 
 interface SlotDraft {
