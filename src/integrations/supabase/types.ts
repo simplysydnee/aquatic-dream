@@ -2987,21 +2987,16 @@ export type Database = {
         Args: { _dob: string; _first: string; _last: string }
         Returns: boolean
       }
-      swimmer_has_waiver_on_file:
-        | {
-            Args: { _dob: string; _first: string; _last: string }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              _dob: string
-              _first: string
-              _last: string
-              _parent_email?: string
-              _parent_phone?: string
-            }
-            Returns: boolean
-          }
+      swimmer_has_waiver_on_file: {
+        Args: {
+          _dob: string
+          _first: string
+          _last: string
+          _parent_email?: string
+          _parent_phone?: string
+        }
+        Returns: boolean
+      }
       text_soundex: { Args: { "": string }; Returns: string }
       unsubscribe_marketing_by_token: {
         Args: { _reason?: string; _token: string }
