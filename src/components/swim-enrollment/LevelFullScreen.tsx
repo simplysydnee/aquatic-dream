@@ -96,10 +96,14 @@ const LevelFullScreen = ({ level, childAge, ageGroup, onBack, reason = "full" }:
           </div>
           <div>
             <h3 className="font-display text-2xl font-bold text-foreground">
-              {groupName} is full for this session
+              {isAgeMismatch
+                ? `${levelName} isn't offered for this age right now`
+                : `${groupName} is full for this session`}
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              {levelName} · We cap each class at 3 swimmers so every kid gets real attention. You haven't been charged or enrolled.
+              {isAgeMismatch
+                ? `${levelName} sessions are currently scheduled for a different age group. You haven't been charged or enrolled — please go back and pick a different level, or contact us if you'd like help placing your swimmer.`
+                : `${levelName} · We cap each class at 3 swimmers so every kid gets real attention. You haven't been charged or enrolled.`}
             </p>
           </div>
         </div>
@@ -107,16 +111,30 @@ const LevelFullScreen = ({ level, childAge, ageGroup, onBack, reason = "full" }:
         {mode === "choose" && (
           <>
             <div className="grid sm:grid-cols-2 gap-3 mt-6">
-              <button
-                onClick={() => setMode("waitlist")}
-                className="text-left p-5 rounded-xl border-2 border-border hover:border-primary bg-card transition-all group"
-              >
-                <Calendar className="w-6 h-6 text-primary mb-2" />
-                <p className="font-semibold text-foreground">Join the waitlist</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  We'll text or email you the moment a spot opens up — or if we add another {groupName} class.
-                </p>
-              </button>
+              {!isAgeMismatch && (
+                <button
+                  onClick={() => setMode("waitlist")}
+                  className="text-left p-5 rounded-xl border-2 border-border hover:border-primary bg-card transition-all group"
+                >
+                  <Calendar className="w-6 h-6 text-primary mb-2" />
+                  <p className="font-semibold text-foreground">Join the waitlist</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    We'll text or email you the moment a spot opens up — or if we add another {groupName} class.
+                  </p>
+                </button>
+              )}
+              {isAgeMismatch && (
+                <button
+                  onClick={onBack}
+                  className="text-left p-5 rounded-xl border-2 border-border hover:border-primary bg-card transition-all group"
+                >
+                  <ChevronLeft className="w-6 h-6 text-primary mb-2" />
+                  <p className="font-semibold text-foreground">Pick a different level</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Go back to the assessment and choose a level that fits your swimmer's age.
+                  </p>
+                </button>
+              )}
               <button
                 onClick={() => navigate("/book-private-lesson")}
                 className="text-left p-5 rounded-xl border-2 border-border hover:border-primary bg-card transition-all group"
@@ -124,7 +142,7 @@ const LevelFullScreen = ({ level, childAge, ageGroup, onBack, reason = "full" }:
                 <Sparkles className="w-6 h-6 text-primary mb-2" />
                 <p className="font-semibold text-foreground">Book a private lesson</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Skip the wait. 1-on-1 with an instructor on your schedule — $50/lesson June special.
+                  Skip the wait. 1-on-1 with an instructor on your schedule — $50/lesson summer special.
                 </p>
               </button>
             </div>
