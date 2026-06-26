@@ -417,6 +417,17 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
           pl = row.parent_last_name || "";
           cf = row.child_first_name || "";
           cl = row.child_last_name || "";
+          // Fallback for legacy rows that have combined name columns but null split columns.
+          if ((!pf || !pl) && row.parent_name) {
+            const p = splitName(row.parent_name);
+            if (!pf) pf = p.first;
+            if (!pl) pl = p.last;
+          }
+          if ((!cf || !cl) && row.child_name) {
+            const c = splitName(row.child_name);
+            if (!cf) cf = c.first;
+            if (!cl) cl = c.last;
+          }
         }
         const key = `${email}|${cf.toLowerCase()}|${cl.toLowerCase()}`;
         if (!email || map.has(key)) return;
