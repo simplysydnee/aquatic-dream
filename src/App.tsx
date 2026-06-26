@@ -43,7 +43,6 @@ import KioskCheckIn from "./pages/KioskCheckIn";
 import Unsubscribe from "./pages/Unsubscribe";
 import UnsubscribeMarketing from "./pages/UnsubscribeMarketing";
 import ScrollToTop from "./components/ScrollToTop";
-import PickerTest from "./pages/__PickerTest";
 
 const queryClient = new QueryClient();
 
