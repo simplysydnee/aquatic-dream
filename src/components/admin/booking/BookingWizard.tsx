@@ -76,6 +76,14 @@ interface GroupSession {
   enrolled: number;
   session_start_date: string | null;
   session_end_date: string | null;
+  session_period_id: string | null;
+}
+
+interface SessionPeriod {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
 }
 
 interface SlotDraft {
@@ -1573,20 +1581,29 @@ function GroupSlotPicker({
   selected, onChange, swimmerAge,
 }: { selected: SlotDraft | null; onChange: (s: SlotDraft) => void; swimmerAge: number | null }) {
   const [sessions, setSessions] = useState<GroupSession[]>([]);
+  const [periods, setPeriods] = useState<SessionPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [dayFilter, setDayFilter] = useState<string>("all");
+  const [periodFilter, setPeriodFilter] = useState<string>("all");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const today = format(new Date(), "yyyy-MM-dd");
-      const { data: sRows } = await supabase
-        .from("swim_sessions")
-        .select("id, session_name, swim_level, day_of_week, start_time, end_time, max_students, session_start_date, session_end_date")
-        .eq("is_active", true)
-        .or(`session_end_date.is.null,session_end_date.gte.${today}`)
-        .order("swim_level");
+      const [{ data: sRows }, { data: pRows }] = await Promise.all([
+        supabase
+          .from("swim_sessions")
+          .select("id, session_name, swim_level, day_of_week, start_time, end_time, max_students, session_start_date, session_end_date, session_period_id")
+          .eq("is_active", true)
+          .or(`session_end_date.is.null,session_end_date.gte.${today}`)
+          .order("swim_level"),
+        supabase
+          .from("session_periods")
+          .select("id, name, start_date, end_date")
+          .eq("is_active", true)
+          .order("start_date"),
+      ]);
       const ids = ((sRows as any[]) || []).map((r) => r.id);
       const { data: counts } = ids.length
         ? await supabase.rpc("get_session_enrollment_counts", { _session_ids: ids })
@@ -1597,6 +1614,7 @@ function GroupSlotPicker({
         ...r,
         enrolled: countMap.get(r.id) ?? 0,
       })));
+      setPeriods((pRows as any[]) || []);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -1604,7 +1622,8 @@ function GroupSlotPicker({
 
   const filtered = sessions.filter((s) =>
     (levelFilter === "all" || s.swim_level === levelFilter) &&
-    (dayFilter === "all" || s.day_of_week === dayFilter),
+    (dayFilter === "all" || s.day_of_week === dayFilter) &&
+    (periodFilter === "all" || s.session_period_id === periodFilter),
   );
 
   if (loading) return <Card className="p-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></Card>;
@@ -1614,7 +1633,16 @@ function GroupSlotPicker({
       <h3 className="font-semibold text-lg mb-1">Pick a group class</h3>
       <p className="text-sm text-muted-foreground mb-4">Active sessions with open seats.{swimmerAge ? ` Swimmer age: ${swimmerAge}.` : ""}</p>
 
-      <div className="flex gap-2 mb-3">
+      <div className="flex gap-2 mb-3 flex-wrap">
+        <Select value={periodFilter} onValueChange={setPeriodFilter}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Session" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All sessions</SelectItem>
+            {periods.map((p) => (
+              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={levelFilter} onValueChange={setLevelFilter}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Level" /></SelectTrigger>
           <SelectContent>
@@ -1634,6 +1662,7 @@ function GroupSlotPicker({
           </SelectContent>
         </Select>
       </div>
+
 
       <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
         {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No matching sessions.</p>}

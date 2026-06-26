@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.swimmer_has_waiver_on_file(text, text, date);
