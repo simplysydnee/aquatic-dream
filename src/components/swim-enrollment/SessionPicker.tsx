@@ -242,7 +242,8 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
   );
 
   const alreadyEnrolledInAvailablePeriods = !loading && emptyReason === "already-enrolled";
-  const levelFull = !loading && !alreadyEnrolledInAvailablePeriods && (slots.length === 0 || slots.every(s => s.spots_left <= 0));
+  const wrongAgeGroup = !loading && emptyReason === "wrong-age-group";
+  const levelFull = !loading && !alreadyEnrolledInAvailablePeriods && !wrongAgeGroup && (slots.length === 0 || slots.every(s => s.spots_left <= 0));
 
   return (
     <motion.div
