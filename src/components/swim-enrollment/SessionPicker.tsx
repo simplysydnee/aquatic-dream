@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, PRICING } from "./types";
 import LevelFullScreen from "./LevelFullScreen";
 
-type EmptyReason = "none" | "already-enrolled";
+type EmptyReason = "none" | "already-enrolled" | "wrong-age-group";
 
 interface SlotInfo {
   assignSessionId: string;
@@ -93,22 +93,39 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
         setEmptyReason("none");
         const [periodsRes, sessionsRes] = await Promise.all([
           (supabase as any).from("session_periods_public").select("*").eq("is_active", true).gte("end_date", today).order("start_date"),
+          // NOTE: intentionally NOT filtering by age_group here so we can distinguish
+          // "no sessions for this age" from "every session is full".
           supabase.from("swim_sessions").select("id, swim_level, day_of_week, start_time, end_time, max_students, is_active, session_name, session_start_date, session_end_date, age_group, price_per_lesson, total_lessons, session_price, instructor_id, registration_status, session_period_id")
-            .eq("age_group", ageGroup)
             .eq("swim_level", level)
             .eq("is_active", true)
             .eq("registration_status", "open"),
         ]);
 
         const periods = periodsRes.data || [];
-        const sessions = sessionsRes.data || [];
+        const allLevelSessions = sessionsRes.data || [];
 
-        if (sessions.length === 0) {
+        // Split by whether the row matches the child's age bucket.
+        const sessionsForAge = allLevelSessions.filter(s => s.age_group === ageGroup);
+        const sessionsForOtherAge = allLevelSessions.filter(s => s.age_group !== ageGroup);
+
+        // Case: no rows at all for this level → genuine "nothing offered".
+        if (allLevelSessions.length === 0) {
           setSlots([]);
           setEmptyReason("none");
           setLoading(false);
           return;
         }
+
+        // Case: this level is only offered for the other age bucket.
+        if (sessionsForAge.length === 0 && sessionsForOtherAge.length > 0) {
+          console.log("[SessionPicker] age-mismatch:", { level, childAge, ageGroup, otherAgeCount: sessionsForOtherAge.length });
+          setSlots([]);
+          setEmptyReason("wrong-age-group");
+          setLoading(false);
+          return;
+        }
+
+        const sessions = sessionsForAge;
 
         const activePeriodIds = new Set(periods.map(p => p.id));
         const excludeSet = new Set(excludePeriodIds || []);
@@ -225,7 +242,8 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
   );
 
   const alreadyEnrolledInAvailablePeriods = !loading && emptyReason === "already-enrolled";
-  const levelFull = !loading && !alreadyEnrolledInAvailablePeriods && (slots.length === 0 || slots.every(s => s.spots_left <= 0));
+  const wrongAgeGroup = !loading && emptyReason === "wrong-age-group";
+  const levelFull = !loading && !alreadyEnrolledInAvailablePeriods && !wrongAgeGroup && (slots.length === 0 || slots.every(s => s.spots_left <= 0));
 
   return (
     <motion.div
@@ -233,7 +251,7 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
       animate={{ opacity: 1, x: 0 }}
       className="max-w-2xl mx-auto"
     >
-      {!levelFull && (
+      {!levelFull && !wrongAgeGroup && (
         <>
           <h3 className="font-display text-2xl font-bold text-foreground mb-1">
             Pick Your Sessions
@@ -290,8 +308,10 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
             </Button>
           </div>
         </Card>
+      ) : wrongAgeGroup ? (
+        <LevelFullScreen level={level} childAge={childAge} ageGroup={ageGroup} onBack={onBack} reason="age-mismatch" />
       ) : slots.length === 0 || slots.every(s => s.spots_left <= 0) ? (
-        <LevelFullScreen level={level} childAge={childAge} ageGroup={ageGroup} onBack={onBack} />
+        <LevelFullScreen level={level} childAge={childAge} ageGroup={ageGroup} onBack={onBack} reason="full" />
       ) : (
         <div className="space-y-8">
           {Object.entries(grouped).map(([key, groupSlots]) => {
