@@ -16,15 +16,18 @@ interface Props {
   childAge: number;
   ageGroup: AgeGroup;
   onBack: () => void;
+  /** "full" = real capacity exhaustion, "age-mismatch" = this level isn't offered for this age bucket */
+  reason?: "full" | "age-mismatch";
 }
 
 type Mode = "choose" | "waitlist" | "saved";
 
-const LevelFullScreen = ({ level, childAge, ageGroup, onBack }: Props) => {
+const LevelFullScreen = ({ level, childAge, ageGroup, onBack, reason = "full" }: Props) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [mode, setMode] = useState<Mode>("choose");
   const [submitting, setSubmitting] = useState(false);
+  const isAgeMismatch = reason === "age-mismatch";
   const [form, setForm] = useState({
     parentFirstName: "",
     parentLastName: "",
