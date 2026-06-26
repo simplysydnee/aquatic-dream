@@ -251,7 +251,7 @@ const SessionPicker = ({ level, childAge, excludePeriodIds, onSelect, onBack }: 
       animate={{ opacity: 1, x: 0 }}
       className="max-w-2xl mx-auto"
     >
-      {!levelFull && (
+      {!levelFull && !wrongAgeGroup && (
         <>
           <h3 className="font-display text-2xl font-bold text-foreground mb-1">
             Pick Your Sessions
