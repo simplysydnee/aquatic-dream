@@ -66,6 +66,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route path="/__pickertest" element={<PickerTest />} />
             <Route path="/checkin" element={<KioskCheckIn />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/unsubscribe-marketing" element={<UnsubscribeMarketing />} />
