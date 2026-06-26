@@ -356,13 +356,13 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
       const like = `%${q}%`;
       const [b, e, r] = await Promise.all([
         supabase.from("lesson_bookings")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at,stripe_payment_method_id")
-          .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},parent_phone.ilike.${like}`)
+          .select("parent_first_name,parent_last_name,parent_name,parent_email,parent_phone,child_first_name,child_last_name,child_name,child_dob,updated_at,stripe_payment_method_id")
+          .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},parent_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},child_name.ilike.${like},parent_phone.ilike.${like}`)
           .order("updated_at", { ascending: false })
           .limit(20),
         supabase.from("swim_enrollments")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
-          .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},parent_phone.ilike.${like}`)
+          .select("parent_first_name,parent_last_name,parent_name,parent_email,parent_phone,child_first_name,child_last_name,child_name,child_dob,updated_at")
+          .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},parent_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},child_name.ilike.${like},parent_phone.ilike.${like}`)
           .order("updated_at", { ascending: false })
           .limit(20),
         supabase.from("lesson_requests")
@@ -417,6 +417,17 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
           pl = row.parent_last_name || "";
           cf = row.child_first_name || "";
           cl = row.child_last_name || "";
+          // Fallback for legacy rows that have combined name columns but null split columns.
+          if ((!pf || !pl) && row.parent_name) {
+            const p = splitName(row.parent_name);
+            if (!pf) pf = p.first;
+            if (!pl) pl = p.last;
+          }
+          if ((!cf || !cl) && row.child_name) {
+            const c = splitName(row.child_name);
+            if (!cf) cf = c.first;
+            if (!cl) cl = c.last;
+          }
         }
         const key = `${email}|${cf.toLowerCase()}|${cl.toLowerCase()}`;
         if (!email || map.has(key)) return;
