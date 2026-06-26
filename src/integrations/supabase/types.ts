@@ -2740,10 +2740,13 @@ export type Database = {
         }
       }
       current_user_instructor_id: { Args: never; Returns: string }
+      daitch_mokotoff: { Args: { "": string }; Returns: string[] }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      dmetaphone: { Args: { "": string }; Returns: string }
+      dmetaphone_alt: { Args: { "": string }; Returns: string }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
@@ -2979,14 +2982,27 @@ export type Database = {
         }[]
       }
       release_slot_holds: { Args: { p_session_token: string }; Returns: number }
+      soundex: { Args: { "": string }; Returns: string }
       swimmer_has_active_waiver: {
         Args: { _dob: string; _first: string; _last: string }
         Returns: boolean
       }
-      swimmer_has_waiver_on_file: {
-        Args: { _dob: string; _first: string; _last: string }
-        Returns: boolean
-      }
+      swimmer_has_waiver_on_file:
+        | {
+            Args: { _dob: string; _first: string; _last: string }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _dob: string
+              _first: string
+              _last: string
+              _parent_email?: string
+              _parent_phone?: string
+            }
+            Returns: boolean
+          }
+      text_soundex: { Args: { "": string }; Returns: string }
       unsubscribe_marketing_by_token: {
         Args: { _reason?: string; _token: string }
         Returns: {
