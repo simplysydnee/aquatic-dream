@@ -1624,6 +1624,10 @@ function GroupSlotPicker({
     (levelFilter === "all" || s.swim_level === levelFilter) &&
     (dayFilter === "all" || s.day_of_week === dayFilter) &&
     (periodFilter === "all" || s.session_period_id === periodFilter),
+  ).sort((a, b) =>
+    (a.day_of_week || "").localeCompare(b.day_of_week || "")
+    || (a.start_time || "").localeCompare(b.start_time || "")
+    || (a.swim_level || "").localeCompare(b.swim_level || ""),
   );
 
   if (loading) return <Card className="p-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></Card>;
