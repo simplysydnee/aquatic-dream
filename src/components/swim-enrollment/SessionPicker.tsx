@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SwimLevel, LEVEL_DISPLAY, getAgeGroup, getGroupName, AGE_GROUP_LABELS, PRICING } from "./types";
 import LevelFullScreen from "./LevelFullScreen";
 
-type EmptyReason = "none" | "already-enrolled";
+type EmptyReason = "none" | "already-enrolled" | "wrong-age-group";
 
 interface SlotInfo {
   assignSessionId: string;
