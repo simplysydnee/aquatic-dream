@@ -1,30 +1,52 @@
 // Admin-initiated card-on-file setup for an EXISTING lesson booking.
-// Two actions in one endpoint:
-//   action="start"   → create Stripe setup-mode embedded Checkout session,
-//                      return client_secret + checkout_session_id.
-//   action="finalize" → retrieve session, attach payment_method to the
-//                      booking, mark occurrences card_on_file.
+// Actions:
+//   action="check"           → probe for a reusable PM from another booking
+//                              under the same parent_email (no Stripe writes).
+//   action="attach_existing" → re-validate that reusable PM, then stamp it
+//                              on this booking and flip occurrences.
+//   action="start"           → create Stripe setup-mode embedded Checkout
+//                              session (collect a new card).
+//   action="finalize"        → after embedded checkout completes, attach the
+//                              new PM to this booking and flip occurrences.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
+import { findReusableCardForEmail } from "../_shared/card-on-file.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const Env = z.enum(["sandbox", "live"]);
+const CheckSchema = z.object({
+  action: z.literal("check"),
+  booking_id: z.string().uuid(),
+  environment: Env,
+});
+const AttachExistingSchema = z.object({
+  action: z.literal("attach_existing"),
+  booking_id: z.string().uuid(),
+  source_booking_id: z.string().uuid(),
+  environment: Env,
+});
 const StartSchema = z.object({
   action: z.literal("start"),
   booking_id: z.string().uuid(),
-  environment: z.enum(["sandbox", "live"]),
+  environment: Env,
 });
 const FinalizeSchema = z.object({
   action: z.literal("finalize"),
   booking_id: z.string().uuid(),
   checkout_session_id: z.string().min(1),
-  environment: z.enum(["sandbox", "live"]),
+  environment: Env,
 });
-const BodySchema = z.discriminatedUnion("action", [StartSchema, FinalizeSchema]);
+const BodySchema = z.discriminatedUnion("action", [
+  CheckSchema,
+  AttachExistingSchema,
+  StartSchema,
+  FinalizeSchema,
+]);
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -60,13 +82,77 @@ Deno.serve(async (req) => {
 
     const { data: booking, error: bErr } = await supabaseAdmin
       .from("lesson_bookings")
-      .select("id, parent_name, parent_email, parent_phone, stripe_customer_id")
+      .select("id, parent_name, parent_email, parent_phone, stripe_customer_id, stripe_payment_method_id")
       .eq("id", body.booking_id)
       .maybeSingle();
     if (bErr || !booking) return j({ error: "Booking not found" }, 404);
 
     const stripe = createStripeClient(body.environment as StripeEnv);
 
+    // ─────────────────────────────────────── CHECK ───────────────────────────────────────
+    if (body.action === "check") {
+      // If this booking already has a card, no reuse banner needed.
+      if (booking.stripe_payment_method_id) {
+        return j({ found: false, reason: "already_has_card" });
+      }
+      if (!booking.parent_email) return j({ found: false, reason: "no_prior_pm" });
+
+      const result = await findReusableCardForEmail(
+        supabaseAdmin,
+        stripe,
+        booking.parent_email,
+      );
+      return j(result);
+    }
+
+    // ─────────────────────────────────── ATTACH_EXISTING ─────────────────────────────────
+    if (body.action === "attach_existing") {
+      if (booking.stripe_payment_method_id) {
+        return j({ error: "Booking already has a card on file" }, 400);
+      }
+      if (!booking.parent_email) return j({ error: "Booking missing parent email" }, 400);
+
+      const result = await findReusableCardForEmail(
+        supabaseAdmin,
+        stripe,
+        booking.parent_email,
+      );
+      if (!result.found) {
+        return j({ error: "No reusable card found for this parent" }, 400);
+      }
+      // Defense in depth: require the source booking the UI showed the admin
+      // is the one we'd actually attach. Prevents stale-UI races.
+      if (result.source_booking_id !== body.source_booking_id) {
+        return j({
+          error: "Selected card no longer matches the parent's most recent card",
+        }, 409);
+      }
+
+      await supabaseAdmin.from("lesson_bookings").update({
+        stripe_payment_method_id: result.stripe_payment_method_id,
+        stripe_customer_id: result.stripe_customer_id,
+      }).eq("id", booking.id);
+
+      await supabaseAdmin.from("lesson_booking_occurrences")
+        .update({
+          payment_status: "card_on_file",
+          charge_status: "pending",
+          charge_error: null,
+        })
+        .eq("booking_id", booking.id)
+        .neq("status", "cancelled")
+        .neq("payment_status", "paid");
+
+      return j({
+        success: true,
+        payment_method_id: result.stripe_payment_method_id,
+        customer_id: result.stripe_customer_id,
+        brand: result.brand,
+        last4: result.last4,
+      });
+    }
+
+    // ─────────────────────────────────────── START ───────────────────────────────────────
     if (body.action === "start") {
       let customerId = booking.stripe_customer_id as string | null;
       if (!customerId) {
@@ -102,7 +188,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // finalize
+    // ───────────────────────────────────── FINALIZE ──────────────────────────────────────
     const cs = await stripe.checkout.sessions.retrieve(body.checkout_session_id);
     if (cs.status !== "complete" || !cs.setup_intent) {
       return j({ error: `Card setup not complete: ${cs.status}` }, 400);
@@ -122,7 +208,6 @@ Deno.serve(async (req) => {
       stripe_customer_id: customerId,
     }).eq("id", booking.id);
 
-    // Flip any unpaid/pending occurrences to card_on_file so the cron will charge them.
     await supabaseAdmin.from("lesson_booking_occurrences")
       .update({
         payment_status: "card_on_file",
