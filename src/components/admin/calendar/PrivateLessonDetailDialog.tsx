@@ -355,6 +355,34 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
               <Separator />
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payment</p>
+
+                {/* Reusable card banner */}
+                {reusableCard && !reuseDismissed && !hasCardOnFile && (
+                  <div className="rounded-lg border border-blue-300 bg-blue-50 p-3 space-y-2">
+                    <p className="text-sm">
+                      <span className="font-semibold">
+                        {reusableCard.brand.toUpperCase()} •••• {reusableCard.last4}
+                      </span>{" "}
+                      is on file for this parent
+                      {reusableCard.source_child_name
+                        ? <> from {reusableCard.source_child_name}'s lesson</>
+                        : null}.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Expires {String(reusableCard.exp_month).padStart(2, "0")}/{String(reusableCard.exp_year).slice(-2)}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={attachExistingCard} disabled={busy !== null}>
+                        {busy === "attach" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CreditCard className="w-4 h-4 mr-1" />}
+                        Use this card
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setReuseDismissed(true)} disabled={busy !== null}>
+                        Collect a new card
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2">
                   {hasCardOnFile && (
                     <Button size="sm" onClick={() => setChargeConfirmOpen(true)} disabled={busy !== null}>
