@@ -63,9 +63,67 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
   const [manualRef, setManualRef] = useState<string>("");
   const [chargeConfirmOpen, setChargeConfirmOpen] = useState(false);
 
+  // Reusable card-on-file probe (from this parent's other bookings)
+  const [reusableCard, setReusableCard] = useState<{
+    brand: string;
+    last4: string;
+    exp_month: number;
+    exp_year: number;
+    source_booking_id: string;
+    source_child_name: string | null;
+  } | null>(null);
+  const [reuseDismissed, setReuseDismissed] = useState(false);
+
   const waiverUrl = lesson?.waiver_token ? `${SITE}/lesson-waiver/${lesson.waiver_token}` : null;
   const hasCardOnFile = !!lesson?.stripe_payment_method_id;
   const isPaid = lesson?.payment_status === "paid";
+
+  // Probe for a reusable card whenever the dialog opens on a booking
+  // that does not yet have a card on file.
+  useEffect(() => {
+    let cancelled = false;
+    setReusableCard(null);
+    setReuseDismissed(false);
+    if (!lesson || hasCardOnFile || isPaid) return;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("admin-setup-card-for-booking", {
+          body: {
+            action: "check",
+            booking_id: lesson.booking_id,
+            environment: getStripeEnvironment(),
+          },
+        });
+        if (cancelled) return;
+        if (error || (data as any)?.error) return;
+        if ((data as any)?.found) setReusableCard(data as any);
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [lesson?.booking_id, hasCardOnFile, isPaid]);
+
+  const attachExistingCard = async () => {
+    if (!reusableCard || !lesson) return;
+    setBusy("attach");
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-setup-card-for-booking", {
+        body: {
+          action: "attach_existing",
+          booking_id: lesson.booking_id,
+          source_booking_id: reusableCard.source_booking_id,
+          environment: getStripeEnvironment(),
+        },
+      });
+      if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
+      toast.success(`${reusableCard.brand.toUpperCase()} •••• ${reusableCard.last4} attached`);
+      setReusableCard(null);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message || "Could not attach card");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const resendConfirmation = async () => {
     setBusy("resend");
