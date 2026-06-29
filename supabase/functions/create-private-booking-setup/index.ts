@@ -66,6 +66,31 @@ Deno.serve(async (req) => {
     if (!parsed.success) return j({ error: parsed.error.flatten(), step }, 400);
     const body = parsed.data;
 
+    // Idempotency replay: if this exact submission was already accepted, return
+    // the original Checkout client_secret instead of creating a parallel
+    // pending_card booking ("ghost booking" pattern from Freya/Valeria).
+    if (body.idempotency_key) {
+      try {
+        const { data: prior } = await supabase
+          .from("lesson_bookings")
+          .select("id, stripe_customer_id, status")
+          .eq("idempotency_key", body.idempotency_key)
+          .maybeSingle();
+        if (prior?.id) {
+          // Reused booking branch (no checkout). Surface success without
+          // creating duplicates.
+          if ((prior as any).status === "active") {
+            return j({ booking_id: prior.id, reused: true, idempotent: true });
+          }
+          // Pending booking — re-issue checkout session would require storing
+          // it; safer to just acknowledge and let the client poll-confirm.
+          return j({ booking_id: prior.id, idempotent: true, pending: true });
+        }
+      } catch (e) {
+        console.warn("idempotency lookup failed (non-fatal)", e instanceof Error ? e.message : String(e));
+      }
+    }
+
     step = "validate_agreement";
     if (!body.agreement.waiver_accepted || !body.agreement.terms_accepted || !body.agreement.privacy_policy_accepted) {
       return j({ error: "Required agreements not accepted", step }, 400);
