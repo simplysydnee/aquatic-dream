@@ -269,6 +269,19 @@ export default function PrivateBookingFlow() {
         handleSlotsTaken(((data as any)?.conflicts as string[]) ?? []);
         return;
       }
+      // Reuse-path success: server attached the saved card and the booking is
+      // already active. Skip the card step and go straight to confirmation.
+      if ((data as any)?.reused === true) {
+        if (!activeWaiver && form.childDob) {
+          backfillVisitorWaiver({
+            legal,
+            signerEmail: form.parentEmail,
+            child: { firstName: form.childFirstName, lastName: form.childLastName, dob: form.childDob },
+          });
+        }
+        setStep("done");
+        return;
+      }
       if (!data?.client_secret) throw new Error((data as any)?.error || "Could not start card setup");
       setSetup({ clientSecret: data.client_secret, bookingId: data.booking_id, checkoutSessionId: data.checkout_session_id });
       // If this was a freshly-signed waiver (not carried over), backfill visitor_waivers
