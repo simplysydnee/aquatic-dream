@@ -132,7 +132,7 @@ export default function PrivateBookingFlow() {
         },
       );
       if (error) return;
-      if (data?.has_card && data?.reuse_token) {
+      if (data?.found && data?.reuse_token) {
         setReuseCard({
           token: data.reuse_token,
           brand: data.brand,
