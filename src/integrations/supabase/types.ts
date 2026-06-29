@@ -130,6 +130,51 @@ export type Database = {
           },
         ]
       }
+      card_reuse_tokens: {
+        Row: {
+          brand: string | null
+          consumed_at: string | null
+          created_at: string
+          exp_month: number | null
+          exp_year: number | null
+          expires_at: string
+          last4: string | null
+          parent_email: string
+          source_booking_id: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          token: string
+        }
+        Insert: {
+          brand?: string | null
+          consumed_at?: string | null
+          created_at?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          expires_at?: string
+          last4?: string | null
+          parent_email: string
+          source_booking_id?: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          token: string
+        }
+        Update: {
+          brand?: string | null
+          consumed_at?: string | null
+          created_at?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          expires_at?: string
+          last4?: string | null
+          parent_email?: string
+          source_booking_id?: string | null
+          stripe_customer_id?: string
+          stripe_payment_method_id?: string
+          token?: string
+        }
+        Relationships: []
+      }
       client_credits: {
         Row: {
           amount_cents: number
@@ -906,6 +951,7 @@ export type Database = {
           end_time: string
           frequency: string | null
           id: string
+          idempotency_key: string | null
           instructor_id: string | null
           instructor_name: string | null
           lesson_type: string
@@ -954,6 +1000,7 @@ export type Database = {
           end_time: string
           frequency?: string | null
           id?: string
+          idempotency_key?: string | null
           instructor_id?: string | null
           instructor_name?: string | null
           lesson_type: string
@@ -1002,6 +1049,7 @@ export type Database = {
           end_time?: string
           frequency?: string | null
           id?: string
+          idempotency_key?: string | null
           instructor_id?: string | null
           instructor_name?: string | null
           lesson_type?: string

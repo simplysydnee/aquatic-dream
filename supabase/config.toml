@@ -60,6 +60,8 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.confirm-private-booking]
     verify_jwt = false
+  [functions.lookup-parent-card-on-file-public]
+    verify_jwt = false
   [functions.charge-private-lesson-occurrence]
     verify_jwt = true
   [functions.cancel-private-lesson-occurrence]

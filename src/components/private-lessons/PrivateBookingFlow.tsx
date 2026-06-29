@@ -65,9 +65,26 @@ function conflictKey(instructorId: string, date: string, startTime: string): str
 }
 
 
+// Feature flag — keep OFF until we've manually completed a real test booking
+// in preview. When OFF, the file behaves byte-for-byte like before this change.
+const SELF_SERVE_CARD_REUSE_ENABLED =
+  (import.meta.env.VITE_ENABLE_SELF_SERVE_CARD_REUSE as string | undefined) === "true";
+
+type ReuseCard = {
+  token: string;
+  brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+};
+
 export default function PrivateBookingFlow() {
   const [step, setStep] = useState<Step>("info");
   const [sessionToken] = useState(() =>
+    crypto.randomUUID().replace(/-/g, "") + Date.now().toString(36));
+  // Stable per-flow key so a retry of the same submission won't create a
+  // duplicate "ghost" pending_card booking row.
+  const [idempotencyKey] = useState(() =>
     crypto.randomUUID().replace(/-/g, "") + Date.now().toString(36));
   const [form, setForm] = useState({
     parentFirstName: "", parentLastName: "", parentEmail: "", parentPhone: "",
@@ -80,6 +97,8 @@ export default function PrivateBookingFlow() {
   const [submitting, setSubmitting] = useState(false);
   const [setup, setSetup] = useState<{ clientSecret: string; bookingId: string; checkoutSessionId: string } | null>(null);
   const [activeWaiver, setActiveWaiver] = useState<ActiveWaiver | null>(null);
+  const [reuseCard, setReuseCard] = useState<ReuseCard | null>(null);
+  const [useReuse, setUseReuse] = useState(true);
 
 
   useEffect(() => {
@@ -93,6 +112,41 @@ export default function PrivateBookingFlow() {
   const computedAge = useMemo(() => (form.childDob ? calcAge(form.childDob) : null), [form.childDob]);
   const update = (k: string, v: any) => { setForm({ ...form, [k]: v }); if (errors[k]) setErrors({ ...errors, [k]: "" }); };
 
+  // Additive, best-effort: look up a sibling card on file. Any error is
+  // swallowed — the parent always retains the standard "enter a new card"
+  // path on the next step regardless of what this returns.
+  const tryLookupReusableCard = async () => {
+    if (!SELF_SERVE_CARD_REUSE_ENABLED) return;
+    try {
+      const email = form.parentEmail.trim().toLowerCase();
+      if (!email || !form.parentFirstName.trim() || !form.parentLastName.trim()) return;
+      const { data, error } = await supabase.functions.invoke(
+        "lookup-parent-card-on-file-public",
+        {
+          body: {
+            parent_email: email,
+            parent_first_name: form.parentFirstName.trim(),
+            parent_last_name: form.parentLastName.trim(),
+            environment: getStripeEnvironment(),
+          },
+        },
+      );
+      if (error) return;
+      if (data?.found && data?.reuse_token) {
+        setReuseCard({
+          token: data.reuse_token,
+          brand: data.brand,
+          last4: data.last4,
+          exp_month: data.exp_month,
+          exp_year: data.exp_year,
+        });
+        setUseReuse(true);
+      }
+    } catch {
+      /* purely additive — never block the booking */
+    }
+  };
+
   const handleInfoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = infoSchema.safeParse(form);
@@ -102,14 +156,14 @@ export default function PrivateBookingFlow() {
       setErrors(fe);
       return;
     }
-    // Look up an active waiver for this swimmer so we can skip the legal step
-    // later if one already exists (same first/last name + DOB within 12 months).
     if (form.childDob) {
       const w = await lookupActiveWaiver(form.childFirstName, form.childLastName, form.childDob);
       setActiveWaiver(w);
     } else {
       setActiveWaiver(null);
     }
+    // Fire-and-forget; never block step transition on lookup result.
+    tryLookupReusableCard().catch(() => {});
     setStep("slots");
   };
 
@@ -157,6 +211,8 @@ export default function PrivateBookingFlow() {
         body: {
           environment: getStripeEnvironment(),
           session_token: sessionToken,
+          idempotency_key: idempotencyKey,
+          reuse_token: SELF_SERVE_CARD_REUSE_ENABLED && useReuse && reuseCard ? reuseCard.token : undefined,
           parent_first_name: form.parentFirstName,
           parent_last_name: form.parentLastName,
           parent_email: form.parentEmail,
@@ -211,6 +267,19 @@ export default function PrivateBookingFlow() {
       }
       if ((data as any)?.error === "slots_taken" || (data as any)?.error === "slot_closed") {
         handleSlotsTaken(((data as any)?.conflicts as string[]) ?? []);
+        return;
+      }
+      // Reuse-path success: server attached the saved card and the booking is
+      // already active. Skip the card step and go straight to confirmation.
+      if ((data as any)?.reused === true) {
+        if (!activeWaiver && form.childDob) {
+          backfillVisitorWaiver({
+            legal,
+            signerEmail: form.parentEmail,
+            child: { firstName: form.childFirstName, lastName: form.childLastName, dob: form.childDob },
+          });
+        }
+        setStep("done");
         return;
       }
       if (!data?.client_secret) throw new Error((data as any)?.error || "Could not start card setup");
@@ -329,6 +398,24 @@ export default function PrivateBookingFlow() {
             ))}
           </ul>
         </div>
+        {SELF_SERVE_CARD_REUSE_ENABLED && reuseCard && (
+          <div className="max-w-2xl mx-auto mb-4 p-3 border border-primary/30 bg-primary/5 rounded-lg text-sm flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={useReuse}
+              onChange={(e) => setUseReuse(e.target.checked)}
+              className="mt-1"
+              id="reuse-card-toggle"
+            />
+            <label htmlFor="reuse-card-toggle" className="cursor-pointer">
+              Use saved card on file: <strong>{reuseCard.brand.toUpperCase()} •••• {reuseCard.last4}</strong>
+              {" "}(exp {String(reuseCard.exp_month).padStart(2, "0")}/{String(reuseCard.exp_year).slice(-2)})
+              <span className="block text-xs text-muted-foreground mt-0.5">
+                Uncheck to enter a different card at the next step.
+              </span>
+            </label>
+          </div>
+        )}
         <LegalAgreements
           parentName={`${form.parentFirstName} ${form.parentLastName}`}
           childName={`${form.childFirstName} ${form.childLastName}`}
