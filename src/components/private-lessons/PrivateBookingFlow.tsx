@@ -112,6 +112,41 @@ export default function PrivateBookingFlow() {
   const computedAge = useMemo(() => (form.childDob ? calcAge(form.childDob) : null), [form.childDob]);
   const update = (k: string, v: any) => { setForm({ ...form, [k]: v }); if (errors[k]) setErrors({ ...errors, [k]: "" }); };
 
+  // Additive, best-effort: look up a sibling card on file. Any error is
+  // swallowed — the parent always retains the standard "enter a new card"
+  // path on the next step regardless of what this returns.
+  const tryLookupReusableCard = async () => {
+    if (!SELF_SERVE_CARD_REUSE_ENABLED) return;
+    try {
+      const email = form.parentEmail.trim().toLowerCase();
+      if (!email || !form.parentFirstName.trim() || !form.parentLastName.trim()) return;
+      const { data, error } = await supabase.functions.invoke(
+        "lookup-parent-card-on-file-public",
+        {
+          body: {
+            parent_email: email,
+            parent_first_name: form.parentFirstName.trim(),
+            parent_last_name: form.parentLastName.trim(),
+            environment: getStripeEnvironment(),
+          },
+        },
+      );
+      if (error) return;
+      if (data?.has_card && data?.reuse_token) {
+        setReuseCard({
+          token: data.reuse_token,
+          brand: data.brand,
+          last4: data.last4,
+          exp_month: data.exp_month,
+          exp_year: data.exp_year,
+        });
+        setUseReuse(true);
+      }
+    } catch {
+      /* purely additive — never block the booking */
+    }
+  };
+
   const handleInfoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = infoSchema.safeParse(form);
@@ -121,14 +156,14 @@ export default function PrivateBookingFlow() {
       setErrors(fe);
       return;
     }
-    // Look up an active waiver for this swimmer so we can skip the legal step
-    // later if one already exists (same first/last name + DOB within 12 months).
     if (form.childDob) {
       const w = await lookupActiveWaiver(form.childFirstName, form.childLastName, form.childDob);
       setActiveWaiver(w);
     } else {
       setActiveWaiver(null);
     }
+    // Fire-and-forget; never block step transition on lookup result.
+    tryLookupReusableCard().catch(() => {});
     setStep("slots");
   };
 
