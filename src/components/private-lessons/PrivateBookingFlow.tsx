@@ -211,6 +211,8 @@ export default function PrivateBookingFlow() {
         body: {
           environment: getStripeEnvironment(),
           session_token: sessionToken,
+          idempotency_key: idempotencyKey,
+          reuse_token: SELF_SERVE_CARD_REUSE_ENABLED && useReuse && reuseCard ? reuseCard.token : undefined,
           parent_first_name: form.parentFirstName,
           parent_last_name: form.parentLastName,
           parent_email: form.parentEmail,
