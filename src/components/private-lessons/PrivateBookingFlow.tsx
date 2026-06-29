@@ -207,41 +207,46 @@ export default function PrivateBookingFlow() {
 
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("create-private-booking-setup", {
-        body: {
-          environment: getStripeEnvironment(),
-          session_token: sessionToken,
-          idempotency_key: idempotencyKey,
-          reuse_token: SELF_SERVE_CARD_REUSE_ENABLED && useReuse && reuseCard ? reuseCard.token : undefined,
-          parent_first_name: form.parentFirstName,
-          parent_last_name: form.parentLastName,
-          parent_email: form.parentEmail,
-          parent_phone: form.parentPhone || null,
-          sms_consent: !!form.smsConsent,
-          child_first_name: form.childFirstName,
-          child_last_name: form.childLastName,
-          child_age: calcAge(form.childDob),
-          notes: form.notes || null,
-          slots: slotsToUse.map((s) => ({
-            instructor_id: s.instructor_id,
-            slot_date: s.slot_date,
-            start_time: s.start_time,
-            end_time: s.end_time,
-          })),
-
-          agreement: {
-            waiver_accepted: legal.waiverAccepted,
-            photo_release_accepted: legal.photoReleaseAccepted === "yes",
-            privacy_policy_accepted: legal.privacyPolicyAccepted,
-            terms_accepted: legal.termsAccepted,
-            signature_text: legal.signatureText,
-            emergency_contact_first_name: legal.emergencyContactFirstName,
-            emergency_contact_last_name: legal.emergencyContactLastName,
-            emergency_contact_phone: legal.emergencyContactPhone,
-            emergency_contact_relationship: legal.emergencyContactRelationship,
-          },
+      const buildBody = (includeReuse: boolean) => ({
+        environment: getStripeEnvironment(),
+        session_token: sessionToken,
+        idempotency_key: idempotencyKey,
+        reuse_token: includeReuse && SELF_SERVE_CARD_REUSE_ENABLED && useReuse && reuseCard ? reuseCard.token : undefined,
+        parent_first_name: form.parentFirstName,
+        parent_last_name: form.parentLastName,
+        parent_email: form.parentEmail,
+        parent_phone: form.parentPhone || null,
+        sms_consent: !!form.smsConsent,
+        child_first_name: form.childFirstName,
+        child_last_name: form.childLastName,
+        child_age: calcAge(form.childDob),
+        notes: form.notes || null,
+        slots: slotsToUse.map((s) => ({
+          instructor_id: s.instructor_id,
+          slot_date: s.slot_date,
+          start_time: s.start_time,
+          end_time: s.end_time,
+        })),
+        agreement: {
+          waiver_accepted: legal.waiverAccepted,
+          photo_release_accepted: legal.photoReleaseAccepted === "yes",
+          privacy_policy_accepted: legal.privacyPolicyAccepted,
+          terms_accepted: legal.termsAccepted,
+          signature_text: legal.signatureText,
+          emergency_contact_first_name: legal.emergencyContactFirstName,
+          emergency_contact_last_name: legal.emergencyContactLastName,
+          emergency_contact_phone: legal.emergencyContactPhone,
+          emergency_contact_relationship: legal.emergencyContactRelationship,
         },
       });
+
+      const sentWithReuse =
+        SELF_SERVE_CARD_REUSE_ENABLED && useReuse && !!reuseCard;
+
+      let { data, error } = await supabase.functions.invoke("create-private-booking-setup", {
+        body: buildBody(true),
+      });
+
       if (error) {
         let serverMsg = error.message;
         let serverStep: string | undefined;
@@ -262,9 +267,27 @@ export default function PrivateBookingFlow() {
           handleSlotsTaken(conflicts ?? []);
           return;
         }
-        console.error("create-private-booking-setup failed", { step: serverStep, message: serverMsg });
-        throw new Error(serverStep ? `[${serverStep}] ${serverMsg}` : serverMsg);
+        // Reuse-path hardening: if we sent a reuse_token and the server
+        // returned any non-200 that isn't a slot conflict, silently retry the
+        // same call WITHOUT reuse_token so the parent gets the normal Stripe
+        // Checkout iframe as if the reuse path never existed.
+        if (sentWithReuse) {
+          console.warn("reuse_token request failed — retrying without reuse_token", { step: serverStep, message: serverMsg });
+          const retry = await supabase.functions.invoke("create-private-booking-setup", {
+            body: buildBody(false),
+          });
+          if (!retry.error) {
+            data = retry.data;
+          } else {
+            console.error("create-private-booking-setup failed (after reuse-fallback retry)", { step: serverStep, message: serverMsg });
+            throw new Error(serverStep ? `[${serverStep}] ${serverMsg}` : serverMsg);
+          }
+        } else {
+          console.error("create-private-booking-setup failed", { step: serverStep, message: serverMsg });
+          throw new Error(serverStep ? `[${serverStep}] ${serverMsg}` : serverMsg);
+        }
       }
+
       if ((data as any)?.error === "slots_taken" || (data as any)?.error === "slot_closed") {
         handleSlotsTaken(((data as any)?.conflicts as string[]) ?? []);
         return;
