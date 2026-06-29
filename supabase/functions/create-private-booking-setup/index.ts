@@ -228,6 +228,49 @@ Deno.serve(async (req) => {
       })).id;
     }
 
+    // ADDITIVE: optional reuse of a sibling card via short-lived reuse_token.
+    // Any failure here MUST fall through silently to today's normal Setup
+    // Checkout flow. The parent must never see a reuse-related error.
+    let reuseInfo: { pmId: string; customerId: string; tokenRow: string } | null = null;
+    if (body.reuse_token) {
+      try {
+        step = "reuse_token_resolve";
+        const { data: tok } = await supabase
+          .from("card_reuse_tokens")
+          .select("token, parent_email, stripe_customer_id, stripe_payment_method_id, expires_at, consumed_at")
+          .eq("token", body.reuse_token)
+          .maybeSingle();
+        if (
+          tok &&
+          !(tok as any).consumed_at &&
+          new Date((tok as any).expires_at).getTime() > Date.now() &&
+          ((tok as any).parent_email || "").toLowerCase() === body.parent_email.toLowerCase()
+        ) {
+          // Revalidate the PM is still attached + not expired before stamping.
+          const pm = await stripe.paymentMethods.retrieve((tok as any).stripe_payment_method_id);
+          const pmCust = typeof pm.customer === "string" ? pm.customer : pm.customer?.id ?? null;
+          const expOk = pm.card
+            ? !(pm.card.exp_year < new Date().getUTCFullYear() ||
+                (pm.card.exp_year === new Date().getUTCFullYear() && pm.card.exp_month < new Date().getUTCMonth() + 1))
+            : false;
+          if (pm.type === "card" && pmCust && expOk) {
+            reuseInfo = {
+              pmId: (tok as any).stripe_payment_method_id,
+              customerId: pmCust,
+              tokenRow: (tok as any).token,
+            };
+            customerId = pmCust;
+          }
+        }
+      } catch (e) {
+        console.warn(
+          "reuse_token branch failed — falling through to Setup Checkout",
+          e instanceof Error ? e.message : String(e),
+        );
+        reuseInfo = null;
+      }
+    }
+
     // Pick canonical start time = earliest, end = latest? For series we just stamp first slot.
     const sorted = [...body.slots].sort((a, b) => (a.slot_date + a.start_time).localeCompare(b.slot_date + b.start_time));
     const first = sorted[0];
@@ -237,19 +280,22 @@ Deno.serve(async (req) => {
     const parentName = `${body.parent_first_name} ${body.parent_last_name}`;
     const childName = `${body.child_first_name} ${body.child_last_name}`;
 
-    // Create Stripe Checkout session FIRST so a Stripe failure doesn't leave
-    // orphan pending_card rows in the DB that would later be miscounted as
-    // taken slots.
-    step = "stripe_checkout_session_create";
-    const session = await stripe.checkout.sessions.create({
-      mode: "setup",
-      ui_mode: "embedded_page",
-      customer: customerId,
-      currency: "usd",
-      payment_method_types: ["card"],
-      redirect_on_completion: "never",
-      metadata: { booking_id: bookingId, type: "private_lesson_card_on_file" },
-    });
+    // Create Stripe Checkout session FIRST (only if NOT reusing a saved card)
+    // so a Stripe failure doesn't leave orphan pending_card rows in the DB
+    // that would later be miscounted as taken slots.
+    let session: { id: string; client_secret: string | null } | null = null;
+    if (!reuseInfo) {
+      step = "stripe_checkout_session_create";
+      session = await stripe.checkout.sessions.create({
+        mode: "setup",
+        ui_mode: "embedded_page",
+        customer: customerId,
+        currency: "usd",
+        payment_method_types: ["card"],
+        redirect_on_completion: "never",
+        metadata: { booking_id: bookingId, type: "private_lesson_card_on_file" },
+      });
+    }
 
     step = "insert_lesson_booking";
     const smsConsent = body.sms_consent === true;
@@ -264,6 +310,7 @@ Deno.serve(async (req) => {
       "See our SMS Terms (/sms-terms) and Privacy Policy (/waivers). " +
       "Consent is not a condition of enrollment.";
 
+    const bookingStatus = reuseInfo ? "active" : "pending_card";
     const { error: bErr } = await supabase.from("lesson_bookings").insert({
       id: bookingId,
       lesson_type: "private",
@@ -286,10 +333,12 @@ Deno.serve(async (req) => {
       series_start: first.slot_date,
       series_end: last.slot_date,
       notes: body.notes ?? null,
-      status: "pending_card",
+      status: bookingStatus,
       booking_source: "self_serve",
       waiver_signed_at: body.agreement.waiver_accepted ? new Date().toISOString() : null,
       stripe_customer_id: customerId,
+      stripe_payment_method_id: reuseInfo?.pmId ?? null,
+      idempotency_key: body.idempotency_key ?? null,
       cancellation_policy_hours: 24,
       sms_consent: smsConsent,
       sms_consent_at: smsConsent ? new Date().toISOString() : null,
@@ -300,17 +349,30 @@ Deno.serve(async (req) => {
     if (bErr) throw bErr;
 
     step = "insert_occurrences";
+    const occStatus = reuseInfo ? "scheduled" : "pending_card";
     const occurrences = body.slots.map((s) => ({
       id: crypto.randomUUID(),
       booking_id: bookingId,
       occurrence_date: s.slot_date,
       payment_status: "card_on_file",
       charge_status: "pending",
-      status: "pending_card",
+      status: occStatus,
       cancel_token: crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, ""),
     }));
     const { error: oErr } = await supabase.from("lesson_booking_occurrences").insert(occurrences);
     if (oErr) throw oErr;
+
+    // Mark the reuse token consumed (best-effort).
+    if (reuseInfo) {
+      try {
+        await supabase
+          .from("card_reuse_tokens")
+          .update({ consumed_at: new Date().toISOString() })
+          .eq("token", reuseInfo.tokenRow);
+      } catch (e) {
+        console.warn("reuse token consume failed (non-fatal)", e instanceof Error ? e.message : String(e));
+      }
+    }
 
     // Claim the slots: remove any slot_holds (from this or any other
     // session) that cover the booked instructor/date/time so subsequent
@@ -349,10 +411,22 @@ Deno.serve(async (req) => {
     });
     if (aErr) console.error("agreement insert failed (non-fatal)", aErr?.message);
 
+    if (reuseInfo) {
+      // Fire confirmation just like confirm-private-booking would on the
+      // Setup Checkout path. Best-effort, never blocks the response.
+      try {
+        const { sendPrivateBookingConfirmation } = await import("../_shared/send-private-booking-confirmation.ts");
+        await sendPrivateBookingConfirmation(supabase, bookingId, { mode: "initial" });
+      } catch (e) {
+        console.error("reuse-path confirmation send failed (non-fatal)", e instanceof Error ? e.message : String(e));
+      }
+      return j({ booking_id: bookingId, reused: true });
+    }
+
     return j({
       booking_id: bookingId,
-      client_secret: session.client_secret,
-      checkout_session_id: session.id,
+      client_secret: session!.client_secret,
+      checkout_session_id: session!.id,
       customer_id: customerId,
     });
   } catch (err: any) {
