@@ -65,9 +65,26 @@ function conflictKey(instructorId: string, date: string, startTime: string): str
 }
 
 
+// Feature flag — keep OFF until we've manually completed a real test booking
+// in preview. When OFF, the file behaves byte-for-byte like before this change.
+const SELF_SERVE_CARD_REUSE_ENABLED =
+  (import.meta.env.VITE_ENABLE_SELF_SERVE_CARD_REUSE as string | undefined) === "true";
+
+type ReuseCard = {
+  token: string;
+  brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+};
+
 export default function PrivateBookingFlow() {
   const [step, setStep] = useState<Step>("info");
   const [sessionToken] = useState(() =>
+    crypto.randomUUID().replace(/-/g, "") + Date.now().toString(36));
+  // Stable per-flow key so a retry of the same submission won't create a
+  // duplicate "ghost" pending_card booking row.
+  const [idempotencyKey] = useState(() =>
     crypto.randomUUID().replace(/-/g, "") + Date.now().toString(36));
   const [form, setForm] = useState({
     parentFirstName: "", parentLastName: "", parentEmail: "", parentPhone: "",
@@ -80,6 +97,8 @@ export default function PrivateBookingFlow() {
   const [submitting, setSubmitting] = useState(false);
   const [setup, setSetup] = useState<{ clientSecret: string; bookingId: string; checkoutSessionId: string } | null>(null);
   const [activeWaiver, setActiveWaiver] = useState<ActiveWaiver | null>(null);
+  const [reuseCard, setReuseCard] = useState<ReuseCard | null>(null);
+  const [useReuse, setUseReuse] = useState(true);
 
 
   useEffect(() => {
