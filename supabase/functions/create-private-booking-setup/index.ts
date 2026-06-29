@@ -34,6 +34,8 @@ const BodySchema = z.object({
   child_age: z.number().int().min(1).max(99),
   notes: z.string().max(1000).optional().nullable(),
   sms_consent: z.boolean().optional(),
+  idempotency_key: z.string().min(8).max(128).optional(),
+  reuse_token: z.string().min(8).max(128).optional(),
   slots: z.array(SlotSchema).min(1).max(40),
   agreement: z.object({
     waiver_accepted: z.boolean(),
