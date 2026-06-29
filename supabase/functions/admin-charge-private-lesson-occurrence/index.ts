@@ -5,6 +5,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
+import { findReusableCardForEmail } from "../_shared/card-on-file.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
