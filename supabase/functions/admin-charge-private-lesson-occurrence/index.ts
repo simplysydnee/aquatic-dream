@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
 
     const { data: row, error: rErr } = await supabaseAdmin
       .from("lesson_booking_occurrences")
-      .select("id, booking_id, occurrence_date, payment_status, charge_status, stripe_payment_intent_id, lesson_bookings!inner(id, parent_name, child_name, lesson_type, stripe_customer_id, stripe_payment_method_id, price_per_session)")
+      .select("id, booking_id, occurrence_date, payment_status, charge_status, stripe_payment_intent_id, lesson_bookings!inner(id, parent_name, parent_email, child_name, lesson_type, stripe_customer_id, stripe_payment_method_id, price_per_session)")
       .eq("id", occurrence_id)
       .maybeSingle();
     if (rErr || !row) return j({ error: "Occurrence not found" }, 404);
@@ -64,11 +64,28 @@ Deno.serve(async (req) => {
     }
 
     const b: any = (row as any).lesson_bookings;
+    const stripe = createStripeClient(environment as StripeEnv);
+
+    // Auto-attach sibling card if this booking is missing one but the parent
+    // has a valid card on another booking. Prevents "no card on file" errors
+    // when admin makes a second booking without re-collecting payment info.
+    if ((!b?.stripe_customer_id || !b?.stripe_payment_method_id) && b?.parent_email) {
+      const reuse = await findReusableCardForEmail(supabaseAdmin, stripe, b.parent_email);
+      if (reuse.found) {
+        await supabaseAdmin.from("lesson_bookings").update({
+          stripe_customer_id: reuse.stripe_customer_id,
+          stripe_payment_method_id: reuse.stripe_payment_method_id,
+          updated_at: new Date().toISOString(),
+        }).eq("id", b.id);
+        b.stripe_customer_id = reuse.stripe_customer_id;
+        b.stripe_payment_method_id = reuse.stripe_payment_method_id;
+      }
+    }
+
     if (!b?.stripe_customer_id || !b?.stripe_payment_method_id) {
       return j({ error: "No card on file" }, 400);
     }
 
-    const stripe = createStripeClient(environment as StripeEnv);
     const amount = Math.round(Number(b.price_per_session) * 100);
 
     const pi = await stripe.paymentIntents.create({
