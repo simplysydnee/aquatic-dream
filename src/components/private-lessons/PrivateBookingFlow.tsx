@@ -398,6 +398,24 @@ export default function PrivateBookingFlow() {
             ))}
           </ul>
         </div>
+        {SELF_SERVE_CARD_REUSE_ENABLED && reuseCard && (
+          <div className="max-w-2xl mx-auto mb-4 p-3 border border-primary/30 bg-primary/5 rounded-lg text-sm flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={useReuse}
+              onChange={(e) => setUseReuse(e.target.checked)}
+              className="mt-1"
+              id="reuse-card-toggle"
+            />
+            <label htmlFor="reuse-card-toggle" className="cursor-pointer">
+              Use saved card on file: <strong>{reuseCard.brand.toUpperCase()} •••• {reuseCard.last4}</strong>
+              {" "}(exp {String(reuseCard.exp_month).padStart(2, "0")}/{String(reuseCard.exp_year).slice(-2)})
+              <span className="block text-xs text-muted-foreground mt-0.5">
+                Uncheck to enter a different card at the next step.
+              </span>
+            </label>
+          </div>
+        )}
         <LegalAgreements
           parentName={`${form.parentFirstName} ${form.parentLastName}`}
           childName={`${form.childFirstName} ${form.childLastName}`}
