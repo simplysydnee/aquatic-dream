@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,18 +14,24 @@ const AdminLogin = () => {
   const [submitting, setSubmitting] = useState(false);
   const { signIn, user, isAdmin, isInstructor, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Only trust a same-origin relative path so a malicious ?next=... can't
+  // bounce the user off-site. This preserves OAuth consent round-trips.
+  const rawNext = searchParams.get("next");
+  const nextPath =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
 
   useEffect(() => {
     if (authLoading) return;
 
-    if (user && isAdmin) {
+    if (user && (isAdmin || isInstructor)) {
       setSubmitting(false);
-      navigate("/admin", { replace: true });
-      return;
-    }
-    if (user && isInstructor) {
-      setSubmitting(false);
-      navigate("/instructor", { replace: true });
+      if (nextPath) {
+        navigate(nextPath, { replace: true });
+        return;
+      }
+      navigate(isAdmin ? "/admin" : "/instructor", { replace: true });
       return;
     }
 
@@ -36,7 +42,7 @@ const AdminLogin = () => {
         setError("This account does not have access.");
       }
     }
-  }, [user, isAdmin, isInstructor, authLoading, submitting, navigate]);
+  }, [user, isAdmin, isInstructor, authLoading, submitting, navigate, nextPath]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
