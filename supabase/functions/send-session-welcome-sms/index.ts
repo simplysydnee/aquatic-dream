@@ -62,15 +62,20 @@ Deno.serve(async (req) => {
       .eq("swim_sessions.session_period_id", sessionPeriodId);
     if (enrErr) return json(500, { error: enrErr.message });
 
-    // Skip anything already sent for this period
+    // Skip phones already sent this welcome for this session period (search recent logs)
+    const startDateFmtRaw = formatPTDate(period.start_date, { weekday: "short", month: "short", day: "numeric" });
     const { data: alreadySent } = await admin
       .from("reminder_logs")
-      .select("phone")
+      .select("phone, message")
       .eq("channel", "sms")
       .eq("status", "sent")
       .eq("reminder_kind", "session_welcome_sms")
-      .like("message", `%${period.start_date}%`);
-    const sentPhones = new Set((alreadySent || []).map((r: any) => r.phone));
+      .gte("created_at", new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString());
+    const sentPhones = new Set(
+      (alreadySent || [])
+        .filter((r: any) => (r.message || "").includes(startDateFmtRaw))
+        .map((r: any) => r.phone)
+    );
 
     // Group by normalized phone
     const groups = new Map<string, { firstNames: string[]; firstDay?: string; firstTime?: string; enrollmentIds: string[] }>();
