@@ -1,24 +1,39 @@
-# Delete test private bookings
+## What I found
 
-Remove the three test bookings created on Jun 29 via the self-serve flow using denise Chacon's email.
+- Session 2 starts **Mon Jul 13, 2026**, exactly 7 days from today (Jul 6).
+- The `send-session-welcome-email` function exists and works, but it's **only triggered manually** from the admin UI (Sessions / Enrollments / Communications tabs).
+- There is **no cron job** scheduled to auto-send it a week before a session period starts. That's why nothing went out today.
+- Confirmed via the DB: 0 of 47 Session 2 enrollments have `session_welcome_sent_at` populated.
 
-## Rows to remove
+## Plan
 
-| Booking ID | Child name | Date / Time |
-|---|---|---|
-| `8d2a87e7-439b-43d9-b565-34a0f5c69ef6` | DoubleKid Tester | Tue Jul 14, 3:00 PM |
-| `26c564e0-cd1a-44ea-8833-0a4f651aafca` | ReuseEvKid ev_d3f23860 | Tue Jul 14, 5:30 PM |
-| `2d3b66f5-26e9-4cd3-b93e-916c11d3c3ab` | ReuseKid Tester | Wed Jul 8, 8:00 PM |
+### 1. Add a scheduled auto-send (the actual fix)
 
-## Steps
+Create a new edge function `send-session-welcome-scheduled` that:
+- Runs daily.
+- Finds any `session_periods` whose `start_date` is exactly 7 days from "today" in Pacific Time.
+- For each matching period, invokes the existing `send-session-welcome-email` with `{ sessionPeriodId }`.
+- The existing function already groups enrollments by parent email, uses an idempotency key per (period, email), and updates `session_welcome_sent_at` — so re-runs are safe and no duplicates go out.
 
-1. Pre-check: query `lesson_booking_occurrences` for these three `booking_id`s and confirm none have `stripe_payment_intent_id` set (i.e. no real Stripe charge). If any do, stop and report before deleting.
-2. Delete matching rows from `lesson_booking_occurrences` (child rows first).
-3. Delete the three rows from `lesson_bookings`.
-4. Verify with a follow-up SELECT that the Tuesday Jul 14 private-lessons panel no longer lists them.
+Schedule it via `pg_cron` to run once a day at **8:00 AM Pacific** (16:00 UTC while PDT is in effect):
 
-## Technical notes
+```text
+cron: 0 16 * * *
+job:  send-session-welcome-scheduled
+```
 
-- Uses the `insert` tool (DELETE is a data operation, not a schema change).
-- Denise Chacon's real bookings (Adrian, Julian Chacon) are not touched — they have different booking IDs.
-- No Stripe refund needed; these were card-on-file setups, not paid charges.
+Registered through the Supabase insert tool (not a migration) since the URL/anon-key are project-specific, matching the pattern used by the other scheduled jobs in this project.
+
+### 2. Backfill Session 2 today
+
+Immediately invoke `send-session-welcome-email` once with `sessionPeriodId = b2222222-...` (Session 2) so the ~47 enrollments get their welcome email today, as originally intended. The function's per-parent idempotency key prevents duplicates if anyone was already sent manually.
+
+### 3. No UI or template changes
+
+The manual "Send welcome email" buttons in the admin stay exactly as they are. No changes to the email template, business logic, or Stripe/enrollment flow.
+
+## Notes
+
+- 7 days is a whole-day match, so DST edge cases don't matter — the job just compares `start_date` to today+7 in Pacific.
+- If you'd rather the automated send go out on a different day (e.g. 5 days prior, or the Sunday before), tell me and I'll adjust the offset.
+- Leaves room to later add a similar auto-send for the payment reminder or a 1-day-out nudge, if you want that separately.
