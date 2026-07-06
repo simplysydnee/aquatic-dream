@@ -2971,6 +2971,10 @@ export type Database = {
           session_id: string
         }[]
       }
+      get_session_gap_outreach: {
+        Args: { _from_period: string; _to_period: string }
+        Returns: Json
+      }
       get_swim_enrollment_by_waiver_token: {
         Args: { _token: string }
         Returns: {
