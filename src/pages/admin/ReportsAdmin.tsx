@@ -140,7 +140,12 @@ export default function ReportsAdmin() {
           <TabsList>
             <TabsTrigger value="noshows">No-shows</TabsTrigger>
             <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
+            <TabsTrigger value="gap">Session gap outreach</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="gap">
+            <SessionGapOutreach />
+          </TabsContent>
 
           <TabsContent value="noshows">
             <Card className="p-4">
