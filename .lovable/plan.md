@@ -1,39 +1,78 @@
-## What I found
+## Part 1 — "Session starts next week" SMS
 
-- Session 2 starts **Mon Jul 13, 2026**, exactly 7 days from today (Jul 6).
-- The `send-session-welcome-email` function exists and works, but it's **only triggered manually** from the admin UI (Sessions / Enrollments / Communications tabs).
-- There is **no cron job** scheduled to auto-send it a week before a session period starts. That's why nothing went out today.
-- Confirmed via the DB: 0 of 47 Session 2 enrollments have `session_welcome_sent_at` populated.
+New edge function `send-session-welcome-sms` mirroring `send-session-welcome-email`:
 
-## Plan
+- Input: `sessionPeriodId` (admin-triggered).
+- Recipients: all `swim_enrollments` in that period with status `confirmed`/`enrolled`/`pending_payment` and a valid `parent_phone`.
+- **Dedupe by normalized parent phone**: parents with multiple swimmers get ONE combined SMS.
+- Idempotency: log to `reminder_logs` with `reminder_kind = 'session_welcome_sms'`; skip any phone already logged as `sent` for this period.
+- Uses shared `sendSms` + `logSms` from `supabase/functions/_shared/textmagic.ts`.
+- Auth: admin JWT check.
 
-### 1. Add a scheduled auto-send (the actual fix)
+**Message templates (warmer tone):**
 
-Create a new edge function `send-session-welcome-scheduled` that:
-- Runs daily.
-- Finds any `session_periods` whose `start_date` is exactly 7 days from "today" in Pacific Time.
-- For each matching period, invokes the existing `send-session-welcome-email` with `{ sessionPeriodId }`.
-- The existing function already groups enrollments by parent email, uses an idempotency key per (period, email), and updates `session_welcome_sent_at` — so re-runs are safe and no duplicates go out.
+Single swimmer:
+> Hi! {ChildFirst}'s next swim session starts {Mon, Jul 13} at Aquatic Dreams. First lesson {Monday} at {3:30 PM}. We emailed full details — check spam if you don't see it! Reply STOP to opt out.
 
-Schedule it via `pg_cron` to run once a day at **8:00 AM Pacific** (16:00 UTC while PDT is in effect):
+Multiple swimmers (same parent):
+> Hi! Your swimmers ({FirstNames}) start their next session {Mon, Jul 13} at Aquatic Dreams. First lessons this week — check your email (and spam) for the full schedule. Reply STOP to opt out.
 
-```text
-cron: 0 16 * * *
-job:  send-session-welcome-scheduled
-```
+**Trigger:** admin clicks a new "Send 'starts next week' SMS" button on the Session 2 row in `SessionsAdmin`, matching placement of the current welcome-email button. Fires immediately after confirm.
 
-Registered through the Supabase insert tool (not a migration) since the URL/anon-key are project-specific, matching the pattern used by the other scheduled jobs in this project.
+No cron for now.
 
-### 2. Backfill Session 2 today
+## Part 2 — Reports: Session gap outreach
 
-Immediately invoke `send-session-welcome-email` once with `sessionPeriodId = b2222222-...` (Session 2) so the ~47 enrollments get their welcome email today, as originally intended. The function's per-parent idempotency key prevents duplicates if anyone was already sent manually.
+New "Session gap outreach" section inside `src/pages/admin/ReportsAdmin.tsx`.
 
-### 3. No UI or template changes
+**Data:**
 
-The manual "Send welcome email" buttons in the admin stay exactly as they are. No changes to the email template, business logic, or Stripe/enrollment flow.
+1. **Session 2 capacity** — per `swim_level`, `spots_left = SUM(max_students) - COUNT(enrollments)` across active sessions in that period. Show start/end dates and per-level spots remaining.
+2. **Gap list** — parents/swimmers who EITHER:
+   - Enrolled in Session 1 (`confirmed`/`enrolled`) but NOT in Session 2, OR
+   - Have a `lesson_requests` row in the last 90 days with no matching Session 2 enrollment.
 
-## Notes
+   **Name matching (corrected):** use the same COALESCE fallback pattern established today in `enrollments_waiver_status` — derive first/last from `child_name` when `child_first_name`/`child_last_name` are NULL:
+   ```sql
+   derived_first = COALESCE(
+     NULLIF(trim(child_first_name), ''),
+     NULLIF(split_part(coalesce(child_name,''), ' ', 1), '')
+   )
+   derived_last = COALESCE(
+     NULLIF(trim(child_last_name), ''),
+     CASE WHEN position(' ' in coalesce(child_name,'')) > 0
+          THEN NULLIF(trim(regexp_replace(child_name, '^.* ', '')), '') END,
+     CASE WHEN position(' ' in coalesce(child_first_name,'')) > 0
+          THEN NULLIF(trim(regexp_replace(child_first_name, ' [^ ]+$', '')), '') END
+   )
+   ```
+   Match key: `lower(derived_first) + lower(derived_last) + child_dob`. Fallback: `lower(parent_email) + lower(derived_first)` when dob missing. Applied to BOTH sides of the Session 1 → Session 2 comparison so the ~47% legacy `child_name`-only rows are not silently dropped. Implemented as a new SECURITY DEFINER RPC `get_session_gap_outreach(_from_period uuid, _to_period uuid)` returning both the gap list and per-level capacity — keeps the fallback logic server-side and mirrors the pattern in `enrollments_waiver_status`.
 
-- 7 days is a whole-day match, so DST edge cases don't matter — the job just compares `start_date` to today+7 in Pacific.
-- If you'd rather the automated send go out on a different day (e.g. 5 days prior, or the Sunday before), tell me and I'll adjust the offset.
-- Leaves room to later add a similar auto-send for the payment reminder or a 1-day-out nudge, if you want that separately.
+   Columns: Child name • Last level • Parent name • Email • Phone • Source (Session 1 / Lesson request) • Level-match indicator (green ✓ exact / yellow nearest).
+
+**Actions on the list:**
+- Multi-select rows.
+- **Dedupe by parent** for both actions: parents with multiple swimmers get one email/SMS.
+- **Send bulk marketing email** — opens existing marketing composer prefilled with Session 2 dates + enrollment link, targeted at selected parent emails via the existing marketing pipeline.
+- **Send bulk SMS** — new edge function `send-bulk-outreach-sms` accepts `{ phone, childNames[], startDate }[]`, logs each to `reminder_logs` with `reminder_kind = 'session_outreach_sms'`.
+
+**Default templates (editable in composer):**
+
+- Email subject: "Open spots for Session 2 — starts Jul 13"
+- SMS (single swimmer):
+  > Hi! Session 2 at Aquatic Dreams starts Jul 13. We still have open spots for {ChildFirst} — enroll here: https://aquaticdreamsswim.com/swim-lessons Reply STOP to opt out.
+- SMS (multiple swimmers, same parent):
+  > Hi! Session 2 at Aquatic Dreams starts Jul 13. We still have open spots for {FirstNames} — enroll here: https://aquaticdreamsswim.com/swim-lessons Reply STOP to opt out.
+
+## Technical notes
+
+- New DB object: RPC `public.get_session_gap_outreach(_from_period uuid, _to_period uuid)` (SECURITY DEFINER, admin-only via `has_role`), using COALESCE fallback on legacy `child_name`.
+- New edge functions:
+  - `supabase/functions/send-session-welcome-sms/index.ts`
+  - `supabase/functions/send-bulk-outreach-sms/index.ts`
+- Modified files:
+  - `src/pages/admin/ReportsAdmin.tsx` — new "Session gap outreach" section
+  - `src/pages/admin/SessionsAdmin.tsx` — new "Send 'starts next week' SMS" button
+- No table schema changes. All SMS logged via existing `reminder_logs` + `logSms()`.
+- Admin-gated via `has_role(_user_id, 'admin')`.
+- Both SMS paths dedupe by normalized `parent_phone` so multi-swimmer families receive exactly one message.

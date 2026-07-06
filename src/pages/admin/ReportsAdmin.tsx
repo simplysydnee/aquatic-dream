@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2, Download } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import SessionGapOutreach from "@/components/admin/SessionGapOutreach";
 
 interface Instructor { id: string; name: string; }
 interface Attendance { enrollment_id: string; session_id: string; lesson_date: string; checked_in: boolean; }
@@ -139,7 +140,12 @@ export default function ReportsAdmin() {
           <TabsList>
             <TabsTrigger value="noshows">No-shows</TabsTrigger>
             <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
+            <TabsTrigger value="gap">Session gap outreach</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="gap">
+            <SessionGapOutreach />
+          </TabsContent>
 
           <TabsContent value="noshows">
             <Card className="p-4">

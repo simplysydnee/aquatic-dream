@@ -14,7 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
-import { Plus, Pencil, Copy, Loader2, CalendarIcon, ToggleLeft, ToggleRight, Clock, Users, CalendarDays, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Copy, Loader2, CalendarIcon, ToggleLeft, ToggleRight, Clock, Users, CalendarDays, Trash2, X, MessageSquare } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ManageDatesModal from "@/components/admin/ManageDatesModal";
 
@@ -709,6 +709,18 @@ const SessionsAdmin = () => {
                       <span className="text-xs text-muted-foreground ml-2">({linkedCount} classes)</span>
                     </div>
                     <div className="flex items-center gap-1">
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={async () => {
+                        if (!confirm(`Send "session starts next week" SMS to all parents in ${p.name}? Parents with multiple swimmers get one combined text.`)) return;
+                        const t = toast({ title: "Sending session SMS...", description: "This may take a minute." });
+                        const { data, error } = await supabase.functions.invoke("send-session-welcome-sms", { body: { sessionPeriodId: p.id } });
+                        if (error) {
+                          toast({ title: "SMS blast failed", description: error.message, variant: "destructive" });
+                        } else {
+                          toast({ title: "Session SMS sent", description: `Sent ${data?.sent ?? 0}, skipped ${data?.skipped ?? 0}, failed ${data?.failed ?? 0}.` });
+                        }
+                      }}>
+                        <MessageSquare className="w-3 h-3 mr-1" /> Send SMS
+                      </Button>
                       <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => {
                         setCreateForm(f => ({ ...f, session_period_id: p.id }));
                         setCreateDialogOpen(true);
