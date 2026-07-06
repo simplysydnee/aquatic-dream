@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2, Download } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import SessionGapOutreach from "@/components/admin/SessionGapOutreach";
 
 interface Instructor { id: string; name: string; }
 interface Attendance { enrollment_id: string; session_id: string; lesson_date: string; checked_in: boolean; }
