@@ -78,6 +78,8 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.send-sms-message]
     verify_jwt = false
+  [functions.send-session-welcome-scheduled]
+    verify_jwt = false
 
 
 

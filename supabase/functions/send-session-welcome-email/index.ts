@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     // Load ALL enrollments for that session period
     const { data: enrollments, error: enrErr } = await supabase
       .from('swim_enrollments')
-      .select('id, parent_name, parent_first_name, parent_last_name, parent_email, child_name, child_first_name, session_id, session_fee_status, status, swim_sessions!inner(session_name, swim_level, day_of_week, start_time, end_time, session_start_date, session_end_date, session_price, session_period_id, session_periods(name, start_date, end_date))')
+      .select('id, parent_name, parent_first_name, parent_last_name, parent_email, child_name, child_first_name, session_id, session_fee_status, session_welcome_sent_at, status, swim_sessions!inner(session_name, swim_level, day_of_week, start_time, end_time, session_start_date, session_end_date, session_price, session_period_id, session_periods(name, start_date, end_date))')
       .in('status', ['confirmed','enrolled','pending_payment','pending'])
       .eq('swim_sessions.session_period_id', targetPeriodId)
 
@@ -112,6 +112,13 @@ Deno.serve(async (req) => {
     const results: any[] = []
 
     for (const [parentEmail, list] of groupEntries) {
+      // Skip parents whose entire group has already been sent — prevents
+      // duplicate email attempts and avoids the Functions API rate limit
+      // when retrying large backfills.
+      if (!enrollmentId && list.every((e: any) => e.session_welcome_sent_at)) {
+        results.push({ email: parentEmail, status: 'skipped', reason: 'already_sent' })
+        continue
+      }
       try {
         // Build swimmers[] + combined calendar events
         const swimmers: any[] = []
@@ -214,17 +221,17 @@ Deno.serve(async (req) => {
           facilityAddress: FACILITY_ADDRESS,
         }
 
-        // Public anon JWT — required because send-transactional-email verifies JWT format.
-        // The sb_secret_... service-role key is not a JWT and is rejected by the gateway.
-        const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImppbHJpamtsbmVoYmZ1dWx5a3R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NTA1OTQsImV4cCI6MjA4ODEyNjU5NH0.Y6CyBlFSOwKdqC9qFIux4WwUFCn3sz3c6putcANnQ44'
+        // Use the service-role key: send-transactional-email accepts service-role
+        // OR an authenticated admin JWT for non-public templates. Anon is rejected.
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
         const sendRes = await fetch(
           `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-email`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${anonKey}`,
-              'apikey': anonKey,
+              'Authorization': `Bearer ${serviceKey}`,
+              'apikey': serviceKey,
             },
             body: JSON.stringify({
               templateName: 'session-welcome',
@@ -255,6 +262,8 @@ Deno.serve(async (req) => {
         console.error(`welcome email failed for ${parentEmail}:`, message)
         results.push({ email: parentEmail, status: 'failed', error: message })
       }
+      // Small pace between parents to stay under the Functions API rate limit.
+      await new Promise((r) => setTimeout(r, 800))
     }
 
     const sent = results.filter((r) => r.status === 'sent').length
