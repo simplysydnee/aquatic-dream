@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
       if (s?.start_time && !g.firstTime) g.firstTime = formatPTTime(s.start_time);
     }
 
-    const startDateFmt = formatPTDate(period.start_date, { weekday: "short", month: "short", day: "numeric" });
+    const startDateFmt = startDateFmtRaw;
 
     let sent = 0, failed = 0, skipped = 0;
     const results: any[] = [];
