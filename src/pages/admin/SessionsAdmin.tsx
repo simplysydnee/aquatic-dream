@@ -14,7 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { LEVEL_DISPLAY, LEVEL_BADGE_COLORS, type SwimLevel } from "@/components/swim-enrollment/types";
-import { Plus, Pencil, Copy, Loader2, CalendarIcon, ToggleLeft, ToggleRight, Clock, Users, CalendarDays, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Copy, Loader2, CalendarIcon, ToggleLeft, ToggleRight, Clock, Users, CalendarDays, Trash2, X, MessageSquare } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ManageDatesModal from "@/components/admin/ManageDatesModal";
 
