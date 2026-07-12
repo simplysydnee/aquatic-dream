@@ -84,10 +84,18 @@ export default function StartReminderPreviewDialog({
         return;
       }
       const resp = data as PreviewResponse;
-      setPreview(resp);
+      const safeRows = Array.isArray(resp?.rows) ? resp.rows : [];
+      setPreview({ ...resp, rows: safeRows });
       const initial: Record<string, boolean> = {};
-      for (const r of resp.rows) initial[r.enrollmentId] = r.willSend;
+      for (const r of safeRows) initial[r.enrollmentId] = r.willSend;
       setChecked(initial);
+      if (safeRows.length === 0 && (resp?.total ?? 0) > 0) {
+        toast({
+          title: "Preview returned counts but no rows",
+          description: "Try Refresh — the response may have been truncated.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
