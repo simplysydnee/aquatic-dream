@@ -691,6 +691,60 @@ const SwimEnrollmentsAdmin = () => {
                 Send {sessionPeriods.find(p => p.id === periodFilter)?.name || "session"} welcome
               </Button>
             )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const body: Record<string, unknown> = { dryRun: true };
+                if (periodFilter !== "all") body.sessionPeriodId = periodFilter;
+                const { data: preview, error: previewErr } = await supabase.functions.invoke(
+                  "send-session-start-reminders",
+                  { body },
+                );
+                if (previewErr) {
+                  toast({ title: "Preview failed", description: previewErr.message, variant: "destructive" });
+                  return;
+                }
+                const total = preview?.total ?? 0;
+                const withLink = preview?.withPayLink ?? 0;
+                const reminderOnly = preview?.reminderOnly ?? 0;
+                const noPhone = preview?.skippedNoPhone ?? 0;
+                const already = preview?.skippedAlreadySent ?? 0;
+                const targetDate = preview?.targetDate ?? "tomorrow";
+                if (!total && !already) {
+                  toast({ title: "No recipients", description: `No sessions start on ${targetDate}.` });
+                  return;
+                }
+                const willSend = withLink + reminderOnly;
+                if (!willSend) {
+                  toast({ title: "Nothing to send", description: `All ${already} already texted. ${noPhone} without phone.` });
+                  return;
+                }
+                const msg =
+                  `Send SMS to ${willSend} family${willSend === 1 ? "" : "ies"} for lessons starting ${targetDate}?\n\n` +
+                  `• ${withLink} will get a payment link\n` +
+                  `• ${reminderOnly} reminder only (already paid)\n` +
+                  `• ${noPhone} skipped (no phone)\n` +
+                  `• ${already} skipped (already texted)`;
+                if (!confirm(msg)) return;
+                const sendBody: Record<string, unknown> = {};
+                if (periodFilter !== "all") sendBody.sessionPeriodId = periodFilter;
+                const { data, error } = await supabase.functions.invoke(
+                  "send-session-start-reminders",
+                  { body: sendBody },
+                );
+                if (error) {
+                  toast({ title: "Send failed", description: error.message, variant: "destructive" });
+                } else {
+                  toast({
+                    title: "Start reminders sent",
+                    description: `${data?.sent ?? 0} sent, ${data?.failed ?? 0} failed.`,
+                  });
+                }
+              }}
+            >
+              Text tomorrow's start reminder
+            </Button>
             <Select value={ageFilter} onValueChange={setAgeFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="All Ages" />
