@@ -12,6 +12,7 @@ import { useState } from "react";
 import LevelBadge from "@/components/LevelBadge";
 import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
 import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
+import TextPayLinkButton from "@/components/admin/TextPayLinkButton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -35,6 +36,7 @@ interface Enrollment {
   child_age: number;
   parent_name: string;
   parent_email: string;
+  parent_phone?: string | null;
   payment_status: string;
   session_fee_status?: string;
   status: string;
@@ -290,6 +292,13 @@ function SessionCard({ session, enrolled, onChanged }: { session: SessionInfo; e
                     <Badge variant="outline" className={`${paymentStatusBadgeClass(e.session_fee_status)} text-[10px]`}>
                       Session: {formatPaymentStatus(e.session_fee_status)}
                     </Badge>
+                    {e.session_fee_status === "due_day_1" && (
+                      <TextPayLinkButton
+                        enrollmentId={e.id}
+                        parentPhone={e.parent_phone ?? null}
+                        sessionFeeStatus={e.session_fee_status}
+                      />
+                    )}
                   </div>
                 </div>
               ))}
