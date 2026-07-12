@@ -161,9 +161,10 @@ Deno.serve(async (req) => {
     const list = (enrollments || []) as any[]
 
     // Dedupe against prior sends of this reminder kind for these enrollments.
+    // In test mode we skip dedupe entirely so the admin can re-run previews.
     const enrollmentIds = list.map((e) => e.id)
     const alreadySent = new Set<string>()
-    if (enrollmentIds.length) {
+    if (!isTest && enrollmentIds.length) {
       const { data: sentRows } = await supabase
         .from('reminder_logs')
         .select('enrollment_id')
@@ -186,13 +187,24 @@ Deno.serve(async (req) => {
         buckets.skippedAlreadySent.push(e)
         continue
       }
-      if (!normalizePhone(e.parent_phone)) {
+      // In test mode, missing parent phone is fine — we route to the admin.
+      if (!isTest && !normalizePhone(e.parent_phone)) {
         buckets.skippedNoPhone.push(e)
         continue
       }
       const owes = e.session_fee_status !== 'paid' && e.session_fee_status !== 'comp'
       if (owes) buckets.willSendWithLink.push(e)
       else buckets.willSendReminderOnly.push(e)
+    }
+
+    // In test mode, cap total sends so the admin's inbox doesn't get flooded.
+    if (isTest) {
+      const cap = Math.max(1, Math.min(50, Number(testLimit) || 5))
+      const combined = [...buckets.willSendWithLink, ...buckets.willSendReminderOnly]
+      const capped = combined.slice(0, cap)
+      const withLinkIds = new Set(buckets.willSendWithLink.map((e) => e.id))
+      buckets.willSendWithLink = capped.filter((e) => withLinkIds.has(e.id))
+      buckets.willSendReminderOnly = capped.filter((e) => !withLinkIds.has(e.id))
     }
 
     if (dryRun) {
