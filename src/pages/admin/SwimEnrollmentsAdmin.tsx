@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LEVEL_DISPLAY, type SwimLevel, getGroupName, getAgeGroup } from "@/components/swim-enrollment/types";
 import EnrollmentDetailDialog from "@/components/admin/EnrollmentDetailDialog";
 import SendPaymentLinkDialog, { type SendPaymentLinkTarget } from "@/components/admin/SendPaymentLinkDialog";
+import TextPayLinkButton from "@/components/admin/TextPayLinkButton";
 import SessionEnrollmentCards from "@/components/admin/SessionEnrollmentCards";
 import { Progress } from "@/components/ui/progress";
 import { Eye, CheckCircle, Send, ArrowRightLeft, Trash2 } from "lucide-react";
@@ -872,14 +873,21 @@ const SwimEnrollmentsAdmin = () => {
                         <TableCell>
                           <div className="flex gap-1">
                             {e.session_fee_status === "due_day_1" && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                title="Send $240 session fee payment link"
-                                onClick={() => sendPaymentLink(e)}
-                              >
-                                <Send className="w-4 h-4 text-primary" />
-                              </Button>
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  title="Email session fee payment link"
+                                  onClick={() => sendPaymentLink(e)}
+                                >
+                                  <Send className="w-4 h-4 text-primary" />
+                                </Button>
+                                <TextPayLinkButton
+                                  enrollmentId={e.id}
+                                  parentPhone={e.parent_phone}
+                                  sessionFeeStatus={e.session_fee_status}
+                                />
+                              </>
                             )}
                             <Button size="icon" variant="ghost" title="Move to another class" onClick={() => { setMoveTarget(e); setMoveOpen(true); }}>
                               <ArrowRightLeft className="w-4 h-4" />
