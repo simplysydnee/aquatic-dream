@@ -57,12 +57,24 @@ Deno.serve(async (req) => {
       targetDate: targetDateInput,
       dryRun = false,
       environment = 'live',
+      testPhone: testPhoneRaw,
+      testLimit,
     } = body as {
       sessionPeriodId?: string
       sessionIds?: string[]
       targetDate?: string
       dryRun?: boolean
       environment?: string
+      testPhone?: string
+      testLimit?: number
+    }
+
+    const testPhone = testPhoneRaw ? normalizePhone(testPhoneRaw) : null
+    const isTest = !!testPhone
+    if (testPhoneRaw && !testPhone) {
+      return new Response(JSON.stringify({ error: 'Invalid testPhone' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const targetDate = targetDateInput || ptDateStr(1)
