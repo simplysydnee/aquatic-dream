@@ -694,94 +694,25 @@ const SwimEnrollmentsAdmin = () => {
             <Button
               size="sm"
               variant="outline"
-              onClick={async () => {
-                const body: Record<string, unknown> = { dryRun: true };
-                if (periodFilter !== "all") body.sessionPeriodId = periodFilter;
-                const { data: preview, error: previewErr } = await supabase.functions.invoke(
-                  "send-session-start-reminders",
-                  { body },
-                );
-                if (previewErr) {
-                  toast({ title: "Preview failed", description: previewErr.message, variant: "destructive" });
-                  return;
-                }
-                const total = preview?.total ?? 0;
-                const withLink = preview?.withPayLink ?? 0;
-                const reminderOnly = preview?.reminderOnly ?? 0;
-                const noPhone = preview?.skippedNoPhone ?? 0;
-                const already = preview?.skippedAlreadySent ?? 0;
-                const targetDate = preview?.targetDate ?? "tomorrow";
-                if (!total && !already) {
-                  toast({ title: "No recipients", description: `No sessions start on ${targetDate}.` });
-                  return;
-                }
-                const willSend = withLink + reminderOnly;
-                if (!willSend) {
-                  toast({ title: "Nothing to send", description: `All ${already} already texted. ${noPhone} without phone.` });
-                  return;
-                }
-                const msg =
-                  `Send SMS to ${willSend} family${willSend === 1 ? "" : "ies"} for lessons starting ${targetDate}?\n\n` +
-                  `• ${withLink} will get a payment link\n` +
-                  `• ${reminderOnly} reminder only (already paid)\n` +
-                  `• ${noPhone} skipped (no phone)\n` +
-                  `• ${already} skipped (already texted)`;
-                if (!confirm(msg)) return;
-                const sendBody: Record<string, unknown> = {};
-                if (periodFilter !== "all") sendBody.sessionPeriodId = periodFilter;
-                const { data, error } = await supabase.functions.invoke(
-                  "send-session-start-reminders",
-                  { body: sendBody },
-                );
-                if (error) {
-                  toast({ title: "Send failed", description: error.message, variant: "destructive" });
-                } else {
-                  toast({
-                    title: "Start reminders sent",
-                    description: `${data?.sent ?? 0} sent, ${data?.failed ?? 0} failed.`,
-                  });
-                }
+              onClick={() => {
+                setReminderTestPhone(undefined);
+                setReminderPreviewOpen(true);
               }}
             >
-              Text tomorrow's start reminder
+              Preview start reminders
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={async () => {
+              onClick={() => {
                 const stored = typeof window !== "undefined"
                   ? window.localStorage.getItem("admin_test_sms_phone") ?? ""
                   : "";
-                const input = window.prompt(
-                  "Send TEST reminders to which phone number?\n(You'll get at most 2 texts: one with a pay link, one reminder-only. Format: +12095551234)",
-                  stored,
-                );
-                if (!input) return;
-                const testPhone = input.trim();
-                if (!testPhone) return;
-                try {
-                  window.localStorage.setItem("admin_test_sms_phone", testPhone);
-                } catch {
-                  // ignore
-                }
-                const body: Record<string, unknown> = { testPhone };
-                if (periodFilter !== "all") body.sessionPeriodId = periodFilter;
-                const { data, error } = await supabase.functions.invoke(
-                  "send-session-start-reminders",
-                  { body },
-                );
-                if (error) {
-                  toast({ title: "Test send failed", description: error.message, variant: "destructive" });
-                  return;
-                }
-                const targetDate = data?.targetDate ?? "tomorrow";
-                toast({
-                  title: `Test SMS sent to ${testPhone}`,
-                  description: `${data?.sent ?? 0} of ${(data?.withPayLink ?? 0) + (data?.reminderOnly ?? 0)} test messages sent for ${targetDate}. ${data?.failed ?? 0} failed.`,
-                });
+                setReminderTestPhone(stored || "+1");
+                setReminderPreviewOpen(true);
               }}
             >
-              Test to my number
+              Preview as test to my number
             </Button>
             <Select value={ageFilter} onValueChange={setAgeFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
