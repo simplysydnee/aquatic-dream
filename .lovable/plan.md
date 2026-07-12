@@ -1,64 +1,42 @@
-## Goal
+## What's happening
 
-Let you preview every SMS that would go out — with the real rendered message body, the real Stripe pay link, and the real recipient phone — in a table inside the admin, before a single text hits TextMagic.
+On `/admin/enrollments`, opening "Preview start reminders" throws:
 
-## How the preview works
-
-Add a **"Preview messages"** button next to the existing "Text tomorrow's start reminder" button on `/admin/enrollments`.
-
-Clicking it opens a full-screen dialog that shows one row per enrollment that would be texted:
-
-```text
-| Send? | Family        | Phone          | Variant     | Message preview                           | Pay link      |
-|-------|---------------|----------------|-------------|-------------------------------------------|---------------|
-|  ☑    | Sarah Kim     | +1 209 555 ... | Pay link    | Hi Sarah, Mia's first swim lesson...     | stripe.com/...|
-|  ☑    | Jose Ruiz     | +1 209 555 ... | Reminder    | Hi Jose, reminder: Leo's first swim...   |    —          |
-|  ⚠    | Amy Tran      | (no phone)     | Skipped     | Would not send — no phone on file        |    —          |
-|  ⚠    | Ben Cole      | +1 209 555 ... | Already sent| Already texted earlier — will skip        |    —          |
+```
+TypeError: resp.rows is not iterable
+  at loadPreview (StartReminderPreviewDialog.tsx:69)
 ```
 
-At the bottom of the dialog:
-- Counts summary (X will send, Y skipped no phone, Z already sent).
-- **"Send checked to families"** button (real send, real numbers).
-- **"Send checked to my number instead"** with a phone input (routes all checked rows to that one number, same rendered bodies).
-- **Cancel** — closes without sending anything.
+The summary counts render (29 pay link, 20 reminder only, 7 no phone), but the table shows "No enrollments match" because `resp.rows` came back missing/non-array, which also blows up the `for (const r of resp.rows)` loop that seeds the row checkboxes.
 
-Nothing is sent until you click one of the two send buttons in that dialog.
+Root cause: the preview edge function generates a Stripe Payment Link for every "pay link" enrollment **sequentially** (29 serial calls to `get-or-create-session-payment-link`, each spawning its own function invocation + Stripe round-trip). That easily exceeds the edge function response window, so the client sees a truncated / malformed response — enough counts to render badges, no usable `rows` array.
 
-## Where the Stripe links come from
+## Fix
 
-The preview call generates the real Payment Links up front (via the existing `get-or-create-session-payment-link` function, which is idempotent and already reuses any link it created before). That means:
+Two small, targeted changes. No schema, no Stripe flow changes, no new features.
 
-- The link you see in the preview is the exact same link the family will receive.
-- Re-opening the preview doesn't create duplicate Stripe links — it reuses the ones already stored on the enrollment row.
-- No SMS is sent during preview generation.
+### 1. `supabase/functions/send-session-start-reminders/index.ts`
 
-## Edge function changes
+- Replace the sequential `for` loop that awaits `fetchPayLink` per enrollment with a single `Promise.all` over just the rows that actually need a pay link (variant `pay_link`, `willSend` true). Map results back to rows by `enrollmentId`.
+- Keep `fetchPayLink` as-is (it already swallows errors and returns `null`), so one bad link never breaks the whole preview.
+- No change to send-mode behavior — send mode still calls `fetchPayLink` per row inline right before texting (it already needs the link at that moment).
 
-Extend the existing `send-session-start-reminders` function with a new `mode` parameter:
+Result: preview for ~30 enrollments finishes in one Stripe round-trip's worth of time instead of 30, well inside the response window, so `rows` arrives intact.
 
-- `mode: "preview"` — resolves sessions, loads enrollments, generates/reuses pay links, returns a JSON array of `{ enrollmentId, family, phone, variant, message, payLink, skipReason }`. Zero calls to TextMagic. Zero `reminder_logs` inserts.
-- `mode: "send"` — same as today's real send. Accepts an optional `enrollmentIds` array so the UI can send only the rows you checked in the preview.
-- `mode: "send"` with `testPhone` — same as today's test mode, honoring `enrollmentIds`.
+### 2. `src/components/admin/StartReminderPreviewDialog.tsx`
 
-The current `dryRun` flag (just returns counts) stays for backward compatibility with the existing summary path, but the new preview mode is the main one you'll use.
+- Defensive guard in `loadPreview`: coerce `resp.rows` with `Array.isArray(resp.rows) ? resp.rows : []` before the `for…of` seed loop, so a malformed response can never throw an unhandled rejection.
+- If `rows` came back empty but the summary counts are non-zero, show a small inline warning ("Preview returned counts but no rows — try Refresh.") instead of the generic empty state, so the failure mode is visible instead of silent.
 
-## UI changes
-
-- Replace the current confirm-with-counts flow with the new preview dialog.
-- Keep the "Test to my number" button available as a shortcut, but it now just opens the same preview dialog with the test-phone field pre-filled.
-- The preview table uses your admin spreadsheet style (dense rows, checkboxes, inline info). No card layout.
+Nothing else in the dialog changes — same table, same checkboxes, same two send buttons, same test-phone routing.
 
 ## Files touched
 
 Edited:
-- `supabase/functions/send-session-start-reminders/index.ts` — add `mode: "preview"` branch that returns rendered messages + pay links without sending; accept `enrollmentIds` filter on send.
-- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — swap the confirm flow for the new preview dialog.
-
-New:
-- `src/components/admin/StartReminderPreviewDialog.tsx` — the preview table, per-row checkboxes, and the two send buttons.
+- `supabase/functions/send-session-start-reminders/index.ts`
+- `src/components/admin/StartReminderPreviewDialog.tsx`
 
 ## Out of scope
 
-- No email version, no cron, no changes to any other reminder flow.
-- No changes to the Stripe webhook or to how session fees post back.
+- No changes to the Stripe webhook, `get-or-create-session-payment-link`, `reminder_logs`, or any other reminder flow.
+- No UI redesign — same dialog, same buttons.
