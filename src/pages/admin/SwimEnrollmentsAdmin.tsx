@@ -753,24 +753,18 @@ const SwimEnrollmentsAdmin = () => {
                   ? window.localStorage.getItem("admin_test_sms_phone") ?? ""
                   : "";
                 const input = window.prompt(
-                  "Send TEST reminders to which phone number?\n(All messages will be routed here instead of families. Format: +12095551234)",
+                  "Send TEST reminders to which phone number?\n(You'll get at most 2 texts: one with a pay link, one reminder-only. Format: +12095551234)",
                   stored,
                 );
                 if (!input) return;
                 const testPhone = input.trim();
                 if (!testPhone) return;
-                const limitStr = window.prompt(
-                  "How many test messages max? (1-50)",
-                  "5",
-                );
-                if (limitStr === null) return;
-                const testLimit = Math.max(1, Math.min(50, Number(limitStr) || 5));
                 try {
                   window.localStorage.setItem("admin_test_sms_phone", testPhone);
                 } catch {
                   // ignore
                 }
-                const body: Record<string, unknown> = { testPhone, testLimit };
+                const body: Record<string, unknown> = { testPhone };
                 if (periodFilter !== "all") body.sessionPeriodId = periodFilter;
                 const { data, error } = await supabase.functions.invoke(
                   "send-session-start-reminders",

@@ -197,14 +197,20 @@ Deno.serve(async (req) => {
       else buckets.willSendReminderOnly.push(e)
     }
 
-    // In test mode, cap total sends so the admin's inbox doesn't get flooded.
+    // In test mode, only send ONE sample of each variant (pay-link + reminder-only)
+    // by default. Admin can override with an explicit testLimit for larger batches.
     if (isTest) {
-      const cap = Math.max(1, Math.min(50, Number(testLimit) || 5))
-      const combined = [...buckets.willSendWithLink, ...buckets.willSendReminderOnly]
-      const capped = combined.slice(0, cap)
-      const withLinkIds = new Set(buckets.willSendWithLink.map((e) => e.id))
-      buckets.willSendWithLink = capped.filter((e) => withLinkIds.has(e.id))
-      buckets.willSendReminderOnly = capped.filter((e) => !withLinkIds.has(e.id))
+      if (testLimit && Number(testLimit) > 0) {
+        const cap = Math.max(1, Math.min(50, Number(testLimit)))
+        const combined = [...buckets.willSendWithLink, ...buckets.willSendReminderOnly]
+        const capped = combined.slice(0, cap)
+        const withLinkIds = new Set(buckets.willSendWithLink.map((e) => e.id))
+        buckets.willSendWithLink = capped.filter((e) => withLinkIds.has(e.id))
+        buckets.willSendReminderOnly = capped.filter((e) => !withLinkIds.has(e.id))
+      } else {
+        buckets.willSendWithLink = buckets.willSendWithLink.slice(0, 1)
+        buckets.willSendReminderOnly = buckets.willSendReminderOnly.slice(0, 1)
+      }
     }
 
     if (dryRun) {
