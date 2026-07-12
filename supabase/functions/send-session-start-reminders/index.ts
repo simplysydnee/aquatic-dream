@@ -57,12 +57,24 @@ Deno.serve(async (req) => {
       targetDate: targetDateInput,
       dryRun = false,
       environment = 'live',
+      testPhone: testPhoneRaw,
+      testLimit,
     } = body as {
       sessionPeriodId?: string
       sessionIds?: string[]
       targetDate?: string
       dryRun?: boolean
       environment?: string
+      testPhone?: string
+      testLimit?: number
+    }
+
+    const testPhone = testPhoneRaw ? normalizePhone(testPhoneRaw) : null
+    const isTest = !!testPhone
+    if (testPhoneRaw && !testPhone) {
+      return new Response(JSON.stringify({ error: 'Invalid testPhone' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const targetDate = targetDateInput || ptDateStr(1)
@@ -149,9 +161,10 @@ Deno.serve(async (req) => {
     const list = (enrollments || []) as any[]
 
     // Dedupe against prior sends of this reminder kind for these enrollments.
+    // In test mode we skip dedupe entirely so the admin can re-run previews.
     const enrollmentIds = list.map((e) => e.id)
     const alreadySent = new Set<string>()
-    if (enrollmentIds.length) {
+    if (!isTest && enrollmentIds.length) {
       const { data: sentRows } = await supabase
         .from('reminder_logs')
         .select('enrollment_id')
@@ -174,13 +187,24 @@ Deno.serve(async (req) => {
         buckets.skippedAlreadySent.push(e)
         continue
       }
-      if (!normalizePhone(e.parent_phone)) {
+      // In test mode, missing parent phone is fine — we route to the admin.
+      if (!isTest && !normalizePhone(e.parent_phone)) {
         buckets.skippedNoPhone.push(e)
         continue
       }
       const owes = e.session_fee_status !== 'paid' && e.session_fee_status !== 'comp'
       if (owes) buckets.willSendWithLink.push(e)
       else buckets.willSendReminderOnly.push(e)
+    }
+
+    // In test mode, cap total sends so the admin's inbox doesn't get flooded.
+    if (isTest) {
+      const cap = Math.max(1, Math.min(50, Number(testLimit) || 5))
+      const combined = [...buckets.willSendWithLink, ...buckets.willSendReminderOnly]
+      const capped = combined.slice(0, cap)
+      const withLinkIds = new Set(buckets.willSendWithLink.map((e) => e.id))
+      buckets.willSendWithLink = capped.filter((e) => withLinkIds.has(e.id))
+      buckets.willSendReminderOnly = capped.filter((e) => !withLinkIds.has(e.id))
     }
 
     if (dryRun) {
@@ -227,23 +251,28 @@ Deno.serve(async (req) => {
       const timeStr = sess?.start_time ? formatPTTime(sess.start_time) : ''
       const firstChild = (e.child_name || '').split(' ')[0] || 'your swimmer'
       const firstParent = (e.parent_name || '').split(' ')[0] || 'there'
-      const phone = normalizePhone(e.parent_phone)!
+      const realPhone = normalizePhone(e.parent_phone)
+      const phone = isTest ? testPhone! : realPhone!
 
       let payLink: string | null = null
       if (includeLink) {
         payLink = await fetchPayLink(e.id)
       }
 
-      const message = includeLink && payLink
+      const base = includeLink && payLink
         ? `Hi ${firstParent}, ${firstChild}'s first swim lesson at Aquatic Dreams is ${dayLabel} at ${timeStr}. Pay the session fee before you arrive: ${payLink} — Reply STOP to opt out.`
         : `Hi ${firstParent}, reminder: ${firstChild}'s first swim lesson at Aquatic Dreams is ${dayLabel} at ${timeStr}. See you at the pool!`
+
+      const message = isTest
+        ? `[TEST → ${firstParent} / ${realPhone ?? 'no phone'}] ${base}`
+        : base
 
       const result = await sendSms(phone, message)
       await supabase.from('reminder_logs').insert({
         swimmer_name: e.child_name,
         enrollment_id: e.id,
         channel: 'sms',
-        reminder_kind: REMINDER_KIND,
+        reminder_kind: isTest ? `${REMINDER_KIND}_test` : REMINDER_KIND,
         phone,
         message,
         sent_at: result.ok ? new Date().toISOString() : null,
@@ -260,24 +289,28 @@ Deno.serve(async (req) => {
     for (const e of buckets.willSendWithLink) await sendOne(e, true)
     for (const e of buckets.willSendReminderOnly) await sendOne(e, false)
 
-    // Log no-phone skips as failed for audit.
-    for (const e of buckets.skippedNoPhone) {
-      await supabase.from('reminder_logs').insert({
-        swimmer_name: e.child_name,
-        enrollment_id: e.id,
-        channel: 'sms',
-        reminder_kind: REMINDER_KIND,
-        phone: null,
-        message: '(not sent — no phone on file)',
-        status: 'failed',
-        error: 'no_phone',
-      })
+    // Log no-phone skips as failed for audit (not applicable in test mode).
+    if (!isTest) {
+      for (const e of buckets.skippedNoPhone) {
+        await supabase.from('reminder_logs').insert({
+          swimmer_name: e.child_name,
+          enrollment_id: e.id,
+          channel: 'sms',
+          reminder_kind: REMINDER_KIND,
+          phone: null,
+          message: '(not sent — no phone on file)',
+          status: 'failed',
+          error: 'no_phone',
+        })
+      }
     }
 
     return new Response(
       JSON.stringify({
         ok: true,
         targetDate,
+        isTest,
+        testPhone: isTest ? testPhone : undefined,
         total: list.length,
         sent,
         failed,
