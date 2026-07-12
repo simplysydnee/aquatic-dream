@@ -82,6 +82,8 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.text-session-payment-link]
     verify_jwt = true
+  [functions.send-session-start-reminders]
+    verify_jwt = true
 
 
 
