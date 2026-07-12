@@ -289,18 +289,20 @@ Deno.serve(async (req) => {
     for (const e of buckets.willSendWithLink) await sendOne(e, true)
     for (const e of buckets.willSendReminderOnly) await sendOne(e, false)
 
-    // Log no-phone skips as failed for audit.
-    for (const e of buckets.skippedNoPhone) {
-      await supabase.from('reminder_logs').insert({
-        swimmer_name: e.child_name,
-        enrollment_id: e.id,
-        channel: 'sms',
-        reminder_kind: REMINDER_KIND,
-        phone: null,
-        message: '(not sent — no phone on file)',
-        status: 'failed',
-        error: 'no_phone',
-      })
+    // Log no-phone skips as failed for audit (not applicable in test mode).
+    if (!isTest) {
+      for (const e of buckets.skippedNoPhone) {
+        await supabase.from('reminder_logs').insert({
+          swimmer_name: e.child_name,
+          enrollment_id: e.id,
+          channel: 'sms',
+          reminder_kind: REMINDER_KIND,
+          phone: null,
+          message: '(not sent — no phone on file)',
+          status: 'failed',
+          error: 'no_phone',
+        })
+      }
     }
 
     return new Response(
