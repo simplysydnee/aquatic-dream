@@ -251,23 +251,28 @@ Deno.serve(async (req) => {
       const timeStr = sess?.start_time ? formatPTTime(sess.start_time) : ''
       const firstChild = (e.child_name || '').split(' ')[0] || 'your swimmer'
       const firstParent = (e.parent_name || '').split(' ')[0] || 'there'
-      const phone = normalizePhone(e.parent_phone)!
+      const realPhone = normalizePhone(e.parent_phone)
+      const phone = isTest ? testPhone! : realPhone!
 
       let payLink: string | null = null
       if (includeLink) {
         payLink = await fetchPayLink(e.id)
       }
 
-      const message = includeLink && payLink
+      const base = includeLink && payLink
         ? `Hi ${firstParent}, ${firstChild}'s first swim lesson at Aquatic Dreams is ${dayLabel} at ${timeStr}. Pay the session fee before you arrive: ${payLink} — Reply STOP to opt out.`
         : `Hi ${firstParent}, reminder: ${firstChild}'s first swim lesson at Aquatic Dreams is ${dayLabel} at ${timeStr}. See you at the pool!`
+
+      const message = isTest
+        ? `[TEST → ${firstParent} / ${realPhone ?? 'no phone'}] ${base}`
+        : base
 
       const result = await sendSms(phone, message)
       await supabase.from('reminder_logs').insert({
         swimmer_name: e.child_name,
         enrollment_id: e.id,
         channel: 'sms',
-        reminder_kind: REMINDER_KIND,
+        reminder_kind: isTest ? `${REMINDER_KIND}_test` : REMINDER_KIND,
         phone,
         message,
         sent_at: result.ok ? new Date().toISOString() : null,
