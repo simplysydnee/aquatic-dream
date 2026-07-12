@@ -309,6 +309,8 @@ Deno.serve(async (req) => {
       JSON.stringify({
         ok: true,
         targetDate,
+        isTest,
+        testPhone: isTest ? testPhone : undefined,
         total: list.length,
         sent,
         failed,
