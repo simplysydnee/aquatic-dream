@@ -788,6 +788,7 @@ const SwimEnrollmentsAdmin = () => {
               }}
             >
               Test to my number
+            </Button>
             <Select value={ageFilter} onValueChange={setAgeFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="All Ages" />
