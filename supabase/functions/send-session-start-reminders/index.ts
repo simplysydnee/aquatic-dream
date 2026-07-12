@@ -33,6 +33,8 @@ function ptWeekday(dateStr: string): string {
   }).format(dt)
 }
 
+type Variant = 'pay_link' | 'reminder_only' | 'skipped_no_phone' | 'skipped_already_sent'
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
@@ -52,23 +54,26 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}))
     const {
+      mode: modeInput,
       sessionPeriodId,
       sessionIds: sessionIdsInput,
       targetDate: targetDateInput,
       dryRun = false,
       environment = 'live',
       testPhone: testPhoneRaw,
-      testLimit,
+      enrollmentIds: enrollmentIdsInput,
     } = body as {
+      mode?: 'preview' | 'send'
       sessionPeriodId?: string
       sessionIds?: string[]
       targetDate?: string
       dryRun?: boolean
       environment?: string
       testPhone?: string
-      testLimit?: number
+      enrollmentIds?: string[]
     }
 
+    const mode: 'preview' | 'send' = modeInput === 'preview' ? 'preview' : 'send'
     const testPhone = testPhoneRaw ? normalizePhone(testPhoneRaw) : null
     const isTest = !!testPhone
     if (testPhoneRaw && !testPhone) {
@@ -78,10 +83,11 @@ Deno.serve(async (req) => {
     }
 
     const targetDate = targetDateInput || ptDateStr(1)
+    const enrollmentIdFilter = Array.isArray(enrollmentIdsInput) && enrollmentIdsInput.length
+      ? new Set(enrollmentIdsInput)
+      : null
 
-    // Resolve which sessions to target.
-    // Priority: explicit sessionIds > sessionPeriodId > all sessions whose FIRST
-    // lesson_date equals targetDate.
+    // Resolve target sessions.
     let sessionIds: string[] = []
     if (sessionIdsInput && sessionIdsInput.length) {
       sessionIds = sessionIdsInput
@@ -93,9 +99,7 @@ Deno.serve(async (req) => {
       sessionIds = (sess || []).map((s: any) => s.id)
     }
 
-    // Filter sessionIds to those whose first (min, non-cancelled) lesson_date == targetDate.
     if (sessionIds.length === 0) {
-      // Auto-detect: any session whose first lesson_date is targetDate.
       const { data: allSld } = await supabase
         .from('session_lesson_dates')
         .select('session_id, lesson_date, is_cancelled')
@@ -122,25 +126,20 @@ Deno.serve(async (req) => {
       sessionIds = sessionIds.filter((sid) => firstBy.get(sid) === targetDate)
     }
 
+    const dayLabel = ptWeekday(targetDate)
+
     if (sessionIds.length === 0) {
       return new Response(
         JSON.stringify({
-          ok: true,
-          targetDate,
-          total: 0,
-          sent: 0,
-          withPayLink: 0,
-          reminderOnly: 0,
-          skippedNoPhone: 0,
-          skippedAlreadySent: 0,
-          failed: 0,
+          ok: true, mode, targetDate, total: 0, rows: [],
+          sent: 0, failed: 0,
+          withPayLink: 0, reminderOnly: 0, skippedNoPhone: 0, skippedAlreadySent: 0,
           message: 'No sessions start on this date.',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
 
-    // Load session info for start_time / label.
     const { data: sessions } = await supabase
       .from('swim_sessions')
       .select('id, start_time, session_name')
@@ -149,7 +148,6 @@ Deno.serve(async (req) => {
       (sessions || []).map((s: any) => [s.id, s]),
     )
 
-    // Load active enrollments for those sessions.
     const { data: enrollments } = await supabase
       .from('swim_enrollments')
       .select(
@@ -158,82 +156,21 @@ Deno.serve(async (req) => {
       .in('session_id', sessionIds)
       .not('status', 'in', '(cancelled,suspended)')
 
-    const list = (enrollments || []) as any[]
+    let list = (enrollments || []) as any[]
+    if (enrollmentIdFilter) list = list.filter((e) => enrollmentIdFilter.has(e.id))
 
-    // Dedupe against prior sends of this reminder kind for these enrollments.
-    // In test mode we skip dedupe entirely so the admin can re-run previews.
-    const enrollmentIds = list.map((e) => e.id)
+    // Dedupe against prior sends (skipped in test mode).
     const alreadySent = new Set<string>()
-    if (!isTest && enrollmentIds.length) {
+    if (!isTest && list.length) {
       const { data: sentRows } = await supabase
         .from('reminder_logs')
         .select('enrollment_id')
         .eq('channel', 'sms')
         .eq('status', 'sent')
         .eq('reminder_kind', REMINDER_KIND)
-        .in('enrollment_id', enrollmentIds)
+        .in('enrollment_id', list.map((e) => e.id))
       for (const r of (sentRows || []) as any[]) alreadySent.add(r.enrollment_id)
     }
-
-    // Bucketize.
-    const buckets = {
-      willSendWithLink: [] as any[],
-      willSendReminderOnly: [] as any[],
-      skippedNoPhone: [] as any[],
-      skippedAlreadySent: [] as any[],
-    }
-    for (const e of list) {
-      if (alreadySent.has(e.id)) {
-        buckets.skippedAlreadySent.push(e)
-        continue
-      }
-      // In test mode, missing parent phone is fine — we route to the admin.
-      if (!isTest && !normalizePhone(e.parent_phone)) {
-        buckets.skippedNoPhone.push(e)
-        continue
-      }
-      const owes = e.session_fee_status !== 'paid' && e.session_fee_status !== 'comp'
-      if (owes) buckets.willSendWithLink.push(e)
-      else buckets.willSendReminderOnly.push(e)
-    }
-
-    // In test mode, only send ONE sample of each variant (pay-link + reminder-only)
-    // by default. Admin can override with an explicit testLimit for larger batches.
-    if (isTest) {
-      if (testLimit && Number(testLimit) > 0) {
-        const cap = Math.max(1, Math.min(50, Number(testLimit)))
-        const combined = [...buckets.willSendWithLink, ...buckets.willSendReminderOnly]
-        const capped = combined.slice(0, cap)
-        const withLinkIds = new Set(buckets.willSendWithLink.map((e) => e.id))
-        buckets.willSendWithLink = capped.filter((e) => withLinkIds.has(e.id))
-        buckets.willSendReminderOnly = capped.filter((e) => !withLinkIds.has(e.id))
-      } else {
-        buckets.willSendWithLink = buckets.willSendWithLink.slice(0, 1)
-        buckets.willSendReminderOnly = buckets.willSendReminderOnly.slice(0, 1)
-      }
-    }
-
-    if (dryRun) {
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          targetDate,
-          total: list.length,
-          withPayLink: buckets.willSendWithLink.length,
-          reminderOnly: buckets.willSendReminderOnly.length,
-          skippedNoPhone: buckets.skippedNoPhone.length,
-          skippedAlreadySent: buckets.skippedAlreadySent.length,
-          sessionCount: sessionIds.length,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
-
-    let sent = 0
-    let failed = 0
-    const errors: Array<{ enrollment_id: string; error: string }> = []
-
-    const dayLabel = ptWeekday(targetDate) // e.g. "Monday"
 
     async function fetchPayLink(enrollmentId: string): Promise<string | null> {
       try {
@@ -252,35 +189,129 @@ Deno.serve(async (req) => {
       }
     }
 
-    async function sendOne(e: any, includeLink: boolean) {
+    function buildMessage(
+      e: any,
+      includeLink: boolean,
+      payLink: string | null,
+    ): string {
       const sess = sessionById.get(e.session_id)
       const timeStr = sess?.start_time ? formatPTTime(sess.start_time) : ''
       const firstChild = (e.child_name || '').split(' ')[0] || 'your swimmer'
       const firstParent = (e.parent_name || '').split(' ')[0] || 'there'
-      const realPhone = normalizePhone(e.parent_phone)
-      const phone = isTest ? testPhone! : realPhone!
-
-      let payLink: string | null = null
-      if (includeLink) {
-        payLink = await fetchPayLink(e.id)
-      }
-
       const base = includeLink && payLink
         ? `Hi ${firstParent}, ${firstChild}'s first swim lesson at Aquatic Dreams is ${dayLabel} at ${timeStr}. Pay the session fee before you arrive: ${payLink} — Reply STOP to opt out.`
         : `Hi ${firstParent}, reminder: ${firstChild}'s first swim lesson at Aquatic Dreams is ${dayLabel} at ${timeStr}. See you at the pool!`
+      if (!isTest) return base
+      const realPhone = normalizePhone(e.parent_phone)
+      return `[TEST → ${firstParent} / ${realPhone ?? 'no phone'}] ${base}`
+    }
 
-      const message = isTest
-        ? `[TEST → ${firstParent} / ${realPhone ?? 'no phone'}] ${base}`
-        : base
+    // Classify + build rows.
+    type Row = {
+      enrollmentId: string
+      childName: string
+      parentName: string
+      parentPhone: string | null
+      routedPhone: string | null
+      sessionName: string | null
+      startTime: string | null
+      variant: Variant
+      willSend: boolean
+      includesLink: boolean
+      payLink: string | null
+      message: string
+      skipReason: string | null
+    }
 
-      const result = await sendSms(phone, message)
+    const rows: Row[] = []
+    for (const e of list) {
+      const sess = sessionById.get(e.session_id)
+      const realPhone = normalizePhone(e.parent_phone)
+      const owes = e.session_fee_status !== 'paid' && e.session_fee_status !== 'comp'
+
+      let variant: Variant
+      let willSend = true
+      let skipReason: string | null = null
+
+      if (alreadySent.has(e.id)) {
+        variant = 'skipped_already_sent'
+        willSend = false
+        skipReason = 'already_sent'
+      } else if (!isTest && !realPhone) {
+        variant = 'skipped_no_phone'
+        willSend = false
+        skipReason = 'no_phone'
+      } else {
+        variant = owes ? 'pay_link' : 'reminder_only'
+      }
+
+      let payLink: string | null = null
+      if (willSend && variant === 'pay_link') {
+        payLink = await fetchPayLink(e.id)
+      }
+
+      const message = willSend
+        ? buildMessage(e, variant === 'pay_link', payLink)
+        : variant === 'skipped_no_phone'
+        ? '(would not send — no phone on file)'
+        : '(would not send — already texted earlier)'
+
+      rows.push({
+        enrollmentId: e.id,
+        childName: e.child_name,
+        parentName: e.parent_name,
+        parentPhone: realPhone,
+        routedPhone: willSend ? (isTest ? testPhone : realPhone) : null,
+        sessionName: sess?.session_name ?? null,
+        startTime: sess?.start_time ?? null,
+        variant,
+        willSend,
+        includesLink: variant === 'pay_link',
+        payLink,
+        message,
+        skipReason,
+      })
+    }
+
+    const summary = {
+      total: rows.length,
+      withPayLink: rows.filter((r) => r.variant === 'pay_link' && r.willSend).length,
+      reminderOnly: rows.filter((r) => r.variant === 'reminder_only' && r.willSend).length,
+      skippedNoPhone: rows.filter((r) => r.variant === 'skipped_no_phone').length,
+      skippedAlreadySent: rows.filter((r) => r.variant === 'skipped_already_sent').length,
+      sessionCount: sessionIds.length,
+    }
+
+    if (mode === 'preview' || dryRun) {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          mode: mode === 'preview' ? 'preview' : 'dry_run',
+          targetDate,
+          isTest,
+          testPhone: isTest ? testPhone : undefined,
+          rows,
+          ...summary,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    // ===== Real send =====
+    let sent = 0
+    let failed = 0
+    const errors: Array<{ enrollment_id: string; error: string }> = []
+
+    for (const r of rows) {
+      if (!r.willSend || !r.routedPhone) continue
+      const result = await sendSms(r.routedPhone, r.message)
       await supabase.from('reminder_logs').insert({
-        swimmer_name: e.child_name,
-        enrollment_id: e.id,
+        swimmer_name: r.childName,
+        enrollment_id: r.enrollmentId,
         channel: 'sms',
         reminder_kind: isTest ? `${REMINDER_KIND}_test` : REMINDER_KIND,
-        phone,
-        message,
+        phone: r.routedPhone,
+        message: r.message,
         sent_at: result.ok ? new Date().toISOString() : null,
         status: result.ok ? 'sent' : 'failed',
         error: result.ok ? null : result.error ?? null,
@@ -288,19 +319,15 @@ Deno.serve(async (req) => {
       if (result.ok) sent++
       else {
         failed++
-        errors.push({ enrollment_id: e.id, error: result.error || 'unknown' })
+        errors.push({ enrollment_id: r.enrollmentId, error: result.error || 'unknown' })
       }
     }
 
-    for (const e of buckets.willSendWithLink) await sendOne(e, true)
-    for (const e of buckets.willSendReminderOnly) await sendOne(e, false)
-
-    // Log no-phone skips as failed for audit (not applicable in test mode).
     if (!isTest) {
-      for (const e of buckets.skippedNoPhone) {
+      for (const r of rows.filter((x) => x.variant === 'skipped_no_phone')) {
         await supabase.from('reminder_logs').insert({
-          swimmer_name: e.child_name,
-          enrollment_id: e.id,
+          swimmer_name: r.childName,
+          enrollment_id: r.enrollmentId,
           channel: 'sms',
           reminder_kind: REMINDER_KIND,
           phone: null,
@@ -314,16 +341,13 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         ok: true,
+        mode: 'send',
         targetDate,
         isTest,
         testPhone: isTest ? testPhone : undefined,
-        total: list.length,
         sent,
         failed,
-        withPayLink: buckets.willSendWithLink.length,
-        reminderOnly: buckets.willSendReminderOnly.length,
-        skippedNoPhone: buckets.skippedNoPhone.length,
-        skippedAlreadySent: buckets.skippedAlreadySent.length,
+        ...summary,
         errors,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
