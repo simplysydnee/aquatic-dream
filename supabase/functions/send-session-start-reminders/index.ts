@@ -245,17 +245,6 @@ Deno.serve(async (req) => {
         variant = owes ? 'pay_link' : 'reminder_only'
       }
 
-      let payLink: string | null = null
-      if (willSend && variant === 'pay_link') {
-        payLink = await fetchPayLink(e.id)
-      }
-
-      const message = willSend
-        ? buildMessage(e, variant === 'pay_link', payLink)
-        : variant === 'skipped_no_phone'
-        ? '(would not send — no phone on file)'
-        : '(would not send — already texted earlier)'
-
       rows.push({
         enrollmentId: e.id,
         childName: e.child_name,
@@ -267,11 +256,29 @@ Deno.serve(async (req) => {
         variant,
         willSend,
         includesLink: variant === 'pay_link',
-        payLink,
-        message,
+        payLink: null,
+        message: '',
         skipReason,
       })
     }
+
+    // Generate pay links in parallel for rows that need them.
+    const linkTargets = rows.filter((r) => r.willSend && r.variant === 'pay_link')
+    const linkResults = await Promise.all(
+      linkTargets.map((r) => fetchPayLink(r.enrollmentId)),
+    )
+    linkTargets.forEach((r, i) => { r.payLink = linkResults[i] })
+
+    // Build messages now that pay links are resolved.
+    for (const r of rows) {
+      const e = list.find((x) => x.id === r.enrollmentId)!
+      r.message = r.willSend
+        ? buildMessage(e, r.variant === 'pay_link', r.payLink)
+        : r.variant === 'skipped_no_phone'
+        ? '(would not send — no phone on file)'
+        : '(would not send — already texted earlier)'
+    }
+
 
     const summary = {
       total: rows.length,
