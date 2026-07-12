@@ -1117,6 +1117,13 @@ const SwimEnrollmentsAdmin = () => {
         }}
       />
 
+      <StartReminderPreviewDialog
+        open={reminderPreviewOpen}
+        onClose={() => setReminderPreviewOpen(false)}
+        periodFilter={periodFilter}
+        initialTestPhone={reminderTestPhone}
+      />
+
 
       <AlertDialog open={!!cancelTarget} onOpenChange={(o) => { if (!o) setCancelTarget(null); }}>
         <AlertDialogContent>
