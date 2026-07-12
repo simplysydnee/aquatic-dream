@@ -1,78 +1,60 @@
-## Part 1 — "Session starts next week" SMS
 
-New edge function `send-session-welcome-sms` mirroring `send-session-welcome-email`:
+## Goal
 
-- Input: `sessionPeriodId` (admin-triggered).
-- Recipients: all `swim_enrollments` in that period with status `confirmed`/`enrolled`/`pending_payment` and a valid `parent_phone`.
-- **Dedupe by normalized parent phone**: parents with multiple swimmers get ONE combined SMS.
-- Idempotency: log to `reminder_logs` with `reminder_kind = 'session_welcome_sms'`; skip any phone already logged as `sent` for this period.
-- Uses shared `sendSms` + `logSms` from `supabase/functions/_shared/textmagic.ts`.
-- Auth: admin JWT check.
+Add a one-click "Text pay link" button that SMS's a Stripe payment link (payable in the browser) for a specific enrollment's session fee ($240 or the session's actual price). The existing "Send email" registration/payment link flow stays as-is; this is a new SMS-only path that lives next to it.
 
-**Message templates (warmer tone):**
+## Where the button appears
 
-Single swimmer:
-> Hi! {ChildFirst}'s next swim session starts {Mon, Jul 13} at Aquatic Dreams. First lesson {Monday} at {3:30 PM}. We emailed full details — check spam if you don't see it! Reply STOP to opt out.
+1. **Row action on `SwimEnrollmentsAdmin`** — new "Text pay link" button next to the existing "Send payment link" (email) action on each enrollment row.
+2. **Calendar → session enrollment cards (`SessionEnrollmentCards.tsx`)** — same button on each swimmer card when a session is opened from the calendar/enrollments view.
 
-Multiple swimmers (same parent):
-> Hi! Your swimmers ({FirstNames}) start their next session {Mon, Jul 13} at Aquatic Dreams. First lessons this week — check your email (and spam) for the full schedule. Reply STOP to opt out.
+Both places already have `enrollmentId` and `parent_phone` in scope.
 
-**Trigger:** admin clicks a new "Send 'starts next week' SMS" button on the Session 2 row in `SessionsAdmin`, matching placement of the current welcome-email button. Fires immediately after confirm.
+## New edge function: `text-session-payment-link`
 
-No cron for now.
+Server-side, so we never expose Stripe secrets or SMS creds to the browser. Roughly 60 lines. `verify_jwt = false` in `config.toml` (matches existing payment-link functions).
 
-## Part 2 — Reports: Session gap outreach
+Steps inside the function:
+1. Validate `{ enrollmentId, environment }` from body.
+2. Load enrollment (id, `parent_phone`, `parent_first_name`, `child_first_name`, `session_fee_status`, `swim_sessions.session_price`).
+3. Reject if `session_fee_status` is `paid` or `comp`, or if `parent_phone` is missing.
+4. Reuse `get-or-create-session-payment-link` logic to fetch-or-create the enrollment's Stripe Payment Link (idempotent via `session_fee_payment_link_url` on the row). Extract the pure link-creation into `_shared/session-payment-link.ts` so both functions share it — no duplicate Stripe product/price creation.
+5. Compose SMS body:
+   `Hi {parentFirst}, here's the secure payment link for {childFirst}'s session fee (${amount}): {link} — Aquatic Dreams. Reply STOP to opt out.`
+6. Send via existing `_shared/textmagic.ts` `sendSms` helper (same one `send-sms-message` uses).
+7. Log to `reminder_logs` with `reminder_kind = 'session_payment_link_sms'` (channel `sms`, status `sent`/`failed`, TextMagic message id in `provider_message_id`, enrollment id).
+8. Return `{ success: true, link, phone }`.
 
-New "Session gap outreach" section inside `src/pages/admin/ReportsAdmin.tsx`.
+## Frontend wiring
 
-**Data:**
+- New tiny component `TextPayLinkButton.tsx` (`{ enrollmentId, parentPhone, disabled }`) — button + confirm toast + `supabase.functions.invoke("text-session-payment-link", ...)`. Handles loading, success ("Texted to (209) …"), and error toasts. Disabled when `!parentPhone` or `session_fee_status` is paid/comp — pass those in as props.
+- Mount in:
+  - `src/pages/admin/SwimEnrollmentsAdmin.tsx` — next to the existing email "Send payment link" button in each row.
+  - `src/components/admin/SessionEnrollmentCards.tsx` — under each swimmer card.
 
-1. **Session 2 capacity** — per `swim_level`, `spots_left = SUM(max_students) - COUNT(enrollments)` across active sessions in that period. Show start/end dates and per-level spots remaining.
-2. **Gap list** — parents/swimmers who EITHER:
-   - Enrolled in Session 1 (`confirmed`/`enrolled`) but NOT in Session 2, OR
-   - Have a `lesson_requests` row in the last 90 days with no matching Session 2 enrollment.
+No changes to the existing `SendPaymentLinkDialog` (email flow) or to `send-session-payment-link`.
 
-   **Name matching (corrected):** use the same COALESCE fallback pattern established today in `enrollments_waiver_status` — derive first/last from `child_name` when `child_first_name`/`child_last_name` are NULL:
-   ```sql
-   derived_first = COALESCE(
-     NULLIF(trim(child_first_name), ''),
-     NULLIF(split_part(coalesce(child_name,''), ' ', 1), '')
-   )
-   derived_last = COALESCE(
-     NULLIF(trim(child_last_name), ''),
-     CASE WHEN position(' ' in coalesce(child_name,'')) > 0
-          THEN NULLIF(trim(regexp_replace(child_name, '^.* ', '')), '') END,
-     CASE WHEN position(' ' in coalesce(child_first_name,'')) > 0
-          THEN NULLIF(trim(regexp_replace(child_first_name, ' [^ ]+$', '')), '') END
-   )
-   ```
-   Match key: `lower(derived_first) + lower(derived_last) + child_dob`. Fallback: `lower(parent_email) + lower(derived_first)` when dob missing. Applied to BOTH sides of the Session 1 → Session 2 comparison so the ~47% legacy `child_name`-only rows are not silently dropped. Implemented as a new SECURITY DEFINER RPC `get_session_gap_outreach(_from_period uuid, _to_period uuid)` returning both the gap list and per-level capacity — keeps the fallback logic server-side and mirrors the pattern in `enrollments_waiver_status`.
+## Data & guarantees
 
-   Columns: Child name • Last level • Parent name • Email • Phone • Source (Session 1 / Lesson request) • Level-match indicator (green ✓ exact / yellow nearest).
+- The SMS link is the **same** Stripe Payment Link the email flow generates, so paying via SMS runs through the existing `payments-webhook` path (`metadata.type='session_fee'`), which already flips `session_fee_status='paid'` and stamps `session_fee_stripe_id`. No new webhook or reconciliation code needed.
+- Idempotent: repeated clicks reuse `session_fee_payment_link_url` on the row instead of creating new Stripe objects.
+- Respects the enrollment payment rules (returning grace, comp, already paid) via the pre-flight status check.
 
-**Actions on the list:**
-- Multi-select rows.
-- **Dedupe by parent** for both actions: parents with multiple swimmers get one email/SMS.
-- **Send bulk marketing email** — opens existing marketing composer prefilled with Session 2 dates + enrollment link, targeted at selected parent emails via the existing marketing pipeline.
-- **Send bulk SMS** — new edge function `send-bulk-outreach-sms` accepts `{ phone, childNames[], startDate }[]`, logs each to `reminder_logs` with `reminder_kind = 'session_outreach_sms'`.
+## Files touched
 
-**Default templates (editable in composer):**
+New:
+- `supabase/functions/text-session-payment-link/index.ts`
+- `supabase/functions/_shared/session-payment-link.ts` (extracted shared helper)
+- `src/components/admin/TextPayLinkButton.tsx`
 
-- Email subject: "Open spots for Session 2 — starts Jul 13"
-- SMS (single swimmer):
-  > Hi! Session 2 at Aquatic Dreams starts Jul 13. We still have open spots for {ChildFirst} — enroll here: https://aquaticdreamsswim.com/swim-lessons Reply STOP to opt out.
-- SMS (multiple swimmers, same parent):
-  > Hi! Session 2 at Aquatic Dreams starts Jul 13. We still have open spots for {FirstNames} — enroll here: https://aquaticdreamsswim.com/swim-lessons Reply STOP to opt out.
+Edited:
+- `supabase/functions/get-or-create-session-payment-link/index.ts` — switch to the shared helper.
+- `supabase/config.toml` — register the new function with `verify_jwt = false`.
+- `src/pages/admin/SwimEnrollmentsAdmin.tsx` — mount the button in the row actions.
+- `src/components/admin/SessionEnrollmentCards.tsx` — mount the button on each card.
 
-## Technical notes
+## Out of scope
 
-- New DB object: RPC `public.get_session_gap_outreach(_from_period uuid, _to_period uuid)` (SECURITY DEFINER, admin-only via `has_role`), using COALESCE fallback on legacy `child_name`.
-- New edge functions:
-  - `supabase/functions/send-session-welcome-sms/index.ts`
-  - `supabase/functions/send-bulk-outreach-sms/index.ts`
-- Modified files:
-  - `src/pages/admin/ReportsAdmin.tsx` — new "Session gap outreach" section
-  - `src/pages/admin/SessionsAdmin.tsx` — new "Send 'starts next week' SMS" button
-- No table schema changes. All SMS logged via existing `reminder_logs` + `logSms()`.
-- Admin-gated via `has_role(_user_id, 'admin')`.
-- Both SMS paths dedupe by normalized `parent_phone` so multi-swimmer families receive exactly one message.
+- No email changes.
+- No SMS opt-in/consent screen changes (using existing TextMagic pipeline and STOP language).
+- No bulk "text all" action — this is per-enrollment only for now.
