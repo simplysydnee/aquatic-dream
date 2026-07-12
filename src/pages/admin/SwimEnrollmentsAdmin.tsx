@@ -109,6 +109,8 @@ const SwimEnrollmentsAdmin = () => {
   const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [ageFilter, setAgeFilter] = useState<string>("all");
   const [seatsPeriodFilter, setSeatsPeriodFilter] = useState<string>("upcoming");
+  const [reminderPreviewOpen, setReminderPreviewOpen] = useState(false);
+  const [reminderTestPhone, setReminderTestPhone] = useState<string | undefined>(undefined);
 
   // Manual mark-paid dialog state
   const [markPaidTarget, setMarkPaidTarget] = useState<
