@@ -745,6 +745,49 @@ const SwimEnrollmentsAdmin = () => {
             >
               Text tomorrow's start reminder
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const stored = typeof window !== "undefined"
+                  ? window.localStorage.getItem("admin_test_sms_phone") ?? ""
+                  : "";
+                const input = window.prompt(
+                  "Send TEST reminders to which phone number?\n(All messages will be routed here instead of families. Format: +12095551234)",
+                  stored,
+                );
+                if (!input) return;
+                const testPhone = input.trim();
+                if (!testPhone) return;
+                const limitStr = window.prompt(
+                  "How many test messages max? (1-50)",
+                  "5",
+                );
+                if (limitStr === null) return;
+                const testLimit = Math.max(1, Math.min(50, Number(limitStr) || 5));
+                try {
+                  window.localStorage.setItem("admin_test_sms_phone", testPhone);
+                } catch {
+                  // ignore
+                }
+                const body: Record<string, unknown> = { testPhone, testLimit };
+                if (periodFilter !== "all") body.sessionPeriodId = periodFilter;
+                const { data, error } = await supabase.functions.invoke(
+                  "send-session-start-reminders",
+                  { body },
+                );
+                if (error) {
+                  toast({ title: "Test send failed", description: error.message, variant: "destructive" });
+                  return;
+                }
+                const targetDate = data?.targetDate ?? "tomorrow";
+                toast({
+                  title: `Test SMS sent to ${testPhone}`,
+                  description: `${data?.sent ?? 0} of ${(data?.withPayLink ?? 0) + (data?.reminderOnly ?? 0)} test messages sent for ${targetDate}. ${data?.failed ?? 0} failed.`,
+                });
+              }}
+            >
+              Test to my number
             <Select value={ageFilter} onValueChange={setAgeFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="All Ages" />
