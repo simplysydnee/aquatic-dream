@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2, Download } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import SessionGapOutreach from "@/components/admin/SessionGapOutreach";
+import SessionPaymentLinkSmsBlast from "@/components/admin/SessionPaymentLinkSmsBlast";
 
 interface Instructor { id: string; name: string; }
 interface Attendance { enrollment_id: string; session_id: string; lesson_date: string; checked_in: boolean; }
@@ -143,7 +144,8 @@ export default function ReportsAdmin() {
             <TabsTrigger value="gap">Session gap outreach</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="gap">
+          <TabsContent value="gap" className="space-y-4">
+            <SessionPaymentLinkSmsBlast />
             <SessionGapOutreach />
           </TabsContent>
 
