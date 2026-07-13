@@ -7,24 +7,37 @@ export function getConnectionApiKey(env: StripeEnv): string {
   // The Lovable connector gateway has been returning "Credential not found"
   // for STRIPE_LIVE_API_KEY in this project, so a real key from the same
   // Stripe account as the publishable key is the reliable path for live.
+  //
+  // CRITICAL: only use the manual key when its mode (test/live) matches the
+  // requested env. Otherwise, embedded checkout would create a session in
+  // one Stripe account while the iframe mounts a publishable key from the
+  // other account, and Stripe rejects the session with
+  // "Something went wrong, please contact the merchant" the moment the
+  // iframe boots. When mismatched, fall through to the env-specific
+  // gateway key.
   const manual = Deno.env.get('STRIPE_API_KEY');
+  const wantsLive = env === 'live';
   if (manual && /^(sk|rk)_(test|live)_/.test(manual)) {
-    return manual;
+    const manualIsLive = /^(sk|rk)_live_/.test(manual);
+    if (manualIsLive === wantsLive) return manual;
+    // Fall through to gateway when the manual key targets the wrong mode.
   }
 
-  // Fallback: Lovable connector gateway keys (used when no manual key set).
+  // Fallback: Lovable connector gateway keys (used when no manual key set
+  // or when the manual key's mode doesn't match the requested env).
   const gateway = env === 'sandbox'
     ? Deno.env.get('STRIPE_SANDBOX_API_KEY')
     : Deno.env.get('STRIPE_LIVE_API_KEY');
   if (!gateway) {
     throw new Error(
       `No Stripe key configured for env=${env}. ` +
-      `Set STRIPE_API_KEY (sk_live_/sk_test_) or ` +
+      `Set STRIPE_API_KEY (${wantsLive ? 'sk_live_' : 'sk_test_'}) or ` +
       `${env === 'sandbox' ? 'STRIPE_SANDBOX_API_KEY' : 'STRIPE_LIVE_API_KEY'}.`
     );
   }
   return gateway;
 }
+
 
 import Stripe from "https://esm.sh/stripe@18.5.0";
 
