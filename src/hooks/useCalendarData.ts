@@ -214,7 +214,50 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     ]);
 
     if (sessionsRes.data) setSwimSessions(sessionsRes.data);
-    if (enrollmentsRes.data) setEnrollments(enrollmentsRes.data);
+    if (enrollmentsRes.data) {
+      // Merge swimmer-level active waivers so a waiver signed on a prior
+      // enrollment (or via visitor/private lesson) still counts on newer
+      // enrollment rows. Without this, re-enrolling for a new session shows
+      // "no waiver" even when the family already signed one that's still valid.
+      const rows = enrollmentsRes.data as any[];
+      const swimmerKey = (r: any) => {
+        const first = (r.child_first_name || "").trim().toLowerCase();
+        const last = (r.child_last_name || "").trim().toLowerCase();
+        const dob = r.child_dob || "";
+        return first && last && dob ? `${first}|${last}|${dob}` : null;
+      };
+      const unique = new Map<string, { first: string; last: string; dob: string }>();
+      for (const r of rows) {
+        const k = swimmerKey(r);
+        if (k && !unique.has(k)) {
+          unique.set(k, {
+            first: r.child_first_name,
+            last: r.child_last_name,
+            dob: r.child_dob,
+          });
+        }
+      }
+      const activeMap = new Map<string, string | null>();
+      await Promise.all(
+        Array.from(unique.entries()).map(async ([k, s]) => {
+          try {
+            const { data } = await supabase.rpc(
+              "get_active_waiver_signed_at_for_swimmer",
+              { _first: s.first, _last: s.last, _dob: s.dob },
+            );
+            activeMap.set(k, (data as string | null) || null);
+          } catch {
+            activeMap.set(k, null);
+          }
+        }),
+      );
+      const merged = rows.map((r) => {
+        const k = swimmerKey(r);
+        const active = k ? activeMap.get(k) : null;
+        return { ...r, waiver_signed_at: active || r.waiver_signed_at || null };
+      });
+      setEnrollments(merged);
+    }
     if (eventsRes.data) setPoolEvents(eventsRes.data);
     if (attendanceRes.data) setAttendance(attendanceRes.data);
     if (agreementsRes.data) setAgreements(agreementsRes.data);
