@@ -240,24 +240,34 @@ export function useSwimmers() {
     const bkHas = new Map<string, boolean>();
     await Promise.all([
       enrIds.length
-        ? supabase
-            .rpc("enrollments_waiver_status" as any, { _ids: enrIds })
-            .then(({ data }) =>
+        ? (async () => {
+            try {
+              const { data } = await supabase.rpc(
+                "enrollments_waiver_status" as any,
+                { _ids: enrIds },
+              );
               ((data as any[]) || []).forEach((r) =>
                 enrHas.set(r.enrollment_id, !!r.has_waiver),
-              ),
-            )
-            .catch(() => undefined)
+              );
+            } catch {
+              /* best-effort */
+            }
+          })()
         : Promise.resolve(),
       bkIds.length
-        ? supabase
-            .rpc("bookings_waiver_status" as any, { _ids: bkIds })
-            .then(({ data }) =>
+        ? (async () => {
+            try {
+              const { data } = await supabase.rpc(
+                "bookings_waiver_status" as any,
+                { _ids: bkIds },
+              );
               ((data as any[]) || []).forEach((r) =>
                 bkHas.set(r.booking_id, !!r.has_waiver),
-              ),
-            )
-            .catch(() => undefined)
+              );
+            } catch {
+              /* best-effort */
+            }
+          })()
         : Promise.resolve(),
     ]);
     const nowIso = new Date().toISOString();
