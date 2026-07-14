@@ -84,6 +84,32 @@ export default function ComplianceTab({ swimmer, onChanged }: { swimmer: Swimmer
     } else {
       setBookingWaiverFlags({});
     }
+
+    // Family-wide waiver-on-file check (last+dob primary, email/phone fallback).
+    // This is the same rule the check-in flow uses, so a waiver signed under a
+    // sibling record or a visitor waiver still counts here.
+    try {
+      const parts = (swimmer.child_name || "").trim().split(/\s+/);
+      const first = parts[0] || "";
+      const last = parts.slice(1).join(" ") || "";
+      if (first) {
+        const { data } = await supabase.rpc(
+          "swimmer_has_waiver_on_file" as any,
+          {
+            _first: first,
+            _last: last || null,
+            _dob: swimmer.child_dob || null,
+            _parent_email: swimmer.parent_email || null,
+            _parent_phone: swimmer.parent_phone || null,
+          },
+        );
+        setFamilyWaiverOnFile(!!data);
+      } else {
+        setFamilyWaiverOnFile(false);
+      }
+    } catch {
+      setFamilyWaiverOnFile(false);
+    }
     setLoading(false);
   };
 
@@ -93,7 +119,10 @@ export default function ComplianceTab({ swimmer, onChanged }: { swimmer: Swimmer
   }, [swimmer.key]);
 
   const latest = agreements[0];
-  const hasAnyWaiver = agreements.length > 0 || Object.values(bookingWaiverFlags).some(Boolean);
+  const hasAnyWaiver =
+    agreements.length > 0 ||
+    Object.values(bookingWaiverFlags).some(Boolean) ||
+    familyWaiverOnFile;
 
   // Build per-record status rows
   const enrollmentRows = swimmer.enrollments.map((e) => {
