@@ -44,6 +44,7 @@ export default function ComplianceTab({ swimmer, onChanged }: { swimmer: Swimmer
   const [loading, setLoading] = useState(true);
   const [agreements, setAgreements] = useState<AgreementRow[]>([]);
   const [bookingWaiverFlags, setBookingWaiverFlags] = useState<Record<string, string | null>>({});
+  const [familyWaiverOnFile, setFamilyWaiverOnFile] = useState(false);
   const [target, setTarget] = useState<MissingTarget | null>(null);
   const [signerName, setSignerName] = useState(swimmer.parent_name || "");
   const [note, setNote] = useState("");
