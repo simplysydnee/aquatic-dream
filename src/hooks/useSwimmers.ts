@@ -232,6 +232,42 @@ export function useSwimmers() {
       supabase.from("lesson_bookings").select("*").order("created_at", { ascending: false }),
     ]);
 
+    // Enrich waiver_signed_at with family-wide status so a waiver signed on
+    // any sibling record (enrollment / booking / visitor waiver) still counts.
+    const enrIds = ((enrollmentsRes.data as any[]) || []).map((e) => e.id).filter(Boolean);
+    const bkIds = ((bookingsRes.data as any[]) || []).map((b) => b.id).filter(Boolean);
+    const enrHas = new Map<string, boolean>();
+    const bkHas = new Map<string, boolean>();
+    await Promise.all([
+      enrIds.length
+        ? supabase
+            .rpc("enrollments_waiver_status" as any, { _ids: enrIds })
+            .then(({ data }) =>
+              ((data as any[]) || []).forEach((r) =>
+                enrHas.set(r.enrollment_id, !!r.has_waiver),
+              ),
+            )
+            .catch(() => undefined)
+        : Promise.resolve(),
+      bkIds.length
+        ? supabase
+            .rpc("bookings_waiver_status" as any, { _ids: bkIds })
+            .then(({ data }) =>
+              ((data as any[]) || []).forEach((r) =>
+                bkHas.set(r.booking_id, !!r.has_waiver),
+              ),
+            )
+            .catch(() => undefined)
+        : Promise.resolve(),
+    ]);
+    const nowIso = new Date().toISOString();
+    ((enrollmentsRes.data as any[]) || []).forEach((e) => {
+      if (!e.waiver_signed_at && enrHas.get(e.id)) e.waiver_signed_at = nowIso;
+    });
+    ((bookingsRes.data as any[]) || []).forEach((b) => {
+      if (!b.waiver_signed_at && bkHas.get(b.id)) b.waiver_signed_at = nowIso;
+    });
+
     const map = new Map<string, Swimmer>();
 
     const ensure = (childName: string, parentEmail: string, base: Partial<Swimmer>) => {
