@@ -263,6 +263,20 @@ export default function ComplianceTab({ swimmer, onChanged }: { swimmer: Swimmer
                   <Badge className="bg-emerald-600 hover:bg-emerald-600 gap-1 shrink-0">
                     <ShieldCheck className="h-3 w-3" /> Signed
                   </Badge>
+                ) : familyWaiverOnFile ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline" className="gap-1 text-emerald-700 border-emerald-300">
+                      <ShieldCheck className="h-3 w-3" /> Covered by waiver on file
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs"
+                      onClick={() => row.target && setTarget(row.target)}
+                    >
+                      Attach agreement
+                    </Button>
+                  </div>
                 ) : (
                   <Button
                     size="sm"
