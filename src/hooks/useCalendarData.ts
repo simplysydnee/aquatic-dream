@@ -215,47 +215,33 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
 
     if (sessionsRes.data) setSwimSessions(sessionsRes.data);
     if (enrollmentsRes.data) {
-      // Merge swimmer-level active waivers so a waiver signed on a prior
-      // enrollment (or via visitor/private lesson) still counts on newer
-      // enrollment rows. Without this, re-enrolling for a new session shows
-      // "no waiver" even when the family already signed one that's still valid.
+      // Merge family-wide waiver status so a waiver signed on any prior
+      // enrollment, lesson booking, or visitor waiver still counts on newer
+      // enrollment rows. Uses the same RPC as the check-in flow (last+dob
+      // primary, email/phone fallback) so waiver status is consistent across
+      // every admin surface.
       const rows = enrollmentsRes.data as any[];
-      const swimmerKey = (r: any) => {
-        const first = (r.child_first_name || "").trim().toLowerCase();
-        const last = (r.child_last_name || "").trim().toLowerCase();
-        const dob = r.child_dob || "";
-        return first && last && dob ? `${first}|${last}|${dob}` : null;
-      };
-      const unique = new Map<string, { first: string; last: string; dob: string }>();
-      for (const r of rows) {
-        const k = swimmerKey(r);
-        if (k && !unique.has(k)) {
-          unique.set(k, {
-            first: r.child_first_name,
-            last: r.child_last_name,
-            dob: r.child_dob,
-          });
+      const ids = rows.map((r) => r.id).filter(Boolean);
+      let hasMap = new Map<string, boolean>();
+      if (ids.length) {
+        try {
+          const { data } = await supabase.rpc(
+            "enrollments_waiver_status" as any,
+            { _ids: ids },
+          );
+          ((data as any[]) || []).forEach((r) =>
+            hasMap.set(r.enrollment_id, !!r.has_waiver),
+          );
+        } catch {
+          hasMap = new Map();
         }
       }
-      const activeMap = new Map<string, string | null>();
-      await Promise.all(
-        Array.from(unique.entries()).map(async ([k, s]) => {
-          try {
-            const { data } = await supabase.rpc(
-              "get_active_waiver_signed_at_for_swimmer",
-              { _first: s.first, _last: s.last, _dob: s.dob },
-            );
-            activeMap.set(k, (data as string | null) || null);
-          } catch {
-            activeMap.set(k, null);
-          }
-        }),
-      );
-      const merged = rows.map((r) => {
-        const k = swimmerKey(r);
-        const active = k ? activeMap.get(k) : null;
-        return { ...r, waiver_signed_at: active || r.waiver_signed_at || null };
-      });
+      const nowIso = new Date().toISOString();
+      const merged = rows.map((r) => ({
+        ...r,
+        waiver_signed_at:
+          r.waiver_signed_at || (hasMap.get(r.id) ? nowIso : null),
+      }));
       setEnrollments(merged);
     }
     if (eventsRes.data) setPoolEvents(eventsRes.data);
@@ -330,6 +316,31 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         confirmation_email_error: b?.confirmation_email_error || null,
       };
     });
+    // Enrich waiver_signed_at using the family-wide RPC so a waiver signed on
+    // any prior booking / enrollment / visitor waiver counts here too.
+    const bookingIds = Array.from(
+      new Set(privates.map((p) => p.booking_id).filter(Boolean)),
+    ) as string[];
+    if (bookingIds.length) {
+      try {
+        const { data } = await supabase.rpc(
+          "bookings_waiver_status" as any,
+          { _ids: bookingIds },
+        );
+        const bHas = new Map<string, boolean>();
+        ((data as any[]) || []).forEach((r) =>
+          bHas.set(r.booking_id, !!r.has_waiver),
+        );
+        const nowIso = new Date().toISOString();
+        for (const p of privates) {
+          if (!p.waiver_signed_at && bHas.get(p.booking_id)) {
+            p.waiver_signed_at = nowIso;
+          }
+        }
+      } catch {
+        // Best-effort enrichment; keep raw values on failure.
+      }
+    }
     setPrivateLessons(privates);
 
     // ── Compute open private slots from booking blocks minus taken occurrences ──

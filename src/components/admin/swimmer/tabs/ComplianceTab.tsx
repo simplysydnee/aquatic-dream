@@ -44,6 +44,7 @@ export default function ComplianceTab({ swimmer, onChanged }: { swimmer: Swimmer
   const [loading, setLoading] = useState(true);
   const [agreements, setAgreements] = useState<AgreementRow[]>([]);
   const [bookingWaiverFlags, setBookingWaiverFlags] = useState<Record<string, string | null>>({});
+  const [familyWaiverOnFile, setFamilyWaiverOnFile] = useState(false);
   const [target, setTarget] = useState<MissingTarget | null>(null);
   const [signerName, setSignerName] = useState(swimmer.parent_name || "");
   const [note, setNote] = useState("");
@@ -83,6 +84,32 @@ export default function ComplianceTab({ swimmer, onChanged }: { swimmer: Swimmer
     } else {
       setBookingWaiverFlags({});
     }
+
+    // Family-wide waiver-on-file check (last+dob primary, email/phone fallback).
+    // This is the same rule the check-in flow uses, so a waiver signed under a
+    // sibling record or a visitor waiver still counts here.
+    try {
+      const parts = (swimmer.child_name || "").trim().split(/\s+/);
+      const first = parts[0] || "";
+      const last = parts.slice(1).join(" ") || "";
+      if (first) {
+        const { data } = await supabase.rpc(
+          "swimmer_has_waiver_on_file" as any,
+          {
+            _first: first,
+            _last: last || null,
+            _dob: swimmer.child_dob || null,
+            _parent_email: swimmer.parent_email || null,
+            _parent_phone: swimmer.parent_phone || null,
+          },
+        );
+        setFamilyWaiverOnFile(!!data);
+      } else {
+        setFamilyWaiverOnFile(false);
+      }
+    } catch {
+      setFamilyWaiverOnFile(false);
+    }
     setLoading(false);
   };
 
@@ -92,7 +119,10 @@ export default function ComplianceTab({ swimmer, onChanged }: { swimmer: Swimmer
   }, [swimmer.key]);
 
   const latest = agreements[0];
-  const hasAnyWaiver = agreements.length > 0 || Object.values(bookingWaiverFlags).some(Boolean);
+  const hasAnyWaiver =
+    agreements.length > 0 ||
+    Object.values(bookingWaiverFlags).some(Boolean) ||
+    familyWaiverOnFile;
 
   // Build per-record status rows
   const enrollmentRows = swimmer.enrollments.map((e) => {
@@ -233,6 +263,20 @@ export default function ComplianceTab({ swimmer, onChanged }: { swimmer: Swimmer
                   <Badge className="bg-emerald-600 hover:bg-emerald-600 gap-1 shrink-0">
                     <ShieldCheck className="h-3 w-3" /> Signed
                   </Badge>
+                ) : familyWaiverOnFile ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline" className="gap-1 text-emerald-700 border-emerald-300">
+                      <ShieldCheck className="h-3 w-3" /> Covered by waiver on file
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs"
+                      onClick={() => row.target && setTarget(row.target)}
+                    >
+                      Attach agreement
+                    </Button>
+                  </div>
                 ) : (
                   <Button
                     size="sm"
