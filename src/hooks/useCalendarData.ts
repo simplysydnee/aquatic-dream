@@ -316,6 +316,31 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         confirmation_email_error: b?.confirmation_email_error || null,
       };
     });
+    // Enrich waiver_signed_at using the family-wide RPC so a waiver signed on
+    // any prior booking / enrollment / visitor waiver counts here too.
+    const bookingIds = Array.from(
+      new Set(privates.map((p) => p.booking_id).filter(Boolean)),
+    ) as string[];
+    if (bookingIds.length) {
+      try {
+        const { data } = await supabase.rpc(
+          "bookings_waiver_status" as any,
+          { _ids: bookingIds },
+        );
+        const bHas = new Map<string, boolean>();
+        ((data as any[]) || []).forEach((r) =>
+          bHas.set(r.booking_id, !!r.has_waiver),
+        );
+        const nowIso = new Date().toISOString();
+        for (const p of privates) {
+          if (!p.waiver_signed_at && bHas.get(p.booking_id)) {
+            p.waiver_signed_at = nowIso;
+          }
+        }
+      } catch {
+        // Best-effort enrichment; keep raw values on failure.
+      }
+    }
     setPrivateLessons(privates);
 
     // ── Compute open private slots from booking blocks minus taken occurrences ──
