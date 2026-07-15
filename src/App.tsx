@@ -96,6 +96,7 @@ const App = () => (
               <Route path="private-lessons/new" element={<BookingNew />} />
               <Route path="users" element={<UsersAdmin />} />
               <Route path="messages" element={<MessagesAdmin />} />
+              <Route path="domain-health" element={<DomainHealthAdmin />} />
             </Route>
 
             {/* Instructor portal */}
