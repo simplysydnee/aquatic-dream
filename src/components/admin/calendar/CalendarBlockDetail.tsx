@@ -664,8 +664,8 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                                   </Button>
                                 )}
                                 {sessionUnpaid && (
-                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingPaymentFor === enr.id} onClick={() => handleSendPaymentLink(enr.id)}>
-                                    <Send className="w-3 h-3" />{sendingPaymentFor === enr.id ? "…" : (enr.payment_reminder_sent_at ? "Resend session link" : "Email session link")}
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingPaymentFor === enr.id || !enr.parent_phone} title={enr.parent_phone ? "Text session fee payment link" : "No parent phone on file"} onClick={() => handleSendPaymentLink(enr.id)}>
+                                    <MessageSquare className="w-3 h-3" />{sendingPaymentFor === enr.id ? "…" : "Text session link"}
                                   </Button>
                                 )}
                                 {!enr.waiver_signed_at && (
