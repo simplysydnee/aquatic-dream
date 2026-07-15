@@ -106,6 +106,9 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
   const [enrMarkBusy, setEnrMarkBusy] = useState(false);
   const [sendingWaiverFor, setSendingWaiverFor] = useState<string | null>(null);
   const [sendingRegFor, setSendingRegFor] = useState<string | null>(null);
+  const [editingPhoneFor, setEditingPhoneFor] = useState<string | null>(null);
+  const [phoneDraft, setPhoneDraft] = useState("");
+  const [savingPhoneFor, setSavingPhoneFor] = useState<string | null>(null);
 
   const sendEnrollmentWaiverLink = async (enrollmentId: string) => {
     setSendingWaiverFor(enrollmentId);
