@@ -84,6 +84,10 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = true
   [functions.send-session-start-reminders]
     verify_jwt = true
+  [functions.check-domain-health]
+    verify_jwt = true
+
+
 
 
 
