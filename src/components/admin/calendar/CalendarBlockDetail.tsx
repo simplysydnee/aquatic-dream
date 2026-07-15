@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2, Ban, ArrowRightLeft } from "lucide-react";
+import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2, Ban, ArrowRightLeft, MessageSquare } from "lucide-react";
 import CancelLessonDialog from "./CancelLessonDialog";
 import type { CancelTarget } from "@/lib/lessonCancel";
 import { Button } from "@/components/ui/button";
@@ -231,11 +231,14 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
   const handleSendPaymentLink = async (enrollmentId: string) => {
     setSendingPaymentFor(enrollmentId);
     try {
-      const { error } = await supabase.functions.invoke("send-session-payment-link", {
-        body: { enrollmentId, environment: getStripeEnvironment(), siteUrl: window.location.origin },
+      const { data, error } = await supabase.functions.invoke("text-session-payment-link", {
+        body: { enrollmentId, environment: getStripeEnvironment() },
       });
-      if (error) throw error;
-      toast.success("Payment link sent!");
+      if (error || !data?.success) {
+        throw new Error((error as any)?.message || data?.error || "Failed to send payment link");
+      }
+      toast.success(`Payment link texted${data.phone ? ` to ${data.phone}` : ""}`);
+      onRefetch?.();
     } catch (err: any) {
       toast.error(err?.message || "Failed to send payment link");
     } finally {
@@ -661,8 +664,8 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                                   </Button>
                                 )}
                                 {sessionUnpaid && (
-                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingPaymentFor === enr.id} onClick={() => handleSendPaymentLink(enr.id)}>
-                                    <Send className="w-3 h-3" />{sendingPaymentFor === enr.id ? "…" : (enr.payment_reminder_sent_at ? "Resend session link" : "Email session link")}
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingPaymentFor === enr.id || !enr.parent_phone} title={enr.parent_phone ? "Text session fee payment link" : "No parent phone on file"} onClick={() => handleSendPaymentLink(enr.id)}>
+                                    <MessageSquare className="w-3 h-3" />{sendingPaymentFor === enr.id ? "…" : "Text session link"}
                                   </Button>
                                 )}
                                 {!enr.waiver_signed_at && (
