@@ -97,6 +97,7 @@ export function AdminSidebar() {
       label: "System",
       items: [
         { title: "Email Log", url: "/admin/emails", icon: Mail, badge: 0 },
+        { title: "Domain Health", url: "/admin/domain-health", icon: Globe, badge: 0 },
         { title: "User Management", url: "/admin/users", icon: Users, badge: 0 },
       ],
     },
