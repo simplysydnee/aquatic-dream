@@ -69,18 +69,24 @@ Deno.serve(async (req) => {
     const lastDateLabel = new Date(occs[occs.length - 1].occurrence_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     const lessonTimeLabel = `${fmtTime(booking.start_time)} – ${fmtTime(booking.end_time)}`
 
-    const checkoutSession = await stripe.checkout.sessions.create({
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: `${lessonTypeLabel} Series — ${occs.length} lessons`,
-            description: `${booking.child_name || booking.parent_name} • ${firstDateLabel} – ${lastDateLabel} • ${lessonTimeLabel}`,
-          },
-          unit_amount: Math.round(price * 100),
+    // Group occurrences by unit_amount so mixed promo/non-promo series
+    // still send a single Stripe checkout with correct totals.
+    const groups = new Map<number, number>()
+    perPrices.forEach((p) => groups.set(p, (groups.get(p) ?? 0) + 1))
+    const lineItems = Array.from(groups.entries()).map(([unitDollars, qty]) => ({
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: `${lessonTypeLabel} — $${unitDollars} × ${qty}`,
+          description: `${booking.child_name || booking.parent_name} • ${firstDateLabel} – ${lastDateLabel} • ${lessonTimeLabel}`,
         },
-        quantity: occs.length,
-      }],
+        unit_amount: Math.round(unitDollars * 100),
+      },
+      quantity: qty,
+    }))
+
+    const checkoutSession = await stripe.checkout.sessions.create({
+      line_items: lineItems,
       mode: 'payment',
       // Stripe default expiry is 24h; extend to the 30-day max so emailed
       // links don't go stale before the parent gets to them.
