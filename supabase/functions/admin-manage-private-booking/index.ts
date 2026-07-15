@@ -96,7 +96,9 @@ Deno.serve(async (req) => {
       }
 
       const stripe = createStripeClient(environment as StripeEnv);
-      const amount = Math.round(Number(b.price_per_session || 65) * 100);
+      // Promo-aware pricing (Summer Special $50 for private within promo window).
+      const dollars = getPrivateLessonPrice(b.lesson_type, (occ as any).occurrence_date);
+      const amount = Math.round(Number(dollars) * 100);
       try {
         const pi = await stripe.paymentIntents.create({
           amount,
