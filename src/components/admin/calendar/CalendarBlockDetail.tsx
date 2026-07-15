@@ -516,18 +516,36 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                                   Reg: {enr.payment_status === "paid" ? "Paid" : enr.payment_status === "comp" ? "Comp" : enr.payment_status === "waived" ? "Waived" : "Unpaid"}
                                 </Badge>
                               )}
-                              <Badge className={cn(
-                                "text-[10px] px-1.5 py-0.5",
-                                enr.session_fee_status === "paid"
+                              {(() => {
+                                const paid = enr.session_fee_status === "paid";
+                                const comp = enr.session_fee_status === "comp";
+                                // Returning families should have paid $240 at checkout — anything else is truly unpaid.
+                                // First-timers pay $240 in-person on day 1.
+                                const returningUnpaid = !paid && !comp && !enr.is_first_time;
+                                const cls = paid
                                   ? "bg-green-100 text-green-700 hover:bg-green-100"
-                                  : enr.session_fee_status === "comp"
+                                  : comp
                                   ? "bg-gray-100 text-gray-700 hover:bg-gray-100"
+                                  : returningUnpaid
+                                  ? "bg-red-100 text-red-700 hover:bg-red-100"
                                   : enr.payment_reminder_sent_at
                                   ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
-                                  : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
-                              )}>
-                                Session: {enr.session_fee_status === "paid" ? "Paid" : enr.session_fee_status === "comp" ? "Comp" : enr.payment_reminder_sent_at ? "Sent" : "Due day 1"}
-                              </Badge>
+                                  : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100";
+                                const label = paid
+                                  ? "Paid"
+                                  : comp
+                                  ? "Comp"
+                                  : returningUnpaid
+                                  ? "Unpaid"
+                                  : enr.payment_reminder_sent_at
+                                  ? "Sent"
+                                  : "Due day 1";
+                                return (
+                                  <Badge className={cn("text-[10px] px-1.5 py-0.5", cls)}>
+                                    Session: {label}
+                                  </Badge>
+                                );
+                              })()}
                               <Badge className={cn(
                                 "text-[10px] px-1.5 py-0.5",
                                 enr.waiver_signed_at
