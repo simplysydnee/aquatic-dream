@@ -106,6 +106,9 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
   const [enrMarkBusy, setEnrMarkBusy] = useState(false);
   const [sendingWaiverFor, setSendingWaiverFor] = useState<string | null>(null);
   const [sendingRegFor, setSendingRegFor] = useState<string | null>(null);
+  const [editingPhoneFor, setEditingPhoneFor] = useState<string | null>(null);
+  const [phoneDraft, setPhoneDraft] = useState("");
+  const [savingPhoneFor, setSavingPhoneFor] = useState<string | null>(null);
 
   const sendEnrollmentWaiverLink = async (enrollmentId: string) => {
     setSendingWaiverFor(enrollmentId);
@@ -243,6 +246,26 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
       toast.error(err?.message || "Failed to send payment link");
     } finally {
       setSendingPaymentFor(null);
+    }
+  };
+
+  const savePhone = async (enrollmentId: string) => {
+    setSavingPhoneFor(enrollmentId);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-update-enrollment-phone", {
+        body: { enrollmentId, phone: phoneDraft },
+      });
+      if (error || !data?.success) {
+        throw new Error((error as any)?.message || data?.error || "Failed to save phone");
+      }
+      toast.success(`Phone saved: ${data.phone}`);
+      setEditingPhoneFor(null);
+      setPhoneDraft("");
+      onRefetch?.();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save phone");
+    } finally {
+      setSavingPhoneFor(null);
     }
   };
 
@@ -664,9 +687,33 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                                   </Button>
                                 )}
                                 {sessionUnpaid && (
-                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingPaymentFor === enr.id || !enr.parent_phone} title={enr.parent_phone ? "Text session fee payment link" : "No parent phone on file"} onClick={() => handleSendPaymentLink(enr.id)}>
-                                    <MessageSquare className="w-3 h-3" />{sendingPaymentFor === enr.id ? "…" : "Text session link"}
-                                  </Button>
+                                  enr.parent_phone ? (
+                                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingPaymentFor === enr.id} title="Text session fee payment link" onClick={() => handleSendPaymentLink(enr.id)}>
+                                      <MessageSquare className="w-3 h-3" />{sendingPaymentFor === enr.id ? "…" : "Text session link"}
+                                    </Button>
+                                  ) : (
+                                    editingPhoneFor === enr.id ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <Input
+                                          type="tel"
+                                          value={phoneDraft}
+                                          onChange={(e) => setPhoneDraft(e.target.value)}
+                                          placeholder="Phone"
+                                          className="h-7 text-xs w-36"
+                                        />
+                                        <Button size="sm" className="h-7 text-xs" disabled={savingPhoneFor === enr.id} onClick={() => savePhone(enr.id)}>
+                                          {savingPhoneFor === enr.id ? "Saving…" : "Save"}
+                                        </Button>
+                                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setEditingPhoneFor(null); setPhoneDraft(""); }}>
+                                          Cancel
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => { setEditingPhoneFor(enr.id); setPhoneDraft(""); }}>
+                                        <Phone className="w-3 h-3" /> Add phone
+                                      </Button>
+                                    )
+                                  )
                                 )}
                                 {!enr.waiver_signed_at && (
                                   <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={sendingWaiverFor === enr.id} onClick={() => sendEnrollmentWaiverLink(enr.id)}>
