@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2, Ban, ArrowRightLeft } from "lucide-react";
+import { X, Clock, User, Pencil, UserPlus, Phone, Mail, Lock, AlertTriangle, Send, Stethoscope, CreditCard, CheckCircle2, Ban, ArrowRightLeft, MessageSquare } from "lucide-react";
 import CancelLessonDialog from "./CancelLessonDialog";
 import type { CancelTarget } from "@/lib/lessonCancel";
 import { Button } from "@/components/ui/button";
