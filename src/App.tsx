@@ -31,6 +31,7 @@ import BookingNew from "./pages/admin/BookingNew";
 import PrintDaySchedule from "./pages/admin/PrintDaySchedule";
 import CheckInAdmin from "./pages/admin/CheckInAdmin";
 import MessagesAdmin from "./pages/admin/MessagesAdmin";
+import DomainHealthAdmin from "./pages/admin/DomainHealthAdmin";
 
 import Waivers from "./pages/Waivers";
 import SmsTerms from "./pages/SmsTerms";
