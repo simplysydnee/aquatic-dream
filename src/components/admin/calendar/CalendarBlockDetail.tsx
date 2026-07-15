@@ -231,11 +231,14 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
   const handleSendPaymentLink = async (enrollmentId: string) => {
     setSendingPaymentFor(enrollmentId);
     try {
-      const { error } = await supabase.functions.invoke("send-session-payment-link", {
-        body: { enrollmentId, environment: getStripeEnvironment(), siteUrl: window.location.origin },
+      const { data, error } = await supabase.functions.invoke("text-session-payment-link", {
+        body: { enrollmentId, environment: getStripeEnvironment() },
       });
-      if (error) throw error;
-      toast.success("Payment link sent!");
+      if (error || !data?.success) {
+        throw new Error((error as any)?.message || data?.error || "Failed to send payment link");
+      }
+      toast.success(`Payment link texted${data.phone ? ` to ${data.phone}` : ""}`);
+      onRefetch?.();
     } catch (err: any) {
       toast.error(err?.message || "Failed to send payment link");
     } finally {
