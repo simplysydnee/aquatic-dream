@@ -6,6 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
 import { findReusableCardForEmail } from "../_shared/card-on-file.ts";
+import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -86,7 +87,10 @@ Deno.serve(async (req) => {
       return j({ error: "No card on file" }, 400);
     }
 
-    const amount = Math.round(Number(b.price_per_session) * 100);
+    // Promo-aware pricing: use occurrence date + lesson_type so July private
+    // lessons charge $50 (Summer Special) instead of the stored $65.
+    const dollars = getPrivateLessonPrice(b.lesson_type, row.occurrence_date);
+    const amount = Math.round(Number(dollars) * 100);
 
     const pi = await stripe.paymentIntents.create({
       amount,

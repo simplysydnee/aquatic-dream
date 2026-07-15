@@ -3,6 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { type StripeEnv, createStripeClient } from "../_shared/stripe.ts";
+import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,7 +97,9 @@ Deno.serve(async (req) => {
       }
 
       const stripe = createStripeClient(environment as StripeEnv);
-      const amount = Math.round(Number(b.price_per_session || 65) * 100);
+      // Promo-aware pricing (Summer Special $50 for private within promo window).
+      const dollars = getPrivateLessonPrice(b.lesson_type, (occ as any).occurrence_date);
+      const amount = Math.round(Number(dollars) * 100);
       try {
         const pi = await stripe.paymentIntents.create({
           amount,

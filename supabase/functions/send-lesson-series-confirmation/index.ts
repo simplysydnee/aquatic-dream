@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { createStripeClient, type StripeEnv } from '../_shared/stripe.ts'
+import { getPrivateLessonPrice } from '../_shared/private-lesson-pricing.ts'
 import { buildSessionCalendarLinks } from '../_shared/calendar-links.ts'
 import { requireAdminOrServiceRole } from '../_shared/auth-guard.ts'
 
@@ -47,9 +48,12 @@ Deno.serve(async (req) => {
     if (oErr) return json({ error: oErr.message }, 500)
     if (!occs || occs.length === 0) return json({ error: 'No unpaid occurrences' }, 400)
 
-    const price = Number(booking.price_per_session)
-    if (!price || price <= 0) return json({ error: 'Invalid price' }, 400)
-    const total = price * occs.length
+    // Promo-aware per-occurrence pricing. Each occurrence resolves independently
+    // (Summer Special $50 vs regular $65 for private; semi-private always $45),
+    // so a mixed-date series totals correctly.
+    const perPrices = occs.map((o: any) => Number(getPrivateLessonPrice(booking.lesson_type, o.occurrence_date)))
+    if (perPrices.some((p) => !p || p <= 0)) return json({ error: 'Invalid price' }, 400)
+    const total = perPrices.reduce((s, p) => s + p, 0)
 
     const env: StripeEnv = environment === 'live' ? 'live' : 'sandbox'
     const stripe = createStripeClient(env)
@@ -65,18 +69,24 @@ Deno.serve(async (req) => {
     const lastDateLabel = new Date(occs[occs.length - 1].occurrence_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     const lessonTimeLabel = `${fmtTime(booking.start_time)} – ${fmtTime(booking.end_time)}`
 
-    const checkoutSession = await stripe.checkout.sessions.create({
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: `${lessonTypeLabel} Series — ${occs.length} lessons`,
-            description: `${booking.child_name || booking.parent_name} • ${firstDateLabel} – ${lastDateLabel} • ${lessonTimeLabel}`,
-          },
-          unit_amount: Math.round(price * 100),
+    // Group occurrences by unit_amount so mixed promo/non-promo series
+    // still send a single Stripe checkout with correct totals.
+    const groups = new Map<number, number>()
+    perPrices.forEach((p) => groups.set(p, (groups.get(p) ?? 0) + 1))
+    const lineItems = Array.from(groups.entries()).map(([unitDollars, qty]) => ({
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: `${lessonTypeLabel} — $${unitDollars} × ${qty}`,
+          description: `${booking.child_name || booking.parent_name} • ${firstDateLabel} – ${lastDateLabel} • ${lessonTimeLabel}`,
         },
-        quantity: occs.length,
-      }],
+        unit_amount: Math.round(unitDollars * 100),
+      },
+      quantity: qty,
+    }))
+
+    const checkoutSession = await stripe.checkout.sessions.create({
+      line_items: lineItems,
       mode: 'payment',
       // Stripe default expiry is 24h; extend to the 30-day max so emailed
       // links don't go stale before the parent gets to them.
