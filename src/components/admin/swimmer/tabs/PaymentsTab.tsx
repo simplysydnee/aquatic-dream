@@ -12,6 +12,7 @@ import { CheckCircle2, ExternalLink, Send, DollarSign, CreditCard, Ban, FileChec
 import type { Swimmer, SwimmerEnrollment } from "@/hooks/useSwimmers";
 import { formatPaymentStatus, paymentStatusBadgeClass } from "@/lib/paymentLabels";
 import { getStripeEnvironment } from "@/lib/stripe";
+import { getPrivateLessonPrice } from "@/lib/privateLessonPricing";
 import CreditsSection from "./CreditsSection";
 import LessonOccurrenceCheckoutDialog from "@/components/admin/calendar/LessonOccurrenceCheckoutDialog";
 import SendPaymentLinkDialog, { type SendPaymentLinkTarget } from "@/components/admin/SendPaymentLinkDialog";
@@ -119,7 +120,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
         o.payment_status !== "paid" &&
         o.payment_status !== "comp" &&
         o.payment_status !== "refunded";
-      if (isOpen) due += Number(o.lesson_bookings?.price_per_session ?? 0);
+      if (isOpen) due += getPrivateLessonPrice(o.lesson_bookings?.lesson_type ?? "private", o.occurrence_date);
     }
     return due;
   }, [swimmer.enrollments, occurrences]);
@@ -371,7 +372,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
             .map(([bookingId, list]) => {
               const lb = list[0].lesson_bookings;
               const total = list.reduce(
-                (sum, o) => sum + Number(o.lesson_bookings?.price_per_session ?? 0),
+                (sum, o) => sum + getPrivateLessonPrice(o.lesson_bookings?.lesson_type ?? "private", o.occurrence_date),
                 0,
               );
               const busy = busyId === `series-${bookingId}`;
@@ -402,7 +403,7 @@ export default function PaymentsTab({ swimmer, onChanged }: Props) {
 
           {occurrences.map((o) => {
             const lb = o.lesson_bookings;
-            const price = Number(lb?.price_per_session ?? 0);
+            const price = getPrivateLessonPrice(lb?.lesson_type ?? "private", o.occurrence_date);
             const lessonTypeLabel = lb?.lesson_type === "private" ? "Private" : "Semi-private";
             const cancelled = !!o.cancelled_at;
             const isPaid = o.payment_status === "paid" || o.payment_status === "comp";
