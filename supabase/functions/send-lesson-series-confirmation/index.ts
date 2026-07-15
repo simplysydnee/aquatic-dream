@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { createStripeClient, type StripeEnv } from '../_shared/stripe.ts'
+import { getPrivateLessonPrice } from '../_shared/private-lesson-pricing.ts'
 import { buildSessionCalendarLinks } from '../_shared/calendar-links.ts'
 import { requireAdminOrServiceRole } from '../_shared/auth-guard.ts'
 
@@ -47,9 +48,12 @@ Deno.serve(async (req) => {
     if (oErr) return json({ error: oErr.message }, 500)
     if (!occs || occs.length === 0) return json({ error: 'No unpaid occurrences' }, 400)
 
-    const price = Number(booking.price_per_session)
-    if (!price || price <= 0) return json({ error: 'Invalid price' }, 400)
-    const total = price * occs.length
+    // Promo-aware per-occurrence pricing. Each occurrence resolves independently
+    // (Summer Special $50 vs regular $65 for private; semi-private always $45),
+    // so a mixed-date series totals correctly.
+    const perPrices = occs.map((o: any) => Number(getPrivateLessonPrice(booking.lesson_type, o.occurrence_date)))
+    if (perPrices.some((p) => !p || p <= 0)) return json({ error: 'Invalid price' }, 400)
+    const total = perPrices.reduce((s, p) => s + p, 0)
 
     const env: StripeEnv = environment === 'live' ? 'live' : 'sandbox'
     const stripe = createStripeClient(env)
