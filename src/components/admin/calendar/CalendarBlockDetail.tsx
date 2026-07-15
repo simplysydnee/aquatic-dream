@@ -249,6 +249,26 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
     }
   };
 
+  const savePhone = async (enrollmentId: string) => {
+    setSavingPhoneFor(enrollmentId);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-update-enrollment-phone", {
+        body: { enrollmentId, phone: phoneDraft },
+      });
+      if (error || !data?.success) {
+        throw new Error((error as any)?.message || data?.error || "Failed to save phone");
+      }
+      toast.success(`Phone saved: ${data.phone}`);
+      setEditingPhoneFor(null);
+      setPhoneDraft("");
+      onRefetch?.();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save phone");
+    } finally {
+      setSavingPhoneFor(null);
+    }
+  };
+
   const handleResendLessonLink = async () => {
     if (!lessonOcc) return;
     setResending(true);
