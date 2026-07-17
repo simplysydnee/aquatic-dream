@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { toast } from "sonner";
+import { getPrivateLessonPrice } from "@/lib/privateLessonPricing";
 
 interface Props {
   open: boolean;
