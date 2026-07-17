@@ -928,7 +928,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                         }
                       })();
                     } else if (isLessonEventType && lessonOcc && lessonBooking) {
-                      const price = Number(lessonBooking.price_per_session) || 0;
+                      const price = getPrivateLessonPrice(lessonBooking.lesson_type, lessonOcc.occurrence_date);
                       const paid =
                         lessonOcc.payment_status === "paid" || lessonOcc.payment_status === "comp"
                           ? price
