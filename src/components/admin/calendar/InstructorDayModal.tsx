@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import CancelLessonDialog from "./CancelLessonDialog";
 import ReassignDialog from "./ReassignDialog";
 import type { CancelTarget } from "@/lib/lessonCancel";
+import { getPrivateLessonPrice } from "@/lib/privateLessonPricing";
 
 interface Props {
   open: boolean;
