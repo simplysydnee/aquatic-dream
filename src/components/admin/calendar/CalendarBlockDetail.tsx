@@ -811,7 +811,10 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                       </a>
                     )}
                     <div className="text-xs text-muted-foreground">
-                      ${Number(lessonBooking.price_per_session).toFixed(2)} • {lessonBooking.lesson_type === "private" ? "Private" : "Semi-Private"}
+                      ${getPrivateLessonPrice(lessonBooking.lesson_type, lessonOcc.occurrence_date).toFixed(2)} • {lessonBooking.lesson_type === "private" ? "Private" : "Semi-Private"}
+                      {isPromoDate(lessonOcc.occurrence_date) && lessonBooking.lesson_type !== "semi_private" && (
+                        <span> • {PROMO_LABEL}</span>
+                      )}
                       {lessonOcc.payment_link_sent_at && (
                         <span> • Link sent {format(new Date(lessonOcc.payment_link_sent_at), "MMM d, h:mma")}</span>
                       )}
