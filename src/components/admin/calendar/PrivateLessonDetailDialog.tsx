@@ -21,6 +21,7 @@ import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import ChargeConfirmDialog from "@/components/admin/calendar/ChargeConfirmDialog";
+import { getPrivateLessonPrice, isPromoDate, PROMO_LABEL } from "@/lib/privateLessonPricing";
 
 interface Props {
   lesson: PrivateLessonBooking | null;
