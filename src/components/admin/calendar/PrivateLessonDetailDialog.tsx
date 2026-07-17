@@ -395,7 +395,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
                   {hasCardOnFile && (
                     <Button size="sm" onClick={() => setChargeConfirmOpen(true)} disabled={busy !== null}>
                       {busy === "charge" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <DollarSign className="w-4 h-4 mr-1" />}
-                      Charge ${lesson.price_per_session}
+                      Charge ${effectivePrice}
                     </Button>
                   )}
                   <Popover>
