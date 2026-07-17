@@ -78,6 +78,10 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
   const waiverUrl = lesson?.waiver_token ? `${SITE}/lesson-waiver/${lesson.waiver_token}` : null;
   const hasCardOnFile = !!lesson?.stripe_payment_method_id;
   const isPaid = lesson?.payment_status === "paid";
+  const effectivePrice = lesson
+    ? getPrivateLessonPrice(lesson.lesson_type ?? "private", lesson.occurrence_date)
+    : 0;
+  const isPromo = lesson ? isPromoDate(lesson.occurrence_date) && lesson.lesson_type !== "semi_private" : false;
 
   // Probe for a reusable card whenever the dialog opens on a booking
   // that does not yet have a card on file.
