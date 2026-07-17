@@ -551,7 +551,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
       <ChargeConfirmDialog
         open={chargeConfirmOpen}
         onOpenChange={setChargeConfirmOpen}
-        amount={Number(lesson.price_per_session) || 0}
+        amount={effectivePrice}
         parentName={lesson.parent_name}
         lessonDate={lesson.occurrence_date}
         onConfirm={chargeCardOnFile}
