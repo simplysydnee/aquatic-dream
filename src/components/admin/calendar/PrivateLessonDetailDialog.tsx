@@ -197,7 +197,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
           bookingId: lesson.booking_id,
           environment: getStripeEnvironment(),
           siteUrl: SITE,
-          amountLabel: `$${lesson.price_per_session}`,
+          amountLabel: `$${effectivePrice}`,
         },
       });
       if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
