@@ -982,7 +982,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                 }
               }}
               occurrenceId={lessonOcc?.id || null}
-              title={lessonBooking ? `Charge ${lessonBooking.parent_name} — $${Number(lessonBooking.price_per_session).toFixed(2)}` : undefined}
+              title={lessonBooking && lessonOcc ? `Charge ${lessonBooking.parent_name} — $${getPrivateLessonPrice(lessonBooking.lesson_type, lessonOcc.occurrence_date).toFixed(2)}` : undefined}
             />
 
             <FrontDeskWaiverDialog
