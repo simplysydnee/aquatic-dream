@@ -21,6 +21,7 @@ import FrontDeskEnrollmentWaiverDialog from "./FrontDeskEnrollmentWaiverDialog";
 import EditSwimmerDialog, { type EditTarget } from "./EditSwimmerDialog";
 import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 import { getStripeEnvironment } from "@/lib/stripe";
+import { getPrivateLessonPrice, isPromoDate, PROMO_LABEL } from "@/lib/privateLessonPricing";
 import { ClipboardSignature } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -810,7 +811,10 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                       </a>
                     )}
                     <div className="text-xs text-muted-foreground">
-                      ${Number(lessonBooking.price_per_session).toFixed(2)} • {lessonBooking.lesson_type === "private" ? "Private" : "Semi-Private"}
+                      ${getPrivateLessonPrice(lessonBooking.lesson_type, lessonOcc.occurrence_date).toFixed(2)} • {lessonBooking.lesson_type === "private" ? "Private" : "Semi-Private"}
+                      {isPromoDate(lessonOcc.occurrence_date) && lessonBooking.lesson_type !== "semi_private" && (
+                        <span> • {PROMO_LABEL}</span>
+                      )}
                       {lessonOcc.payment_link_sent_at && (
                         <span> • Link sent {format(new Date(lessonOcc.payment_link_sent_at), "MMM d, h:mma")}</span>
                       )}
@@ -924,7 +928,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                         }
                       })();
                     } else if (isLessonEventType && lessonOcc && lessonBooking) {
-                      const price = Number(lessonBooking.price_per_session) || 0;
+                      const price = getPrivateLessonPrice(lessonBooking.lesson_type, lessonOcc.occurrence_date);
                       const paid =
                         lessonOcc.payment_status === "paid" || lessonOcc.payment_status === "comp"
                           ? price
@@ -978,7 +982,7 @@ const CalendarBlockDetail = ({ block, onClose, onEdit, onCheckIn, onRefetch, all
                 }
               }}
               occurrenceId={lessonOcc?.id || null}
-              title={lessonBooking ? `Charge ${lessonBooking.parent_name} — $${Number(lessonBooking.price_per_session).toFixed(2)}` : undefined}
+              title={lessonBooking && lessonOcc ? `Charge ${lessonBooking.parent_name} — $${getPrivateLessonPrice(lessonBooking.lesson_type, lessonOcc.occurrence_date).toFixed(2)}` : undefined}
             />
 
             <FrontDeskWaiverDialog

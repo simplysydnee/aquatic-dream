@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import CancelLessonDialog from "./CancelLessonDialog";
 import ReassignDialog from "./ReassignDialog";
 import type { CancelTarget } from "@/lib/lessonCancel";
+import { getPrivateLessonPrice } from "@/lib/privateLessonPricing";
 
 interface Props {
   open: boolean;
@@ -150,7 +151,7 @@ const InstructorDayModal = ({ open, onOpenChange, instructorName, initialDate, o
       .filter(({ b }) => b && b.instructor_name === instructorName)
       .map(({ o, b }) => {
         const timeLabel = `${fmtT(b.start_time)} – ${fmtT(b.end_time)}`;
-        const paid = o.payment_status === "paid" ? Number(b.price_per_session || 0) : 0;
+        const paid = o.payment_status === "paid" ? getPrivateLessonPrice(b.lesson_type, o.occurrence_date) : 0;
         const swimmer = {
           parentName: b.parent_name,
           parentEmail: b.parent_email,

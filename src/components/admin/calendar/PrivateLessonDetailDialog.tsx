@@ -21,6 +21,7 @@ import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import ChargeConfirmDialog from "@/components/admin/calendar/ChargeConfirmDialog";
+import { getPrivateLessonPrice, isPromoDate, PROMO_LABEL } from "@/lib/privateLessonPricing";
 
 interface Props {
   lesson: PrivateLessonBooking | null;
@@ -77,6 +78,10 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
   const waiverUrl = lesson?.waiver_token ? `${SITE}/lesson-waiver/${lesson.waiver_token}` : null;
   const hasCardOnFile = !!lesson?.stripe_payment_method_id;
   const isPaid = lesson?.payment_status === "paid";
+  const effectivePrice = lesson
+    ? getPrivateLessonPrice(lesson.lesson_type ?? "private", lesson.occurrence_date)
+    : 0;
+  const isPromo = lesson ? isPromoDate(lesson.occurrence_date) && lesson.lesson_type !== "semi_private" : false;
 
   // Probe for a reusable card whenever the dialog opens on a booking
   // that does not yet have a card on file.
@@ -192,7 +197,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
           bookingId: lesson.booking_id,
           environment: getStripeEnvironment(),
           siteUrl: SITE,
-          amountLabel: `$${lesson.price_per_session}`,
+          amountLabel: `$${effectivePrice}`,
         },
       });
       if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
@@ -317,7 +322,10 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
           <Separator />
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2"><CreditCard className="w-4 h-4 text-muted-foreground" /> Price</span>
-            <span className="font-semibold">${lesson.price_per_session}</span>
+            <span className="font-semibold">
+              ${effectivePrice}
+              {isPromo && <span className="ml-2 text-xs font-normal text-muted-foreground">{PROMO_LABEL}</span>}
+            </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2"><ClipboardSignature className="w-4 h-4 text-muted-foreground" /> Waiver</span>
@@ -387,7 +395,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
                   {hasCardOnFile && (
                     <Button size="sm" onClick={() => setChargeConfirmOpen(true)} disabled={busy !== null}>
                       {busy === "charge" ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <DollarSign className="w-4 h-4 mr-1" />}
-                      Charge ${lesson.price_per_session}
+                      Charge ${effectivePrice}
                     </Button>
                   )}
                   <Popover>
@@ -543,7 +551,7 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
       <ChargeConfirmDialog
         open={chargeConfirmOpen}
         onOpenChange={setChargeConfirmOpen}
-        amount={Number(lesson.price_per_session) || 0}
+        amount={effectivePrice}
         parentName={lesson.parent_name}
         lessonDate={lesson.occurrence_date}
         onConfirm={chargeCardOnFile}

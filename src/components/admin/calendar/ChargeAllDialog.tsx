@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { toast } from "sonner";
+import { getPrivateLessonPrice } from "@/lib/privateLessonPricing";
 
 interface Props {
   open: boolean;
@@ -115,7 +116,7 @@ export default function ChargeAllDialog({ open, onOpenChange, date }: Props) {
             parent_name: b?.parent_name ?? null,
             lesson_type: b?.lesson_type ?? null,
             instructor_name: b?.instructor_name ?? null,
-            price: Number(b?.price_per_session ?? 0),
+            price: getPrivateLessonPrice(b?.lesson_type ?? "private", r.occurrence_date),
             has_card: Boolean(b?.stripe_payment_method_id && b?.stripe_customer_id),
           };
         });

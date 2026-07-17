@@ -1,36 +1,34 @@
-
 ## Problem
 
-Private lessons in July should charge **$50** (Summer Special promo, active Jun 1 – Aug 31 2026), but admin charge actions are billing **$65**. The promo-aware helper `getPrivateLessonPrice(lesson_type, occurrence_date)` already exists in `_shared/private-lesson-pricing.ts` and is correctly used by the cron charger and public checkout, but three admin/manual paths still read the stale `price_per_session` value that was locked on the booking row when it was created (before the promo window, or for bookings created with the regular price stored).
+The edge functions now charge the correct $50 promo price for July private lessons, but three admin UI surfaces still **display** the stale `price_per_session` value ($65) from the booking row. So the "Charge $65" button and confirmation totals scare admin off — even though Stripe would actually bill $50.
 
 ## Files to change
 
-### 1. `supabase/functions/admin-charge-private-lesson-occurrence/index.ts`
-- Import `getPrivateLessonPrice` from `../_shared/private-lesson-pricing.ts`.
-- Replace `const amount = Math.round(Number(b.price_per_session) * 100)` with a promo-aware calc using `b.lesson_type` and `row.occurrence_date`.
+Replace every stale `price_per_session` read on the calendar surfaces with the promo-aware helper `getPrivateLessonPrice(lesson_type, occurrence_date)` from `@/lib/privateLessonPricing`.
 
-### 2. `supabase/functions/admin-manage-private-booking/index.ts` (`charge_occurrence` branch, ~line 99)
-- Import `getPrivateLessonPrice`.
-- Replace `Number(b.price_per_session || 65) * 100` with promo-aware calc using `b.lesson_type` and `occ.occurrence_date`.
+### 1. `src/components/admin/calendar/PrivateLessonDetailDialog.tsx`
+Four spots:
+- Line 195 (`amountLabel: \`$${lesson.price_per_session}\``) — pass promo-aware amount for the emailed card-on-file link.
+- Line 320 (Price row display) — show promo price with a small "Summer Special" note when applicable.
+- Line 390 (`Charge $${lesson.price_per_session}` button label) — must read $50 for July.
+- Line 546 (`amount={Number(lesson.price_per_session) || 0}` passed to `ChargeConfirmDialog`) — pass promo amount.
 
-### 3. `supabase/functions/send-lesson-series-confirmation/index.ts` (series payment link, ~line 50-78)
-- Compute per-occurrence prices via `getPrivateLessonPrice(booking.lesson_type, o.occurrence_date)`.
-- Build one Stripe `line_item` per occurrence (or group identical unit_amounts) instead of `unit_amount = price` × `quantity = occs.length`, so mixed promo/non-promo series total correctly.
+### 2. `src/components/admin/calendar/ChargeAllDialog.tsx`
+Line 118: compute `price` per row via `getPrivateLessonPrice(b?.lesson_type, r.occurrence_date)` instead of `Number(b?.price_per_session ?? 0)`. Total (line 146) and per-row displays then show $50 for July privates automatically.
 
-### 4. `src/components/admin/swimmer/tabs/PaymentsTab.tsx` (Payments tab UI)
-- Replace `Number(lb?.price_per_session ?? 0)` reads at lines 122, 374, 405 with `getPrivateLessonPrice(lb?.lesson_type, o.occurrence_date)` so displayed amounts, unpaid totals, and the "Email combined link" total all show $50 on promo dates. Semi-private stays $45 automatically.
-
-Deploy the three edge functions after edits.
-
-## Retry July 14 failed charges
-
-After the code is deployed:
-
-1. Query `lesson_booking_occurrences` for `occurrence_date = '2026-07-14'` where `payment_status != 'paid'` and `charge_status IN ('failed', NULL)` and the booking is `private`/`semi_private`. Show the list (child, parent, booking id, occurrence id, current price_per_session, prior error) for confirmation.
-2. For each confirmed row, invoke `admin-charge-private-lesson-occurrence` — now billing the correct $50 (or $45 semi-private). Report success/failure per row.
+### 3. Sanity sweep
+Grep the calendar folder and swimmer PaymentsTab one more time for any remaining `price_per_session` UI reads and swap them the same way. PaymentsTab was already updated in the last pass, but re-verify.
 
 ## Out of scope
 
-- Not changing the stored `price_per_session` column on existing `lesson_bookings` rows (would ripple through history/reporting). The helper overrides at charge time and in the UI, which is enough.
-- Not touching public booking flow, cron charger, or confirmation emails — they already use `getPrivateLessonPrice`.
-- Regular price constant stays $65; only the promo window path is affected.
+- No backend changes (edge functions already correctly charge promo price).
+- Not backfilling `lesson_bookings.price_per_session` — the helper is the single source of truth at display + charge time.
+- No changes to group swim session pricing.
+
+## Verification
+
+After the edit, open a July 14 private lesson block on `/admin`:
+- Price row shows **$50** (with Summer Special note).
+- Charge button reads **Charge $50**.
+- ChargeConfirmDialog total reads **$50**.
+- "Charge all today" dialog totals reflect $50 per private, $45 per semi-private.
