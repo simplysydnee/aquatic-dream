@@ -21,6 +21,7 @@ import FrontDeskEnrollmentWaiverDialog from "./FrontDeskEnrollmentWaiverDialog";
 import EditSwimmerDialog, { type EditTarget } from "./EditSwimmerDialog";
 import SwimmerLink from "@/components/admin/swimmer/SwimmerLink";
 import { getStripeEnvironment } from "@/lib/stripe";
+import { getPrivateLessonPrice, isPromoDate, PROMO_LABEL } from "@/lib/privateLessonPricing";
 import { ClipboardSignature } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
