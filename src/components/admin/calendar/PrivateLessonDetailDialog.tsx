@@ -322,7 +322,10 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
           <Separator />
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2"><CreditCard className="w-4 h-4 text-muted-foreground" /> Price</span>
-            <span className="font-semibold">${lesson.price_per_session}</span>
+            <span className="font-semibold">
+              ${effectivePrice}
+              {isPromo && <span className="ml-2 text-xs font-normal text-muted-foreground">{PROMO_LABEL}</span>}
+            </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2"><ClipboardSignature className="w-4 h-4 text-muted-foreground" /> Waiver</span>
