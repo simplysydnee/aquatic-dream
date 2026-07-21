@@ -47,6 +47,7 @@ import Unsubscribe from "./pages/Unsubscribe";
 import UnsubscribeMarketing from "./pages/UnsubscribeMarketing";
 import ScrollToTop from "./components/ScrollToTop";
 import OAuthConsent from "./pages/OAuthConsent";
+import JoinMembership from "./pages/JoinMembership";
 
 const queryClient = new QueryClient();
 
@@ -111,6 +112,9 @@ const App = () => (
             {/* Standalone full-screen flows (no public layout chrome) */}
             <Route path="/lesson-waiver/:token" element={<LessonWaiver />} />
             <Route path="/enrollment-waiver/:token" element={<EnrollmentWaiver />} />
+
+            {/* Standalone membership sign-up (no public chrome) */}
+            <Route path="/join" element={<JoinMembership />} />
 
             {/* Public routes */}
             <Route element={<PublicLayout />}>
