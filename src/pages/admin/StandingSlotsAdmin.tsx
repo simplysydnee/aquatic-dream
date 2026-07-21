@@ -551,7 +551,12 @@ const StandingSlotsAdmin = () => {
                         value={editDraft!.plan_key}
                         onValueChange={(v: PlanKey) => {
                           const cap = plans.find((p) => p.plan_key === v)?.capacity_per_slot ?? editDraft!.capacity;
-                          setEditDraft({ ...editDraft!, plan_key: v, capacity: cap });
+                          setEditDraft({
+                            ...editDraft!,
+                            plan_key: v,
+                            capacity: cap,
+                            swim_level: v === "kid_group" ? (editDraft!.swim_level ?? "white") : null,
+                          });
                         }}
                       >
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -561,6 +566,23 @@ const StandingSlotsAdmin = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                    </td>
+                    <td className="px-2 py-1">
+                      {editDraft!.plan_key === "kid_group" ? (
+                        <Select
+                          value={editDraft!.swim_level ?? ""}
+                          onValueChange={(v: SwimLevel) => setEditDraft({ ...editDraft!, swim_level: v })}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-40"><SelectValue placeholder="Level…" /></SelectTrigger>
+                          <SelectContent>
+                            {SWIM_LEVELS.map((lv) => (
+                              <SelectItem key={lv} value={lv}>{LEVEL_LABELS[lv]}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-2 py-1">
                       <Select
