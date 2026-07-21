@@ -80,6 +80,8 @@ export default function JoinMembership() {
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState(false);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [swimLevel, setSwimLevel] = useState<SwimLevel | null>(null);
@@ -118,23 +120,31 @@ export default function JoinMembership() {
     })();
   }, []);
 
-  useEffect(() => {
+  const loadSlots = useCallback(async () => {
     if (!plan) return;
-    (async () => {
+    setSlotsLoading(true);
+    setSlotsError(false);
+    try {
       const { data: slotData, error } = await supabase.functions.invoke("get-open-slots", {
         body: {
           plan_key: plan.plan_key,
           swim_level: plan.plan_key === "kid_group" ? swimLevel : undefined,
         },
       });
-      if (error) {
-        toast.error("Could not load open slots");
-        setSlots([]);
-        return;
-      }
+      if (error) throw error;
       setSlots(Array.isArray(slotData?.slots) ? slotData.slots : []);
-    })();
+    } catch (e) {
+      console.error("loadSlots error", e);
+      setSlotsError(true);
+      setSlots([]);
+    } finally {
+      setSlotsLoading(false);
+    }
   }, [plan, swimLevel]);
+
+  useEffect(() => {
+    loadSlots();
+  }, [loadSlots]);
 
   const planSlots = useMemo(() => {
     if (!plan) return [];
@@ -439,11 +449,29 @@ export default function JoinMembership() {
                   </div>
                 )}
 
-                {planSlots.length === 0 ? (
+                {slotsLoading ? (
+                  <div className="flex flex-col items-center justify-center gap-3 py-12 text-[#2a5e84]">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <p className="text-sm">Loading available times…</p>
+                  </div>
+                ) : slotsError ? (
+                  <div className="py-8 text-center text-[#2a5e84]">
+                    <p className="mb-3">Could not load open slots.</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={loadSlots}
+                      className="border-[#2a5e84]/30 text-[#1a3a8a] hover:bg-[#2a5e84]/5"
+                    >
+                      Try again
+                    </Button>
+                  </div>
+                ) : planSlots.length === 0 ? (
                   <p className="py-8 text-center text-[#2a5e84]">
                     {plan.plan_key === "kid_group" && swimLevel
                       ? `No open ${LEVEL_LABELS[swimLevel]} slots right now. Try a different level or check back soon.`
-                      : "No open slots right now. Please check back soon."}
+                      : "No open spots right now — check back soon"}
                   </p>
                 ) : (
                   <div className="space-y-2">
