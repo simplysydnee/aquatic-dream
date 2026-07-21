@@ -4,8 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient } from "../_shared/stripe.ts";
 import { computeMembershipQuote } from "../_shared/membership-pricing.ts";
 
-// SANDBOX ONLY — Phase 3b. Never use the live key here.
-const ENV = "sandbox" as const;
+// Uses the same Stripe env as the rest of the app's payment flows.
+const ENV = "live" as const;
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -160,33 +160,34 @@ serve(async (req) => {
       return json({ error: "Could not stage enrollment" }, 500);
     }
 
-    const existing = await stripe.customers.list({ email: parent_email, limit: 1 });
-    const customer =
-      existing.data[0] ??
-      (await stripe.customers.create({
+    console.log("[create-membership-checkout] looking up stripe customer", parent_email);
+    let customer: any;
+    try {
+      const existing = await stripe.customers.list({ email: parent_email, limit: 1 });
+      customer = existing?.data?.[0];
+    } catch (e) {
+      console.error("[create-membership-checkout] customers.list failed", e);
+    }
+    if (!customer) {
+      customer = await stripe.customers.create({
         email: parent_email,
         name: payload.parent_name || undefined,
         phone: payload.parent_phone || undefined,
-      }));
+      });
+    }
+    console.log("[create-membership-checkout] customer", customer?.id);
 
     const lineItems: any[] = [{ price: stripePriceId, quantity: 1 }];
+    // Charge a prorated first invoice now (billed for the partial period from
+    // signup to the billing anchor) and then flat monthly on the 1st.
+    // Stripe Checkout (subscription mode) does not accept
+    // `subscription_data.add_invoice_items`; use billing_cycle_anchor +
+    // proration_behavior=create_prorations to get a prorated first invoice.
     const subscriptionData: any = {
       billing_cycle_anchor: anchor,
-      proration_behavior: "none",
+      proration_behavior: "create_prorations",
       metadata: { type: "membership", pending_membership_id: pending.id },
     };
-    if (firstChargeCents > 0) {
-      subscriptionData.add_invoice_items = [
-        {
-          price_data: {
-            currency: "usd",
-            product: stripeProductId!,
-            unit_amount: firstChargeCents,
-          },
-          quantity: 1,
-        },
-      ];
-    }
 
     const origin = req.headers.get("origin") || "";
     const session = await stripe.checkout.sessions.create({
@@ -203,9 +204,10 @@ serve(async (req) => {
         pending_membership_id: pending.id,
       },
     });
+    console.log("[create-membership-checkout] session", JSON.stringify({ id: session?.id, ui_mode: (session as any)?.ui_mode, has_secret: !!session?.client_secret, url: session?.url }));
 
     if (!session.client_secret) {
-      return json({ error: "Stripe did not return a client_secret" }, 500);
+      return json({ error: "Stripe did not return a client_secret", debug: { id: session?.id, ui_mode: (session as any)?.ui_mode, url: session?.url } }, 500);
     }
 
     await supabaseAdmin
