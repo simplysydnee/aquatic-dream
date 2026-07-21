@@ -33,6 +33,7 @@ import CheckInAdmin from "./pages/admin/CheckInAdmin";
 import MessagesAdmin from "./pages/admin/MessagesAdmin";
 import DomainHealthAdmin from "./pages/admin/DomainHealthAdmin";
 import AgentConnectionInstructions from "./pages/admin/AgentConnectionInstructions";
+import StandingSlotsAdmin from "./pages/admin/StandingSlotsAdmin";
 
 import Waivers from "./pages/Waivers";
 import SmsTerms from "./pages/SmsTerms";
@@ -93,6 +94,7 @@ const App = () => (
               <Route path="marketing" element={<MarketingAdmin />} />
               <Route path="waivers" element={<WaiversAdmin />} />
               <Route path="sessions" element={<SessionsAdmin />} />
+              <Route path="standing-slots" element={<StandingSlotsAdmin />} />
               <Route path="private-lessons" element={<PrivateLessonsAdmin />} />
               <Route path="private-lessons/new" element={<BookingNew />} />
               <Route path="users" element={<UsersAdmin />} />
