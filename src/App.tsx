@@ -32,6 +32,7 @@ import PrintDaySchedule from "./pages/admin/PrintDaySchedule";
 import CheckInAdmin from "./pages/admin/CheckInAdmin";
 import MessagesAdmin from "./pages/admin/MessagesAdmin";
 import DomainHealthAdmin from "./pages/admin/DomainHealthAdmin";
+import AgentConnectionInstructions from "./pages/admin/AgentConnectionInstructions";
 
 import Waivers from "./pages/Waivers";
 import SmsTerms from "./pages/SmsTerms";
@@ -97,6 +98,7 @@ const App = () => (
               <Route path="users" element={<UsersAdmin />} />
               <Route path="messages" element={<MessagesAdmin />} />
               <Route path="domain-health" element={<DomainHealthAdmin />} />
+              <Route path="agent-connect" element={<AgentConnectionInstructions />} />
             </Route>
 
             {/* Instructor portal */}
