@@ -88,8 +88,51 @@ export default function JoinMembership() {
       toast.error("Please complete all fields");
       return;
     }
-    toast.success("Payment coming in the next step.");
+    setStep(6);
   };
+
+  const [charges, setCharges] = useState<{ firstChargeCents: number; monthlyCents: number } | null>(
+    null,
+  );
+
+  const fetchClientSecret = useCallback(async (): Promise<string> => {
+    if (!plan || !slot) throw new Error("Missing plan or slot");
+    const { data, error } = await supabase.functions.invoke("create-membership-checkout", {
+      body: {
+        plan_key: plan.plan_key,
+        standing_slot_id: slot.id,
+        child_first_name: form.child_first,
+        child_last_name: form.child_last,
+        parent_name: form.parent_name,
+        parent_email: form.parent_email,
+        parent_phone: form.parent_phone,
+        recurring_consent: authRecurring,
+        sms_consent: smsConsent,
+        returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
+      },
+    });
+    if (error || !data?.clientSecret) {
+      const msg = String(error?.message || data?.error || "Failed to start checkout");
+      toast.error(msg);
+      throw new Error(msg);
+    }
+    setCharges({
+      firstChargeCents: data.firstChargeCents ?? 0,
+      monthlyCents: data.monthlyCents ?? plan.monthly_price_cents,
+    });
+    return data.clientSecret;
+  }, [plan, slot, form, authRecurring, smsConsent]);
+
+  // Detect Stripe return
+  const [returned, setReturned] = useState(false);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("membership") === "success") {
+      setReturned(true);
+      setStep(7);
+    }
+  }, []);
+
 
   return (
     <div className="min-h-screen bg-[#F7F3EE]">
