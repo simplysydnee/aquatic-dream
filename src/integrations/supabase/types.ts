@@ -1502,6 +1502,9 @@ export type Database = {
           id: string
           is_first_time: boolean | null
           medical_notes: string | null
+          membership_agreement_accepted_at: string | null
+          membership_agreement_text: string | null
+          membership_agreement_version: string | null
           notes: string | null
           parent_email: string
           parent_first_name: string | null
@@ -1535,6 +1538,9 @@ export type Database = {
           id?: string
           is_first_time?: boolean | null
           medical_notes?: string | null
+          membership_agreement_accepted_at?: string | null
+          membership_agreement_text?: string | null
+          membership_agreement_version?: string | null
           notes?: string | null
           parent_email: string
           parent_first_name?: string | null
@@ -1568,6 +1574,9 @@ export type Database = {
           id?: string
           is_first_time?: boolean | null
           medical_notes?: string | null
+          membership_agreement_accepted_at?: string | null
+          membership_agreement_text?: string | null
+          membership_agreement_version?: string | null
           notes?: string | null
           parent_email?: string
           parent_first_name?: string | null
