@@ -160,14 +160,22 @@ serve(async (req) => {
       return json({ error: "Could not stage enrollment" }, 500);
     }
 
-    const existing = await stripe.customers.list({ email: parent_email, limit: 1 });
-    const customer =
-      existing.data[0] ??
-      (await stripe.customers.create({
+    console.log("[create-membership-checkout] looking up stripe customer", parent_email);
+    let customer: any;
+    try {
+      const existing = await stripe.customers.list({ email: parent_email, limit: 1 });
+      customer = existing?.data?.[0];
+    } catch (e) {
+      console.error("[create-membership-checkout] customers.list failed", e);
+    }
+    if (!customer) {
+      customer = await stripe.customers.create({
         email: parent_email,
         name: payload.parent_name || undefined,
         phone: payload.parent_phone || undefined,
-      }));
+      });
+    }
+    console.log("[create-membership-checkout] customer", customer?.id);
 
     const lineItems: any[] = [{ price: stripePriceId, quantity: 1 }];
     const subscriptionData: any = {
