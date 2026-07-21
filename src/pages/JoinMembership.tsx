@@ -83,15 +83,23 @@ export default function JoinMembership() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke("get-open-slots");
-      if (error) toast.error("Could not load plans");
-      else {
-        setPlans(data?.plans || []);
-        setSlots(data?.slots || []);
-      }
+      // Plans come directly from membership_plans (public read) so Step 1
+      // never depends on standing_slots availability.
+      const { data: planRows, error: planErr } = await supabase
+        .from("membership_plans")
+        .select("id, plan_key, name, monthly_price_cents")
+        .eq("active", true)
+        .order("monthly_price_cents", { ascending: true });
+      if (planErr) toast.error("Could not load plans");
+      else setPlans((planRows as Plan[]) || []);
       setLoading(false);
+
+      // Load open slots in the background via the service-role edge function.
+      const { data: slotData } = await supabase.functions.invoke("get-open-slots");
+      if (slotData?.slots) setSlots(slotData.slots);
     })();
   }, []);
+
 
   const planSlots = useMemo(() => {
     if (!plan) return [];
