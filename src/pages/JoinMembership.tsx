@@ -279,6 +279,52 @@ export default function JoinMembership() {
     null,
   );
 
+  type MembershipQuote = {
+    monthlyCents: number;
+    firstChargeCents: number;
+    firstLessonLabel: string;
+    billingStartLabel: string;
+    lessonsCovered: number;
+    refMonthName: string;
+  };
+  const [quote, setQuote] = useState<MembershipQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  useEffect(() => {
+    if (!plan || !slot) {
+      setQuote(null);
+      return;
+    }
+    let cancelled = false;
+    setQuoteLoading(true);
+    supabase.functions
+      .invoke("get-membership-quote", {
+        body: { plan_key: plan.plan_key, standing_slot_id: slot.id },
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data || data.error) {
+          setQuote(null);
+        } else {
+          setQuote({
+            monthlyCents: data.monthlyCents ?? plan.monthly_price_cents,
+            firstChargeCents: data.firstChargeCents ?? 0,
+            firstLessonLabel: data.firstLessonLabel ?? "",
+            billingStartLabel: data.billingStartLabel ?? "",
+            lessonsCovered: data.lessonsCovered ?? 0,
+            refMonthName: data.refMonthName ?? "",
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setQuoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [plan, slot]);
+
+
   const fetchClientSecret = useCallback(async (): Promise<string> => {
     if (!plan || !slot) throw new Error("Missing plan or slot");
     const { data, error } = await supabase.functions.invoke("create-membership-checkout", {
