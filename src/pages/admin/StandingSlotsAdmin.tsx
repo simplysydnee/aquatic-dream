@@ -651,6 +651,11 @@ const StandingSlotsAdmin = () => {
               return (
                 <tr key={s.id} className={cn("border-t hover:bg-muted/30", !s.active && "opacity-60")}>
                   <td className="px-3 py-2">{PLAN_LABELS[s.plan_key]}</td>
+                  <td className="px-3 py-2">
+                    {s.plan_key === "kid_group"
+                      ? (s.swim_level ? LEVEL_LABELS[s.swim_level] : <span className="text-destructive text-xs">Not set</span>)
+                      : <span className="text-muted-foreground">—</span>}
+                  </td>
                   <td className="px-3 py-2">{instructorName(s.instructor_id)}</td>
                   <td className="px-3 py-2">{DAYS[s.day_of_week] ?? s.day_of_week}</td>
                   <td className="px-3 py-2">{timeLabel(s.start_time)}</td>
