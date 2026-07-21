@@ -178,23 +178,16 @@ serve(async (req) => {
     console.log("[create-membership-checkout] customer", customer?.id);
 
     const lineItems: any[] = [{ price: stripePriceId, quantity: 1 }];
+    // Charge a prorated first invoice now (billed for the partial period from
+    // signup to the billing anchor) and then flat monthly on the 1st.
+    // Stripe Checkout (subscription mode) does not accept
+    // `subscription_data.add_invoice_items`; use billing_cycle_anchor +
+    // proration_behavior=create_prorations to get a prorated first invoice.
     const subscriptionData: any = {
       billing_cycle_anchor: anchor,
-      proration_behavior: "none",
+      proration_behavior: "create_prorations",
       metadata: { type: "membership", pending_membership_id: pending.id },
     };
-    if (firstChargeCents > 0) {
-      subscriptionData.add_invoice_items = [
-        {
-          price_data: {
-            currency: "usd",
-            product: stripeProductId!,
-            unit_amount: firstChargeCents,
-          },
-          quantity: 1,
-        },
-      ];
-    }
 
     const origin = req.headers.get("origin") || "";
     const session = await stripe.checkout.sessions.create({
