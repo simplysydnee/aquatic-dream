@@ -268,6 +268,10 @@ const StandingSlotsAdmin = () => {
       toast({ title: "End time must be after start time", variant: "destructive" });
       return;
     }
+    if (editDraft.plan_key === "kid_group" && !editDraft.swim_level) {
+      toast({ title: "Swim level required for Small Group Swim", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     const { error } = await supabase
       .from("standing_slots")
@@ -280,6 +284,7 @@ const StandingSlotsAdmin = () => {
         capacity: editDraft.capacity,
         location: editDraft.location || DEFAULT_LOCATION,
         active: editDraft.active,
+        swim_level: editDraft.plan_key === "kid_group" ? editDraft.swim_level : null,
       })
       .eq("id", editDraft.id);
     setSaving(false);
