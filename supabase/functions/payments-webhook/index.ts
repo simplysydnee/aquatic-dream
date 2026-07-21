@@ -62,7 +62,9 @@ serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const obj = event.data.object;
-        if (obj?.metadata?.type === "registration_fee" && obj?.metadata?.enrollmentId) {
+        if (obj?.metadata?.type === "membership") {
+          await handleMembershipCheckoutCompleted(obj, env);
+        } else if (obj?.metadata?.type === "registration_fee" && obj?.metadata?.enrollmentId) {
           await handleRegistrationFeePaid(obj);
         } else if (obj?.metadata?.type === "session_fee" && obj?.metadata?.enrollmentId) {
           await handleSessionFeePaid(obj);
