@@ -186,16 +186,27 @@ serve(async (req) => {
     console.log("[create-membership-checkout] customer", customer?.id);
 
     const lineItems: any[] = [{ price: stripePriceId, quantity: 1 }];
-    // Charge a prorated first invoice now (billed for the partial period from
-    // signup to the billing anchor) and then flat monthly on the 1st.
-    // Stripe Checkout (subscription mode) does not accept
-    // `subscription_data.add_invoice_items`; use billing_cycle_anchor +
-    // proration_behavior=create_prorations to get a prorated first invoice.
+    // Bill the prorated first-lesson-month amount immediately as a one-time
+    // line item, then start the recurring monthly cycle on `anchor` (1st of
+    // the month after the first-lesson month). We use `trial_end` instead of
+    // `billing_cycle_anchor` because Stripe requires the anchor to be within
+    // one billing interval of "now"; `trial_end` accepts any future date.
+    if (firstChargeCents > 0) {
+      lineItems.push({
+        price_data: {
+          currency: "usd",
+          product: stripeProductId!,
+          unit_amount: firstChargeCents,
+        },
+        quantity: 1,
+      });
+    }
     const subscriptionData: any = {
-      billing_cycle_anchor: anchor,
-      proration_behavior: "create_prorations",
+      trial_end: anchor,
+      proration_behavior: "none",
       metadata: { type: "membership", pending_membership_id: pending.id },
     };
+
 
     const origin = req.headers.get("origin") || "";
     const session = await stripe.checkout.sessions.create({
