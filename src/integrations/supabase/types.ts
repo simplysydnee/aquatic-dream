@@ -1360,6 +1360,214 @@ export type Database = {
         }
         Relationships: []
       }
+      membership_cancellations: {
+        Row: {
+          created_at: string
+          effective_date: string
+          id: string
+          membership_id: string
+          reason: Database["public"]["Enums"]["cancellation_reason"] | null
+          reason_detail: string | null
+          requested_at: string
+        }
+        Insert: {
+          created_at?: string
+          effective_date: string
+          id?: string
+          membership_id: string
+          reason?: Database["public"]["Enums"]["cancellation_reason"] | null
+          reason_detail?: string | null
+          requested_at?: string
+        }
+        Update: {
+          created_at?: string
+          effective_date?: string
+          id?: string
+          membership_id?: string
+          reason?: Database["public"]["Enums"]["cancellation_reason"] | null
+          reason_detail?: string | null
+          requested_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_cancellations_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership_occurrences: {
+        Row: {
+          cancel_reason: string | null
+          closure_type: Database["public"]["Enums"]["closure_type"] | null
+          created_at: string
+          end_time: string | null
+          id: string
+          instructor_id: string | null
+          membership_id: string
+          occurrence_date: string
+          start_time: string | null
+          status: string
+        }
+        Insert: {
+          cancel_reason?: string | null
+          closure_type?: Database["public"]["Enums"]["closure_type"] | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          instructor_id?: string | null
+          membership_id: string
+          occurrence_date: string
+          start_time?: string | null
+          status?: string
+        }
+        Update: {
+          cancel_reason?: string | null
+          closure_type?: Database["public"]["Enums"]["closure_type"] | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          instructor_id?: string | null
+          membership_id?: string
+          occurrence_date?: string
+          start_time?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_occurrences_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_occurrences_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership_plans: {
+        Row: {
+          active: boolean
+          capacity_per_slot: number
+          created_at: string
+          id: string
+          monthly_price_cents: number
+          name: string
+          plan_key: Database["public"]["Enums"]["membership_plan_key"]
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          capacity_per_slot: number
+          created_at?: string
+          id?: string
+          monthly_price_cents: number
+          name: string
+          plan_key: Database["public"]["Enums"]["membership_plan_key"]
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          capacity_per_slot?: number
+          created_at?: string
+          id?: string
+          monthly_price_cents?: number
+          name?: string
+          plan_key?: Database["public"]["Enums"]["membership_plan_key"]
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+        }
+        Relationships: []
+      }
+      memberships: {
+        Row: {
+          cancel_effective_date: string | null
+          cancel_requested_at: string | null
+          child_first_name: string | null
+          child_last_name: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          parent_email: string
+          parent_phone: string | null
+          plan_key: Database["public"]["Enums"]["membership_plan_key"]
+          recurring_consent_amount_cents: number | null
+          recurring_consent_at: string | null
+          recurring_consent_version: string | null
+          sms_consent: boolean | null
+          sms_consent_at: string | null
+          standing_slot_id: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["membership_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+        }
+        Insert: {
+          cancel_effective_date?: string | null
+          cancel_requested_at?: string | null
+          child_first_name?: string | null
+          child_last_name?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          parent_email: string
+          parent_phone?: string | null
+          plan_key: Database["public"]["Enums"]["membership_plan_key"]
+          recurring_consent_amount_cents?: number | null
+          recurring_consent_at?: string | null
+          recurring_consent_version?: string | null
+          sms_consent?: boolean | null
+          sms_consent_at?: string | null
+          standing_slot_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["membership_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+        }
+        Update: {
+          cancel_effective_date?: string | null
+          cancel_requested_at?: string | null
+          child_first_name?: string | null
+          child_last_name?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          parent_email?: string
+          parent_phone?: string | null
+          plan_key?: Database["public"]["Enums"]["membership_plan_key"]
+          recurring_consent_amount_cents?: number | null
+          recurring_consent_at?: string | null
+          recurring_consent_version?: string | null
+          sms_consent?: boolean | null
+          sms_consent_at?: string | null
+          standing_slot_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["membership_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memberships_standing_slot_id_fkey"
+            columns: ["standing_slot_id"]
+            isOneToOne: false
+            referencedRelation: "standing_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_reconciliation_alerts: {
         Row: {
           actual_amount: number
@@ -1980,6 +2188,53 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "sms_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      standing_slots: {
+        Row: {
+          active: boolean
+          capacity: number
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          instructor_id: string | null
+          location: string | null
+          plan_key: Database["public"]["Enums"]["membership_plan_key"]
+          start_time: string
+        }
+        Insert: {
+          active?: boolean
+          capacity: number
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          instructor_id?: string | null
+          location?: string | null
+          plan_key: Database["public"]["Enums"]["membership_plan_key"]
+          start_time: string
+        }
+        Update: {
+          active?: boolean
+          capacity?: number
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          instructor_id?: string | null
+          location?: string | null
+          plan_key?: Database["public"]["Enums"]["membership_plan_key"]
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "standing_slots_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
             referencedColumns: ["id"]
           },
         ]
@@ -3072,6 +3327,10 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "instructor"
+      cancellation_reason: "too_busy" | "graduated" | "cost" | "moved" | "other"
+      closure_type: "planned" | "unplanned"
+      membership_plan_key: "kid_group" | "private" | "adult_group"
+      membership_status: "active" | "pending_cancel" | "cancelled" | "paused"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3200,6 +3459,10 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user", "instructor"],
+      cancellation_reason: ["too_busy", "graduated", "cost", "moved", "other"],
+      closure_type: ["planned", "unplanned"],
+      membership_plan_key: ["kid_group", "private", "adult_group"],
+      membership_status: ["active", "pending_cancel", "cancelled", "paused"],
     },
   },
 } as const
