@@ -32,8 +32,8 @@ serve(async (req) => {
     const { data: plans, error: plansErr } = await plansQuery;
     if (plansErr) throw plansErr;
 
-    const planIds = (plans || []).map((p) => p.id);
-    if (planIds.length === 0) {
+    const planKeys = (plans || []).map((p) => p.plan_key);
+    if (planKeys.length === 0) {
       return new Response(JSON.stringify({ slots: [], plans: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -41,9 +41,9 @@ serve(async (req) => {
 
     const { data: slots, error: slotsErr } = await supabase
       .from("standing_slots")
-      .select("id, plan_id, instructor_id, day_of_week, start_time, end_time, capacity, active, swim_level")
+      .select("id, plan_key, instructor_id, day_of_week, start_time, end_time, capacity, active, swim_level")
       .eq("active", true)
-      .in("plan_id", planIds);
+      .in("plan_key", planKeys);
     if (slotsErr) throw slotsErr;
 
     const instructorIds = Array.from(
@@ -67,17 +67,17 @@ serve(async (req) => {
       counts.set(m.standing_slot_id, (counts.get(m.standing_slot_id) || 0) + 1);
     });
 
-    const planMap = new Map((plans || []).map((p) => [p.id, p]));
+    const planMap = new Map((plans || []).map((p) => [p.plan_key, p]));
     const instMap = new Map((instructors || []).map((i) => [i.id, i.name]));
 
     let result = (slots || [])
       .map((s) => {
-        const plan = planMap.get(s.plan_id);
+        const plan = planMap.get(s.plan_key);
         const enrolled = counts.get(s.id) || 0;
         const spots_left = (s.capacity ?? 0) - enrolled;
         return {
           id: s.id,
-          plan_id: s.plan_id,
+          plan_id: plan?.id,
           plan_key: plan?.plan_key,
           plan_name: plan?.name,
           monthly_price_cents: plan?.monthly_price_cents,
