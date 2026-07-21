@@ -165,17 +165,31 @@ export default function JoinMembership() {
     setStep(2);
   };
 
-  const canContinueStep3 =
-    form.child_first.trim() &&
-    form.child_last.trim() &&
-    !!childDob &&
-    form.parent_first.trim() &&
-    form.parent_last.trim() &&
-    /\S+@\S+\.\S+/.test(form.parent_email) &&
-    form.parent_phone.trim().length >= 10 &&
-    form.is_first_time !== "" &&
-    form.has_medical !== "" &&
-    (form.has_medical !== "yes" || form.medical_notes.trim().length > 0);
+  const isAdult = plan?.plan_key === "adult_group";
+
+  const canContinueStep3 = isAdult
+    ? !!(
+        form.child_first.trim() &&
+        form.child_last.trim() &&
+        childDob &&
+        /\S+@\S+\.\S+/.test(form.parent_email) &&
+        form.parent_phone.trim().length >= 10 &&
+        form.is_first_time !== "" &&
+        form.has_medical !== "" &&
+        (form.has_medical !== "yes" || form.medical_notes.trim().length > 0)
+      )
+    : !!(
+        form.child_first.trim() &&
+        form.child_last.trim() &&
+        childDob &&
+        form.parent_first.trim() &&
+        form.parent_last.trim() &&
+        /\S+@\S+\.\S+/.test(form.parent_email) &&
+        form.parent_phone.trim().length >= 10 &&
+        form.is_first_time !== "" &&
+        form.has_medical !== "" &&
+        (form.has_medical !== "yes" || form.medical_notes.trim().length > 0)
+      );
 
   const canContinueStep5 = authRecurring && smsConsent;
 
@@ -184,6 +198,15 @@ export default function JoinMembership() {
     if (!canContinueStep3) {
       toast.error("Please complete all required fields");
       return;
+    }
+    // Adults: mirror swimmer name into parent contact fields so Stripe customer,
+    // email, SMS, and waiver lookup all keep working unchanged downstream.
+    if (isAdult) {
+      setForm((prev) => ({
+        ...prev,
+        parent_first: prev.child_first,
+        parent_last: prev.child_last,
+      }));
     }
     setWaiverChecking(true);
     try {
