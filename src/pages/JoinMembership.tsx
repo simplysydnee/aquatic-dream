@@ -827,16 +827,43 @@ export default function JoinMembership() {
                     <Row label="Medical" value={form.medical_notes} />
                   )}
                   <Row label="Waiver" value={waiverOnFile ? "On file" : "Signed today"} />
-                  <div className="border-t border-[#2a5e84]/20 pt-3">
-                    <Row
-                      label="Monthly price"
-                      value={
-                        <span className="text-lg font-bold text-[#F58B76]">
-                          {fmtPrice(plan.monthly_price_cents)}/mo
-                        </span>
-                      }
-                    />
+                  <div className="space-y-2 border-t border-[#2a5e84]/20 pt-3">
+                    {quoteLoading && !quote && (
+                      <div className="text-sm text-[#2a5e84]">Calculating your first charge…</div>
+                    )}
+                    {quote && (
+                      <>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm font-medium text-[#1a3a8a]">Due today</span>
+                          <span className="text-lg font-bold text-[#F58B76]">
+                            {fmtPrice(quote.firstChargeCents)}
+                          </span>
+                        </div>
+                        {quote.firstChargeCents < quote.monthlyCents && quote.lessonsCovered > 0 && (
+                          <p className="text-xs text-[#2a5e84]">
+                            Prorated — covers {quote.lessonsCovered} {quote.refMonthName} lesson
+                            {quote.lessonsCovered === 1 ? "" : "s"}; your first lesson is{" "}
+                            {quote.firstLessonLabel}.
+                          </p>
+                        )}
+                        <p className="text-xs text-[#2a5e84]">
+                          Then <strong>{fmtPrice(quote.monthlyCents)}/month</strong>, automatically
+                          on the 1st, starting {quote.billingStartLabel}.
+                        </p>
+                      </>
+                    )}
+                    {!quote && !quoteLoading && (
+                      <Row
+                        label="Monthly price"
+                        value={
+                          <span className="text-lg font-bold text-[#F58B76]">
+                            {fmtPrice(plan.monthly_price_cents)}/mo
+                          </span>
+                        }
+                      />
+                    )}
                   </div>
+
                 </dl>
                 <Button
                   className="mt-6 w-full bg-[#F58B76] hover:bg-[#F58B76]/90"
