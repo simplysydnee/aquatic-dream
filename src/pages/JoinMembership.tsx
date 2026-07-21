@@ -80,6 +80,8 @@ export default function JoinMembership() {
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState(false);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [swimLevel, setSwimLevel] = useState<SwimLevel | null>(null);
