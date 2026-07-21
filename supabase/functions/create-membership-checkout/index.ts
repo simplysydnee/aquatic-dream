@@ -14,9 +14,7 @@ const supabaseAdmin = createClient(
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const emailRe = /^\S+@\S+\.\S+$/;
 
-/** Count how many times a given weekday (0=Sun..6=Sat) occurs in the current PT month. */
 function weekdayCountsInCurrentMonth(dow: number): { total: number; remaining: number } {
-  // Today in PT (YYYY-MM-DD)
   const todayPT = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
     year: "numeric",
@@ -28,7 +26,6 @@ function weekdayCountsInCurrentMonth(dow: number): { total: number; remaining: n
   let total = 0;
   let remaining = 0;
   for (let day = 1; day <= daysInMonth; day++) {
-    // Use UTC constructor — day-of-week is stable regardless of TZ shift.
     const wd = new Date(Date.UTC(y, m - 1, day)).getUTCDay();
     if (wd === dow) {
       total++;
@@ -38,7 +35,6 @@ function weekdayCountsInCurrentMonth(dow: number): { total: number; remaining: n
   return { total, remaining };
 }
 
-/** First-of-next-month at midnight PT, as a unix timestamp (seconds). */
 function unixFirstOfNextMonthPT(): number {
   const todayPT = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
@@ -47,7 +43,6 @@ function unixFirstOfNextMonthPT(): number {
     day: "2-digit",
   }).format(new Date());
   const [y, m] = todayPT.split("-").map(Number);
-  // Next month, day 1, 08:00 UTC ≈ 00:00/01:00 PT — safely inside the day in PT.
   const nextY = m === 12 ? y + 1 : y;
   const nextM = m === 12 ? 1 : m + 1;
   return Math.floor(Date.UTC(nextY, nextM - 1, 1, 8, 0, 0) / 1000);
@@ -63,15 +58,25 @@ serve(async (req) => {
       standing_slot_id,
       child_first_name,
       child_last_name,
+      child_dob,
+      swim_level,
+      parent_first_name,
+      parent_last_name,
       parent_name,
       parent_email,
       parent_phone,
+      is_first_time,
+      has_medical,
+      medical_notes,
+      notes,
+      waiver_id,
       recurring_consent,
       sms_consent,
+      sms_consent_text,
+      sms_consent_version,
       returnUrl,
     } = body ?? {};
 
-    // ----- Validate input -----
     if (!["kid_group", "private", "adult_group"].includes(plan_key)) {
       return json({ error: "Invalid plan_key" }, 400);
     }
@@ -79,7 +84,10 @@ serve(async (req) => {
       return json({ error: "Invalid standing_slot_id" }, 400);
     }
     if (!child_first_name?.trim() || !child_last_name?.trim()) {
-      return json({ error: "Child name required" }, 400);
+      return json({ error: "Swimmer name required" }, 400);
+    }
+    if (!child_dob || Number.isNaN(Date.parse(child_dob))) {
+      return json({ error: "Swimmer date of birth required" }, 400);
     }
     if (!parent_email || !emailRe.test(parent_email)) {
       return json({ error: "Valid parent_email required" }, 400);
@@ -87,25 +95,24 @@ serve(async (req) => {
     if (recurring_consent !== true) {
       return json({ error: "Recurring billing consent required" }, 400);
     }
+    if (waiver_id && !uuidRe.test(waiver_id)) {
+      return json({ error: "Invalid waiver_id" }, 400);
+    }
 
-    // ----- Load plan -----
     const { data: plan, error: planErr } = await supabaseAdmin
       .from("membership_plans")
       .select("id, plan_key, name, monthly_price_cents, stripe_product_id, stripe_price_id, active")
       .eq("plan_key", plan_key)
       .maybeSingle();
-    if (planErr || !plan || !plan.active) {
-      return json({ error: "Plan not available" }, 404);
-    }
+    if (planErr || !plan || !plan.active) return json({ error: "Plan not available" }, 404);
 
-    // ----- Load slot + re-check capacity -----
     const { data: slot, error: slotErr } = await supabaseAdmin
       .from("standing_slots")
-      .select("id, plan_id, day_of_week, start_time, end_time, capacity, instructor_id, active")
+      .select("id, plan_key, day_of_week, start_time, end_time, capacity, instructor_id, active, swim_level")
       .eq("id", standing_slot_id)
       .maybeSingle();
     if (slotErr || !slot || !slot.active) return json({ error: "Slot not available" }, 404);
-    if (slot.plan_id !== plan.id) return json({ error: "Slot does not match plan" }, 400);
+    if (slot.plan_key !== plan.plan_key) return json({ error: "Slot does not match plan" }, 400);
 
     const { count: usedCount, error: cntErr } = await supabaseAdmin
       .from("memberships")
@@ -118,7 +125,6 @@ serve(async (req) => {
 
     const stripe = createStripeClient(ENV);
 
-    // ----- Auto-provision Stripe product/price if missing (sandbox testing) -----
     let stripePriceId = plan.stripe_price_id as string | null;
     let stripeProductId = plan.stripe_product_id as string | null;
     if (!stripePriceId) {
@@ -140,39 +146,64 @@ serve(async (req) => {
         .eq("id", plan.id);
     }
 
-    // ----- Compute prorated first charge -----
     const { total, remaining } = weekdayCountsInCurrentMonth(slot.day_of_week);
     const firstChargeCents =
       total > 0 && remaining > 0
         ? Math.round((plan.monthly_price_cents * remaining) / total)
         : 0;
-
     const anchor = unixFirstOfNextMonthPT();
 
-    // ----- Find/create Stripe customer by email -----
+    // ----- Stage every field before checkout so nothing is lost via Stripe metadata limits -----
+    const payload = {
+      plan_id: plan.id,
+      plan_key: plan.plan_key,
+      plan_name: plan.name,
+      standing_slot_id: slot.id,
+      swim_level: plan.plan_key === "kid_group" ? (swim_level || slot.swim_level || null) : null,
+      child_first_name: child_first_name.trim(),
+      child_last_name: child_last_name.trim(),
+      child_dob,
+      parent_first_name: (parent_first_name || "").trim() || null,
+      parent_last_name: (parent_last_name || "").trim() || null,
+      parent_name: (parent_name || `${parent_first_name || ""} ${parent_last_name || ""}`).trim(),
+      parent_email: parent_email.trim().toLowerCase(),
+      parent_phone: (parent_phone || "").trim() || null,
+      is_first_time: is_first_time === true,
+      has_medical: has_medical === true,
+      medical_notes: has_medical === true ? (medical_notes || "").trim() || null : null,
+      notes: (notes || "").trim() || null,
+      waiver_id: waiver_id || null,
+      recurring_consent_amount_cents: plan.monthly_price_cents,
+      first_charge_cents: firstChargeCents,
+      sms_consent: sms_consent === true,
+      sms_consent_text: sms_consent === true ? (sms_consent_text || null) : null,
+      sms_consent_version: sms_consent === true ? (sms_consent_version || null) : null,
+    };
+
+    const { data: pending, error: pendErr } = await supabaseAdmin
+      .from("pending_memberships")
+      .insert({ payload })
+      .select("id")
+      .single();
+    if (pendErr || !pending) {
+      console.error("[create-membership-checkout] pending insert failed", pendErr);
+      return json({ error: "Could not stage enrollment" }, 500);
+    }
+
     const existing = await stripe.customers.list({ email: parent_email, limit: 1 });
     const customer =
       existing.data[0] ??
       (await stripe.customers.create({
         email: parent_email,
-        name: parent_name || undefined,
-        phone: parent_phone || undefined,
+        name: payload.parent_name || undefined,
+        phone: payload.parent_phone || undefined,
       }));
 
-    // ----- Build embedded Checkout Session (subscription mode) -----
-    const lineItems: any[] = [
-      { price: stripePriceId, quantity: 1 },
-    ];
-    // Prorated first-month one-off, added as an invoice item on the subscription's
-    // first invoice via `add_invoice_items`. Only include when > 0.
+    const lineItems: any[] = [{ price: stripePriceId, quantity: 1 }];
     const subscriptionData: any = {
       billing_cycle_anchor: anchor,
       proration_behavior: "none",
-      metadata: {
-        type: "membership",
-        plan_key: plan.plan_key,
-        standing_slot_id: slot.id,
-      },
+      metadata: { type: "membership", pending_membership_id: pending.id },
     };
     if (firstChargeCents > 0) {
       subscriptionData.add_invoice_items = [
@@ -199,24 +230,18 @@ serve(async (req) => {
         returnUrl || `${origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
       metadata: {
         type: "membership",
-        plan_key: plan.plan_key,
-        plan_id: plan.id,
-        standing_slot_id: slot.id,
-        child_first_name: child_first_name.trim(),
-        child_last_name: child_last_name.trim(),
-        parent_name: (parent_name || "").trim(),
-        parent_email,
-        parent_phone: parent_phone || "",
-        sms_consent: sms_consent ? "1" : "0",
-        recurring_consent_amount_cents: String(plan.monthly_price_cents),
-        first_charge_cents: String(firstChargeCents),
-        anchor_unix: String(anchor),
+        pending_membership_id: pending.id,
       },
     });
 
     if (!session.client_secret) {
       return json({ error: "Stripe did not return a client_secret" }, 500);
     }
+
+    await supabaseAdmin
+      .from("pending_memberships")
+      .update({ stripe_session_id: session.id })
+      .eq("id", pending.id);
 
     return json({
       clientSecret: session.client_secret,

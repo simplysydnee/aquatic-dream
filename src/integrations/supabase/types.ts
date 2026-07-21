@@ -1492,13 +1492,20 @@ export type Database = {
         Row: {
           cancel_effective_date: string | null
           cancel_requested_at: string | null
+          child_dob: string | null
           child_first_name: string | null
           child_last_name: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
+          has_medical: boolean | null
           id: string
+          is_first_time: boolean | null
+          medical_notes: string | null
+          notes: string | null
           parent_email: string
+          parent_first_name: string | null
+          parent_last_name: string | null
           parent_phone: string | null
           plan_key: Database["public"]["Enums"]["membership_plan_key"]
           recurring_consent_amount_cents: number | null
@@ -1506,22 +1513,32 @@ export type Database = {
           recurring_consent_version: string | null
           sms_consent: boolean | null
           sms_consent_at: string | null
+          sms_consent_text: string | null
+          sms_consent_version: string | null
           standing_slot_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["membership_status"]
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          waiver_id: string | null
         }
         Insert: {
           cancel_effective_date?: string | null
           cancel_requested_at?: string | null
+          child_dob?: string | null
           child_first_name?: string | null
           child_last_name?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          has_medical?: boolean | null
           id?: string
+          is_first_time?: boolean | null
+          medical_notes?: string | null
+          notes?: string | null
           parent_email: string
+          parent_first_name?: string | null
+          parent_last_name?: string | null
           parent_phone?: string | null
           plan_key: Database["public"]["Enums"]["membership_plan_key"]
           recurring_consent_amount_cents?: number | null
@@ -1529,22 +1546,32 @@ export type Database = {
           recurring_consent_version?: string | null
           sms_consent?: boolean | null
           sms_consent_at?: string | null
+          sms_consent_text?: string | null
+          sms_consent_version?: string | null
           standing_slot_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["membership_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          waiver_id?: string | null
         }
         Update: {
           cancel_effective_date?: string | null
           cancel_requested_at?: string | null
+          child_dob?: string | null
           child_first_name?: string | null
           child_last_name?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          has_medical?: boolean | null
           id?: string
+          is_first_time?: boolean | null
+          medical_notes?: string | null
+          notes?: string | null
           parent_email?: string
+          parent_first_name?: string | null
+          parent_last_name?: string | null
           parent_phone?: string | null
           plan_key?: Database["public"]["Enums"]["membership_plan_key"]
           recurring_consent_amount_cents?: number | null
@@ -1552,11 +1579,14 @@ export type Database = {
           recurring_consent_version?: string | null
           sms_consent?: boolean | null
           sms_consent_at?: string | null
+          sms_consent_text?: string | null
+          sms_consent_version?: string | null
           standing_slot_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["membership_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          waiver_id?: string | null
         }
         Relationships: [
           {
@@ -1564,6 +1594,13 @@ export type Database = {
             columns: ["standing_slot_id"]
             isOneToOne: false
             referencedRelation: "standing_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_waiver_id_fkey"
+            columns: ["waiver_id"]
+            isOneToOne: false
+            referencedRelation: "visitor_waivers"
             referencedColumns: ["id"]
           },
         ]
@@ -1631,6 +1668,27 @@ export type Database = {
           customer_email?: string
           id?: string
           payload?: Json
+        }
+        Relationships: []
+      }
+      pending_memberships: {
+        Row: {
+          created_at: string
+          id: string
+          payload: Json
+          stripe_session_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payload: Json
+          stripe_session_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payload?: Json
+          stripe_session_id?: string | null
         }
         Relationships: []
       }

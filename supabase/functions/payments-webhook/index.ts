@@ -618,7 +618,7 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
     return;
   }
 
-  // Idempotency: if a membership already references this subscription id, skip.
+  // Idempotency on subscription id.
   const { data: existing } = await supabase
     .from("memberships")
     .select("id")
@@ -630,9 +630,35 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
   }
 
   const md = session.metadata || {};
-  const stripe = createStripeClient(env);
+  const pendingId: string | undefined = md.pending_membership_id;
+  let payload: Record<string, any> = {};
+  if (pendingId) {
+    const { data: pend, error: pendErr } = await supabase
+      .from("pending_memberships")
+      .select("payload")
+      .eq("id", pendingId)
+      .maybeSingle();
+    if (pendErr || !pend) {
+      console.error("[membership webhook] pending row missing", pendingId, pendErr);
+    } else {
+      payload = (pend.payload as Record<string, any>) || {};
+    }
+  } else {
+    // Legacy fallback (pre-3g checkouts embedded fields directly in metadata).
+    payload = {
+      plan_key: md.plan_key,
+      standing_slot_id: md.standing_slot_id,
+      child_first_name: md.child_first_name,
+      child_last_name: md.child_last_name,
+      parent_name: md.parent_name,
+      parent_email: md.parent_email,
+      parent_phone: md.parent_phone,
+      sms_consent: md.sms_consent === "1",
+      recurring_consent_amount_cents: parseInt(md.recurring_consent_amount_cents || "0", 10) || null,
+    };
+  }
 
-  // Load the subscription for period fields.
+  const stripe = createStripeClient(env);
   let currentPeriodStart: string | null = null;
   let currentPeriodEnd: string | null = null;
   try {
@@ -653,18 +679,25 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
     day: "2-digit",
   }).format(new Date());
 
-  const smsConsent = md.sms_consent === "1";
-  const consentAmount = parseInt(md.recurring_consent_amount_cents || "0", 10) || null;
+  const smsConsent = payload.sms_consent === true;
 
   const { data: newMembership, error: insErr } = await supabase
     .from("memberships")
     .insert({
-      plan_key: md.plan_key,
-      standing_slot_id: md.standing_slot_id,
-      child_first_name: md.child_first_name || null,
-      child_last_name: md.child_last_name || null,
-      parent_email: md.parent_email,
-      parent_phone: md.parent_phone || null,
+      plan_key: payload.plan_key,
+      standing_slot_id: payload.standing_slot_id,
+      child_first_name: payload.child_first_name || null,
+      child_last_name: payload.child_last_name || null,
+      child_dob: payload.child_dob || null,
+      parent_first_name: payload.parent_first_name || null,
+      parent_last_name: payload.parent_last_name || null,
+      parent_email: payload.parent_email,
+      parent_phone: payload.parent_phone || null,
+      is_first_time: payload.is_first_time ?? null,
+      has_medical: payload.has_medical ?? null,
+      medical_notes: payload.medical_notes || null,
+      notes: payload.notes || null,
+      waiver_id: payload.waiver_id || null,
       status: "active",
       start_date: todayPT,
       stripe_customer_id: session.customer,
@@ -673,9 +706,11 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
       current_period_end: currentPeriodEnd,
       recurring_consent_at: new Date().toISOString(),
       recurring_consent_version: "v1",
-      recurring_consent_amount_cents: consentAmount,
+      recurring_consent_amount_cents: payload.recurring_consent_amount_cents ?? null,
       sms_consent: smsConsent,
       sms_consent_at: smsConsent ? new Date().toISOString() : null,
+      sms_consent_text: payload.sms_consent_text || null,
+      sms_consent_version: payload.sms_consent_version || null,
     })
     .select("id")
     .single();
@@ -685,15 +720,13 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
     return;
   }
 
-  // Load slot for weekday/times/instructor.
   const { data: slot } = await supabase
     .from("standing_slots")
     .select("day_of_week, start_time, end_time, instructor_id")
-    .eq("id", md.standing_slot_id)
+    .eq("id", payload.standing_slot_id)
     .maybeSingle();
 
   if (slot) {
-    // Compute next 8 occurrences on slot.day_of_week, starting today or later (PT).
     const [y, m, d] = todayPT.split("-").map(Number);
     let cursor = new Date(Date.UTC(y, m - 1, d));
     while (cursor.getUTCDay() !== slot.day_of_week) {

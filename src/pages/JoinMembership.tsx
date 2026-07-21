@@ -3,8 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -13,11 +15,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Check } from "lucide-react";
+import { Loader2, ArrowLeft, Check, ShieldCheck } from "lucide-react";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe";
 import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
+import LegalAgreements, { type LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import type { SwimLevel } from "@/components/swim-enrollment/types";
+import {
+  lookupActiveWaiver,
+  type ActiveWaiver,
+} from "@/lib/swimmerWaiver";
+import { submitVisitorWaiver } from "@/lib/visitorWaiver";
+import {
+  SMS_CONSENT_DISCLOSURE,
+  SMS_CONSENT_VERSION,
+} from "@/components/swim-enrollment/legal-content";
 
 type PlanKey = "kid_group" | "private" | "adult_group";
 type Plan = {
@@ -58,7 +70,9 @@ const fmtTime = (t: string) => {
 };
 const fmtPrice = (cents: number) => `$${(cents / 100).toFixed(0)}`;
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+// Steps:
+// 1 program, 2 slot, 3 info, 4 waiver (auto-skip if on file), 5 consent, 6 review, 7 checkout, 8 success
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export default function JoinMembership() {
   const [step, setStep] = useState<Step>(1);
@@ -73,18 +87,26 @@ export default function JoinMembership() {
   const [form, setForm] = useState({
     child_first: "",
     child_last: "",
-    parent_name: "",
+    parent_first: "",
+    parent_last: "",
     parent_email: "",
     parent_phone: "",
+    is_first_time: "" as "" | "yes" | "no",
+    has_medical: "" as "" | "yes" | "no",
+    medical_notes: "",
+    notes: "",
   });
   const [authRecurring, setAuthRecurring] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
 
+  const [waiverId, setWaiverId] = useState<string | null>(null);
+  const [waiverOnFile, setWaiverOnFile] = useState<ActiveWaiver | null>(null);
+  const [waiverChecking, setWaiverChecking] = useState(false);
+  const [waiverSubmitting, setWaiverSubmitting] = useState(false);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
-      // Plans come directly from membership_plans (public read) so Step 1
-      // never depends on standing_slots availability.
       const { data: planRows, error: planErr } = await supabase
         .from("membership_plans")
         .select("id, plan_key, name, monthly_price_cents")
@@ -93,13 +115,11 @@ export default function JoinMembership() {
       if (planErr) toast.error("Could not load plans");
       else setPlans((planRows as Plan[]) || []);
       setLoading(false);
-
     })();
   }, []);
 
   useEffect(() => {
     if (!plan) return;
-
     (async () => {
       const { data: slotData, error } = await supabase.functions.invoke("get-open-slots", {
         body: {
@@ -115,7 +135,6 @@ export default function JoinMembership() {
       setSlots(Array.isArray(slotData?.slots) ? slotData.slots : []);
     })();
   }, [plan, swimLevel]);
-
 
   const planSlots = useMemo(() => {
     if (!plan) return [];
@@ -149,18 +168,78 @@ export default function JoinMembership() {
   const canContinueStep3 =
     form.child_first.trim() &&
     form.child_last.trim() &&
-    form.parent_name.trim() &&
+    !!childDob &&
+    form.parent_first.trim() &&
+    form.parent_last.trim() &&
     /\S+@\S+\.\S+/.test(form.parent_email) &&
-    form.parent_phone.trim().length >= 10;
+    form.parent_phone.trim().length >= 10 &&
+    form.is_first_time !== "" &&
+    form.has_medical !== "" &&
+    (form.has_medical !== "yes" || form.medical_notes.trim().length > 0);
 
-  const canContinueStep4 = authRecurring && smsConsent;
+  const canContinueStep5 = authRecurring && smsConsent;
+
+  // Advance from info: check for on-file waiver before rendering step 4.
+  const handleInfoContinue = async () => {
+    if (!canContinueStep3) {
+      toast.error("Please complete all required fields");
+      return;
+    }
+    setWaiverChecking(true);
+    try {
+      const existing = await lookupActiveWaiver(form.child_first, form.child_last, childDob);
+      if (existing) {
+        setWaiverOnFile(existing);
+        setWaiverId(existing.waiver_id);
+        toast.success("Waiver already on file — skipping the legal step");
+        setStep(5);
+        return;
+      }
+    } catch (e) {
+      console.warn("waiver lookup failed", e);
+    } finally {
+      setWaiverChecking(false);
+    }
+    setWaiverOnFile(null);
+    setWaiverId(null);
+    setStep(4);
+  };
+
+  const handleLegalSubmit = async (legal: LegalAgreementData) => {
+    setWaiverSubmitting(true);
+    try {
+      const { id } = await submitVisitorWaiver({
+        legal,
+        signerFirstName: form.parent_first,
+        signerLastName: form.parent_last,
+        signerEmail: form.parent_email,
+        signerPhone: form.parent_phone || null,
+        swimmers: [
+          {
+            first_name: form.child_first.trim(),
+            last_name: form.child_last.trim(),
+            dob: childDob,
+          },
+        ],
+        source: "public",
+      });
+      setWaiverId(id);
+      toast.success("Waiver signed");
+      setStep(5);
+    } catch (e) {
+      console.error(e);
+      toast.error((e as Error).message || "Could not save waiver");
+    } finally {
+      setWaiverSubmitting(false);
+    }
+  };
 
   const handleFinalize = () => {
-    if (!plan || !slot || !canContinueStep3 || !canContinueStep4) {
+    if (!plan || !slot || !canContinueStep3 || !canContinueStep5 || !waiverId) {
       toast.error("Please complete all fields");
       return;
     }
-    setStep(6);
+    setStep(7);
   };
 
   const [charges, setCharges] = useState<{ firstChargeCents: number; monthlyCents: number } | null>(
@@ -175,13 +254,22 @@ export default function JoinMembership() {
         standing_slot_id: slot.id,
         child_first_name: form.child_first,
         child_last_name: form.child_last,
-        child_dob: childDob || null,
+        child_dob: childDob,
         swim_level: plan.plan_key === "kid_group" ? swimLevel : null,
-        parent_name: form.parent_name,
+        parent_first_name: form.parent_first,
+        parent_last_name: form.parent_last,
+        parent_name: `${form.parent_first} ${form.parent_last}`.trim(),
         parent_email: form.parent_email,
         parent_phone: form.parent_phone,
+        is_first_time: form.is_first_time === "yes",
+        has_medical: form.has_medical === "yes",
+        medical_notes: form.medical_notes,
+        notes: form.notes,
+        waiver_id: waiverId,
         recurring_consent: authRecurring,
         sms_consent: smsConsent,
+        sms_consent_text: smsConsent ? SMS_CONSENT_DISCLOSURE : null,
+        sms_consent_version: smsConsent ? SMS_CONSENT_VERSION : null,
         returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
       },
     });
@@ -195,14 +283,14 @@ export default function JoinMembership() {
       monthlyCents: data.monthlyCents ?? plan.monthly_price_cents,
     });
     return data.clientSecret;
-  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob]);
+  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId]);
 
   const [returned, setReturned] = useState(false);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get("membership") === "success") {
       setReturned(true);
-      setStep(7);
+      setStep(8);
     }
   }, []);
 
@@ -215,10 +303,10 @@ export default function JoinMembership() {
         </div>
 
         <div className="mb-6 flex items-center justify-center gap-2">
-          {[1, 2, 3, 4, 5, 6].map((n) => (
+          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
             <div
               key={n}
-              className={`h-2 w-10 rounded-full ${
+              className={`h-2 w-8 rounded-full ${
                 step >= n ? "bg-[#F58B76]" : "bg-[#2a5e84]/20"
               }`}
             />
@@ -364,7 +452,7 @@ export default function JoinMembership() {
               </>
             )}
 
-            {step === 3 && (
+            {step === 3 && plan && (
               <>
                 <button
                   type="button"
@@ -373,27 +461,51 @@ export default function JoinMembership() {
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
-                <h2 className="mb-4 text-xl font-semibold text-[#1a3a8a]">Swimmer & parent info</h2>
+                <h2 className="mb-1 text-xl font-semibold text-[#1a3a8a]">Swimmer & parent info</h2>
+                <p className="mb-4 text-sm text-[#2a5e84]">
+                  Please use the swimmer's full legal name.
+                </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <Label>Child first name</Label>
+                    <Label>{plan.plan_key === "adult_group" ? "Swimmer first name" : "Child first name"}</Label>
                     <Input
                       value={form.child_first}
                       onChange={(e) => setForm({ ...form, child_first: e.target.value })}
                     />
                   </div>
                   <div>
-                    <Label>Child last name</Label>
+                    <Label>{plan.plan_key === "adult_group" ? "Swimmer last name" : "Child last name"}</Label>
                     <Input
                       value={form.child_last}
                       onChange={(e) => setForm({ ...form, child_last: e.target.value })}
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <Label>Parent name</Label>
+                    <Label>Swimmer date of birth</Label>
                     <Input
-                      value={form.parent_name}
-                      onChange={(e) => setForm({ ...form, parent_name: e.target.value })}
+                      type="date"
+                      value={childDob}
+                      onChange={(e) => setChildDob(e.target.value)}
+                      max={new Date().toISOString().slice(0, 10)}
+                    />
+                    {plan.plan_key === "kid_group" && !!childDob && (
+                      <p className="mt-1 text-xs text-[#2a5e84]">
+                        From your assessment. Edit if needed.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label>Parent first name</Label>
+                    <Input
+                      value={form.parent_first}
+                      onChange={(e) => setForm({ ...form, parent_first: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Parent last name</Label>
+                    <Input
+                      value={form.parent_last}
+                      onChange={(e) => setForm({ ...form, parent_last: e.target.value })}
                     />
                   </div>
                   <div>
@@ -412,18 +524,76 @@ export default function JoinMembership() {
                       onChange={(e) => setForm({ ...form, parent_phone: e.target.value })}
                     />
                   </div>
+                  <div className="sm:col-span-2">
+                    <Label>Have you enrolled with us before?</Label>
+                    <RadioGroup
+                      value={form.is_first_time}
+                      onValueChange={(v) => setForm({ ...form, is_first_time: v as "yes" | "no" })}
+                      className="mt-2 flex gap-6"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="yes" id="ft-yes" />
+                        <Label htmlFor="ft-yes" className="cursor-pointer font-normal">First time</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="no" id="ft-no" />
+                        <Label htmlFor="ft-no" className="cursor-pointer font-normal">Returning family</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Any medical conditions, allergies, or accommodations?</Label>
+                    <RadioGroup
+                      value={form.has_medical}
+                      onValueChange={(v) => setForm({ ...form, has_medical: v as "yes" | "no" })}
+                      className="mt-2 flex gap-6"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="no" id="med-no" />
+                        <Label htmlFor="med-no" className="cursor-pointer font-normal">No</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="yes" id="med-yes" />
+                        <Label htmlFor="med-yes" className="cursor-pointer font-normal">Yes</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  {form.has_medical === "yes" && (
+                    <div className="sm:col-span-2">
+                      <Label>Please describe</Label>
+                      <Textarea
+                        value={form.medical_notes}
+                        onChange={(e) => setForm({ ...form, medical_notes: e.target.value })}
+                        rows={3}
+                      />
+                    </div>
+                  )}
+                  <div className="sm:col-span-2">
+                    <Label>Anything else we should know? (optional)</Label>
+                    <Textarea
+                      value={form.notes}
+                      onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                      rows={2}
+                    />
+                  </div>
                 </div>
                 <Button
                   className="mt-6 w-full bg-[#F58B76] hover:bg-[#F58B76]/90"
-                  disabled={!canContinueStep3}
-                  onClick={() => setStep(4)}
+                  disabled={!canContinueStep3 || waiverChecking}
+                  onClick={handleInfoContinue}
                 >
-                  Continue
+                  {waiverChecking ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking waiver…
+                    </>
+                  ) : (
+                    "Continue"
+                  )}
                 </Button>
               </>
             )}
 
-            {step === 4 && plan && (
+            {step === 4 && (
               <>
                 <button
                   type="button"
@@ -432,7 +602,39 @@ export default function JoinMembership() {
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
+                <LegalAgreements
+                  parentName={`${form.parent_first} ${form.parent_last}`.trim()}
+                  childName={`${form.child_first} ${form.child_last}`.trim()}
+                  signerFirstName={form.parent_first}
+                  signerLastName={form.parent_last}
+                  signerPhone={form.parent_phone}
+                  onSubmit={handleLegalSubmit}
+                  onBack={() => setStep(3)}
+                  submitting={waiverSubmitting}
+                  submitLabel="Sign & continue"
+                  submittingLabel="Saving…"
+                />
+              </>
+            )}
+
+            {step === 5 && plan && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setStep(waiverOnFile ? 3 : 4)}
+                  className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </button>
                 <h2 className="mb-4 text-xl font-semibold text-[#1a3a8a]">Agreement & consent</h2>
+                {waiverOnFile && (
+                  <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#2a5e84]/20 bg-[#2a5e84]/5 p-3 text-sm text-[#1a3a8a]">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 text-[#2a5e84]" />
+                    <span>
+                      Liability waiver already on file for {form.child_first} — no need to sign again.
+                    </span>
+                  </div>
+                )}
                 <div className="mb-4 rounded-lg bg-[#2a5e84]/5 p-4 text-sm text-[#1a3a8a]">
                   You're enrolling in a monthly membership. Your card will be charged{" "}
                   <strong>{fmtPrice(plan.monthly_price_cents)}/month</strong> on the 1st,
@@ -453,28 +655,23 @@ export default function JoinMembership() {
                     checked={smsConsent}
                     onCheckedChange={(v) => setSmsConsent(v === true)}
                   />
-                  <span className="text-sm text-[#1a3a8a]">
-                    I agree to receive SMS text messages from Aquatic Dreams Swim Modesto about my
-                    swimmer's lessons, schedule changes, reminders, and closure notices. Message
-                    frequency varies. Message and data rates may apply. Reply STOP to unsubscribe.
-                    See our SMS Terms and Privacy Policy. Consent is not a condition of enrollment.
-                  </span>
+                  <span className="text-sm text-[#1a3a8a]">{SMS_CONSENT_DISCLOSURE}</span>
                 </label>
                 <Button
                   className="mt-6 w-full bg-[#F58B76] hover:bg-[#F58B76]/90"
-                  disabled={!canContinueStep4}
-                  onClick={() => setStep(5)}
+                  disabled={!canContinueStep5}
+                  onClick={() => setStep(6)}
                 >
                   Continue
                 </Button>
               </>
             )}
 
-            {step === 5 && plan && slot && (
+            {step === 6 && plan && slot && (
               <>
                 <button
                   type="button"
-                  onClick={() => setStep(4)}
+                  onClick={() => setStep(5)}
                   className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
@@ -493,9 +690,14 @@ export default function JoinMembership() {
                     <Row label="Instructor" value={`Coach ${slot.instructor_name}`} />
                   )}
                   <Row label="Swimmer" value={`${form.child_first} ${form.child_last}`} />
-                  <Row label="Parent" value={form.parent_name} />
+                  <Row label="Date of birth" value={childDob} />
+                  <Row label="Parent" value={`${form.parent_first} ${form.parent_last}`} />
                   <Row label="Email" value={form.parent_email} />
                   <Row label="Phone" value={form.parent_phone} />
+                  {form.has_medical === "yes" && (
+                    <Row label="Medical" value={form.medical_notes} />
+                  )}
+                  <Row label="Waiver" value={waiverOnFile ? "On file" : "Signed today"} />
                   <div className="border-t border-[#2a5e84]/20 pt-3">
                     <Row
                       label="Monthly price"
@@ -519,11 +721,11 @@ export default function JoinMembership() {
               </>
             )}
 
-            {step === 6 && plan && slot && !returned && (
+            {step === 7 && plan && slot && !returned && (
               <>
                 <button
                   type="button"
-                  onClick={() => setStep(5)}
+                  onClick={() => setStep(6)}
                   className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
@@ -545,7 +747,7 @@ export default function JoinMembership() {
               </>
             )}
 
-            {step === 7 && (
+            {step === 8 && (
               <div className="py-6 text-center">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#F58B76]/15">
                   <Check className="h-7 w-7 text-[#F58B76]" />
