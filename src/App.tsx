@@ -98,6 +98,7 @@ const App = () => (
               <Route path="users" element={<UsersAdmin />} />
               <Route path="messages" element={<MessagesAdmin />} />
               <Route path="domain-health" element={<DomainHealthAdmin />} />
+              <Route path="agent-connect" element={<AgentConnectionInstructions />} />
             </Route>
 
             {/* Instructor portal */}
