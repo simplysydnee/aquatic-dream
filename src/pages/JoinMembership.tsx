@@ -103,6 +103,7 @@ export default function JoinMembership() {
     notes: "",
   });
   const [authRecurring, setAuthRecurring] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
 
   const [waiverId, setWaiverId] = useState<string | null>(null);
@@ -205,7 +206,7 @@ export default function JoinMembership() {
         (form.has_medical !== "yes" || form.medical_notes.trim().length > 0)
       );
 
-  const canContinueStep5 = authRecurring && smsConsent;
+  const canContinueStep5 = authRecurring && smsConsent && agreementAccepted;
 
   // Advance from info: check for on-file waiver before rendering step 4.
   const handleInfoContinue = async () => {
@@ -353,6 +354,10 @@ export default function JoinMembership() {
         sms_consent: smsConsent,
         sms_consent_text: smsConsent ? SMS_CONSENT_DISCLOSURE : null,
         sms_consent_version: smsConsent ? SMS_CONSENT_VERSION : null,
+        recurring_consent_version: MEMBERSHIP_AGREEMENT_VERSION,
+        membership_agreement_version: MEMBERSHIP_AGREEMENT_VERSION,
+        membership_agreement_text: MEMBERSHIP_AGREEMENT_TEXT,
+        membership_agreement_accepted: agreementAccepted,
         returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
       },
     });
@@ -763,11 +768,40 @@ export default function JoinMembership() {
                     </span>
                   </div>
                 )}
-                <div className="mb-4 rounded-lg bg-[#2a5e84]/5 p-4 text-sm text-[#1a3a8a]">
-                  You're enrolling in a monthly membership. Your card will be charged{" "}
-                  <strong>{fmtPrice(plan.monthly_price_cents)}/month</strong> on the 1st,
-                  automatically, until you cancel. Cancel anytime online with 30 days' notice.
+                <div className="mb-4 rounded-lg border border-[#2a5e84]/20 bg-white p-4">
+                  <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-[#2a5e84]/10 pb-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-[#1a3a8a]">
+                      Membership Agreement
+                    </h3>
+                    {quote ? (
+                      <div className="text-xs text-[#1a3a8a]/80">
+                        <span className="font-semibold text-[#1a3a8a]">
+                          Due today {fmtPrice(quote.firstChargeCents)}
+                        </span>
+                        {" · "}
+                        <span>
+                          then {fmtPrice(quote.monthlyCents)}/month starting{" "}
+                          {quote.billingStartLabel}
+                        </span>
+                      </div>
+                    ) : quoteLoading ? (
+                      <span className="text-xs text-[#1a3a8a]/60">Calculating charges…</span>
+                    ) : null}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto whitespace-pre-line rounded border border-[#2a5e84]/10 bg-[#2a5e84]/5 p-3 text-xs leading-relaxed text-[#1a3a8a]">
+                    {MEMBERSHIP_AGREEMENT_TEXT}
+                  </div>
                 </div>
+                <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-lg border border-[#F58B76]/40 bg-[#F58B76]/5 p-3">
+                  <Checkbox
+                    checked={agreementAccepted}
+                    onCheckedChange={(v) => setAgreementAccepted(v === true)}
+                  />
+                  <span className="text-sm font-medium text-[#1a3a8a]">
+                    I have read and agree to the Membership Agreement and authorize the recurring
+                    monthly charge.
+                  </span>
+                </label>
                 <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-lg border border-[#2a5e84]/20 p-3">
                   <Checkbox
                     checked={authRecurring}
@@ -775,7 +809,8 @@ export default function JoinMembership() {
                   />
                   <span className="text-sm text-[#1a3a8a]">
                     I authorize this recurring monthly charge of{" "}
-                    {fmtPrice(plan.monthly_price_cents)} on the 1st of each month until I cancel.
+                    {fmtPrice(quote?.monthlyCents ?? plan.monthly_price_cents)} on the 1st of each
+                    month until I cancel.
                   </span>
                 </label>
                 <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#2a5e84]/20 p-3">
