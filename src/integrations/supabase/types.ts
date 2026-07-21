@@ -2204,6 +2204,7 @@ export type Database = {
           location: string | null
           plan_key: Database["public"]["Enums"]["membership_plan_key"]
           start_time: string
+          swim_level: string | null
         }
         Insert: {
           active?: boolean
@@ -2216,6 +2217,7 @@ export type Database = {
           location?: string | null
           plan_key: Database["public"]["Enums"]["membership_plan_key"]
           start_time: string
+          swim_level?: string | null
         }
         Update: {
           active?: boolean
@@ -2228,6 +2230,7 @@ export type Database = {
           location?: string | null
           plan_key?: Database["public"]["Enums"]["membership_plan_key"]
           start_time?: string
+          swim_level?: string | null
         }
         Relationships: [
           {
