@@ -211,9 +211,10 @@ serve(async (req) => {
         pending_membership_id: pending.id,
       },
     });
+    console.log("[create-membership-checkout] session", JSON.stringify({ id: session?.id, ui_mode: (session as any)?.ui_mode, has_secret: !!session?.client_secret, url: session?.url }));
 
     if (!session.client_secret) {
-      return json({ error: "Stripe did not return a client_secret" }, 500);
+      return json({ error: "Stripe did not return a client_secret", debug: { id: session?.id, ui_mode: (session as any)?.ui_mode, url: session?.url } }, 500);
     }
 
     await supabaseAdmin
