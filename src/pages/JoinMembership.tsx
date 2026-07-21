@@ -143,7 +143,7 @@ export default function JoinMembership() {
         </div>
 
         <div className="mb-6 flex items-center justify-center gap-2">
-          {[1, 2, 3, 4, 5].map((n) => (
+          {[1, 2, 3, 4, 5, 6].map((n) => (
             <div
               key={n}
               className={`h-2 w-10 rounded-full ${
