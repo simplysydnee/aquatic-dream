@@ -17,11 +17,21 @@ import { ArrowUpDown, Plus, Loader2, Save, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type PlanKey = "kid_group" | "private" | "adult_group";
+type SwimLevel = "white" | "red" | "yellow" | "blue" | "green";
 
 const PLAN_LABELS: Record<PlanKey, string> = {
-  kid_group: "Group",
-  private: "Private",
-  adult_group: "Adult Group",
+  kid_group: "Small Group Swim",
+  private: "Private Swim",
+  adult_group: "Adult Swim",
+};
+
+const SWIM_LEVELS: SwimLevel[] = ["white", "red", "yellow", "blue", "green"];
+const LEVEL_LABELS: Record<SwimLevel, string> = {
+  white: "White (Little Fins)",
+  red: "Red (Reef Explorers)",
+  yellow: "Yellow (Sea Scouts)",
+  blue: "Blue (Deep Sea Divers)",
+  green: "Green (Ocean Masters)",
 };
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -47,6 +57,7 @@ interface Slot {
   capacity: number;
   location: string | null;
   active: boolean;
+  swim_level: SwimLevel | null;
 }
 
 interface NewSlot {
@@ -58,6 +69,7 @@ interface NewSlot {
   capacity: number;
   location: string;
   active: boolean;
+  swim_level: SwimLevel | null;
 }
 
 type SortKey =
@@ -80,6 +92,7 @@ const defaultNewSlot = (plans: Plan[]): NewSlot => ({
   capacity: plans.find((p) => p.plan_key === "kid_group")?.capacity_per_slot ?? 3,
   location: DEFAULT_LOCATION,
   active: true,
+  swim_level: "white",
 });
 
 const timeLabel = (t: string) => {
