@@ -5,21 +5,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, Check } from "lucide-react";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe";
+import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
+import type { SwimLevel } from "@/components/swim-enrollment/types";
 
+type PlanKey = "kid_group" | "private" | "adult_group";
 type Plan = {
   id: string;
-  plan_key: "kid_group" | "private" | "adult_group";
+  plan_key: PlanKey;
   name: string;
   monthly_price_cents: number;
 };
 type Slot = {
   id: string;
   plan_id: string;
-  plan_key: Plan["plan_key"];
+  plan_key: PlanKey;
   plan_name: string;
   monthly_price_cents: number;
   instructor_name: string | null;
@@ -27,9 +37,18 @@ type Slot = {
   start_time: string;
   end_time: string;
   spots_left: number;
+  swim_level: SwimLevel | null;
 };
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const SWIM_LEVELS: SwimLevel[] = ["white", "red", "yellow", "blue", "green"];
+const LEVEL_LABELS: Record<SwimLevel, string> = {
+  white: "White (Little Fins)",
+  red: "Red (Reef Explorers)",
+  yellow: "Yellow (Sea Scouts)",
+  blue: "Blue (Deep Sea Divers)",
+  green: "Green (Ocean Masters)",
+};
 
 const fmtTime = (t: string) => {
   const [h, m] = t.split(":").map(Number);
@@ -39,13 +58,18 @@ const fmtTime = (t: string) => {
 };
 const fmtPrice = (cents: number) => `$${(cents / 100).toFixed(0)}`;
 
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
 export default function JoinMembership() {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<Step>(1);
+  const [showAssessment, setShowAssessment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
+  const [swimLevel, setSwimLevel] = useState<SwimLevel | null>(null);
+  const [childDob, setChildDob] = useState<string>("");
   const [form, setForm] = useState({
     child_first: "",
     child_last: "",
@@ -62,17 +86,41 @@ export default function JoinMembership() {
       const { data, error } = await supabase.functions.invoke("get-open-slots");
       if (error) toast.error("Could not load plans");
       else {
-        setPlans(data.plans || []);
-        setSlots(data.slots || []);
+        setPlans(data?.plans || []);
+        setSlots(data?.slots || []);
       }
       setLoading(false);
     })();
   }, []);
 
-  const planSlots = useMemo(
-    () => (plan ? slots.filter((s) => s.plan_id === plan.id) : []),
-    [plan, slots]
-  );
+  const planSlots = useMemo(() => {
+    if (!plan) return [];
+    let list = slots.filter((s) => s.plan_id === plan.id);
+    if (plan.plan_key === "kid_group" && swimLevel) {
+      list = list.filter((s) => s.swim_level === swimLevel);
+    }
+    return list;
+  }, [plan, slots, swimLevel]);
+
+  const selectPlan = (p: Plan) => {
+    setPlan(p);
+    setSlot(null);
+    if (p.plan_key === "kid_group") {
+      setSwimLevel(null);
+      setShowAssessment(true);
+    } else {
+      setSwimLevel(null);
+      setShowAssessment(false);
+      setStep(2);
+    }
+  };
+
+  const handleAssessmentComplete = (level: SwimLevel, _age: number, dob: string) => {
+    setSwimLevel(level);
+    setChildDob(dob);
+    setShowAssessment(false);
+    setStep(2);
+  };
 
   const canContinueStep3 =
     form.child_first.trim() &&
@@ -103,6 +151,8 @@ export default function JoinMembership() {
         standing_slot_id: slot.id,
         child_first_name: form.child_first,
         child_last_name: form.child_last,
+        child_dob: childDob || null,
+        swim_level: plan.plan_key === "kid_group" ? swimLevel : null,
         parent_name: form.parent_name,
         parent_email: form.parent_email,
         parent_phone: form.parent_phone,
@@ -121,9 +171,8 @@ export default function JoinMembership() {
       monthlyCents: data.monthlyCents ?? plan.monthly_price_cents,
     });
     return data.clientSecret;
-  }, [plan, slot, form, authRecurring, smsConsent]);
+  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob]);
 
-  // Detect Stripe return
   const [returned, setReturned] = useState(false);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -132,7 +181,6 @@ export default function JoinMembership() {
       setStep(7);
     }
   }, []);
-
 
   return (
     <div className="min-h-screen bg-[#F7F3EE]">
@@ -159,37 +207,74 @@ export default function JoinMembership() {
           </div>
         ) : (
           <Card className="p-6">
-            {step === 1 && (
+            {step === 1 && !showAssessment && (
               <>
                 <h2 className="mb-4 text-xl font-semibold text-[#1a3a8a]">Pick a program</h2>
-                <div className="space-y-3">
-                  {plans.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => {
-                        setPlan(p);
-                        setSlot(null);
-                        setStep(2);
-                      }}
-                      className="flex w-full items-center justify-between rounded-lg border-2 border-[#2a5e84]/20 p-4 text-left transition hover:border-[#F58B76] hover:bg-[#F58B76]/5"
-                    >
-                      <div>
-                        <div className="font-semibold text-[#1a3a8a]">{p.name}</div>
-                        <div className="text-sm text-[#2a5e84]">Recurring monthly</div>
-                      </div>
-                      <div className="text-lg font-bold text-[#F58B76]">
-                        {fmtPrice(p.monthly_price_cents)}/mo
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                {plans.length === 0 ? (
+                  <p className="py-6 text-center text-[#2a5e84]">
+                    No programs available right now. Please check back soon.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {plans.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => selectPlan(p)}
+                        className="flex w-full items-center justify-between rounded-lg border-2 border-[#2a5e84]/20 p-4 text-left transition hover:border-[#F58B76] hover:bg-[#F58B76]/5"
+                      >
+                        <div>
+                          <div className="font-semibold text-[#1a3a8a]">{p.name}</div>
+                          <div className="text-sm text-[#2a5e84]">
+                            {p.plan_key === "kid_group"
+                              ? "Kids group class · we'll match your swimmer to the right level"
+                              : p.plan_key === "private"
+                              ? "One-on-one coaching"
+                              : "Adult group class"}
+                          </div>
+                        </div>
+                        <div className="text-lg font-bold text-[#F58B76]">
+                          {fmtPrice(p.monthly_price_cents)}/mo
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {step === 1 && showAssessment && plan?.plan_key === "kid_group" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAssessment(false);
+                    setPlan(null);
+                  }}
+                  className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back to programs
+                </button>
+                <h2 className="mb-2 text-xl font-semibold text-[#1a3a8a]">Find Your Spot</h2>
+                <p className="mb-6 text-sm text-[#2a5e84]">
+                  A quick skill check to match your swimmer to the right group.
+                </p>
+                <SwimAssessment onComplete={handleAssessmentComplete} />
               </>
             )}
 
             {step === 2 && plan && (
               <>
                 <button
-                  onClick={() => setStep(1)}
+                  type="button"
+                  onClick={() => {
+                    if (plan.plan_key === "kid_group") {
+                      setShowAssessment(true);
+                      setStep(1);
+                    } else {
+                      setStep(1);
+                    }
+                  }}
                   className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
@@ -197,15 +282,40 @@ export default function JoinMembership() {
                 <h2 className="mb-4 text-xl font-semibold text-[#1a3a8a]">
                   Pick a slot — {plan.name}
                 </h2>
+
+                {plan.plan_key === "kid_group" && (
+                  <div className="mb-4 flex items-center gap-3 rounded-lg border border-[#2a5e84]/20 bg-[#2a5e84]/5 p-3">
+                    <div className="flex-1 text-sm text-[#1a3a8a]">
+                      <div className="font-semibold">Recommended level</div>
+                      <div className="text-xs text-[#2a5e84]">
+                        Parent may override if you'd prefer a different group.
+                      </div>
+                    </div>
+                    <Select value={swimLevel ?? ""} onValueChange={(v: SwimLevel) => setSwimLevel(v)}>
+                      <SelectTrigger className="h-9 w-56 text-xs">
+                        <SelectValue placeholder="Choose level…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SWIM_LEVELS.map((lv) => (
+                          <SelectItem key={lv} value={lv}>{LEVEL_LABELS[lv]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {planSlots.length === 0 ? (
                   <p className="py-8 text-center text-[#2a5e84]">
-                    No open slots right now. Please check back soon.
+                    {plan.plan_key === "kid_group" && swimLevel
+                      ? `No open ${LEVEL_LABELS[swimLevel]} slots right now. Try a different level or check back soon.`
+                      : "No open slots right now. Please check back soon."}
                   </p>
                 ) : (
                   <div className="space-y-2">
                     {planSlots.map((s) => (
                       <button
                         key={s.id}
+                        type="button"
                         onClick={() => {
                           setSlot(s);
                           setStep(3);
@@ -233,6 +343,7 @@ export default function JoinMembership() {
             {step === 3 && (
               <>
                 <button
+                  type="button"
                   onClick={() => setStep(2)}
                   className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
                 >
@@ -291,6 +402,7 @@ export default function JoinMembership() {
             {step === 4 && plan && (
               <>
                 <button
+                  type="button"
                   onClick={() => setStep(3)}
                   className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
                 >
@@ -337,6 +449,7 @@ export default function JoinMembership() {
             {step === 5 && plan && slot && (
               <>
                 <button
+                  type="button"
                   onClick={() => setStep(4)}
                   className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
                 >
@@ -345,6 +458,9 @@ export default function JoinMembership() {
                 <h2 className="mb-4 text-xl font-semibold text-[#1a3a8a]">Review</h2>
                 <dl className="space-y-3 rounded-lg bg-[#2a5e84]/5 p-4 text-sm">
                   <Row label="Program" value={plan.name} />
+                  {plan.plan_key === "kid_group" && swimLevel && (
+                    <Row label="Level" value={LEVEL_LABELS[swimLevel]} />
+                  )}
                   <Row
                     label="Slot"
                     value={`${DAYS[slot.day_of_week]} ${fmtTime(slot.start_time)}–${fmtTime(slot.end_time)}`}
@@ -382,6 +498,7 @@ export default function JoinMembership() {
             {step === 6 && plan && slot && !returned && (
               <>
                 <button
+                  type="button"
                   onClick={() => setStep(5)}
                   className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
                 >

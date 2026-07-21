@@ -17,11 +17,21 @@ import { ArrowUpDown, Plus, Loader2, Save, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type PlanKey = "kid_group" | "private" | "adult_group";
+type SwimLevel = "white" | "red" | "yellow" | "blue" | "green";
 
 const PLAN_LABELS: Record<PlanKey, string> = {
-  kid_group: "Group",
-  private: "Private",
-  adult_group: "Adult Group",
+  kid_group: "Small Group Swim",
+  private: "Private Swim",
+  adult_group: "Adult Swim",
+};
+
+const SWIM_LEVELS: SwimLevel[] = ["white", "red", "yellow", "blue", "green"];
+const LEVEL_LABELS: Record<SwimLevel, string> = {
+  white: "White (Little Fins)",
+  red: "Red (Reef Explorers)",
+  yellow: "Yellow (Sea Scouts)",
+  blue: "Blue (Deep Sea Divers)",
+  green: "Green (Ocean Masters)",
 };
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -47,6 +57,7 @@ interface Slot {
   capacity: number;
   location: string | null;
   active: boolean;
+  swim_level: SwimLevel | null;
 }
 
 interface NewSlot {
@@ -58,6 +69,7 @@ interface NewSlot {
   capacity: number;
   location: string;
   active: boolean;
+  swim_level: SwimLevel | null;
 }
 
 type SortKey =
@@ -80,6 +92,7 @@ const defaultNewSlot = (plans: Plan[]): NewSlot => ({
   capacity: plans.find((p) => p.plan_key === "kid_group")?.capacity_per_slot ?? 3,
   location: DEFAULT_LOCATION,
   active: true,
+  swim_level: "white",
 });
 
 const timeLabel = (t: string) => {
@@ -216,6 +229,10 @@ const StandingSlotsAdmin = () => {
       return;
     }
     setSaving(true);
+    if (newSlot.plan_key === "kid_group" && !newSlot.swim_level) {
+      toast({ title: "Swim level required for Small Group Swim", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase.from("standing_slots").insert({
       plan_key: newSlot.plan_key,
       instructor_id: newSlot.instructor_id,
@@ -225,6 +242,7 @@ const StandingSlotsAdmin = () => {
       capacity: newSlot.capacity,
       location: newSlot.location || DEFAULT_LOCATION,
       active: newSlot.active,
+      swim_level: newSlot.plan_key === "kid_group" ? newSlot.swim_level : null,
     });
     setSaving(false);
     if (error) {
@@ -250,6 +268,10 @@ const StandingSlotsAdmin = () => {
       toast({ title: "End time must be after start time", variant: "destructive" });
       return;
     }
+    if (editDraft.plan_key === "kid_group" && !editDraft.swim_level) {
+      toast({ title: "Swim level required for Small Group Swim", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     const { error } = await supabase
       .from("standing_slots")
@@ -262,6 +284,7 @@ const StandingSlotsAdmin = () => {
         capacity: editDraft.capacity,
         location: editDraft.location || DEFAULT_LOCATION,
         active: editDraft.active,
+        swim_level: editDraft.plan_key === "kid_group" ? editDraft.swim_level : null,
       })
       .eq("id", editDraft.id);
     setSaving(false);
@@ -370,6 +393,7 @@ const StandingSlotsAdmin = () => {
           <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="text-left px-3 py-2"><SortHead k="plan_key">Program</SortHead></th>
+              <th className="text-left px-3 py-2">Level</th>
               <th className="text-left px-3 py-2"><SortHead k="instructor">Instructor</SortHead></th>
               <th className="text-left px-3 py-2"><SortHead k="day_of_week">Day</SortHead></th>
               <th className="text-left px-3 py-2"><SortHead k="start_time">Start</SortHead></th>
@@ -390,7 +414,12 @@ const StandingSlotsAdmin = () => {
                     value={newSlot.plan_key}
                     onValueChange={(v: PlanKey) => {
                       const cap = plans.find((p) => p.plan_key === v)?.capacity_per_slot ?? newSlot.capacity;
-                      setNewSlot({ ...newSlot, plan_key: v, capacity: cap });
+                      setNewSlot({
+                        ...newSlot,
+                        plan_key: v,
+                        capacity: cap,
+                        swim_level: v === "kid_group" ? (newSlot.swim_level ?? "white") : null,
+                      });
                     }}
                   >
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -400,6 +429,23 @@ const StandingSlotsAdmin = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                </td>
+                <td className="px-2 py-1">
+                  {newSlot.plan_key === "kid_group" ? (
+                    <Select
+                      value={newSlot.swim_level ?? ""}
+                      onValueChange={(v: SwimLevel) => setNewSlot({ ...newSlot, swim_level: v })}
+                    >
+                      <SelectTrigger className="h-8 text-xs w-40"><SelectValue placeholder="Level…" /></SelectTrigger>
+                      <SelectContent>
+                        {SWIM_LEVELS.map((lv) => (
+                          <SelectItem key={lv} value={lv}>{LEVEL_LABELS[lv]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
                 </td>
                 <td className="px-2 py-1">
                   <Select
@@ -482,13 +528,13 @@ const StandingSlotsAdmin = () => {
             )}
 
             {loading && (
-              <tr><td colSpan={11} className="px-3 py-8 text-center text-muted-foreground">
+              <tr><td colSpan={12} className="px-3 py-8 text-center text-muted-foreground">
                 <Loader2 className="inline h-4 w-4 animate-spin mr-2" />Loading…
               </td></tr>
             )}
 
             {!loading && filtered.length === 0 && !adding && (
-              <tr><td colSpan={11} className="px-3 py-8 text-center text-muted-foreground">
+              <tr><td colSpan={12} className="px-3 py-8 text-center text-muted-foreground">
                 No slots match. Click "Add slot" to create one.
               </td></tr>
             )}
@@ -505,7 +551,12 @@ const StandingSlotsAdmin = () => {
                         value={editDraft!.plan_key}
                         onValueChange={(v: PlanKey) => {
                           const cap = plans.find((p) => p.plan_key === v)?.capacity_per_slot ?? editDraft!.capacity;
-                          setEditDraft({ ...editDraft!, plan_key: v, capacity: cap });
+                          setEditDraft({
+                            ...editDraft!,
+                            plan_key: v,
+                            capacity: cap,
+                            swim_level: v === "kid_group" ? (editDraft!.swim_level ?? "white") : null,
+                          });
                         }}
                       >
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -515,6 +566,23 @@ const StandingSlotsAdmin = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                    </td>
+                    <td className="px-2 py-1">
+                      {editDraft!.plan_key === "kid_group" ? (
+                        <Select
+                          value={editDraft!.swim_level ?? ""}
+                          onValueChange={(v: SwimLevel) => setEditDraft({ ...editDraft!, swim_level: v })}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-40"><SelectValue placeholder="Level…" /></SelectTrigger>
+                          <SelectContent>
+                            {SWIM_LEVELS.map((lv) => (
+                              <SelectItem key={lv} value={lv}>{LEVEL_LABELS[lv]}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-2 py-1">
                       <Select
@@ -583,6 +651,11 @@ const StandingSlotsAdmin = () => {
               return (
                 <tr key={s.id} className={cn("border-t hover:bg-muted/30", !s.active && "opacity-60")}>
                   <td className="px-3 py-2">{PLAN_LABELS[s.plan_key]}</td>
+                  <td className="px-3 py-2">
+                    {s.plan_key === "kid_group"
+                      ? (s.swim_level ? LEVEL_LABELS[s.swim_level] : <span className="text-destructive text-xs">Not set</span>)
+                      : <span className="text-muted-foreground">—</span>}
+                  </td>
                   <td className="px-3 py-2">{instructorName(s.instructor_id)}</td>
                   <td className="px-3 py-2">{DAYS[s.day_of_week] ?? s.day_of_week}</td>
                   <td className="px-3 py-2">{timeLabel(s.start_time)}</td>
