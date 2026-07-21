@@ -739,9 +739,14 @@ export default function JoinMembership() {
                   {slot.instructor_name && (
                     <Row label="Instructor" value={`Coach ${slot.instructor_name}`} />
                   )}
-                  <Row label="Swimmer" value={`${form.child_first} ${form.child_last}`} />
+                  <Row
+                    label={isAdult ? "Name" : "Swimmer"}
+                    value={`${form.child_first} ${form.child_last}`}
+                  />
                   <Row label="Date of birth" value={childDob} />
-                  <Row label="Parent" value={`${form.parent_first} ${form.parent_last}`} />
+                  {!isAdult && (
+                    <Row label="Parent" value={`${form.parent_first} ${form.parent_last}`} />
+                  )}
                   <Row label="Email" value={form.parent_email} />
                   <Row label="Phone" value={form.parent_phone} />
                   {form.has_medical === "yes" && (
