@@ -14,7 +14,15 @@ serve(async (req) => {
     );
 
     const url = new URL(req.url);
-    const planKey = url.searchParams.get("plan_key");
+    let planKey = url.searchParams.get("plan_key");
+    let swimLevel = url.searchParams.get("swim_level");
+    if (req.method === "POST") {
+      try {
+        const body = await req.json();
+        planKey = body.plan_key ?? planKey;
+        swimLevel = body.swim_level ?? swimLevel;
+      } catch { /* no body */ }
+    }
 
     let plansQuery = supabase
       .from("membership_plans")
@@ -33,7 +41,7 @@ serve(async (req) => {
 
     const { data: slots, error: slotsErr } = await supabase
       .from("standing_slots")
-      .select("id, plan_id, instructor_id, day_of_week, start_time, end_time, capacity, active")
+      .select("id, plan_id, instructor_id, day_of_week, start_time, end_time, capacity, active, swim_level")
       .eq("active", true)
       .in("plan_id", planIds);
     if (slotsErr) throw slotsErr;
@@ -62,7 +70,7 @@ serve(async (req) => {
     const planMap = new Map((plans || []).map((p) => [p.id, p]));
     const instMap = new Map((instructors || []).map((i) => [i.id, i.name]));
 
-    const result = (slots || [])
+    let result = (slots || [])
       .map((s) => {
         const plan = planMap.get(s.plan_id);
         const enrolled = counts.get(s.id) || 0;
@@ -79,11 +87,17 @@ serve(async (req) => {
           start_time: s.start_time,
           end_time: s.end_time,
           capacity: s.capacity,
+          swim_level: s.swim_level ?? null,
           enrolled_count: enrolled,
           spots_left,
         };
       })
       .filter((s) => s.spots_left > 0);
+
+    // Optional level filter — only applies to kid_group (Small Group Swim)
+    if (swimLevel) {
+      result = result.filter((s) => s.plan_key !== "kid_group" || s.swim_level === swimLevel);
+    }
 
     return new Response(
       JSON.stringify({ slots: result, plans: plans || [] }),
