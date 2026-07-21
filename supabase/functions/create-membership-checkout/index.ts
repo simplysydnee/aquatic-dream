@@ -170,12 +170,21 @@ serve(async (req) => {
         .eq("id", plan.id);
     }
 
-    const { total, remaining } = weekdayCountsInCurrentMonth(slot.day_of_week);
+    const firstLesson = firstLessonDate(slot.day_of_week);
+    const { total, remaining } = weekdayCountsForMonth(
+      firstLesson.y,
+      firstLesson.m,
+      firstLesson.d,
+      slot.day_of_week,
+    );
     const firstChargeCents =
       total > 0 && remaining > 0
         ? Math.round((plan.monthly_price_cents * remaining) / total)
         : 0;
-    const anchor = unixFirstOfNextMonthPT();
+    // Anchor to the 1st of the month AFTER the first-lesson month, so the
+    // first-lesson month is covered by the prorated first invoice (charged now)
+    // and the next flat charge lands on the 1st of the following month.
+    const anchor = unixFirstOfMonthAfter(firstLesson.y, firstLesson.m);
 
     // ----- Stage every field before checkout so nothing is lost via Stripe metadata limits -----
     const payload = {
