@@ -32,6 +32,7 @@ import PrintDaySchedule from "./pages/admin/PrintDaySchedule";
 import CheckInAdmin from "./pages/admin/CheckInAdmin";
 import MessagesAdmin from "./pages/admin/MessagesAdmin";
 import DomainHealthAdmin from "./pages/admin/DomainHealthAdmin";
+import AgentConnectionInstructions from "./pages/admin/AgentConnectionInstructions";
 
 import Waivers from "./pages/Waivers";
 import SmsTerms from "./pages/SmsTerms";
