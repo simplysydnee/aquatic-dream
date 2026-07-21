@@ -24,8 +24,6 @@ serve(async (req) => {
       } catch { /* no body */ }
     }
 
-    console.info("get-open-slots incoming", { planKey, swimLevel });
-
     let plansQuery = supabase
       .from("membership_plans")
       .select("id, plan_key, name, monthly_price_cents, active")
@@ -36,7 +34,6 @@ serve(async (req) => {
 
     const planKeys = (plans || []).map((p) => p.plan_key);
     if (planKeys.length === 0) {
-      console.info("get-open-slots no matching active plans", { planKey });
       return new Response(JSON.stringify({ slots: [], plans: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -48,8 +45,6 @@ serve(async (req) => {
       .eq("active", true)
       .in("plan_key", planKeys);
     if (slotsErr) throw slotsErr;
-
-    console.info("get-open-slots raw slots", { planKey, rawCount: slots?.length ?? 0 });
 
     const instructorIds = Array.from(
       new Set((slots || []).map((s) => s.instructor_id).filter(Boolean))
@@ -103,8 +98,6 @@ serve(async (req) => {
     if (swimLevel) {
       result = result.filter((s) => s.plan_key !== "kid_group" || s.swim_level === swimLevel);
     }
-
-    console.info("get-open-slots returning", { planKey, swimLevel, filteredCount: result.length });
 
     return new Response(
       JSON.stringify({ slots: result, plans: plans || [] }),
