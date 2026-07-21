@@ -94,16 +94,32 @@ export default function JoinMembership() {
       else setPlans((planRows as Plan[]) || []);
       setLoading(false);
 
-      // Load open slots in the background via the service-role edge function.
-      const { data: slotData } = await supabase.functions.invoke("get-open-slots");
-      if (slotData?.slots) setSlots(slotData.slots);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!plan) return;
+
+    (async () => {
+      const { data: slotData, error } = await supabase.functions.invoke("get-open-slots", {
+        body: {
+          plan_key: plan.plan_key,
+          swim_level: plan.plan_key === "kid_group" ? swimLevel : undefined,
+        },
+      });
+      if (error) {
+        toast.error("Could not load open slots");
+        setSlots([]);
+        return;
+      }
+      setSlots(Array.isArray(slotData?.slots) ? slotData.slots : []);
+    })();
+  }, [plan, swimLevel]);
 
 
   const planSlots = useMemo(() => {
     if (!plan) return [];
-    let list = slots.filter((s) => s.plan_id === plan.id);
+    let list = slots.filter((s) => s.plan_key === plan.plan_key);
     if (plan.plan_key === "kid_group" && swimLevel) {
       list = list.filter((s) => s.swim_level === swimLevel);
     }
