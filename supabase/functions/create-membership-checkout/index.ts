@@ -14,37 +14,61 @@ const supabaseAdmin = createClient(
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const emailRe = /^\S+@\S+\.\S+$/;
 
-function weekdayCountsInCurrentMonth(dow: number): { total: number; remaining: number } {
-  const todayPT = new Intl.DateTimeFormat("en-CA", {
+const SEASON_START = "2026-08-17"; // Phase 3h/3i season start
+
+function todayPTParts(): { y: number; m: number; d: number } {
+  const s = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-  const [y, m, d] = todayPT.split("-").map(Number);
-  const daysInMonth = new Date(y, m, 0).getDate();
+  const [y, m, d] = s.split("-").map(Number);
+  return { y, m, d };
+}
+
+// First occurrence of `dow` (0=Sun..6=Sat) on/after max(today PT, SEASON_START).
+function firstLessonDate(dow: number): { y: number; m: number; d: number } {
+  const today = todayPTParts();
+  const [sy, sm, sd] = SEASON_START.split("-").map(Number);
+  const todayNum = today.y * 10000 + today.m * 100 + today.d;
+  const seasonNum = sy * 10000 + sm * 100 + sd;
+  const start = todayNum >= seasonNum ? today : { y: sy, m: sm, d: sd };
+  let { y, m, d } = start;
+  for (let i = 0; i < 7; i++) {
+    const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    if (wd === dow) return { y, m, d };
+    const next = new Date(Date.UTC(y, m - 1, d + 1));
+    y = next.getUTCFullYear();
+    m = next.getUTCMonth() + 1;
+    d = next.getUTCDate();
+  }
+  return { y, m, d };
+}
+
+function weekdayCountsForMonth(
+  year: number,
+  month: number,
+  fromDay: number,
+  dow: number,
+): { total: number; remaining: number } {
+  const daysInMonth = new Date(year, month, 0).getDate();
   let total = 0;
   let remaining = 0;
   for (let day = 1; day <= daysInMonth; day++) {
-    const wd = new Date(Date.UTC(y, m - 1, day)).getUTCDay();
+    const wd = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
     if (wd === dow) {
       total++;
-      if (day >= d) remaining++;
+      if (day >= fromDay) remaining++;
     }
   }
   return { total, remaining };
 }
 
-function unixFirstOfNextMonthPT(): number {
-  const todayPT = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  const [y, m] = todayPT.split("-").map(Number);
-  const nextY = m === 12 ? y + 1 : y;
-  const nextM = m === 12 ? 1 : m + 1;
+// Unix seconds for the 1st of the month AFTER (year, month) at 08:00 UTC (~midnight PT).
+function unixFirstOfMonthAfter(year: number, month: number): number {
+  const nextY = month === 12 ? year + 1 : year;
+  const nextM = month === 12 ? 1 : month + 1;
   return Math.floor(Date.UTC(nextY, nextM - 1, 1, 8, 0, 0) / 1000);
 }
 
