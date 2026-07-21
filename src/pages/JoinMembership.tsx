@@ -120,23 +120,31 @@ export default function JoinMembership() {
     })();
   }, []);
 
-  useEffect(() => {
+  const loadSlots = useCallback(async () => {
     if (!plan) return;
-    (async () => {
+    setSlotsLoading(true);
+    setSlotsError(false);
+    try {
       const { data: slotData, error } = await supabase.functions.invoke("get-open-slots", {
         body: {
           plan_key: plan.plan_key,
           swim_level: plan.plan_key === "kid_group" ? swimLevel : undefined,
         },
       });
-      if (error) {
-        toast.error("Could not load open slots");
-        setSlots([]);
-        return;
-      }
+      if (error) throw error;
       setSlots(Array.isArray(slotData?.slots) ? slotData.slots : []);
-    })();
+    } catch (e) {
+      console.error("loadSlots error", e);
+      setSlotsError(true);
+      setSlots([]);
+    } finally {
+      setSlotsLoading(false);
+    }
   }, [plan, swimLevel]);
+
+  useEffect(() => {
+    loadSlots();
+  }, [loadSlots]);
 
   const planSlots = useMemo(() => {
     if (!plan) return [];
