@@ -40,6 +40,10 @@ serve(async (req) => {
       notes,
       waiver_id,
       recurring_consent,
+      recurring_consent_version,
+      membership_agreement_version,
+      membership_agreement_text,
+      membership_agreement_accepted,
       sms_consent,
       sms_consent_text,
       sms_consent_version,
@@ -148,6 +152,10 @@ serve(async (req) => {
       sms_consent: sms_consent === true,
       sms_consent_text: sms_consent === true ? (sms_consent_text || null) : null,
       sms_consent_version: sms_consent === true ? (sms_consent_version || null) : null,
+      recurring_consent_version: recurring_consent_version || null,
+      membership_agreement_version: membership_agreement_version || null,
+      membership_agreement_text: membership_agreement_text || null,
+      membership_agreement_accepted: membership_agreement_accepted === true,
     };
 
     const { data: pending, error: pendErr } = await supabaseAdmin
