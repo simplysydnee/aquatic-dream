@@ -279,6 +279,52 @@ export default function JoinMembership() {
     null,
   );
 
+  type MembershipQuote = {
+    monthlyCents: number;
+    firstChargeCents: number;
+    firstLessonLabel: string;
+    billingStartLabel: string;
+    lessonsCovered: number;
+    refMonthName: string;
+  };
+  const [quote, setQuote] = useState<MembershipQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  useEffect(() => {
+    if (!plan || !slot) {
+      setQuote(null);
+      return;
+    }
+    let cancelled = false;
+    setQuoteLoading(true);
+    supabase.functions
+      .invoke("get-membership-quote", {
+        body: { plan_key: plan.plan_key, standing_slot_id: slot.id },
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data || data.error) {
+          setQuote(null);
+        } else {
+          setQuote({
+            monthlyCents: data.monthlyCents ?? plan.monthly_price_cents,
+            firstChargeCents: data.firstChargeCents ?? 0,
+            firstLessonLabel: data.firstLessonLabel ?? "",
+            billingStartLabel: data.billingStartLabel ?? "",
+            lessonsCovered: data.lessonsCovered ?? 0,
+            refMonthName: data.refMonthName ?? "",
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setQuoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [plan, slot]);
+
+
   const fetchClientSecret = useCallback(async (): Promise<string> => {
     if (!plan || !slot) throw new Error("Missing plan or slot");
     const { data, error } = await supabase.functions.invoke("create-membership-checkout", {
@@ -781,16 +827,43 @@ export default function JoinMembership() {
                     <Row label="Medical" value={form.medical_notes} />
                   )}
                   <Row label="Waiver" value={waiverOnFile ? "On file" : "Signed today"} />
-                  <div className="border-t border-[#2a5e84]/20 pt-3">
-                    <Row
-                      label="Monthly price"
-                      value={
-                        <span className="text-lg font-bold text-[#F58B76]">
-                          {fmtPrice(plan.monthly_price_cents)}/mo
-                        </span>
-                      }
-                    />
+                  <div className="space-y-2 border-t border-[#2a5e84]/20 pt-3">
+                    {quoteLoading && !quote && (
+                      <div className="text-sm text-[#2a5e84]">Calculating your first charge…</div>
+                    )}
+                    {quote && (
+                      <>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm font-medium text-[#1a3a8a]">Due today</span>
+                          <span className="text-lg font-bold text-[#F58B76]">
+                            {fmtPrice(quote.firstChargeCents)}
+                          </span>
+                        </div>
+                        {quote.firstChargeCents < quote.monthlyCents && quote.lessonsCovered > 0 && (
+                          <p className="text-xs text-[#2a5e84]">
+                            Prorated — covers {quote.lessonsCovered} {quote.refMonthName} lesson
+                            {quote.lessonsCovered === 1 ? "" : "s"}; your first lesson is{" "}
+                            {quote.firstLessonLabel}.
+                          </p>
+                        )}
+                        <p className="text-xs text-[#2a5e84]">
+                          Then <strong>{fmtPrice(quote.monthlyCents)}/month</strong>, automatically
+                          on the 1st, starting {quote.billingStartLabel}.
+                        </p>
+                      </>
+                    )}
+                    {!quote && !quoteLoading && (
+                      <Row
+                        label="Monthly price"
+                        value={
+                          <span className="text-lg font-bold text-[#F58B76]">
+                            {fmtPrice(plan.monthly_price_cents)}/mo
+                          </span>
+                        }
+                      />
+                    )}
                   </div>
+
                 </dl>
                 <Button
                   className="mt-6 w-full bg-[#F58B76] hover:bg-[#F58B76]/90"

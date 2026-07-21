@@ -90,6 +90,10 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = true
   [functions.get-open-slots]
     verify_jwt = false
+  [functions.get-membership-quote]
+    verify_jwt = false
+  [functions.create-membership-checkout]
+    verify_jwt = false
 
 
 
