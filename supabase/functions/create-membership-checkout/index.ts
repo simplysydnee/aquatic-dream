@@ -4,8 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient } from "../_shared/stripe.ts";
 import { computeMembershipQuote } from "../_shared/membership-pricing.ts";
 
-// SANDBOX ONLY — Phase 3b. Never use the live key here.
-const ENV = "sandbox" as const;
+// Uses the same Stripe env as the rest of the app's payment flows.
+const ENV = "live" as const;
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
