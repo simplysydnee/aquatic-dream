@@ -846,9 +846,14 @@ export default function JoinMembership() {
                             {quote.firstLessonLabel}.
                           </p>
                         )}
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm font-medium text-[#1a3a8a]">Then</span>
+                          <span className="text-lg font-bold text-[#F58B76]">
+                            {fmtPrice(quote.monthlyCents)}/month
+                          </span>
+                        </div>
                         <p className="text-xs text-[#2a5e84]">
-                          Then <strong>{fmtPrice(quote.monthlyCents)}/month</strong>, automatically
-                          on the 1st, starting {quote.billingStartLabel}.
+                          Automatically on the 1st, starting {quote.billingStartLabel}.
                         </p>
                       </>
                     )}
