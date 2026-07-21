@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { type StripeEnv, verifyWebhook } from "../_shared/stripe.ts";
+import { type StripeEnv, createStripeClient, verifyWebhook } from "../_shared/stripe.ts";
 import { sendEnrollmentConfirmation as sendConfirmationHelper } from "../_shared/send-enrollment-confirmation.ts";
 import { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } from "../_shared/textmagic.ts";
 
@@ -62,7 +62,9 @@ serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const obj = event.data.object;
-        if (obj?.metadata?.type === "registration_fee" && obj?.metadata?.enrollmentId) {
+        if (obj?.metadata?.type === "membership") {
+          await handleMembershipCheckoutCompleted(obj, env);
+        } else if (obj?.metadata?.type === "registration_fee" && obj?.metadata?.enrollmentId) {
           await handleRegistrationFeePaid(obj);
         } else if (obj?.metadata?.type === "session_fee" && obj?.metadata?.enrollmentId) {
           await handleSessionFeePaid(obj);
@@ -605,4 +607,114 @@ async function sendEnrollmentConfirmation(enrollmentId: string) {
   } catch (err) {
     console.error("Failed to send confirmation email:", err);
   }
+}
+
+// ---------------- Membership (Phase 3b) ----------------
+
+async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
+  const subscriptionId: string | undefined = session.subscription;
+  if (!subscriptionId) {
+    console.error("[membership webhook] no subscription on session", session.id);
+    return;
+  }
+
+  // Idempotency: if a membership already references this subscription id, skip.
+  const { data: existing } = await supabase
+    .from("memberships")
+    .select("id")
+    .eq("stripe_subscription_id", subscriptionId)
+    .maybeSingle();
+  if (existing) {
+    console.log("[membership webhook] already processed", subscriptionId);
+    return;
+  }
+
+  const md = session.metadata || {};
+  const stripe = createStripeClient(env);
+
+  // Load the subscription for period fields.
+  let currentPeriodStart: string | null = null;
+  let currentPeriodEnd: string | null = null;
+  try {
+    const sub = await stripe.subscriptions.retrieve(subscriptionId);
+    const item = (sub as any).items?.data?.[0];
+    const start = item?.current_period_start ?? (sub as any).current_period_start;
+    const end = item?.current_period_end ?? (sub as any).current_period_end;
+    if (start) currentPeriodStart = new Date(start * 1000).toISOString();
+    if (end) currentPeriodEnd = new Date(end * 1000).toISOString();
+  } catch (e) {
+    console.error("[membership webhook] could not load subscription", e);
+  }
+
+  const todayPT = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const smsConsent = md.sms_consent === "1";
+  const consentAmount = parseInt(md.recurring_consent_amount_cents || "0", 10) || null;
+
+  const { data: newMembership, error: insErr } = await supabase
+    .from("memberships")
+    .insert({
+      plan_key: md.plan_key,
+      standing_slot_id: md.standing_slot_id,
+      child_first_name: md.child_first_name || null,
+      child_last_name: md.child_last_name || null,
+      parent_email: md.parent_email,
+      parent_phone: md.parent_phone || null,
+      status: "active",
+      start_date: todayPT,
+      stripe_customer_id: session.customer,
+      stripe_subscription_id: subscriptionId,
+      current_period_start: currentPeriodStart,
+      current_period_end: currentPeriodEnd,
+      recurring_consent_at: new Date().toISOString(),
+      recurring_consent_version: "v1",
+      recurring_consent_amount_cents: consentAmount,
+      sms_consent: smsConsent,
+      sms_consent_at: smsConsent ? new Date().toISOString() : null,
+    })
+    .select("id")
+    .single();
+
+  if (insErr || !newMembership) {
+    console.error("[membership webhook] insert failed", insErr);
+    return;
+  }
+
+  // Load slot for weekday/times/instructor.
+  const { data: slot } = await supabase
+    .from("standing_slots")
+    .select("day_of_week, start_time, end_time, instructor_id")
+    .eq("id", md.standing_slot_id)
+    .maybeSingle();
+
+  if (slot) {
+    // Compute next 8 occurrences on slot.day_of_week, starting today or later (PT).
+    const [y, m, d] = todayPT.split("-").map(Number);
+    let cursor = new Date(Date.UTC(y, m - 1, d));
+    while (cursor.getUTCDay() !== slot.day_of_week) {
+      cursor = new Date(cursor.getTime() + 86400000);
+    }
+    const rows: Array<Record<string, unknown>> = [];
+    for (let i = 0; i < 8; i++) {
+      const iso = cursor.toISOString().slice(0, 10);
+      rows.push({
+        membership_id: newMembership.id,
+        occurrence_date: iso,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
+        instructor_id: slot.instructor_id,
+        status: "scheduled",
+      });
+      cursor = new Date(cursor.getTime() + 7 * 86400000);
+    }
+    const { error: occErr } = await supabase.from("membership_occurrences").insert(rows);
+    if (occErr) console.error("[membership webhook] occurrence insert failed", occErr);
+  }
+
+  console.log("[membership webhook] membership created", newMembership.id);
 }

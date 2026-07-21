@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, Check } from "lucide-react";
+import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
+import { getStripe } from "@/lib/stripe";
 
 type Plan = {
   id: string;
@@ -86,8 +88,51 @@ export default function JoinMembership() {
       toast.error("Please complete all fields");
       return;
     }
-    toast.success("Payment coming in the next step.");
+    setStep(6);
   };
+
+  const [charges, setCharges] = useState<{ firstChargeCents: number; monthlyCents: number } | null>(
+    null,
+  );
+
+  const fetchClientSecret = useCallback(async (): Promise<string> => {
+    if (!plan || !slot) throw new Error("Missing plan or slot");
+    const { data, error } = await supabase.functions.invoke("create-membership-checkout", {
+      body: {
+        plan_key: plan.plan_key,
+        standing_slot_id: slot.id,
+        child_first_name: form.child_first,
+        child_last_name: form.child_last,
+        parent_name: form.parent_name,
+        parent_email: form.parent_email,
+        parent_phone: form.parent_phone,
+        recurring_consent: authRecurring,
+        sms_consent: smsConsent,
+        returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
+      },
+    });
+    if (error || !data?.clientSecret) {
+      const msg = String(error?.message || data?.error || "Failed to start checkout");
+      toast.error(msg);
+      throw new Error(msg);
+    }
+    setCharges({
+      firstChargeCents: data.firstChargeCents ?? 0,
+      monthlyCents: data.monthlyCents ?? plan.monthly_price_cents,
+    });
+    return data.clientSecret;
+  }, [plan, slot, form, authRecurring, smsConsent]);
+
+  // Detect Stripe return
+  const [returned, setReturned] = useState(false);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("membership") === "success") {
+      setReturned(true);
+      setStep(7);
+    }
+  }, []);
+
 
   return (
     <div className="min-h-screen bg-[#F7F3EE]">
@@ -98,7 +143,7 @@ export default function JoinMembership() {
         </div>
 
         <div className="mb-6 flex items-center justify-center gap-2">
-          {[1, 2, 3, 4, 5].map((n) => (
+          {[1, 2, 3, 4, 5, 6].map((n) => (
             <div
               key={n}
               className={`h-2 w-10 rounded-full ${
@@ -329,9 +374,51 @@ export default function JoinMembership() {
                   <Check className="mr-2 h-4 w-4" /> Continue to secure payment
                 </Button>
                 <p className="mt-2 text-center text-xs text-[#2a5e84]">
-                  Payment step coming soon — nothing will be charged yet.
+                  Test mode — use card 4242 4242 4242 4242 with any future expiry & CVC.
                 </p>
               </>
+            )}
+
+            {step === 6 && plan && slot && !returned && (
+              <>
+                <button
+                  onClick={() => setStep(5)}
+                  className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </button>
+                <h2 className="mb-2 text-xl font-semibold text-[#1a3a8a]">Secure payment</h2>
+                <p className="mb-4 text-sm text-[#2a5e84]">
+                  Card will be charged the prorated first month now, then{" "}
+                  <strong>{fmtPrice(plan.monthly_price_cents)}</strong> on the 1st of every month
+                  until you cancel.
+                </p>
+                <div className="overflow-hidden rounded-lg border border-[#2a5e84]/20">
+                  <EmbeddedCheckoutProvider
+                    stripe={getStripe()}
+                    options={{ fetchClientSecret }}
+                  >
+                    <EmbeddedCheckout />
+                  </EmbeddedCheckoutProvider>
+                </div>
+              </>
+            )}
+
+            {step === 7 && (
+              <div className="py-6 text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#F58B76]/15">
+                  <Check className="h-7 w-7 text-[#F58B76]" />
+                </div>
+                <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">You're enrolled!</h2>
+                <p className="text-[#2a5e84]">
+                  {charges
+                    ? `First payment of ${fmtPrice(charges.firstChargeCents)} today, then ${fmtPrice(charges.monthlyCents)}/month on the 1st.`
+                    : "Your membership is confirmed. Watch your email for confirmation."}
+                </p>
+                <p className="mt-2 text-sm text-[#2a5e84]/80">
+                  We'll send a welcome email with your first class details shortly.
+                </p>
+              </div>
             )}
           </Card>
         )}
