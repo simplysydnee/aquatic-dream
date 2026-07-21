@@ -128,7 +128,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         emergencyContactFirstName: signerFirstName || prev.emergencyContactFirstName,
         emergencyContactLastName: signerLastName || prev.emergencyContactLastName,
         emergencyContactPhone: signerPhone || prev.emergencyContactPhone,
-        emergencyContactRelationship: "Self",
+        emergencyContactRelationship: signerRelationshipDefault,
       }));
       setErrors((prev) => ({
         ...prev,
