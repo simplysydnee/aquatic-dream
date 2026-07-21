@@ -30,6 +30,10 @@ import {
   SMS_CONSENT_DISCLOSURE,
   SMS_CONSENT_VERSION,
 } from "@/components/swim-enrollment/legal-content";
+import {
+  MEMBERSHIP_AGREEMENT_TEXT,
+  MEMBERSHIP_AGREEMENT_VERSION,
+} from "@/components/swim-enrollment/membership-agreement";
 
 type PlanKey = "kid_group" | "private" | "adult_group";
 type Plan = {
