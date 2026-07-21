@@ -229,6 +229,10 @@ const StandingSlotsAdmin = () => {
       return;
     }
     setSaving(true);
+    if (newSlot.plan_key === "kid_group" && !newSlot.swim_level) {
+      toast({ title: "Swim level required for Small Group Swim", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase.from("standing_slots").insert({
       plan_key: newSlot.plan_key,
       instructor_id: newSlot.instructor_id,
@@ -238,6 +242,7 @@ const StandingSlotsAdmin = () => {
       capacity: newSlot.capacity,
       location: newSlot.location || DEFAULT_LOCATION,
       active: newSlot.active,
+      swim_level: newSlot.plan_key === "kid_group" ? newSlot.swim_level : null,
     });
     setSaving(false);
     if (error) {
