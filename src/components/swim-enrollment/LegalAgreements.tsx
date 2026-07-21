@@ -94,6 +94,8 @@ interface Props {
   signerLastName?: string;
   signerPhone?: string;
   signerLabel?: string;
+  signerRelationshipDefault?: string;
+  lockFieldsOnSameAsSigner?: boolean;
   showAddAnother?: boolean;
   onAddAnother?: (data: LegalAgreementData) => void;
   submitLabel?: string;
@@ -103,7 +105,7 @@ interface Props {
   headerSubtitle?: React.ReactNode;
 }
 
-const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, signerFirstName, signerLastName, signerPhone, signerLabel, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
+const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, defaultEmergencyContactFirstName, defaultEmergencyContactLastName, defaultEmergencyContactPhone, defaultEmergencyContactRelationship, signerFirstName, signerLastName, signerPhone, signerLabel, signerRelationshipDefault = "Self", lockFieldsOnSameAsSigner = true, showAddAnother, onAddAnother, submitLabel, submittingLabel, hideBack, headerTitle, headerSubtitle }: Props) => {
   const [form, setForm] = useState({
     waiverAccepted: false,
     privacyPolicyAccepted: false,
@@ -126,7 +128,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         emergencyContactFirstName: signerFirstName || prev.emergencyContactFirstName,
         emergencyContactLastName: signerLastName || prev.emergencyContactLastName,
         emergencyContactPhone: signerPhone || prev.emergencyContactPhone,
-        emergencyContactRelationship: "Self",
+        emergencyContactRelationship: signerRelationshipDefault,
       }));
       setErrors((prev) => ({
         ...prev,
@@ -311,7 +313,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactFirstName", e.target.value)}
                 className="mt-1"
                 placeholder="First name"
-                readOnly={sameAsSigner}
+                readOnly={lockFieldsOnSameAsSigner && sameAsSigner}
               />
               {errors.emergencyContactFirstName && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactFirstName}</p>
@@ -325,7 +327,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactLastName", e.target.value)}
                 className="mt-1"
                 placeholder="Last name"
-                readOnly={sameAsSigner}
+                readOnly={lockFieldsOnSameAsSigner && sameAsSigner}
               />
               {errors.emergencyContactLastName && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactLastName}</p>
@@ -339,7 +341,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactRelationship", e.target.value)}
                 className="mt-1"
                 placeholder="e.g. Spouse, Grandparent"
-                readOnly={sameAsSigner}
+                readOnly={lockFieldsOnSameAsSigner && sameAsSigner}
               />
               {errors.emergencyContactRelationship && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactRelationship}</p>
@@ -354,7 +356,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
                 onChange={(e) => update("emergencyContactPhone", e.target.value)}
                 className="mt-1"
                 placeholder="(209) 555-0000"
-                readOnly={sameAsSigner}
+                readOnly={lockFieldsOnSameAsSigner && sameAsSigner}
               />
               {errors.emergencyContactPhone && (
                 <p className="text-xs text-destructive mt-1">{errors.emergencyContactPhone}</p>

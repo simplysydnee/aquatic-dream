@@ -608,6 +608,9 @@ export default function JoinMembership() {
                   signerFirstName={form.parent_first}
                   signerLastName={form.parent_last}
                   signerPhone={form.parent_phone}
+                  signerLabel="Same as parent information"
+                  signerRelationshipDefault="Parent/Guardian"
+                  lockFieldsOnSameAsSigner={false}
                   onSubmit={handleLegalSubmit}
                   onBack={() => setStep(3)}
                   submitting={waiverSubmitting}
