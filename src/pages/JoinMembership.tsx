@@ -374,9 +374,51 @@ export default function JoinMembership() {
                   <Check className="mr-2 h-4 w-4" /> Continue to secure payment
                 </Button>
                 <p className="mt-2 text-center text-xs text-[#2a5e84]">
-                  Payment step coming soon — nothing will be charged yet.
+                  Test mode — use card 4242 4242 4242 4242 with any future expiry & CVC.
                 </p>
               </>
+            )}
+
+            {step === 6 && plan && slot && !returned && (
+              <>
+                <button
+                  onClick={() => setStep(5)}
+                  className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </button>
+                <h2 className="mb-2 text-xl font-semibold text-[#1a3a8a]">Secure payment</h2>
+                <p className="mb-4 text-sm text-[#2a5e84]">
+                  Card will be charged the prorated first month now, then{" "}
+                  <strong>{fmtPrice(plan.monthly_price_cents)}</strong> on the 1st of every month
+                  until you cancel.
+                </p>
+                <div className="overflow-hidden rounded-lg border border-[#2a5e84]/20">
+                  <EmbeddedCheckoutProvider
+                    stripe={getStripe()}
+                    options={{ fetchClientSecret }}
+                  >
+                    <EmbeddedCheckout />
+                  </EmbeddedCheckoutProvider>
+                </div>
+              </>
+            )}
+
+            {step === 7 && (
+              <div className="py-6 text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#F58B76]/15">
+                  <Check className="h-7 w-7 text-[#F58B76]" />
+                </div>
+                <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">You're enrolled!</h2>
+                <p className="text-[#2a5e84]">
+                  {charges
+                    ? `First payment of ${fmtPrice(charges.firstChargeCents)} today, then ${fmtPrice(charges.monthlyCents)}/month on the 1st.`
+                    : "Your membership is confirmed. Watch your email for confirmation."}
+                </p>
+                <p className="mt-2 text-sm text-[#2a5e84]/80">
+                  We'll send a welcome email with your first class details shortly.
+                </p>
+              </div>
             )}
           </Card>
         )}
