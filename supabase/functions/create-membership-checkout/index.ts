@@ -203,7 +203,6 @@ serve(async (req) => {
     }
     const subscriptionData: any = {
       trial_end: anchor,
-      proration_behavior: "none",
       metadata: { type: "membership", pending_membership_id: pending.id },
     };
 
