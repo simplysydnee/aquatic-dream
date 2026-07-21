@@ -484,27 +484,31 @@ export default function JoinMembership() {
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
-                <h2 className="mb-1 text-xl font-semibold text-[#1a3a8a]">Swimmer & parent info</h2>
+                <h2 className="mb-1 text-xl font-semibold text-[#1a3a8a]">
+                  {isAdult ? "Your info" : "Swimmer & parent info"}
+                </h2>
                 <p className="mb-4 text-sm text-[#2a5e84]">
-                  Please use the swimmer's full legal name.
+                  {isAdult
+                    ? "Please use your full legal name."
+                    : "Please use the swimmer's full legal name."}
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <Label>{plan.plan_key === "adult_group" ? "Swimmer first name" : "Child first name"}</Label>
+                    <Label>{isAdult ? "Your first name" : "Child first name"}</Label>
                     <Input
                       value={form.child_first}
                       onChange={(e) => setForm({ ...form, child_first: e.target.value })}
                     />
                   </div>
                   <div>
-                    <Label>{plan.plan_key === "adult_group" ? "Swimmer last name" : "Child last name"}</Label>
+                    <Label>{isAdult ? "Your last name" : "Child last name"}</Label>
                     <Input
                       value={form.child_last}
                       onChange={(e) => setForm({ ...form, child_last: e.target.value })}
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <Label>Swimmer date of birth</Label>
+                    <Label>{isAdult ? "Your date of birth" : "Swimmer date of birth"}</Label>
                     <Input
                       type="date"
                       value={childDob}
@@ -517,22 +521,26 @@ export default function JoinMembership() {
                       </p>
                     )}
                   </div>
+                  {!isAdult && (
+                    <>
+                      <div>
+                        <Label>Parent first name</Label>
+                        <Input
+                          value={form.parent_first}
+                          onChange={(e) => setForm({ ...form, parent_first: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label>Parent last name</Label>
+                        <Input
+                          value={form.parent_last}
+                          onChange={(e) => setForm({ ...form, parent_last: e.target.value })}
+                        />
+                      </div>
+                    </>
+                  )}
                   <div>
-                    <Label>Parent first name</Label>
-                    <Input
-                      value={form.parent_first}
-                      onChange={(e) => setForm({ ...form, parent_first: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Parent last name</Label>
-                    <Input
-                      value={form.parent_last}
-                      onChange={(e) => setForm({ ...form, parent_last: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Parent email</Label>
+                    <Label>{isAdult ? "Your email" : "Parent email"}</Label>
                     <Input
                       type="email"
                       value={form.parent_email}
@@ -540,7 +548,7 @@ export default function JoinMembership() {
                     />
                   </div>
                   <div>
-                    <Label>Parent phone</Label>
+                    <Label>{isAdult ? "Your phone" : "Parent phone"}</Label>
                     <Input
                       type="tel"
                       value={form.parent_phone}
@@ -548,7 +556,11 @@ export default function JoinMembership() {
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <Label>Have you enrolled with us before?</Label>
+                    <Label>
+                      {isAdult
+                        ? "Is this your first time swimming with us?"
+                        : "Have you enrolled with us before?"}
+                    </Label>
                     <RadioGroup
                       value={form.is_first_time}
                       onValueChange={(v) => setForm({ ...form, is_first_time: v as "yes" | "no" })}
@@ -556,16 +568,24 @@ export default function JoinMembership() {
                     >
                       <div className="flex items-center gap-2">
                         <RadioGroupItem value="yes" id="ft-yes" />
-                        <Label htmlFor="ft-yes" className="cursor-pointer font-normal">First time</Label>
+                        <Label htmlFor="ft-yes" className="cursor-pointer font-normal">
+                          {isAdult ? "Yes, first time" : "First time"}
+                        </Label>
                       </div>
                       <div className="flex items-center gap-2">
                         <RadioGroupItem value="no" id="ft-no" />
-                        <Label htmlFor="ft-no" className="cursor-pointer font-normal">Returning family</Label>
+                        <Label htmlFor="ft-no" className="cursor-pointer font-normal">
+                          {isAdult ? "No, I've swum here before" : "Returning family"}
+                        </Label>
                       </div>
                     </RadioGroup>
                   </div>
                   <div className="sm:col-span-2">
-                    <Label>Any medical conditions, allergies, or accommodations?</Label>
+                    <Label>
+                      {isAdult
+                        ? "Do you have any medical conditions or allergies we should know about?"
+                        : "Any medical conditions, allergies, or accommodations?"}
+                    </Label>
                     <RadioGroup
                       value={form.has_medical}
                       onValueChange={(v) => setForm({ ...form, has_medical: v as "yes" | "no" })}
@@ -616,7 +636,7 @@ export default function JoinMembership() {
               </>
             )}
 
-            {step === 4 && (
+            {step === 4 && plan && (
               <>
                 <button
                   type="button"
@@ -626,12 +646,16 @@ export default function JoinMembership() {
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
                 <LegalAgreements
-                  parentName={`${form.parent_first} ${form.parent_last}`.trim()}
+                  parentName={
+                    isAdult
+                      ? `${form.child_first} ${form.child_last}`.trim()
+                      : `${form.parent_first} ${form.parent_last}`.trim()
+                  }
                   childName={`${form.child_first} ${form.child_last}`.trim()}
-                  signerFirstName={form.parent_first}
-                  signerLastName={form.parent_last}
-                  signerPhone={form.parent_phone}
-                  signerLabel="Same as parent information"
+                  signerFirstName={isAdult ? undefined : form.parent_first}
+                  signerLastName={isAdult ? undefined : form.parent_last}
+                  signerPhone={isAdult ? undefined : form.parent_phone}
+                  signerLabel={isAdult ? undefined : "Same as parent information"}
                   signerRelationshipDefault="Parent/Guardian"
                   lockFieldsOnSameAsSigner={false}
                   onSubmit={handleLegalSubmit}
