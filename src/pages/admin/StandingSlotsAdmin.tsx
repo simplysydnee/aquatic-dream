@@ -393,6 +393,7 @@ const StandingSlotsAdmin = () => {
           <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="text-left px-3 py-2"><SortHead k="plan_key">Program</SortHead></th>
+              <th className="text-left px-3 py-2">Level</th>
               <th className="text-left px-3 py-2"><SortHead k="instructor">Instructor</SortHead></th>
               <th className="text-left px-3 py-2"><SortHead k="day_of_week">Day</SortHead></th>
               <th className="text-left px-3 py-2"><SortHead k="start_time">Start</SortHead></th>
