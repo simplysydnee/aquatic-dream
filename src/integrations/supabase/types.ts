@@ -1462,7 +1462,11 @@ export type Database = {
           name: string
           plan_key: Database["public"]["Enums"]["membership_plan_key"]
           stripe_price_id: string | null
+          stripe_price_id_live: string | null
+          stripe_price_id_sandbox: string | null
           stripe_product_id: string | null
+          stripe_product_id_live: string | null
+          stripe_product_id_sandbox: string | null
         }
         Insert: {
           active?: boolean
@@ -1473,7 +1477,11 @@ export type Database = {
           name: string
           plan_key: Database["public"]["Enums"]["membership_plan_key"]
           stripe_price_id?: string | null
+          stripe_price_id_live?: string | null
+          stripe_price_id_sandbox?: string | null
           stripe_product_id?: string | null
+          stripe_product_id_live?: string | null
+          stripe_product_id_sandbox?: string | null
         }
         Update: {
           active?: boolean
@@ -1484,7 +1492,11 @@ export type Database = {
           name?: string
           plan_key?: Database["public"]["Enums"]["membership_plan_key"]
           stripe_price_id?: string | null
+          stripe_price_id_live?: string | null
+          stripe_price_id_sandbox?: string | null
           stripe_product_id?: string | null
+          stripe_product_id_live?: string | null
+          stripe_product_id_sandbox?: string | null
         }
         Relationships: []
       }
