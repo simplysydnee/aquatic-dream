@@ -76,7 +76,7 @@ serve(async (req) => {
 
     const { data: plan, error: planErr } = await supabaseAdmin
       .from("membership_plans")
-      .select("id, plan_key, name, monthly_price_cents, stripe_product_id, stripe_price_id, active")
+      .select("id, plan_key, name, monthly_price_cents, stripe_product_id, stripe_price_id, stripe_product_id_sandbox, stripe_price_id_sandbox, stripe_product_id_live, stripe_price_id_live, active")
       .eq("plan_key", plan_key)
       .maybeSingle();
     if (planErr || !plan || !plan.active) return json({ error: "Plan not available" }, 404);
@@ -100,8 +100,12 @@ serve(async (req) => {
 
     const stripe = createStripeClient(ENV);
 
-    let stripePriceId = plan.stripe_price_id as string | null;
-    let stripeProductId = plan.stripe_product_id as string | null;
+    // Cache Stripe product/price IDs PER ENVIRONMENT — a live price ID
+    // does not exist in the sandbox account and vice versa.
+    const priceCol = ENV === "sandbox" ? "stripe_price_id_sandbox" : "stripe_price_id_live";
+    const productCol = ENV === "sandbox" ? "stripe_product_id_sandbox" : "stripe_product_id_live";
+    let stripePriceId = (plan as any)[priceCol] as string | null;
+    let stripeProductId = (plan as any)[productCol] as string | null;
     if (!stripePriceId) {
       if (!stripeProductId) {
         const product = await stripe.products.create({ name: plan.name });
@@ -117,7 +121,7 @@ serve(async (req) => {
       stripePriceId = price.id;
       await supabaseAdmin
         .from("membership_plans")
-        .update({ stripe_product_id: stripeProductId, stripe_price_id: stripePriceId })
+        .update({ [productCol]: stripeProductId, [priceCol]: stripePriceId })
         .eq("id", plan.id);
     }
 
