@@ -359,6 +359,7 @@ export default function JoinMembership() {
         membership_agreement_text: MEMBERSHIP_AGREEMENT_TEXT,
         membership_agreement_accepted: agreementAccepted,
         returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
+        environment: getStripeEnvironment(),
       },
     });
     if (error || !data?.clientSecret) {
