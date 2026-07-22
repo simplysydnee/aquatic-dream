@@ -47,7 +47,10 @@ serve(async (req) => {
       sms_consent_text,
       sms_consent_version,
       returnUrl,
+      environment,
     } = body ?? {};
+
+    const ENV: StripeEnv = environment === "sandbox" ? "sandbox" : "live";
 
     if (!["kid_group", "private", "adult_group"].includes(plan_key)) {
       return json({ error: "Invalid plan_key" }, 400);
