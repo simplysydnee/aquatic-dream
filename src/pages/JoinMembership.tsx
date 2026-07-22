@@ -17,7 +17,7 @@ import {
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, Check, ShieldCheck } from "lucide-react";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
 import LegalAgreements, { type LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import type { SwimLevel } from "@/components/swim-enrollment/types";
@@ -359,6 +359,7 @@ export default function JoinMembership() {
         membership_agreement_text: MEMBERSHIP_AGREEMENT_TEXT,
         membership_agreement_accepted: agreementAccepted,
         returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
+        environment: getStripeEnvironment(),
       },
     });
     if (error || !data?.clientSecret) {

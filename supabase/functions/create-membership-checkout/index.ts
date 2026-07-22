@@ -4,8 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient } from "../_shared/stripe.ts";
 import { computeMembershipQuote } from "../_shared/membership-pricing.ts";
 
-// Uses the same Stripe env as the rest of the app's payment flows.
-const ENV = "live" as const;
+type StripeEnv = "sandbox" | "live";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -48,7 +47,10 @@ serve(async (req) => {
       sms_consent_text,
       sms_consent_version,
       returnUrl,
+      environment,
     } = body ?? {};
+
+    const ENV: StripeEnv = environment === "sandbox" ? "sandbox" : "live";
 
     if (!["kid_group", "private", "adult_group"].includes(plan_key)) {
       return json({ error: "Invalid plan_key" }, 400);
