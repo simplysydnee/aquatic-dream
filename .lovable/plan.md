@@ -1,34 +1,42 @@
-## Problem
+## Diagnosis
 
-The edge functions now charge the correct $50 promo price for July private lessons, but three admin UI surfaces still **display** the stale `price_per_session` value ($65) from the booking row. So the "Charge $65" button and confirmation totals scare admin off — even though Stripe would actually bill $50.
+All four MCP tools connect (OAuth verification succeeds — logs show `oauth.verify.ok`) but every `tools/call` fails with `outcome: "handler_error"` in the `mcp` edge function logs (e.g. `list_active_sessions` at 2026-07-23, function `85bd0d3f-...`, `durationMs: 0.49` — the handler throws almost immediately, before any DB round-trip).
 
-## Files to change
+### Root cause
 
-Replace every stale `price_per_session` read on the calendar surfaces with the promo-aware helper `getPrivateLessonPrice(lesson_type, occurrence_date)` from `@/lib/privateLessonPricing`.
+Each tool builds its Supabase client the same way:
 
-### 1. `src/components/admin/calendar/PrivateLessonDetailDialog.tsx`
-Four spots:
-- Line 195 (`amountLabel: \`$${lesson.price_per_session}\``) — pass promo-aware amount for the emailed card-on-file link.
-- Line 320 (Price row display) — show promo price with a small "Summer Special" note when applicable.
-- Line 390 (`Charge $${lesson.price_per_session}` button label) — must read $50 for July.
-- Line 546 (`amount={Number(lesson.price_per_session) || 0}` passed to `ChargeConfirmDialog`) — pass promo amount.
+```ts
+createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, { ... })
+```
 
-### 2. `src/components/admin/calendar/ChargeAllDialog.tsx`
-Line 118: compute `price` per row via `getPrivateLessonPrice(b?.lesson_type, r.occurrence_date)` instead of `Number(b?.price_per_session ?? 0)`. Total (line 146) and per-row displays then show $50 for July privates automatically.
+Supabase Edge Functions inject `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` — **not** `SUPABASE_PUBLISHABLE_KEY`. That variable name only exists on the Vite frontend (`VITE_SUPABASE_PUBLISHABLE_KEY`). In the function it's `undefined`, so `createClient(url, undefined, …)` throws `supabaseKey is required.` synchronously on the very first line of every handler. That's why the duration is sub-millisecond and no query error ever shows up — the client is never built.
 
-### 3. Sanity sweep
-Grep the calendar folder and swimmer PaymentsTab one more time for any remaining `price_per_session` UI reads and swap them the same way. PaymentsTab was already updated in the last pass, but re-verify.
+The tools that ship in the mcp-js docs happen to use the same name, but only work in stacks where the developer has separately set that secret. On this project it's not set for the function runtime, so every tool 500s.
 
-## Out of scope
+### Proposed fix (do not apply yet)
 
-- No backend changes (edge functions already correctly charge promo price).
-- Not backfilling `lesson_bookings.price_per_session` — the helper is the single source of truth at display + charge time.
-- No changes to group swim session pricing.
+In all four files under `src/lib/mcp/tools/*.ts`, change the client factory to use `SUPABASE_ANON_KEY` (which is always present in the edge runtime), keeping the user's bearer token forwarded so RLS still runs as the signed-in admin:
 
-## Verification
+```ts
+createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!,
+  { global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false } },
+);
+```
 
-After the edit, open a July 14 private lesson block on `/admin`:
-- Price row shows **$50** (with Summer Special note).
-- Charge button reads **Charge $50**.
-- ChargeConfirmDialog total reads **$50**.
-- "Charge all today" dialog totals reflect $50 per private, $45 per semi-private.
+Then redeploy the `mcp` edge function (the Vite plugin will regenerate `supabase/functions/mcp/index.ts` from the tool sources, and `supabase--deploy_edge_functions` pushes it).
+
+### Verification after the fix
+
+1. `supabase--curl_edge_functions` a `tools/call` for `list_active_sessions` (fastest, no args required) and confirm it returns rows.
+2. Re-check `mcp` function logs for `outcome: "ok"` instead of `handler_error`.
+3. Reconnect from Claude/ChatGPT and run each of the four tools once.
+
+### Not changing
+
+- Auth/OAuth config (already verified working).
+- Tool signatures, schemas, or the `defineMcp` entry.
+- Any RLS policy or table — the anon key + user JWT combination already gives the correct per-user access.
