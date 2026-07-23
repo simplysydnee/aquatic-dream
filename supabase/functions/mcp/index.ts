@@ -10,7 +10,7 @@ import { createClient } from "npm:@supabase/supabase-js@^2.98.0";
 import { defineTool } from "npm:@lovable.dev/mcp-js@0.20.0";
 import { z } from "npm:zod@^3.23.8";
 function client(ctx) {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
     auth: { persistSession: false, autoRefreshToken: false }
   });
