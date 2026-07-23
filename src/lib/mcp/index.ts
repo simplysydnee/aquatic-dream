@@ -3,6 +3,10 @@ import searchSwimmers from "./tools/search-swimmers";
 import listUpcomingPrivateLessons from "./tools/list-upcoming-private-lessons";
 import listActiveSessions from "./tools/list-active-sessions";
 import getClassRoster from "./tools/get-class-roster";
+import listOpenPrivateSlots from "./tools/list-open-private-slots";
+import listPastPrivateFamilies from "./tools/list-past-private-families";
+import sendPrivateOpeningsSms from "./tools/send-private-openings-sms";
+
 
 // Build the issuer from the project ref so the OAuth issuer matches the direct
 // supabase.co host that Supabase publishes in its discovery document.
