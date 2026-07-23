@@ -522,6 +522,8 @@ const StandingSlotsAdmin = () => {
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+            <tr>
+              <th className="w-8 px-2 py-2"></th>
               <th className="text-left px-3 py-2"><SortHead k="plan_key">Program</SortHead></th>
               <th className="text-left px-3 py-2">Level</th>
               <th className="text-left px-3 py-2"><SortHead k="instructor">Instructor</SortHead></th>
