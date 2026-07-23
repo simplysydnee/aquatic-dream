@@ -163,6 +163,337 @@ var get_class_roster_default = defineTool4({
   }
 });
 
+// src/lib/mcp/tools/list-open-private-slots.ts
+import { createClient as createClient5 } from "npm:@supabase/supabase-js@^2.98.0";
+import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z5 } from "npm:zod@^3.23.8";
+
+// src/lib/privateBooking-core.ts
+function addMinutes(time, mins) {
+  const [h, m] = time.split(":").map(Number);
+  const total = h * 60 + m + mins;
+  const hh = Math.floor(total / 60) % 24;
+  const mm = total % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+function normTime(t) {
+  return t.length >= 5 ? t.substring(0, 5) : t;
+}
+function isoDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function blockAppliesOnDate(b, dateStr, dow) {
+  if (b.kind === "weekly") {
+    if (b.day_of_week !== dow) return false;
+    if (b.start_date && dateStr < b.start_date) return false;
+    if (b.end_date && dateStr > b.end_date) return false;
+    return true;
+  }
+  if (b.kind === "date_range") {
+    if (b.start_date && dateStr < b.start_date) return false;
+    if (b.end_date && dateStr > b.end_date) return false;
+    if (b.day_of_week !== null && b.day_of_week !== dow) return false;
+    return true;
+  }
+  return false;
+}
+function composeOpenSlots(input) {
+  const instructorMap = Object.fromEntries(input.instructors.map((i) => [i.id, i.name]));
+  const takenIntervals = [];
+  for (const o of input.taken) {
+    const startT = normTime(o.start_time || "");
+    const endT = normTime(o.end_time || "");
+    if (!o.instructor_id || !startT || !endT) continue;
+    const [sh, sm] = startT.split(":").map(Number);
+    const [eh, em] = endT.split(":").map(Number);
+    takenIntervals.push({ instructor_id: o.instructor_id, date: o.occurrence_date, start: sh * 60 + sm, end: eh * 60 + em });
+  }
+  for (const h of input.holds) {
+    const t = normTime(h.start_time);
+    const [sh, sm] = t.split(":").map(Number);
+    takenIntervals.push({ instructor_id: h.instructor_id, date: h.slot_date, start: sh * 60 + sm, end: sh * 60 + sm + 30 });
+  }
+  const availabilityBlocks = input.blocks.filter((b) => !b.is_blackout);
+  const blackoutBlocks = input.blocks.filter((b) => b.is_blackout);
+  const out = [];
+  const cursor = new Date(input.fromDate);
+  cursor.setHours(0, 0, 0, 0);
+  for (let i = 0; i < input.weeks * 7; i++) {
+    const d = new Date(cursor);
+    d.setDate(d.getDate() + i);
+    const dateStr = isoDate(d);
+    const dow = d.getDay();
+    const blackoutsToday = blackoutBlocks.filter((b) => blockAppliesOnDate(b, dateStr, dow)).map((b) => {
+      const [sh, sm] = normTime(b.start_time).split(":").map(Number);
+      const [eh, em] = normTime(b.end_time).split(":").map(Number);
+      return { instructor_id: b.instructor_id, start: sh * 60 + sm, end: eh * 60 + em };
+    });
+    for (const blk of availabilityBlocks) {
+      if (!blockAppliesOnDate(blk, dateStr, dow)) continue;
+      let t = normTime(blk.start_time);
+      const end = normTime(blk.end_time);
+      const brkStart = blk.break_start_time ? normTime(blk.break_start_time) : null;
+      const brkEnd = blk.break_end_time ? normTime(blk.break_end_time) : null;
+      while (addMinutes(t, blk.slot_minutes) <= end) {
+        const slotEnd = addMinutes(t, blk.slot_minutes);
+        if (brkStart && brkEnd && t < brkEnd && slotEnd > brkStart) {
+          t = brkEnd;
+          continue;
+        }
+        const [th, tm] = t.split(":").map(Number);
+        const [eh, em] = slotEnd.split(":").map(Number);
+        const sMin = th * 60 + tm;
+        const eMin = eh * 60 + em;
+        const overlaps = takenIntervals.some(
+          (iv) => iv.instructor_id === blk.instructor_id && iv.date === dateStr && sMin < iv.end && eMin > iv.start
+        );
+        const blackedOut = blackoutsToday.some(
+          (bo) => bo.instructor_id === blk.instructor_id && sMin < bo.end && eMin > bo.start
+        );
+        if (!overlaps && !blackedOut) {
+          out.push({
+            instructor_id: blk.instructor_id,
+            instructor_name: instructorMap[blk.instructor_id] || "Instructor",
+            slot_date: dateStr,
+            start_time: t,
+            end_time: slotEnd
+          });
+        }
+        t = slotEnd;
+      }
+    }
+  }
+  const seen = /* @__PURE__ */ new Set();
+  return out.filter((s) => {
+    const k = `${s.instructor_id}|${s.slot_date}|${s.start_time}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+// src/lib/mcp/tools/list-open-private-slots.ts
+function client5(ctx) {
+  return createClient5(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var list_open_private_slots_default = defineTool5({
+  name: "list_open_private_slots",
+  title: "List open private lesson slots",
+  description: "List open 30-minute private lesson slots for a specific date. Uses the same availability computation as the public /book-private-lesson picker (instructor booking blocks minus existing bookings, active holds, and blackouts).",
+  inputSchema: {
+    date: z5.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("Target date (YYYY-MM-DD)."),
+    instructorIds: z5.array(z5.string().uuid()).optional().describe("Optional list of instructor UUIDs to restrict to.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ date, instructorIds }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = client5(ctx);
+    const { data: instData, error: instErr } = await supabase.rpc("get_active_instructors_public");
+    if (instErr) return { content: [{ type: "text", text: instErr.message }], isError: true };
+    const instructors = instData || [];
+    const allowed = new Set(instructorIds && instructorIds.length ? instructorIds : instructors.map((i) => i.id));
+    const [blocksRes, occsRes, holdsRes] = await Promise.all([
+      supabase.rpc("get_public_booking_blocks", { _instructor_ids: Array.from(allowed) }),
+      supabase.rpc("get_public_taken_occurrences", { p_from_date: date, p_to_date: date }),
+      supabase.rpc("get_active_slot_holds", { p_from_date: date, p_to_date: date, p_session_token: null })
+    ]);
+    for (const r of [blocksRes, occsRes, holdsRes]) {
+      if (r.error) return { content: [{ type: "text", text: r.error.message }], isError: true };
+    }
+    const [y, m, d] = date.split("-").map(Number);
+    const fromDate = new Date(y, m - 1, d);
+    const slots = composeOpenSlots({
+      fromDate,
+      weeks: 1,
+      instructors: instructors.filter((i) => allowed.has(i.id)),
+      blocks: blocksRes.data || [],
+      taken: occsRes.data || [],
+      holds: holdsRes.data || []
+    }).filter((s) => s.slot_date === date).sort(
+      (a, b) => a.start_time === b.start_time ? a.instructor_name.localeCompare(b.instructor_name) : a.start_time.localeCompare(b.start_time)
+    );
+    return {
+      content: [{ type: "text", text: JSON.stringify(slots, null, 2) }],
+      structuredContent: { rows: slots, count: slots.length, date }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-past-private-families.ts
+import { createClient as createClient6 } from "npm:@supabase/supabase-js@^2.98.0";
+import { defineTool as defineTool6 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z6 } from "npm:zod@^3.23.8";
+function client6(ctx) {
+  return createClient6(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+function normalizePhone(raw) {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("+")) {
+    const d = "+" + trimmed.slice(1).replace(/\D/g, "");
+    return d.length > 1 ? d : null;
+  }
+  const just = trimmed.replace(/\D/g, "");
+  if (just.length === 10) return `+1${just}`;
+  if (just.length === 11 && just.startsWith("1")) return `+${just}`;
+  return just ? `+${just}` : null;
+}
+function isoDaysAgo(days) {
+  const d = /* @__PURE__ */ new Date();
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+var list_past_private_families_default = defineTool6({
+  name: "list_past_private_families",
+  title: "List past private lesson families",
+  description: "List distinct families who have had a private (or semi-private) lesson occurrence on or after sinceDate. Deduped by normalized phone number. Returns phone (E.164), parent name, child first names, and the most recent lesson date. Intended for outreach/blast lists.",
+  inputSchema: {
+    sinceDate: z6.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Only include families with a lesson on/after this date (default: 365 days ago)."),
+    includeSemiPrivate: z6.boolean().default(true).describe("Include semi-private bookings alongside private."),
+    limit: z6.number().int().min(1).max(1e3).default(500)
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ sinceDate, includeSemiPrivate, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = client6(ctx);
+    const since = sinceDate ?? isoDaysAgo(365);
+    const types = includeSemiPrivate ? ["private", "semi-private"] : ["private"];
+    const { data, error } = await supabase.from("lesson_booking_occurrences").select(
+      `occurrence_date, status,
+         booking:lesson_bookings!inner(id, lesson_type, status,
+           parent_name, parent_first_name, parent_last_name, parent_phone,
+           child_first_name, child_name)`
+    ).gte("occurrence_date", since).neq("status", "cancelled").in("booking.lesson_type", types).neq("booking.status", "cancelled").not("booking.parent_phone", "is", null);
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const byPhone = /* @__PURE__ */ new Map();
+    for (const r of data || []) {
+      const b = r.booking;
+      if (!b) continue;
+      const phone = normalizePhone(b.parent_phone);
+      if (!phone) continue;
+      const parentName = b.parent_name || [b.parent_first_name, b.parent_last_name].filter(Boolean).join(" ") || "";
+      const child = (b.child_first_name || "").trim() || ((b.child_name || "").split(" ")[0] || "").trim();
+      const existing = byPhone.get(phone);
+      if (existing) {
+        if (child) existing._children.add(child);
+        if (r.occurrence_date > existing.last_lesson_date) {
+          existing.last_lesson_date = r.occurrence_date;
+        }
+        if (!existing.parent_name && parentName) existing.parent_name = parentName;
+      } else {
+        const children = /* @__PURE__ */ new Set();
+        if (child) children.add(child);
+        byPhone.set(phone, {
+          phone,
+          parent_name: parentName,
+          childNames: [],
+          last_lesson_date: r.occurrence_date,
+          _children: children
+        });
+      }
+    }
+    const rows = Array.from(byPhone.values()).map((r) => ({
+      phone: r.phone,
+      parent_name: r.parent_name,
+      childNames: Array.from(r._children).sort(),
+      last_lesson_date: r.last_lesson_date
+    })).sort((a, b) => a.last_lesson_date < b.last_lesson_date ? 1 : -1).slice(0, limit);
+    return {
+      content: [{ type: "text", text: JSON.stringify(rows, null, 2) }],
+      structuredContent: { rows, count: rows.length, since_date: since }
+    };
+  }
+});
+
+// src/lib/mcp/tools/send-private-openings-sms.ts
+import { defineTool as defineTool7 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z7 } from "npm:zod@^3.23.8";
+var RecipientSchema = z7.object({
+  phone: z7.string().min(5),
+  childNames: z7.array(z7.string()).optional().default([])
+});
+var send_private_openings_sms_default = defineTool7({
+  name: "send_private_openings_sms",
+  title: "Send private lesson openings SMS blast",
+  description: "Send a bulk SMS blast (via TextMagic) to a list of past private-lesson families about open private slots on a specific date. Delegates to the existing admin-only send-bulk-outreach-sms edge function. REQUIRES confirm=true to actually send; without it the tool refuses. Use list_open_private_slots + list_past_private_families first, preview the template with the user, then call again with confirm=true.",
+  inputSchema: {
+    template: z7.string().min(5).max(1e3).describe(
+      "SMS body. Supports {{childNames}} (per-recipient) and {{date}} placeholders resolved by the sender function."
+    ),
+    dateLabel: z7.string().min(1).describe("Human-readable date label, e.g. 'Sat Aug 30'. Passed as startDateLabel."),
+    recipients: z7.array(RecipientSchema).min(1).max(500),
+    reminderKind: z7.string().default("saturday_openings_sms"),
+    confirm: z7.boolean().default(false).describe("Must be true to actually send. When false the tool returns without sending.")
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+  handler: async ({ template, dateLabel, recipients, reminderKind, confirm }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    if (!confirm) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Refusing to send: confirm=false. Would text ${recipients.length} recipient(s) for ${dateLabel}. Re-call with confirm=true to actually send.`
+          }
+        ],
+        structuredContent: {
+          would_send: recipients.length,
+          date_label: dateLabel,
+          reminder_kind: reminderKind,
+          preview_template: template
+        }
+      };
+    }
+    const url = `${process.env.SUPABASE_URL}/functions/v1/send-bulk-outreach-sms`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ctx.getToken()}`
+      },
+      body: JSON.stringify({
+        template,
+        startDateLabel: dateLabel,
+        recipients,
+        reminderKind
+      })
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      return {
+        content: [{ type: "text", text: `send-bulk-outreach-sms failed (${res.status}): ${text}` }],
+        isError: true
+      };
+    }
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = { raw: text };
+    }
+    return {
+      content: [{ type: "text", text }],
+      structuredContent: parsed ?? { raw: text }
+    };
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "jilrijklnehbfuulykty";
 var mcp_default = defineMcp({
@@ -174,7 +505,15 @@ var mcp_default = defineMcp({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"
   }),
-  tools: [search_swimmers_default, list_upcoming_private_lessons_default, list_active_sessions_default, get_class_roster_default]
+  tools: [
+    search_swimmers_default,
+    list_upcoming_private_lessons_default,
+    list_active_sessions_default,
+    get_class_roster_default,
+    list_open_private_slots_default,
+    list_past_private_families_default,
+    send_private_openings_sms_default
+  ]
 });
 
 // lovable-mcp-supabase-entry.ts

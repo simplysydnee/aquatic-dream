@@ -131,6 +131,142 @@
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
         "outputSchema": null
+      },
+      {
+        "name": "list_open_private_slots",
+        "title": "List open private lesson slots",
+        "description": "List open 30-minute private lesson slots for a specific date. Uses the same availability computation as the public /book-private-lesson picker (instructor booking blocks minus existing bookings, active holds, and blackouts).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Target date (YYYY-MM-DD)."
+            },
+            "instructorIds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "description": "Optional list of instructor UUIDs to restrict to."
+            }
+          },
+          "required": [
+            "date"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_past_private_families",
+        "title": "List past private lesson families",
+        "description": "List distinct families who have had a private (or semi-private) lesson occurrence on or after sinceDate. Deduped by normalized phone number. Returns phone (E.164), parent name, child first names, and the most recent lesson date. Intended for outreach/blast lists.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sinceDate": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Only include families with a lesson on/after this date (default: 365 days ago)."
+            },
+            "includeSemiPrivate": {
+              "type": "boolean",
+              "default": true,
+              "description": "Include semi-private bookings alongside private."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "send_private_openings_sms",
+        "title": "Send private lesson openings SMS blast",
+        "description": "Send a bulk SMS blast (via TextMagic) to a list of past private-lesson families about open private slots on a specific date. Delegates to the existing admin-only send-bulk-outreach-sms edge function. REQUIRES confirm=true to actually send; without it the tool refuses. Use list_open_private_slots + list_past_private_families first, preview the template with the user, then call again with confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "template": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 1000,
+              "description": "SMS body. Supports {{childNames}} (per-recipient) and {{date}} placeholders resolved by the sender function."
+            },
+            "dateLabel": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable date label, e.g. 'Sat Aug 30'. Passed as startDateLabel."
+            },
+            "recipients": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "minLength": 5
+                  },
+                  "childNames": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  }
+                },
+                "required": [
+                  "phone"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 500
+            },
+            "reminderKind": {
+              "type": "string",
+              "default": "saturday_openings_sms"
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false,
+              "description": "Must be true to actually send. When false the tool returns without sending."
+            }
+          },
+          "required": [
+            "template",
+            "dateLabel",
+            "recipients"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
       }
     ]
   }
