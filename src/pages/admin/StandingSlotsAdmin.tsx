@@ -421,6 +421,53 @@ const StandingSlotsAdmin = () => {
         </Button>
       </div>
 
+      {/* Capacity dashboard — at-a-glance fill by program/level */}
+      <Card className="p-4">
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-primary">Capacity at a glance</h2>
+          <span className="text-xs text-muted-foreground">Active memberships / total capacity</span>
+        </div>
+        {loading ? (
+          <div className="py-6 text-center text-muted-foreground text-sm">
+            <Loader2 className="inline h-4 w-4 animate-spin mr-2" />Loading capacity…
+          </div>
+        ) : dashboardGroups.length === 0 ? (
+          <div className="py-6 text-center text-muted-foreground text-sm">No active slots yet.</div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {dashboardGroups.map((g) => {
+              const pct = g.capacity > 0 ? Math.min(100, Math.round((g.enrolled / g.capacity) * 100)) : 0;
+              const state = fillState(g.enrolled, g.capacity);
+              return (
+                <div key={g.key} className="rounded-lg border bg-card p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-sm text-foreground truncate">{g.label}</div>
+                    <span className={cn("text-[11px] font-semibold uppercase tracking-wide", state.tone)}>
+                      {state.label}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between text-xs text-muted-foreground">
+                    <span>
+                      <span className="text-lg font-semibold text-foreground tabular-nums">{g.enrolled}</span>
+                      <span className="mx-1">/</span>
+                      <span className="tabular-nums">{g.capacity}</span>
+                    </span>
+                    <span>{g.slotCount} slot{g.slotCount === 1 ? "" : "s"}</span>
+                  </div>
+                  <div className="mt-2 h-2 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={cn("h-full transition-all", g.accent, g.enrolled >= g.capacity && "bg-destructive")}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+
       <Card className="p-3 flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Program</label>
