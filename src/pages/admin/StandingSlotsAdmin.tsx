@@ -781,8 +781,21 @@ const StandingSlotsAdmin = () => {
                   </tr>
                 );
               }
+              const isExpanded = expandedSlots.has(s.id);
+              const roster = rosterBySlot[s.id] || [];
               return (
+                <>
                 <tr key={s.id} className={cn("border-t hover:bg-muted/30", !s.active && "opacity-60")}>
+                  <td className="px-2 py-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(s.id)}
+                      className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                      aria-label={isExpanded ? "Collapse roster" : "Expand roster"}
+                    >
+                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                  </td>
                   <td className="px-3 py-2">{PLAN_LABELS[s.plan_key]}</td>
                   <td className="px-3 py-2">
                     {s.plan_key === "kid_group"
@@ -809,6 +822,61 @@ const StandingSlotsAdmin = () => {
                     </Button>
                   </td>
                 </tr>
+                {isExpanded && (
+                  <tr className="bg-muted/20 border-t">
+                    <td></td>
+                    <td colSpan={12} className="px-3 py-3">
+                      {roster.length === 0 ? (
+                        <div className="text-xs text-muted-foreground italic">No active memberships in this slot.</div>
+                      ) : (
+                        <div className="space-y-1">
+                          <div className="text-[11px] uppercase tracking-wide text-primary font-semibold mb-1.5">
+                            Roster ({roster.length})
+                          </div>
+                          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                            {roster.map((m) => {
+                              const childName = [m.child_first_name, m.child_last_name].filter(Boolean).join(" ") || "Unnamed swimmer";
+                              const parentName = [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ");
+                              return (
+                                <div key={m.id} className="rounded-md border bg-card px-3 py-2 text-xs">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-medium text-foreground truncate">{childName}</span>
+                                    {s.plan_key === "kid_group" && s.swim_level && (
+                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">
+                                        {s.swim_level}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {parentName && (
+                                    <div className="text-muted-foreground mt-0.5 truncate">{parentName}</div>
+                                  )}
+                                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-muted-foreground">
+                                    {m.parent_email && (
+                                      <a href={`mailto:${m.parent_email}`} className="inline-flex items-center gap-1 hover:text-primary truncate">
+                                        <Mail className="h-3 w-3" />{m.parent_email}
+                                      </a>
+                                    )}
+                                    {m.parent_phone && (
+                                      <a href={`tel:${m.parent_phone}`} className="inline-flex items-center gap-1 hover:text-primary">
+                                        <Phone className="h-3 w-3" />{m.parent_phone}
+                                      </a>
+                                    )}
+                                  </div>
+                                  <div className="mt-1">
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">
+                                      {m.status}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </>
               );
             })}
           </tbody>
