@@ -540,6 +540,7 @@ const StandingSlotsAdmin = () => {
           <tbody>
             {adding && newSlot && (
               <tr className="border-t bg-amber-50/60">
+                <td className="px-2 py-1"></td>
                 <td className="px-2 py-1">
                   <Select
                     value={newSlot.plan_key}
