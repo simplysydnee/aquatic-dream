@@ -20,7 +20,7 @@ import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
 import LegalAgreements, { type LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
-import type { SwimLevel } from "@/components/swim-enrollment/types";
+import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
 import {
   lookupActiveWaiver,
   type ActiveWaiver,
@@ -58,13 +58,7 @@ type Slot = {
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const SWIM_LEVELS: SwimLevel[] = ["white", "red", "yellow", "blue", "green"];
-const LEVEL_LABELS: Record<SwimLevel, string> = {
-  white: "White (Little Fins)",
-  red: "Red (Reef Explorers)",
-  yellow: "Yellow (Sea Scouts)",
-  blue: "Blue (Deep Sea Divers)",
-  green: "Green (Ocean Masters)",
-};
+const LEVEL_LABELS = LEVEL_GROUP_NAMES;
 
 const fmtTime = (t: string) => {
   const [h, m] = t.split(":").map(Number);

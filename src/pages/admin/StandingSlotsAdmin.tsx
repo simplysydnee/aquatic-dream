@@ -40,13 +40,8 @@ const PLAN_LABELS: Record<PlanKey, string> = {
 };
 
 const SWIM_LEVELS: SwimLevel[] = ["white", "red", "yellow", "blue", "green"];
-const LEVEL_LABELS: Record<SwimLevel, string> = {
-  white: "White (Little Fins)",
-  red: "Red (Reef Explorers)",
-  yellow: "Yellow (Sea Scouts)",
-  blue: "Blue (Deep Sea Divers)",
-  green: "Green (Ocean Masters)",
-};
+import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
+const LEVEL_LABELS = LEVEL_GROUP_NAMES;
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DEFAULT_LOCATION = "1212 Kansas Ave, Modesto, CA";
