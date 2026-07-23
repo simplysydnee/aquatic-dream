@@ -20,7 +20,7 @@ import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
 import LegalAgreements, { type LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
-import type { SwimLevel } from "@/components/swim-enrollment/types";
+import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
 import {
   lookupActiveWaiver,
   type ActiveWaiver,
