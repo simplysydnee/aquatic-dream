@@ -18,6 +18,23 @@ export const LEVEL_DISPLAY: Record<SwimLevel, LevelInfo> = {
   green: { name: "Green", groupName: "Ocean Masters", diveStatus: "Expert", description: "Side-roll-side kick, stroke development", color: "bg-green-100 text-green-700 border-green-300" },
 };
 
+/**
+ * Single source of truth: color → branded swim-group name.
+ * Display this everywhere levels are shown to parents or staff.
+ * Color remains the underlying stored value.
+ */
+export const LEVEL_GROUP_NAMES: Record<SwimLevel, string> = {
+  white: "Little Fins",
+  red: "Reef Explorers",
+  yellow: "Sea Scouts",
+  blue: "Deep Sea Divers",
+  green: "Ocean Masters",
+};
+
+export function getBrandedLevelName(level: SwimLevel): string {
+  return LEVEL_GROUP_NAMES[level];
+}
+
 /** Maps level to its group display name based on age group */
 export function getGroupName(level: SwimLevel, ageGroup: AgeGroup): string {
   if (ageGroup === "preschool-3-5") {
