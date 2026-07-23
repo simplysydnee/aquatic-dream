@@ -22,5 +22,14 @@ export default defineMcp({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",
   }),
-  tools: [searchSwimmers, listUpcomingPrivateLessons, listActiveSessions, getClassRoster],
+  tools: [
+    searchSwimmers,
+    listUpcomingPrivateLessons,
+    listActiveSessions,
+    getClassRoster,
+    listOpenPrivateSlots,
+    listPastPrivateFamilies,
+    sendPrivateOpeningsSms,
+  ],
+
 });
