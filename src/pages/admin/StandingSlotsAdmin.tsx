@@ -659,13 +659,13 @@ const StandingSlotsAdmin = () => {
             )}
 
             {loading && (
-              <tr><td colSpan={12} className="px-3 py-8 text-center text-muted-foreground">
+              <tr><td colSpan={13} className="px-3 py-8 text-center text-muted-foreground">
                 <Loader2 className="inline h-4 w-4 animate-spin mr-2" />Loading…
               </td></tr>
             )}
 
             {!loading && filtered.length === 0 && !adding && (
-              <tr><td colSpan={12} className="px-3 py-8 text-center text-muted-foreground">
+              <tr><td colSpan={13} className="px-3 py-8 text-center text-muted-foreground">
                 No slots match. Click "Add slot" to create one.
               </td></tr>
             )}
