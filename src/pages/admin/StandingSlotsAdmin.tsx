@@ -876,7 +876,7 @@ const StandingSlotsAdmin = () => {
                     </td>
                   </tr>
                 )}
-                </>
+                </FragmentRow>
               );
             })}
           </tbody>
