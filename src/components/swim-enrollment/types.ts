@@ -35,16 +35,9 @@ export function getBrandedLevelName(level: SwimLevel): string {
   return LEVEL_GROUP_NAMES[level];
 }
 
-/** Maps level to its group display name based on age group */
-export function getGroupName(level: SwimLevel, ageGroup: AgeGroup): string {
-  if (ageGroup === "preschool-3-5") {
-    if (level === "white") return "Little Fins";
-    if (level === "red") return "Reef Explorers";
-  }
-  // School-age groupings
-  if (level === "yellow") return "Sea Scouts";
-  if (level === "blue") return "Deep Sea Divers";
-  return "Ocean Masters"; // green
+/** Maps level to its branded group display name (age group ignored — mapping is by color). */
+export function getGroupName(level: SwimLevel, _ageGroup?: AgeGroup): string {
+  return LEVEL_GROUP_NAMES[level];
 }
 
 /** Maps level to its dive status based on age group */
