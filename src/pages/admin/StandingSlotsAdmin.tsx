@@ -147,7 +147,10 @@ const StandingSlotsAdmin = () => {
       supabase.from("membership_plans").select("plan_key, capacity_per_slot, name").eq("active", true),
       supabase.rpc("get_instructors_admin"),
       supabase.from("standing_slots").select("*"),
-      supabase.from("memberships").select("standing_slot_id").eq("status", "active"),
+      supabase
+        .from("memberships")
+        .select("id, standing_slot_id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status")
+        .eq("status", "active"),
     ]);
 
     if (planRes.error) toast({ title: "Plans load failed", description: planRes.error.message, variant: "destructive" });
@@ -156,13 +159,28 @@ const StandingSlotsAdmin = () => {
 
     setPlans((planRes.data as Plan[]) || []);
     setInstructors(((instRes.data as Instructor[]) || []).filter((i) => i.is_active));
-    setSlots((slotRes.data as Slot[]) || []);
+    const slotList = (slotRes.data as Slot[]) || [];
+    setSlots(slotList);
 
+    const slotLevelById = new Map(slotList.map((s) => [s.id, s.swim_level]));
     const counts: Record<string, number> = {};
-    for (const m of (memRes.data as { standing_slot_id: string | null }[]) || []) {
-      if (m.standing_slot_id) counts[m.standing_slot_id] = (counts[m.standing_slot_id] || 0) + 1;
+    const roster: Record<string, RosterMember[]> = {};
+    for (const m of (memRes.data as RosterMember[]) || []) {
+      if (!m.standing_slot_id) continue;
+      counts[m.standing_slot_id] = (counts[m.standing_slot_id] || 0) + 1;
+      (roster[m.standing_slot_id] ||= []).push({
+        ...m,
+        swim_level: slotLevelById.get(m.standing_slot_id) ?? null,
+      });
+    }
+    for (const list of Object.values(roster)) {
+      list.sort((a, b) =>
+        (a.child_last_name || "").localeCompare(b.child_last_name || "") ||
+        (a.child_first_name || "").localeCompare(b.child_first_name || ""),
+      );
     }
     setEnrolledCounts(counts);
+    setRosterBySlot(roster);
     setLoading(false);
   };
 
