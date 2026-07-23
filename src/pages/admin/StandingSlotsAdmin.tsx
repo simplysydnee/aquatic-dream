@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment as FragmentRow, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,22 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { ArrowUpDown, Plus, Loader2, Save, X } from "lucide-react";
+import { ArrowUpDown, Plus, Loader2, Save, X, ChevronDown, ChevronRight, Mail, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface RosterMember {
+  id: string;
+  standing_slot_id: string | null;
+  plan_key: PlanKey;
+  child_first_name: string | null;
+  child_last_name: string | null;
+  parent_first_name: string | null;
+  parent_last_name: string | null;
+  parent_email: string | null;
+  parent_phone: string | null;
+  status: string;
+  swim_level?: SwimLevel | null;
+}
 
 type PlanKey = "kid_group" | "private" | "adult_group";
 type SwimLevel = "white" | "red" | "yellow" | "blue" | "green";
@@ -108,6 +122,8 @@ const StandingSlotsAdmin = () => {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [enrolledCounts, setEnrolledCounts] = useState<Record<string, number>>({});
+  const [rosterBySlot, setRosterBySlot] = useState<Record<string, RosterMember[]>>({});
+  const [expandedSlots, setExpandedSlots] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const [filterPlan, setFilterPlan] = useState<string>("all");
@@ -131,7 +147,10 @@ const StandingSlotsAdmin = () => {
       supabase.from("membership_plans").select("plan_key, capacity_per_slot, name").eq("active", true),
       supabase.rpc("get_instructors_admin"),
       supabase.from("standing_slots").select("*"),
-      supabase.from("memberships").select("standing_slot_id").eq("status", "active"),
+      supabase
+        .from("memberships")
+        .select("id, standing_slot_id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status")
+        .eq("status", "active"),
     ]);
 
     if (planRes.error) toast({ title: "Plans load failed", description: planRes.error.message, variant: "destructive" });
@@ -140,13 +159,28 @@ const StandingSlotsAdmin = () => {
 
     setPlans((planRes.data as Plan[]) || []);
     setInstructors(((instRes.data as Instructor[]) || []).filter((i) => i.is_active));
-    setSlots((slotRes.data as Slot[]) || []);
+    const slotList = (slotRes.data as Slot[]) || [];
+    setSlots(slotList);
 
+    const slotLevelById = new Map(slotList.map((s) => [s.id, s.swim_level]));
     const counts: Record<string, number> = {};
-    for (const m of (memRes.data as { standing_slot_id: string | null }[]) || []) {
-      if (m.standing_slot_id) counts[m.standing_slot_id] = (counts[m.standing_slot_id] || 0) + 1;
+    const roster: Record<string, RosterMember[]> = {};
+    for (const m of (memRes.data as RosterMember[]) || []) {
+      if (!m.standing_slot_id) continue;
+      counts[m.standing_slot_id] = (counts[m.standing_slot_id] || 0) + 1;
+      (roster[m.standing_slot_id] ||= []).push({
+        ...m,
+        swim_level: slotLevelById.get(m.standing_slot_id) ?? null,
+      });
+    }
+    for (const list of Object.values(roster)) {
+      list.sort((a, b) =>
+        (a.child_last_name || "").localeCompare(b.child_last_name || "") ||
+        (a.child_first_name || "").localeCompare(b.child_first_name || ""),
+      );
     }
     setEnrolledCounts(counts);
+    setRosterBySlot(roster);
     setLoading(false);
   };
 
@@ -313,6 +347,55 @@ const StandingSlotsAdmin = () => {
     await loadAll();
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedSlots((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Capacity dashboard groups: Small Group broken down by level, plus Private and Adult.
+  const dashboardGroups = useMemo(() => {
+    const activeSlots = slots.filter((s) => s.active);
+    type Group = { key: string; label: string; accent: string; enrolled: number; capacity: number; slotCount: number };
+    const groups: Group[] = [];
+
+    for (const lv of SWIM_LEVELS) {
+      const bucket = activeSlots.filter((s) => s.plan_key === "kid_group" && s.swim_level === lv);
+      if (!bucket.length) continue;
+      const capacity = bucket.reduce((a, s) => a + s.capacity, 0);
+      const enrolled = bucket.reduce((a, s) => a + (enrolledCounts[s.id] || 0), 0);
+      const accent =
+        lv === "white" ? "bg-slate-400" :
+        lv === "red" ? "bg-rose-500" :
+        lv === "yellow" ? "bg-amber-400" :
+        lv === "blue" ? "bg-sky-500" :
+        "bg-emerald-500";
+      groups.push({ key: `kid_${lv}`, label: LEVEL_LABELS[lv], accent, capacity, enrolled, slotCount: bucket.length });
+    }
+
+    for (const pk of ["private", "adult_group"] as PlanKey[]) {
+      const bucket = activeSlots.filter((s) => s.plan_key === pk);
+      if (!bucket.length) continue;
+      const capacity = bucket.reduce((a, s) => a + s.capacity, 0);
+      const enrolled = bucket.reduce((a, s) => a + (enrolledCounts[s.id] || 0), 0);
+      const accent = pk === "private" ? "bg-primary" : "bg-secondary";
+      groups.push({ key: pk, label: PLAN_LABELS[pk], accent, capacity, enrolled, slotCount: bucket.length });
+    }
+    return groups;
+  }, [slots, enrolledCounts]);
+
+  const fillState = (enrolled: number, capacity: number) => {
+    if (capacity <= 0) return { label: "—", tone: "text-muted-foreground" };
+    const pct = enrolled / capacity;
+    if (enrolled >= capacity) return { label: "FULL", tone: "text-destructive" };
+    if (pct >= 0.8) return { label: "Nearly full", tone: "text-accent" };
+    if (pct >= 0.4) return { label: "Filling", tone: "text-primary" };
+    return { label: "Open", tone: "text-emerald-600" };
+  };
+
   const SortHead = ({ k, children }: { k: SortKey; children: React.ReactNode }) => (
     <button
       className="inline-flex items-center gap-1 hover:text-foreground"
@@ -337,6 +420,53 @@ const StandingSlotsAdmin = () => {
           Add slot
         </Button>
       </div>
+
+      {/* Capacity dashboard — at-a-glance fill by program/level */}
+      <Card className="p-4">
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-primary">Capacity at a glance</h2>
+          <span className="text-xs text-muted-foreground">Active memberships / total capacity</span>
+        </div>
+        {loading ? (
+          <div className="py-6 text-center text-muted-foreground text-sm">
+            <Loader2 className="inline h-4 w-4 animate-spin mr-2" />Loading capacity…
+          </div>
+        ) : dashboardGroups.length === 0 ? (
+          <div className="py-6 text-center text-muted-foreground text-sm">No active slots yet.</div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {dashboardGroups.map((g) => {
+              const pct = g.capacity > 0 ? Math.min(100, Math.round((g.enrolled / g.capacity) * 100)) : 0;
+              const state = fillState(g.enrolled, g.capacity);
+              return (
+                <div key={g.key} className="rounded-lg border bg-card p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-sm text-foreground truncate">{g.label}</div>
+                    <span className={cn("text-[11px] font-semibold uppercase tracking-wide", state.tone)}>
+                      {state.label}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between text-xs text-muted-foreground">
+                    <span>
+                      <span className="text-lg font-semibold text-foreground tabular-nums">{g.enrolled}</span>
+                      <span className="mx-1">/</span>
+                      <span className="tabular-nums">{g.capacity}</span>
+                    </span>
+                    <span>{g.slotCount} slot{g.slotCount === 1 ? "" : "s"}</span>
+                  </div>
+                  <div className="mt-2 h-2 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={cn("h-full transition-all", g.accent, g.enrolled >= g.capacity && "bg-destructive")}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
 
       <Card className="p-3 flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
@@ -392,6 +522,7 @@ const StandingSlotsAdmin = () => {
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+              <th className="w-8 px-2 py-2"></th>
               <th className="text-left px-3 py-2"><SortHead k="plan_key">Program</SortHead></th>
               <th className="text-left px-3 py-2">Level</th>
               <th className="text-left px-3 py-2"><SortHead k="instructor">Instructor</SortHead></th>
@@ -409,6 +540,7 @@ const StandingSlotsAdmin = () => {
           <tbody>
             {adding && newSlot && (
               <tr className="border-t bg-amber-50/60">
+                <td className="px-2 py-1"></td>
                 <td className="px-2 py-1">
                   <Select
                     value={newSlot.plan_key}
@@ -528,13 +660,13 @@ const StandingSlotsAdmin = () => {
             )}
 
             {loading && (
-              <tr><td colSpan={12} className="px-3 py-8 text-center text-muted-foreground">
+              <tr><td colSpan={13} className="px-3 py-8 text-center text-muted-foreground">
                 <Loader2 className="inline h-4 w-4 animate-spin mr-2" />Loading…
               </td></tr>
             )}
 
             {!loading && filtered.length === 0 && !adding && (
-              <tr><td colSpan={12} className="px-3 py-8 text-center text-muted-foreground">
+              <tr><td colSpan={13} className="px-3 py-8 text-center text-muted-foreground">
                 No slots match. Click "Add slot" to create one.
               </td></tr>
             )}
@@ -546,6 +678,7 @@ const StandingSlotsAdmin = () => {
               if (isEditing) {
                 return (
                   <tr key={s.id} className="border-t bg-amber-50/60">
+                    <td className="px-2 py-1"></td>
                     <td className="px-2 py-1">
                       <Select
                         value={editDraft!.plan_key}
@@ -648,8 +781,21 @@ const StandingSlotsAdmin = () => {
                   </tr>
                 );
               }
+              const isExpanded = expandedSlots.has(s.id);
+              const roster = rosterBySlot[s.id] || [];
               return (
-                <tr key={s.id} className={cn("border-t hover:bg-muted/30", !s.active && "opacity-60")}>
+                <FragmentRow key={s.id}>
+                <tr className={cn("border-t hover:bg-muted/30", !s.active && "opacity-60")}>
+                  <td className="px-2 py-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(s.id)}
+                      className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                      aria-label={isExpanded ? "Collapse roster" : "Expand roster"}
+                    >
+                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                  </td>
                   <td className="px-3 py-2">{PLAN_LABELS[s.plan_key]}</td>
                   <td className="px-3 py-2">
                     {s.plan_key === "kid_group"
@@ -676,6 +822,61 @@ const StandingSlotsAdmin = () => {
                     </Button>
                   </td>
                 </tr>
+                {isExpanded && (
+                  <tr className="bg-muted/20 border-t">
+                    <td></td>
+                    <td colSpan={12} className="px-3 py-3">
+                      {roster.length === 0 ? (
+                        <div className="text-xs text-muted-foreground italic">No active memberships in this slot.</div>
+                      ) : (
+                        <div className="space-y-1">
+                          <div className="text-[11px] uppercase tracking-wide text-primary font-semibold mb-1.5">
+                            Roster ({roster.length})
+                          </div>
+                          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                            {roster.map((m) => {
+                              const childName = [m.child_first_name, m.child_last_name].filter(Boolean).join(" ") || "Unnamed swimmer";
+                              const parentName = [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ");
+                              return (
+                                <div key={m.id} className="rounded-md border bg-card px-3 py-2 text-xs">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-medium text-foreground truncate">{childName}</span>
+                                    {s.plan_key === "kid_group" && s.swim_level && (
+                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">
+                                        {s.swim_level}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {parentName && (
+                                    <div className="text-muted-foreground mt-0.5 truncate">{parentName}</div>
+                                  )}
+                                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-muted-foreground">
+                                    {m.parent_email && (
+                                      <a href={`mailto:${m.parent_email}`} className="inline-flex items-center gap-1 hover:text-primary truncate">
+                                        <Mail className="h-3 w-3" />{m.parent_email}
+                                      </a>
+                                    )}
+                                    {m.parent_phone && (
+                                      <a href={`tel:${m.parent_phone}`} className="inline-flex items-center gap-1 hover:text-primary">
+                                        <Phone className="h-3 w-3" />{m.parent_phone}
+                                      </a>
+                                    )}
+                                  </div>
+                                  <div className="mt-1">
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">
+                                      {m.status}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </FragmentRow>
               );
             })}
           </tbody>
