@@ -122,6 +122,8 @@ const StandingSlotsAdmin = () => {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [enrolledCounts, setEnrolledCounts] = useState<Record<string, number>>({});
+  const [rosterBySlot, setRosterBySlot] = useState<Record<string, RosterMember[]>>({});
+  const [expandedSlots, setExpandedSlots] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const [filterPlan, setFilterPlan] = useState<string>("all");
