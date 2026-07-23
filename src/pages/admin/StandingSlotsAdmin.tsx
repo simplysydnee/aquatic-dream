@@ -13,8 +13,22 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { ArrowUpDown, Plus, Loader2, Save, X } from "lucide-react";
+import { ArrowUpDown, Plus, Loader2, Save, X, ChevronDown, ChevronRight, Mail, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface RosterMember {
+  id: string;
+  standing_slot_id: string | null;
+  plan_key: PlanKey;
+  child_first_name: string | null;
+  child_last_name: string | null;
+  parent_first_name: string | null;
+  parent_last_name: string | null;
+  parent_email: string | null;
+  parent_phone: string | null;
+  status: string;
+  swim_level?: SwimLevel | null;
+}
 
 type PlanKey = "kid_group" | "private" | "adult_group";
 type SwimLevel = "white" | "red" | "yellow" | "blue" | "green";
