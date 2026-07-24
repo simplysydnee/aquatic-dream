@@ -21,6 +21,8 @@ import { getMembershipStripe as getStripe, getMembershipStripeEnvironment as get
 import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
 import LegalAgreements, { type LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
+import ClosureScheduleNote from "@/components/ClosureScheduleNote";
+
 import {
   lookupActiveWaiver,
   type ActiveWaiver,
@@ -1007,10 +1009,15 @@ export default function JoinMembership() {
                     <p className="mt-2 text-sm text-[#2a5e84]/80">
                       We'll send a welcome email with your first class details shortly.
                     </p>
+                    <ClosureScheduleNote
+                      className="mx-auto mt-6 max-w-md rounded-lg border border-[#2a5e84]/20 bg-[#f7f3ee] p-4 text-left"
+                      title="Upcoming closures"
+                    />
                   </>
                 )}
               </div>
             )}
+
           </Card>
         )}
       </div>
