@@ -432,6 +432,7 @@ async function sendWelcomeIfNeeded(membershipId: string, payload: JsonObject): P
             firstLessonDate: longDate,
             classTime: prettyTime,
             monthlyPrice,
+            manageUrl: current.manage_token ? buildManageLink(String(current.manage_token)) : undefined,
           },
         }),
       });
