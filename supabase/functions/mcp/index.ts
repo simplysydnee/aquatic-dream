@@ -591,13 +591,12 @@ var list_memberships_default = defineTool9({
     }
     const supabase = client8(ctx);
     let q = supabase.from("memberships").select(
-      `id, plan_key, status, start_date, monthly_price_cents:membership_plans(monthly_price_cents),
+      `id, plan_key, status, start_date,
          child_first_name, child_last_name,
          parent_first_name, parent_last_name, parent_email, parent_phone,
          stripe_subscription_id, current_period_start, current_period_end,
          standing_slot_id,
-         standing_slots(day_of_week, start_time, end_time, swim_level, instructors(name)),
-         membership_plans(name, monthly_price_cents)`
+         standing_slots(day_of_week, start_time, end_time, swim_level, instructors(name))`
     ).order("created_at", { ascending: false }).limit(limit);
     if (status) q = q.eq("status", status);
     if (plan_key) q = q.eq("plan_key", plan_key);
