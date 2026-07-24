@@ -82,7 +82,7 @@ async function notifyAdminSms(text: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { token, reason, reasonDetail } = await req.json();
+    const { token, reason, reasonDetail, dryRun } = await req.json();
     if (typeof token !== "string" || !token) {
       return new Response(JSON.stringify({ error: "Missing token" }), {
         status: 400,
@@ -155,13 +155,20 @@ Deno.serve(async (req) => {
     };
     console.log("[cancel-membership] cancel_at", updateParams.cancel_at, typeof updateParams.cancel_at);
 
+    const effectiveDate = new Date(cancelAt * 1000).toISOString().slice(0, 10);
+    if (dryRun === true) {
+      return new Response(
+        JSON.stringify({ ok: true, dryRun: true, effectiveDate, cancelAt, cancelAtType: typeof cancelAt }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // Schedule Stripe cancellation. cancel_at MUST be a unix timestamp
     // (integer seconds), not an ISO string. proration_behavior:'none'
     // prevents any partial refund on the final period.
     await stripe.subscriptions.update(stripeSubId, updateParams);
 
     const nowIso = new Date().toISOString();
-    const effectiveDate = new Date(cancelAt * 1000).toISOString().slice(0, 10);
 
     // Update membership.
     const { error: updErr } = await supabase
