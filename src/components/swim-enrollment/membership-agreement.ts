@@ -1,20 +1,22 @@
-// Aquatic Dreams Membership Agreement (v2)
+// Aquatic Dreams Membership Agreement (v3)
 // Keep this file the single source of truth for the exact copy shown at
 // the /join consent step. When the copy changes, bump MEMBERSHIP_AGREEMENT_VERSION
 // so historical acceptances remain auditable.
 
-export const MEMBERSHIP_AGREEMENT_VERSION = "v2";
+export const MEMBERSHIP_AGREEMENT_VERSION = "v3";
 
 export const MEMBERSHIP_AGREEMENT_TEXT = `Aquatic Dreams Membership Agreement
 
 Monthly Membership & Automatic Renewal
 Your Aquatic Dreams membership is a month-to-month program that renews automatically on the 1st of each month. By enrolling, you authorize Aquatic Dreams to charge the payment method on file the flat monthly rate for your selected program on the 1st of every month until you cancel. Your membership will continue to renew each month without further action from you.
 
-Flat Rate — No Makeups
-Your monthly membership fee is a flat rate that reserves your weekly lesson time. It is not a per-lesson charge. Missed lessons — for any reason, including illness, travel, weather, or personal schedule conflicts — are non-refundable and cannot be made up. Some months contain 4 lessons and some contain 5; the monthly rate does not change.
+Flat Rate — Missed Lessons
+Your monthly membership fee is a flat rate that reserves your weekly lesson time. It is not a per-lesson charge. Lessons you miss — for any reason, including illness, travel, weather, or personal schedule conflicts — are non-refundable and are not eligible for makeups. Some months contain 4 lessons and some contain 5; the monthly rate does not change.
 
 Holidays & Closures
-If Aquatic Dreams cancels a scheduled lesson due to a facility closure, holiday, or instructor unavailability, your account will receive a lesson credit toward a future lesson. Closure credits are not refunded as cash. We will notify you in advance whenever possible.
+Aquatic Dreams observes major holidays and an annual winter break. On these planned closure dates there is no class, and no makeup or credit is issued — holiday weeks are already accounted for in your flat monthly rate. Posted closure dates for the season are shown in your enrollment materials and in your account.
+
+If Aquatic Dreams has to close unexpectedly (for example, a facility or pool issue, or instructor unavailability), the affected lesson will be closed and we will offer you a makeup lesson at a mutually available time. Unexpected closures are not refunded or credited as cash. We will notify you as far in advance as possible.
 
 Per-Lesson Rate (Reference Only)
 For reference, the effective per-lesson rate is your monthly membership fee divided by the number of scheduled lessons in that month. Because months vary between 4 and 5 lessons, this per-lesson figure will vary. The billed amount each month is the flat monthly rate, regardless of lesson count.
