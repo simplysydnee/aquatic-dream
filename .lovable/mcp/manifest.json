@@ -267,6 +267,157 @@
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
         "outputSchema": null
+      },
+      {
+        "name": "list_standing_slots",
+        "title": "List standing membership slots",
+        "description": "List weekly membership standing slots with capacity, enrolled count, and spots left. Optional filters: program (kid_group/private/adult_group), swim level (white/red/yellow/blue/green), and day of week (0=Sunday..6=Saturday).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "program": {
+              "type": "string",
+              "enum": [
+                "kid_group",
+                "private",
+                "adult_group"
+              ]
+            },
+            "level": {
+              "type": "string",
+              "enum": [
+                "white",
+                "red",
+                "yellow",
+                "blue",
+                "green"
+              ]
+            },
+            "day": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6,
+              "description": "0=Sunday..6=Saturday"
+            },
+            "activeOnly": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_memberships",
+        "title": "List memberships",
+        "description": "List memberships with swimmer, plan, standing-slot (day/time/level), status, billing period, and parent contact. Optional filters: status, plan_key, and a name/email query.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "past_due",
+                "canceled",
+                "paused",
+                "pending"
+              ]
+            },
+            "plan_key": {
+              "type": "string",
+              "enum": [
+                "kid_group",
+                "private",
+                "adult_group"
+              ]
+            },
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Optional fragment matched against swimmer name, parent name, or parent email."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_membership",
+        "title": "Get membership detail",
+        "description": "Return the full membership record (swimmer, parent, plan, slot, consents, waiver_id) plus every scheduled membership_occurrence (date, time, instructor, status).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_membership_billing_status",
+        "title": "Get membership billing status",
+        "description": "Fetch live billing status from Stripe for a membership: subscription status, latest invoice status, and next charge date + amount. Defaults to the live environment; pass environment='sandbox' for test-mode subscriptions.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "environment": {
+              "type": "string",
+              "enum": [
+                "live",
+                "sandbox"
+              ],
+              "default": "live"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
       }
     ]
   }

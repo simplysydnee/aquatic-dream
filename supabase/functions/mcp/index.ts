@@ -494,6 +494,309 @@ var send_private_openings_sms_default = defineTool7({
   }
 });
 
+// src/lib/mcp/tools/list-standing-slots.ts
+import { createClient as createClient7 } from "npm:@supabase/supabase-js@^2.98.0";
+import { defineTool as defineTool8 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z8 } from "npm:zod@^3.23.8";
+function client7(ctx) {
+  return createClient7(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var list_standing_slots_default = defineTool8({
+  name: "list_standing_slots",
+  title: "List standing membership slots",
+  description: "List weekly membership standing slots with capacity, enrolled count, and spots left. Optional filters: program (kid_group/private/adult_group), swim level (white/red/yellow/blue/green), and day of week (0=Sunday..6=Saturday).",
+  inputSchema: {
+    program: z8.enum(["kid_group", "private", "adult_group"]).optional(),
+    level: z8.enum(["white", "red", "yellow", "blue", "green"]).optional(),
+    day: z8.number().int().min(0).max(6).optional().describe("0=Sunday..6=Saturday"),
+    activeOnly: z8.boolean().default(true)
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ program, level, day, activeOnly }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = client7(ctx);
+    let q = supabase.from("standing_slots").select(
+      "id, plan_key, swim_level, day_of_week, start_time, end_time, capacity, location, active, instructor_id, instructors(name), membership_plans!inner(name)"
+    );
+    if (activeOnly) q = q.eq("active", true);
+    if (program) q = q.eq("plan_key", program);
+    if (level) q = q.eq("swim_level", level);
+    if (typeof day === "number") q = q.eq("day_of_week", day);
+    const { data: slots, error } = await q.order("day_of_week").order("start_time");
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const slotIds = (slots ?? []).map((s) => s.id);
+    const counts = /* @__PURE__ */ new Map();
+    if (slotIds.length) {
+      const { data: mems } = await supabase.from("memberships").select("standing_slot_id").in("standing_slot_id", slotIds).eq("status", "active");
+      for (const m of mems ?? []) {
+        counts.set(m.standing_slot_id, (counts.get(m.standing_slot_id) ?? 0) + 1);
+      }
+    }
+    const rows = (slots ?? []).map((s) => {
+      const enrolled = counts.get(s.id) ?? 0;
+      return {
+        id: s.id,
+        plan_key: s.plan_key,
+        program_name: s.membership_plans?.name ?? null,
+        swim_level: s.swim_level,
+        instructor_name: s.instructors?.name ?? null,
+        day_of_week: s.day_of_week,
+        day_name: DAY_NAMES[s.day_of_week] ?? null,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        capacity: s.capacity,
+        enrolled_count: enrolled,
+        spots_left: Math.max(0, s.capacity - enrolled),
+        active: s.active
+      };
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(rows, null, 2) }],
+      structuredContent: { rows }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-memberships.ts
+import { createClient as createClient8 } from "npm:@supabase/supabase-js@^2.98.0";
+import { defineTool as defineTool9 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z9 } from "npm:zod@^3.23.8";
+function client8(ctx) {
+  return createClient8(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var DAY_NAMES2 = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var list_memberships_default = defineTool9({
+  name: "list_memberships",
+  title: "List memberships",
+  description: "List memberships with swimmer, plan, standing-slot (day/time/level), status, billing period, and parent contact. Optional filters: status, plan_key, and a name/email query.",
+  inputSchema: {
+    status: z9.enum(["active", "past_due", "canceled", "paused", "pending"]).optional(),
+    plan_key: z9.enum(["kid_group", "private", "adult_group"]).optional(),
+    query: z9.string().trim().min(1).optional().describe("Optional fragment matched against swimmer name, parent name, or parent email."),
+    limit: z9.number().int().min(1).max(200).default(100)
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ status, plan_key, query, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = client8(ctx);
+    let q = supabase.from("memberships").select(
+      `id, plan_key, status, start_date, monthly_price_cents:membership_plans(monthly_price_cents),
+         child_first_name, child_last_name,
+         parent_first_name, parent_last_name, parent_email, parent_phone,
+         stripe_subscription_id, current_period_start, current_period_end,
+         standing_slot_id,
+         standing_slots(day_of_week, start_time, end_time, swim_level, instructors(name)),
+         membership_plans(name, monthly_price_cents)`
+    ).order("created_at", { ascending: false }).limit(limit);
+    if (status) q = q.eq("status", status);
+    if (plan_key) q = q.eq("plan_key", plan_key);
+    if (query) {
+      const like = `%${query}%`;
+      q = q.or(
+        `child_first_name.ilike.${like},child_last_name.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},parent_email.ilike.${like}`
+      );
+    }
+    const { data, error } = await q;
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const ids = (data ?? []).map((m) => m.id);
+    const firstDates = /* @__PURE__ */ new Map();
+    if (ids.length) {
+      const { data: occs } = await supabase.from("membership_occurrences").select("membership_id, occurrence_date").in("membership_id", ids).order("occurrence_date", { ascending: true });
+      for (const o of occs ?? []) {
+        if (!firstDates.has(o.membership_id)) firstDates.set(o.membership_id, o.occurrence_date);
+      }
+    }
+    const rows = (data ?? []).map((m) => {
+      const slot = m.standing_slots;
+      const swimmer = [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim();
+      const parent = [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim();
+      return {
+        id: m.id,
+        swimmer_name: swimmer || null,
+        plan_key: m.plan_key,
+        program: m.membership_plans?.name ?? null,
+        slot: slot ? {
+          day_of_week: slot.day_of_week,
+          day_name: DAY_NAMES2[slot.day_of_week] ?? null,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          swim_level: slot.swim_level,
+          instructor_name: slot.instructors?.name ?? null
+        } : null,
+        status: m.status,
+        start_date: m.start_date,
+        first_lesson_date: firstDates.get(m.id) ?? null,
+        monthly_price_cents: m.membership_plans?.monthly_price_cents ?? null,
+        stripe_subscription_id: m.stripe_subscription_id,
+        current_period_start: m.current_period_start,
+        current_period_end: m.current_period_end,
+        next_charge_date: m.current_period_end,
+        parent_name: parent || null,
+        parent_email: m.parent_email,
+        parent_phone: m.parent_phone
+      };
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(rows, null, 2) }],
+      structuredContent: { rows }
+    };
+  }
+});
+
+// src/lib/mcp/tools/get-membership.ts
+import { createClient as createClient9 } from "npm:@supabase/supabase-js@^2.98.0";
+import { defineTool as defineTool10 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z10 } from "npm:zod@^3.23.8";
+function client9(ctx) {
+  return createClient9(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+var get_membership_default = defineTool10({
+  name: "get_membership",
+  title: "Get membership detail",
+  description: "Return the full membership record (swimmer, parent, plan, slot, consents, waiver_id) plus every scheduled membership_occurrence (date, time, instructor, status).",
+  inputSchema: { id: z10.string().uuid() },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ id }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = client9(ctx);
+    const { data: membership, error } = await supabase.from("memberships").select(
+      `*,
+         standing_slots(day_of_week, start_time, end_time, swim_level, location, instructors(name)),
+         membership_plans(name, monthly_price_cents)`
+    ).eq("id", id).maybeSingle();
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    if (!membership) return { content: [{ type: "text", text: "Membership not found" }], isError: true };
+    const { data: occs, error: occErr } = await supabase.from("membership_occurrences").select("id, occurrence_date, start_time, end_time, status, closure_type, cancel_reason, instructor_id, instructors:instructor_id(name)").eq("membership_id", id).order("occurrence_date", { ascending: true });
+    if (occErr) return { content: [{ type: "text", text: occErr.message }], isError: true };
+    const payload = {
+      membership,
+      occurrences: (occs ?? []).map((o) => ({
+        id: o.id,
+        date: o.occurrence_date,
+        start_time: o.start_time,
+        end_time: o.end_time,
+        status: o.status,
+        closure_type: o.closure_type,
+        cancel_reason: o.cancel_reason,
+        instructor_name: o.instructors?.name ?? null
+      }))
+    };
+    return {
+      content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+      structuredContent: payload
+    };
+  }
+});
+
+// src/lib/mcp/tools/get-membership-billing-status.ts
+import { createClient as createClient10 } from "npm:@supabase/supabase-js@^2.98.0";
+import { defineTool as defineTool11 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z11 } from "npm:zod@^3.23.8";
+function client10(ctx) {
+  return createClient10(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+function stripeKey(env) {
+  const manual = process.env.STRIPE_API_KEY;
+  const wantsLive = env === "live";
+  if (manual && /^(sk|rk)_(test|live)_/.test(manual)) {
+    const isLive = /^(sk|rk)_live_/.test(manual);
+    if (isLive === wantsLive) return manual;
+  }
+  return env === "live" ? process.env.STRIPE_LIVE_API_KEY ?? null : process.env.STRIPE_SANDBOX_API_KEY ?? null;
+}
+async function stripeGet(env, path) {
+  const key = stripeKey(env);
+  if (!key) throw new Error(`No Stripe key configured for env=${env}`);
+  const res = await fetch(`https://api.stripe.com/v1${path}`, {
+    headers: { Authorization: `Bearer ${key}` }
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Stripe ${env} ${res.status}: ${body.slice(0, 300)}`);
+  }
+  return res.json();
+}
+var get_membership_billing_status_default = defineTool11({
+  name: "get_membership_billing_status",
+  title: "Get membership billing status",
+  description: "Fetch live billing status from Stripe for a membership: subscription status, latest invoice status, and next charge date + amount. Defaults to the live environment; pass environment='sandbox' for test-mode subscriptions.",
+  inputSchema: {
+    id: z11.string().uuid(),
+    environment: z11.enum(["live", "sandbox"]).default("live")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async ({ id, environment }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const supabase = client10(ctx);
+    const { data: m, error } = await supabase.from("memberships").select("id, stripe_subscription_id, stripe_customer_id, status, current_period_start, current_period_end").eq("id", id).maybeSingle();
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    if (!m) return { content: [{ type: "text", text: "Membership not found" }], isError: true };
+    if (!m.stripe_subscription_id) {
+      const payload = {
+        subscription_status: m.status,
+        last_invoice_status: null,
+        next_charge_date: m.current_period_end,
+        next_charge_amount_cents: null,
+        note: "No Stripe subscription linked to this membership."
+      };
+      return {
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+        structuredContent: payload
+      };
+    }
+    try {
+      const sub = await stripeGet(environment, `/subscriptions/${m.stripe_subscription_id}`);
+      const latestInvoiceId = typeof sub.latest_invoice === "string" ? sub.latest_invoice : sub.latest_invoice?.id;
+      const invoice = latestInvoiceId ? await stripeGet(environment, `/invoices/${latestInvoiceId}`) : null;
+      const nextTs = sub.current_period_end ?? null;
+      const item = sub.items?.data?.[0];
+      const nextAmount = item?.price?.unit_amount ?? null;
+      const payload = {
+        subscription_id: sub.id,
+        subscription_status: sub.status,
+        cancel_at_period_end: sub.cancel_at_period_end ?? false,
+        current_period_start: sub.current_period_start ? new Date(sub.current_period_start * 1e3).toISOString() : null,
+        current_period_end: sub.current_period_end ? new Date(sub.current_period_end * 1e3).toISOString() : null,
+        next_charge_date: nextTs ? new Date(nextTs * 1e3).toISOString() : null,
+        next_charge_amount_cents: nextAmount,
+        last_invoice_status: invoice?.status ?? null,
+        last_invoice_amount_paid_cents: invoice?.amount_paid ?? null,
+        last_invoice_hosted_url: invoice?.hosted_invoice_url ?? null
+      };
+      return {
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+        structuredContent: payload
+      };
+    } catch (e) {
+      return {
+        content: [{ type: "text", text: e.message }],
+        isError: true
+      };
+    }
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "jilrijklnehbfuulykty";
 var mcp_default = defineMcp({
@@ -512,7 +815,11 @@ var mcp_default = defineMcp({
     get_class_roster_default,
     list_open_private_slots_default,
     list_past_private_families_default,
-    send_private_openings_sms_default
+    send_private_openings_sms_default,
+    list_standing_slots_default,
+    list_memberships_default,
+    get_membership_default,
+    get_membership_billing_status_default
   ]
 });
 
