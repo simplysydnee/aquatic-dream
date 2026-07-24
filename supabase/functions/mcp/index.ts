@@ -797,6 +797,126 @@ var get_membership_billing_status_default = defineTool11({
   }
 });
 
+// src/lib/mcp/tools/read-repo-file.ts
+import { defineTool as defineTool12 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z12 } from "npm:zod@^3.23.8";
+var REPO = "simplysydnee/aquatic-dream";
+var read_repo_file_default = defineTool12({
+  name: "read_repo_file",
+  title: "Read repo file",
+  description: "Fetch the raw text of a file from the aquatic-dream GitHub repository (default branch). Read-only. Example path: 'supabase/functions/create-membership-checkout/index.ts'.",
+  inputSchema: {
+    path: z12.string().trim().min(1).max(500).describe("Repo-relative file path, e.g. 'src/lib/mcp/index.ts'."),
+    ref: z12.string().trim().min(1).max(200).optional().describe("Optional branch, tag, or commit SHA. Defaults to the repo's default branch.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async ({ path, ref }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) {
+      return {
+        content: [{ type: "text", text: "GITHUB_TOKEN is not configured on the server." }],
+        isError: true
+      };
+    }
+    const cleanPath = path.replace(/^\/+/, "");
+    const qs = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+    const url = `https://api.github.com/repos/${REPO}/contents/${cleanPath}${qs}`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.raw",
+        "User-Agent": "aquatic-dreams-mcp"
+      }
+    });
+    const body = await res.text();
+    if (!res.ok) {
+      return {
+        content: [{ type: "text", text: `GitHub responded ${res.status}: ${body}` }],
+        isError: true
+      };
+    }
+    return {
+      content: [{ type: "text", text: body }],
+      structuredContent: { path: cleanPath, ref: ref ?? null, content: body }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-repo-dir.ts
+import { defineTool as defineTool13 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z13 } from "npm:zod@^3.23.8";
+var REPO2 = "simplysydnee/aquatic-dream";
+var list_repo_dir_default = defineTool13({
+  name: "list_repo_dir",
+  title: "List repo directory",
+  description: "List file and folder entries at a path in the aquatic-dream GitHub repository (default branch). Read-only. Use path='' for the repo root.",
+  inputSchema: {
+    path: z13.string().trim().max(500).default("").describe("Repo-relative directory path. Empty string for repo root."),
+    ref: z13.string().trim().min(1).max(200).optional().describe("Optional branch, tag, or commit SHA. Defaults to the repo's default branch.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async ({ path, ref }, ctx) => {
+    if (!ctx.isAuthenticated()) {
+      return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+    }
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) {
+      return {
+        content: [{ type: "text", text: "GITHUB_TOKEN is not configured on the server." }],
+        isError: true
+      };
+    }
+    const cleanPath = path.replace(/^\/+|\/+$/g, "");
+    const qs = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+    const url = `https://api.github.com/repos/${REPO2}/contents/${cleanPath}${qs}`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "aquatic-dreams-mcp"
+      }
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      return {
+        content: [{ type: "text", text: `GitHub responded ${res.status}: ${text}` }],
+        isError: true
+      };
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return {
+        content: [{ type: "text", text: `Unexpected GitHub response: ${text}` }],
+        isError: true
+      };
+    }
+    if (!Array.isArray(parsed)) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Path is not a directory. Use read_repo_file for files. Raw: ${text}`
+          }
+        ],
+        isError: true
+      };
+    }
+    const entries = parsed.map((e) => ({ name: e.name, path: e.path, type: e.type, size: e.size ?? null })).sort((a, b) => {
+      if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(entries, null, 2) }],
+      structuredContent: { path: cleanPath, ref: ref ?? null, entries }
+    };
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "jilrijklnehbfuulykty";
 var mcp_default = defineMcp({
@@ -819,7 +939,9 @@ var mcp_default = defineMcp({
     list_standing_slots_default,
     list_memberships_default,
     get_membership_default,
-    get_membership_billing_status_default
+    get_membership_billing_status_default,
+    read_repo_file_default,
+    list_repo_dir_default
   ]
 });
 

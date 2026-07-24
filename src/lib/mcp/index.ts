@@ -40,6 +40,8 @@ export default defineMcp({
     listMemberships,
     getMembership,
     getMembershipBillingStatus,
+    readRepoFile,
+    listRepoDir,
   ],
 
 });
