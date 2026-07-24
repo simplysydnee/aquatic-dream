@@ -25,14 +25,31 @@ type Reason = (typeof ALLOWED_REASONS)[number];
 // month and cancels at the following 1st.
 function firstOfMonthAfter(unixSeconds: number): number {
   const d = new Date(unixSeconds * 1000);
-  // Move to the month AFTER current_period_end, then to the 1st of the
-  // month AFTER that (i.e. end of the final paid month = start of the
-  // month following the final paid month).
-  const year = d.getUTCFullYear();
-  const month = d.getUTCMonth();
-  // final paid month = month + 1 (the one that bills on the next 1st)
-  // cancel at start of month + 2 (LA midnight ≈ 08:00 UTC during PDT / 07:00 UTC otherwise; use 12:00 UTC to be safely inside the day)
-  const target = new Date(Date.UTC(year, month + 2, 1, 12, 0, 0));
+
+  // nextChargeUnix is the ONE more charge (the upcoming renewal on the 1st).
+
+  // The month it pays for ends exactly one month later at the same billing
+
+  // anchor instant. Cancel at that boundary so Stripe does NOT invoice the
+
+  // following period.
+
+  const target = new Date(Date.UTC(
+
+    d.getUTCFullYear(),
+
+    d.getUTCMonth() + 1,   // was + 2 — that scheduled one extra $200 cycle
+
+    d.getUTCDate(),        // keep the anchor day (the 1st)
+
+    d.getUTCHours(),       // keep the anchor time (was hard-coded 12:00 UTC)
+
+    d.getUTCMinutes(),
+
+    d.getUTCSeconds(),
+
+  ));
+
   return Math.floor(target.getTime() / 1000);
 }
 
