@@ -1536,6 +1536,7 @@ export type Database = {
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           waiver_id: string | null
+          welcome_sent_at: string | null
         }
         Insert: {
           cancel_effective_date?: string | null
@@ -1572,6 +1573,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           waiver_id?: string | null
+          welcome_sent_at?: string | null
         }
         Update: {
           cancel_effective_date?: string | null
@@ -1608,6 +1610,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           waiver_id?: string | null
+          welcome_sent_at?: string | null
         }
         Relationships: [
           {
