@@ -69,11 +69,22 @@ const MembershipWelcomeEmail = ({
             are welcome. See you at the pool!
           </Text>
 
+          {closureSchedule && (
+            <Section style={card}>
+              <Text style={cardLabel}>Upcoming closures</Text>
+              <Text style={{ ...cardValue, whiteSpace: 'pre-line', fontWeight: 400, fontSize: '14px' }}>
+                {closureSchedule}
+              </Text>
+              <Text style={small}>Closed dates are not billed as extras. No makeups for planned holidays.</Text>
+            </Section>
+          )}
+
           {manageUrl && (
             <Text style={small}>
               Need to update or cancel later? <Link href={manageUrl} style={link}>Manage or cancel your membership</Link>.
             </Text>
           )}
+
 
           <Text style={footer}>{SITE_NAME} · {address}</Text>
         </Container>
@@ -93,7 +104,9 @@ export const template = {
     firstLessonDate: 'Monday, August 17, 2026',
     classTime: '4:00 PM',
     monthlyPrice: '$140',
+    closureSchedule: 'Winter Break — December 24, 2026 – January 1, 2027',
   },
+
 } satisfies TemplateEntry
 
 const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }
