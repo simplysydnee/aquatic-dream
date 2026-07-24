@@ -25,13 +25,21 @@ export default defineTool({
       .from("memberships")
       .select(
         `*,
-         standing_slots(day_of_week, start_time, end_time, swim_level, location, instructors(name)),
-         membership_plans(name, monthly_price_cents)`,
+         standing_slots(day_of_week, start_time, end_time, swim_level, location, instructors(name))`,
       )
       .eq("id", id)
       .maybeSingle();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     if (!membership) return { content: [{ type: "text", text: "Membership not found" }], isError: true };
+
+    const { data: plan } = await supabase
+      .from("membership_plans")
+      .select("plan_key, name, monthly_price_cents")
+      .eq("plan_key", (membership as any).plan_key)
+      .maybeSingle();
+    (membership as any).membership_plans = plan
+      ? { name: (plan as any).name, monthly_price_cents: (plan as any).monthly_price_cents }
+      : null;
 
     const { data: occs, error: occErr } = await supabase
       .from("membership_occurrences")

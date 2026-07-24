@@ -685,11 +685,12 @@ var get_membership_default = defineTool10({
     const supabase = client9(ctx);
     const { data: membership, error } = await supabase.from("memberships").select(
       `*,
-         standing_slots(day_of_week, start_time, end_time, swim_level, location, instructors(name)),
-         membership_plans(name, monthly_price_cents)`
+         standing_slots(day_of_week, start_time, end_time, swim_level, location, instructors(name))`
     ).eq("id", id).maybeSingle();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     if (!membership) return { content: [{ type: "text", text: "Membership not found" }], isError: true };
+    const { data: plan } = await supabase.from("membership_plans").select("plan_key, name, monthly_price_cents").eq("plan_key", membership.plan_key).maybeSingle();
+    membership.membership_plans = plan ? { name: plan.name, monthly_price_cents: plan.monthly_price_cents } : null;
     const { data: occs, error: occErr } = await supabase.from("membership_occurrences").select("id, occurrence_date, start_time, end_time, status, closure_type, cancel_reason, instructor_id, instructors:instructor_id(name)").eq("membership_id", id).order("occurrence_date", { ascending: true });
     if (occErr) return { content: [{ type: "text", text: occErr.message }], isError: true };
     const payload = {
