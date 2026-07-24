@@ -3,6 +3,8 @@ import { type StripeEnv, createStripeClient } from "./stripe.ts";
 import { firstLessonDate } from "./membership-pricing.ts";
 import { formatPTDate, formatPTTime, sendAndLogBookingConfirmation } from "./textmagic.ts";
 import { buildManageLink } from "./manage-link.ts";
+import { fetchClosureDateSet, fetchClosureSchedule } from "./closure-schedule.ts";
+
 
 type JsonObject = Record<string, unknown>;
 
@@ -443,8 +445,10 @@ async function sendWelcomeIfNeeded(membershipId: string, payload: JsonObject): P
             firstLessonDate: longDate,
             classTime: prettyTime,
             monthlyPrice,
+            closureSchedule: (await fetchClosureSchedule()).text,
             manageUrl: current.manage_token ? buildManageLink(String(current.manage_token)) : undefined,
           },
+
         }),
       });
       if (!res.ok) {

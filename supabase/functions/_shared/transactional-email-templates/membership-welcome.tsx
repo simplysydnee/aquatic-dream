@@ -13,7 +13,9 @@ interface Props {
   monthlyPrice?: string    // "$140"
   facilityAddress?: string
   manageUrl?: string
+  closureSchedule?: string
 }
+
 
 const DEFAULT_ADDRESS = '1212 Kansas Ave, Modesto, CA 95351'
 const SITE_NAME = 'Aquatic Dreams'
@@ -27,9 +29,11 @@ const MembershipWelcomeEmail = ({
   monthlyPrice,
   facilityAddress,
   manageUrl,
+  closureSchedule,
 }: Props) => {
   const address = facilityAddress || DEFAULT_ADDRESS
   const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+
   return (
     <Html lang="en" dir="ltr">
       <Head />
