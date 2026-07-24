@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { type StripeEnv, createStripeClient } from "./stripe.ts";
 import { firstLessonDate } from "./membership-pricing.ts";
+import { formatPTDate, formatPTTime, sendAndLogBookingConfirmation } from "./textmagic.ts";
 
 type JsonObject = Record<string, unknown>;
 
