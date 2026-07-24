@@ -206,6 +206,9 @@ async function ensureMembershipRecord(options: {
 
   if (existing?.id) {
     const occurrenceCount = await ensureOccurrences(existing.id as string, options.payload);
+    await sendWelcomeIfNeeded(existing.id as string, options.payload).catch((e) =>
+      console.error("[membership completion] welcome send failed", errorMessage(e)),
+    );
     return {
       membershipId: existing.id as string,
       subscriptionId: options.subscriptionId,
@@ -215,6 +218,7 @@ async function ensureMembershipRecord(options: {
       alreadyProcessed: true,
     };
   }
+
 
   const stripe = createStripeClient(options.env);
   const subscription = asRecord(await stripe.subscriptions.retrieve(options.subscriptionId));
