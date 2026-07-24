@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2 } from "lucide-react";
+import ClosureScheduleNote from "@/components/ClosureScheduleNote";
+
 
 type Membership = {
   id: string;
@@ -184,6 +186,16 @@ export default function MembershipManage() {
             )}
           </CardContent>
         </Card>
+
+        {!isCancelled && (
+          <Card>
+            <CardHeader><CardTitle className="text-lg">Upcoming closures</CardTitle></CardHeader>
+            <CardContent>
+              <ClosureScheduleNote />
+            </CardContent>
+          </Card>
+        )}
+
 
         {step === "view" && !isPendingCancel && !isCancelled && (
           <Card>
