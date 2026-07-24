@@ -41,6 +41,8 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = true
   [functions.lesson-calendar-ics]
     verify_jwt = false
+  [functions.membership-calendar-ics]
+    verify_jwt = false
   [functions.admin-issue-refund]
     verify_jwt = true
   [functions.admin-mark-waiver-complete]
