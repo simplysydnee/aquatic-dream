@@ -13,7 +13,9 @@ interface Props {
   monthlyPrice?: string    // "$140"
   facilityAddress?: string
   manageUrl?: string
+  closureSchedule?: string
 }
+
 
 const DEFAULT_ADDRESS = '1212 Kansas Ave, Modesto, CA 95351'
 const SITE_NAME = 'Aquatic Dreams'
@@ -27,9 +29,11 @@ const MembershipWelcomeEmail = ({
   monthlyPrice,
   facilityAddress,
   manageUrl,
+  closureSchedule,
 }: Props) => {
   const address = facilityAddress || DEFAULT_ADDRESS
   const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+
   return (
     <Html lang="en" dir="ltr">
       <Head />
@@ -65,11 +69,22 @@ const MembershipWelcomeEmail = ({
             are welcome. See you at the pool!
           </Text>
 
+          {closureSchedule && (
+            <Section style={card}>
+              <Text style={cardLabel}>Upcoming closures</Text>
+              <Text style={{ ...cardValue, whiteSpace: 'pre-line', fontWeight: 400, fontSize: '14px' }}>
+                {closureSchedule}
+              </Text>
+              <Text style={small}>Closed dates are not billed as extras. No makeups for planned holidays.</Text>
+            </Section>
+          )}
+
           {manageUrl && (
             <Text style={small}>
               Need to update or cancel later? <Link href={manageUrl} style={link}>Manage or cancel your membership</Link>.
             </Text>
           )}
+
 
           <Text style={footer}>{SITE_NAME} · {address}</Text>
         </Container>
@@ -89,7 +104,9 @@ export const template = {
     firstLessonDate: 'Monday, August 17, 2026',
     classTime: '4:00 PM',
     monthlyPrice: '$140',
+    closureSchedule: 'Winter Break — December 24, 2026 – January 1, 2027',
   },
+
 } satisfies TemplateEntry
 
 const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }

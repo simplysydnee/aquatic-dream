@@ -1401,6 +1401,7 @@ export type Database = {
       membership_occurrences: {
         Row: {
           cancel_reason: string | null
+          closure_id: string | null
           closure_type: Database["public"]["Enums"]["closure_type"] | null
           created_at: string
           end_time: string | null
@@ -1413,6 +1414,7 @@ export type Database = {
         }
         Insert: {
           cancel_reason?: string | null
+          closure_id?: string | null
           closure_type?: Database["public"]["Enums"]["closure_type"] | null
           created_at?: string
           end_time?: string | null
@@ -1425,6 +1427,7 @@ export type Database = {
         }
         Update: {
           cancel_reason?: string | null
+          closure_id?: string | null
           closure_type?: Database["public"]["Enums"]["closure_type"] | null
           created_at?: string
           end_time?: string | null
@@ -1436,6 +1439,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "membership_occurrences_closure_id_fkey"
+            columns: ["closure_id"]
+            isOneToOne: false
+            referencedRelation: "studio_closures"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "membership_occurrences_instructor_id_fkey"
             columns: ["instructor_id"]
@@ -2326,6 +2336,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      studio_closures: {
+        Row: {
+          closure_type: Database["public"]["Enums"]["closure_type"]
+          created_at: string
+          end_date: string
+          id: string
+          label: string
+          start_date: string
+        }
+        Insert: {
+          closure_type?: Database["public"]["Enums"]["closure_type"]
+          created_at?: string
+          end_date: string
+          id?: string
+          label: string
+          start_date: string
+        }
+        Update: {
+          closure_type?: Database["public"]["Enums"]["closure_type"]
+          created_at?: string
+          end_date?: string
+          id?: string
+          label?: string
+          start_date?: string
+        }
+        Relationships: []
       }
       suppressed_emails: {
         Row: {
@@ -3333,6 +3370,16 @@ export type Database = {
           session_start_time: string
           swim_level: string
           waiver_signed_at: string
+        }[]
+      }
+      get_upcoming_closures: {
+        Args: never
+        Returns: {
+          closure_type: Database["public"]["Enums"]["closure_type"]
+          end_date: string
+          id: string
+          label: string
+          start_date: string
         }[]
       }
       get_visitor_waiver_links: {

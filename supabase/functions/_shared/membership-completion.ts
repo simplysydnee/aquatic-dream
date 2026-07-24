@@ -3,6 +3,8 @@ import { type StripeEnv, createStripeClient } from "./stripe.ts";
 import { firstLessonDate } from "./membership-pricing.ts";
 import { formatPTDate, formatPTTime, sendAndLogBookingConfirmation } from "./textmagic.ts";
 import { buildManageLink } from "./manage-link.ts";
+import { fetchClosureDateSet, fetchClosureSchedule } from "./closure-schedule.ts";
+
 
 type JsonObject = Record<string, unknown>;
 
@@ -339,23 +341,34 @@ async function ensureOccurrences(membershipId: string, payload: JsonObject): Pro
     cursor = new Date(cursor.getTime() + 86400000);
   }
 
+  // Load closure dates so we skip weeks that fall on a studio closure.
+  const closureDates = await fetchClosureDateSet();
+
   const rows: JsonObject[] = [];
-  for (let i = 0; i < 8; i += 1) {
-    rows.push({
-      membership_id: membershipId,
-      occurrence_date: cursor.toISOString().slice(0, 10),
-      start_time: slot.start_time,
-      end_time: slot.end_time,
-      instructor_id: slot.instructor_id,
-      status: "scheduled",
-    });
+  let generated = 0;
+  let guard = 0;
+  while (generated < 8 && guard < 52) {
+    const iso = cursor.toISOString().slice(0, 10);
+    if (!closureDates.has(iso)) {
+      rows.push({
+        membership_id: membershipId,
+        occurrence_date: iso,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
+        instructor_id: slot.instructor_id,
+        status: "scheduled",
+      });
+      generated += 1;
+    }
     cursor = new Date(cursor.getTime() + 7 * 86400000);
+    guard += 1;
   }
 
   const { error: insertErr } = await supabase.from("membership_occurrences").insert(rows);
   if (insertErr) throw new Error(`Membership occurrence insert failed: ${insertErr.message}`);
   return rows.length;
 }
+
 const PLAN_NAMES: Record<string, string> = {
   kid_group: "Small Group Swim",
   private: "Private Swim",
@@ -432,8 +445,10 @@ async function sendWelcomeIfNeeded(membershipId: string, payload: JsonObject): P
             firstLessonDate: longDate,
             classTime: prettyTime,
             monthlyPrice,
+            closureSchedule: (await fetchClosureSchedule()).text,
             manageUrl: current.manage_token ? buildManageLink(String(current.manage_token)) : undefined,
           },
+
         }),
       });
       if (!res.ok) {
