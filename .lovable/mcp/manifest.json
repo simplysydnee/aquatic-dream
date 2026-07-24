@@ -481,6 +481,391 @@
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
         "outputSchema": null
+      },
+      {
+        "name": "cancel_membership",
+        "title": "Cancel membership",
+        "description": "Mark a membership as canceled in the database and record a cancellation row. Does NOT cancel the Stripe subscription — do that separately in Stripe if needed. Requires confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "effective_date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Cancellation effective date (YYYY-MM-DD). Defaults to today."
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "reason_detail": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "set_membership_status",
+        "title": "Pause or resume membership",
+        "description": "Set a membership's status to 'paused' or 'active'. Use cancel_membership to cancel. Requires confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "paused",
+                "active"
+              ]
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "id",
+            "status"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "move_membership_slot",
+        "title": "Move membership to a different standing slot",
+        "description": "Reassign a membership to a different standing slot (day/time/level). Verifies destination slot exists, is active, matches plan_key, and has capacity. Requires confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "membership_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "new_standing_slot_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "membership_id",
+            "new_standing_slot_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "update_standing_slot",
+        "title": "Update standing slot",
+        "description": "Update editable fields on a standing slot (capacity, day_of_week, start_time, end_time, swim_level, instructor_id, location, is_active). Only provided fields change. Requires confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "capacity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "day_of_week": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6
+            },
+            "start_time": {
+              "type": "string",
+              "pattern": "^\\d{2}:\\d{2}(:\\d{2})?$"
+            },
+            "end_time": {
+              "type": "string",
+              "pattern": "^\\d{2}:\\d{2}(:\\d{2})?$"
+            },
+            "swim_level": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "white",
+                    "red",
+                    "yellow",
+                    "blue",
+                    "green"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "instructor_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "location": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "is_active": {
+              "type": "boolean"
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "cancel_private_lesson_occurrence",
+        "title": "Cancel a private lesson occurrence",
+        "description": "Mark a single lesson_booking_occurrences row as cancelled (admin cancel — skips charge). Requires confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "occurrence_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "skip_charge": {
+              "type": "boolean",
+              "default": true,
+              "description": "If true (default), sets charge_status to 'skipped' so the family is not billed."
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "occurrence_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "reassign_private_lesson_instructor",
+        "title": "Reassign instructor on a private lesson occurrence",
+        "description": "Override the instructor on a single lesson_booking_occurrences row (does not change other occurrences in the series). Requires confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "occurrence_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "new_instructor_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "occurrence_id",
+            "new_instructor_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "reschedule_private_lesson_occurrence",
+        "title": "Reschedule a private lesson occurrence",
+        "description": "Move a single lesson_booking_occurrences row to a new date and/or start/end time. Does NOT check instructor availability — verify with list_open_private_slots first. Requires confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "occurrence_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "new_date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "new_start_time": {
+              "type": "string",
+              "pattern": "^\\d{2}:\\d{2}(:\\d{2})?$"
+            },
+            "new_end_time": {
+              "type": "string",
+              "pattern": "^\\d{2}:\\d{2}(:\\d{2})?$"
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "occurrence_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "update_swim_enrollment",
+        "title": "Update a swim enrollment",
+        "description": "Update editable fields on a swim_enrollments row: parent_phone, swim_level, status, session_fee_status, session_fee_payment_method, session_fee_payment_reference. Only provided fields change. Requires confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "parent_phone": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 30
+            },
+            "swim_level": {
+              "type": "string",
+              "enum": [
+                "white",
+                "red",
+                "yellow",
+                "blue",
+                "green"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "cancelled",
+                "pending",
+                "waitlist"
+              ]
+            },
+            "session_fee_status": {
+              "type": "string",
+              "enum": [
+                "paid",
+                "unpaid",
+                "refunded",
+                "waived"
+              ]
+            },
+            "session_fee_payment_method": {
+              "type": "string",
+              "maxLength": 50
+            },
+            "session_fee_payment_reference": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
       }
     ]
   }
