@@ -783,17 +783,6 @@ async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
 
   const stripe = createStripeClient(env);
 
-  // Idempotency: don't create a second subscription for the same session.
-  const { data: already } = await supabase
-    .from("memberships")
-    .select("id")
-    .eq("stripe_checkout_session_id", session.id)
-    .maybeSingle();
-  if (already) {
-    console.log("[membership setup] already processed", session.id);
-    return;
-  }
-
   const { data: pend, error: pendErr } = await supabase
     .from("pending_memberships")
     .select("payload")
@@ -804,6 +793,13 @@ async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
     return;
   }
   const payload = (pend.payload as Record<string, any>) || {};
+
+  // Idempotency: pending payload records the created subscription id.
+  if (payload.stripe_subscription_id) {
+    console.log("[membership setup] already processed", session.id, payload.stripe_subscription_id);
+    return;
+  }
+
 
   const stripePriceId: string | undefined = payload.stripe_price_id;
   const stripeProductId: string | undefined = payload.stripe_product_id;
