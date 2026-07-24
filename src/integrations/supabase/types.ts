@@ -1513,6 +1513,7 @@ export type Database = {
           has_medical: boolean | null
           id: string
           is_first_time: boolean | null
+          manage_token: string
           medical_notes: string | null
           membership_agreement_accepted_at: string | null
           membership_agreement_text: string | null
@@ -1550,6 +1551,7 @@ export type Database = {
           has_medical?: boolean | null
           id?: string
           is_first_time?: boolean | null
+          manage_token?: string
           medical_notes?: string | null
           membership_agreement_accepted_at?: string | null
           membership_agreement_text?: string | null
@@ -1587,6 +1589,7 @@ export type Database = {
           has_medical?: boolean | null
           id?: string
           is_first_time?: boolean | null
+          manage_token?: string
           medical_notes?: string | null
           membership_agreement_accepted_at?: string | null
           membership_agreement_text?: string | null
