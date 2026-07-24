@@ -418,6 +418,69 @@
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
         "outputSchema": null
+      },
+      {
+        "name": "read_repo_file",
+        "title": "Read repo file",
+        "description": "Fetch the raw text of a file from the aquatic-dream GitHub repository (default branch). Read-only. Example path: 'supabase/functions/create-membership-checkout/index.ts'.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "description": "Repo-relative file path, e.g. 'src/lib/mcp/index.ts'."
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Optional branch, tag, or commit SHA. Defaults to the repo's default branch."
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_repo_dir",
+        "title": "List repo directory",
+        "description": "List file and folder entries at a path in the aquatic-dream GitHub repository (default branch). Read-only. Use path='' for the repo root.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "maxLength": 500,
+              "default": "",
+              "description": "Repo-relative directory path. Empty string for repo root."
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Optional branch, tag, or commit SHA. Defaults to the repo's default branch."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
       }
     ]
   }

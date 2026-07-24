@@ -10,6 +10,8 @@ import listStandingSlots from "./tools/list-standing-slots";
 import listMemberships from "./tools/list-memberships";
 import getMembership from "./tools/get-membership";
 import getMembershipBillingStatus from "./tools/get-membership-billing-status";
+import readRepoFile from "./tools/read-repo-file";
+import listRepoDir from "./tools/list-repo-dir";
 
 
 // Build the issuer from the project ref so the OAuth issuer matches the direct
@@ -38,6 +40,8 @@ export default defineMcp({
     listMemberships,
     getMembership,
     getMembershipBillingStatus,
+    readRepoFile,
+    listRepoDir,
   ],
 
 });
