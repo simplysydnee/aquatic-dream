@@ -138,7 +138,10 @@ Deno.serve(async (req) => {
     // During trial: current_period_end == trial_end (next billing date).
     // After trial: current_period_end == next billing date.
     // We want to allow ONE more charge then cancel at end of that final paid month.
-    const nextChargeUnix = sub.current_period_end; // next billing date (the "one more" charge)
+    const nextChargeUnix =
+      sub.items?.data?.[0]?.current_period_end
+      ?? sub.current_period_end
+      ?? Math.floor(new Date(m.current_period_end).getTime() / 1000);
     const finalPeriodEndUnix = firstOfMonthAfter(nextChargeUnix);
     const cancelAt = Math.floor(finalPeriodEndUnix); // integer seconds
     if (!Number.isSafeInteger(cancelAt)) {
