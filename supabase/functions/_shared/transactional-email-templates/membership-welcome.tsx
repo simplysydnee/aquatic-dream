@@ -12,6 +12,7 @@ interface Props {
   classTime?: string       // "4:00 PM"
   monthlyPrice?: string    // "$140"
   facilityAddress?: string
+  manageUrl?: string
 }
 
 const DEFAULT_ADDRESS = '1212 Kansas Ave, Modesto, CA 95351'
