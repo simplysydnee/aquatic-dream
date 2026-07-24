@@ -17,7 +17,7 @@ import {
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, Check, ShieldCheck } from "lucide-react";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
-import { getStripe, getStripeEnvironment } from "@/lib/stripe";
+import { getMembershipStripe as getStripe, getMembershipStripeEnvironment as getStripeEnvironment } from "@/lib/stripe-membership";
 import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
 import LegalAgreements, { type LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
