@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     if (m.standing_slot_id) {
       const { data: s } = await supabase
         .from("standing_slots")
-        .select("day_of_week, start_time, level")
+        .select("day_of_week, start_time, level:swim_level")
         .eq("id", m.standing_slot_id)
         .maybeSingle();
       slot = s || null;
