@@ -3,6 +3,18 @@ import { encode } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 export type StripeEnv = 'sandbox' | 'live';
 
 export function getConnectionApiKey(env: StripeEnv): string {
+  // Membership checkout is intentionally pinned to test mode while /join is
+  // being verified. Prefer this dedicated sk_test_ key for sandbox requests so
+  // the embedded iframe's pk_test_ token and the server-created session always
+  // belong to the same Stripe test account.
+  const membershipTestKey = Deno.env.get('STRIPE_MEMBERSHIP_TEST_SECRET_KEY');
+  if (env === 'sandbox' && membershipTestKey) {
+    if (!/^sk_test_/.test(membershipTestKey)) {
+      throw new Error('STRIPE_MEMBERSHIP_TEST_SECRET_KEY must start with sk_test_');
+    }
+    return membershipTestKey;
+  }
+
   // Prefer a manually-configured real Stripe secret key (sk_/rk_) when set.
   // The Lovable connector gateway has been returning "Credential not found"
   // for STRIPE_LIVE_API_KEY in this project, so a real key from the same
