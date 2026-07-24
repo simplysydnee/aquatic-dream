@@ -864,6 +864,13 @@ async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
     return;
   }
 
+  // Persist subscription id in pending payload so a retried webhook is a no-op.
+  await supabase
+    .from("pending_memberships")
+    .update({ payload: { ...payload, stripe_subscription_id: subscription.id } })
+    .eq("id", pendingId);
+
+
   // Reuse the existing membership insert path by shaping a synthetic session
   // object with the new subscription id + this session id (for idempotency).
   await handleMembershipCheckoutCompleted(
