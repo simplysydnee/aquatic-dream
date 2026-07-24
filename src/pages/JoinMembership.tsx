@@ -1017,6 +1017,15 @@ export default function JoinMembership() {
                     <p className="mt-2 text-sm text-[#2a5e84]/80">
                       We'll send a welcome email with your first class details shortly.
                     </p>
+                    {manageToken && (
+                      <a
+                        href={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/membership-calendar-ics?token=${encodeURIComponent(manageToken)}`}
+                        className="mt-6 inline-flex items-center justify-center rounded-md bg-[#2a5e84] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a3a8a]"
+                        download
+                      >
+                        Add this month's lessons to your calendar
+                      </a>
+                    )}
                     <ClosureScheduleNote
                       className="mx-auto mt-6 max-w-md rounded-lg border border-[#2a5e84]/20 bg-[#f7f3ee] p-4 text-left"
                       title="Upcoming closures"
@@ -1025,6 +1034,7 @@ export default function JoinMembership() {
                 )}
               </div>
             )}
+
 
           </Card>
         )}
