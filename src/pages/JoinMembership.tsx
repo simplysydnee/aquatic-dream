@@ -111,10 +111,16 @@ export default function JoinMembership() {
       const { data: planRows, error: planErr } = await supabase
         .from("membership_plans")
         .select("id, plan_key, name, monthly_price_cents")
-        .eq("active", true)
-        .order("monthly_price_cents", { ascending: true });
-      if (planErr) toast.error("Could not load plans");
-      else setPlans((planRows as Plan[]) || []);
+      .eq("active", true)
+      .order("monthly_price_cents", { ascending: true });
+    if (planErr) toast.error("Could not load plans");
+    else {
+      const order = ["kid_group", "private", "adult_group"];
+      const sorted = ((planRows as Plan[]) || []).sort(
+        (a, b) => order.indexOf(a.plan_key) - order.indexOf(b.plan_key)
+      );
+      setPlans(sorted);
+    }
       setLoading(false);
     })();
   }, []);
@@ -448,7 +454,7 @@ export default function JoinMembership() {
                           <div className="font-semibold text-[#1a3a8a]">{p.name}</div>
                           <div className="text-sm text-[#2a5e84]">
                             {p.plan_key === "kid_group"
-                              ? "Kids group class · we'll match your swimmer to the right level"
+                              ? "Kids group class · group sizes no more than 3 · we'll match your swimmer to the right level"
                               : p.plan_key === "private"
                               ? "One-on-one coaching"
                               : "Adult group class"}
