@@ -65,6 +65,12 @@ const MembershipWelcomeEmail = ({
             are welcome. See you at the pool!
           </Text>
 
+          {manageUrl && (
+            <Text style={small}>
+              Need to update or cancel later? <Link href={manageUrl} style={link}>Manage or cancel your membership</Link>.
+            </Text>
+          )}
+
           <Text style={footer}>{SITE_NAME} · {address}</Text>
         </Container>
       </Body>
