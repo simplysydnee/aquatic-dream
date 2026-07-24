@@ -208,7 +208,7 @@ serve(async (req) => {
     try {
       session = await stripe.checkout.sessions.create({
         mode: "setup",
-        ui_mode: "embedded",
+        ui_mode: "embedded_page",
         customer: customer.id,
         currency: "usd",
         return_url:
