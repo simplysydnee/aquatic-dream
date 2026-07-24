@@ -917,6 +917,328 @@ var list_repo_dir_default = defineTool13({
   }
 });
 
+// src/lib/mcp/tools/cancel-membership.ts
+import { defineTool as defineTool14 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z14 } from "npm:zod@^3.23.8";
+
+// src/lib/mcp/tools/_client.ts
+import { createClient as createClient11 } from "npm:@supabase/supabase-js@^2.98.0";
+function adminClient(ctx) {
+  return createClient11(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+function notAuthed() {
+  return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
+}
+function refuseUnconfirmed(summary, preview) {
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Refusing: confirm=false. ${summary} Re-call with confirm=true to execute.`
+      }
+    ],
+    structuredContent: { would_do: summary, preview }
+  };
+}
+function errResult(message) {
+  return { content: [{ type: "text", text: message }], isError: true };
+}
+function okResult(payload) {
+  return {
+    content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+    structuredContent: payload
+  };
+}
+
+// src/lib/mcp/tools/cancel-membership.ts
+var cancel_membership_default = defineTool14({
+  name: "cancel_membership",
+  title: "Cancel membership",
+  description: "Mark a membership as canceled in the database and record a cancellation row. Does NOT cancel the Stripe subscription \u2014 do that separately in Stripe if needed. Requires confirm=true.",
+  inputSchema: {
+    id: z14.string().uuid(),
+    effective_date: z14.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Cancellation effective date (YYYY-MM-DD). Defaults to today."),
+    reason: z14.string().max(100).optional(),
+    reason_detail: z14.string().max(1e3).optional(),
+    confirm: z14.boolean().default(false)
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  handler: async ({ id, effective_date, reason, reason_detail, confirm }, ctx) => {
+    if (!ctx.isAuthenticated()) return notAuthed();
+    const effective = effective_date ?? (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    if (!confirm) {
+      return refuseUnconfirmed(`Would cancel membership ${id} effective ${effective}.`, {
+        id,
+        effective,
+        reason
+      });
+    }
+    const supabase = adminClient(ctx);
+    const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+    const { error: upErr } = await supabase.from("memberships").update({
+      status: "canceled",
+      cancel_requested_at: nowIso,
+      cancel_effective_date: effective
+    }).eq("id", id);
+    if (upErr) return errResult(upErr.message);
+    const { error: insErr } = await supabase.from("membership_cancellations").insert({
+      membership_id: id,
+      effective_date: effective,
+      reason: reason ?? null,
+      reason_detail: reason_detail ?? null
+    });
+    if (insErr) return errResult(`membership updated, but cancellation row failed: ${insErr.message}`);
+    return okResult({ id, status: "canceled", effective_date: effective });
+  }
+});
+
+// src/lib/mcp/tools/set-membership-status.ts
+import { defineTool as defineTool15 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z15 } from "npm:zod@^3.23.8";
+var set_membership_status_default = defineTool15({
+  name: "set_membership_status",
+  title: "Pause or resume membership",
+  description: "Set a membership's status to 'paused' or 'active'. Use cancel_membership to cancel. Requires confirm=true.",
+  inputSchema: {
+    id: z15.string().uuid(),
+    status: z15.enum(["paused", "active"]),
+    confirm: z15.boolean().default(false)
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async ({ id, status, confirm }, ctx) => {
+    if (!ctx.isAuthenticated()) return notAuthed();
+    if (!confirm) return refuseUnconfirmed(`Would set membership ${id} status to ${status}.`, { id, status });
+    const supabase = adminClient(ctx);
+    const { data, error } = await supabase.from("memberships").update({ status }).eq("id", id).select("id, status").maybeSingle();
+    if (error) return errResult(error.message);
+    if (!data) return errResult("Membership not found");
+    return okResult(data);
+  }
+});
+
+// src/lib/mcp/tools/move-membership-slot.ts
+import { defineTool as defineTool16 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z16 } from "npm:zod@^3.23.8";
+var move_membership_slot_default = defineTool16({
+  name: "move_membership_slot",
+  title: "Move membership to a different standing slot",
+  description: "Reassign a membership to a different standing slot (day/time/level). Verifies destination slot exists, is active, matches plan_key, and has capacity. Requires confirm=true.",
+  inputSchema: {
+    membership_id: z16.string().uuid(),
+    new_standing_slot_id: z16.string().uuid(),
+    confirm: z16.boolean().default(false)
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async ({ membership_id, new_standing_slot_id, confirm }, ctx) => {
+    if (!ctx.isAuthenticated()) return notAuthed();
+    const supabase = adminClient(ctx);
+    const { data: m, error: mErr } = await supabase.from("memberships").select("id, plan_key, standing_slot_id, status").eq("id", membership_id).maybeSingle();
+    if (mErr) return errResult(mErr.message);
+    if (!m) return errResult("Membership not found");
+    const { data: slot, error: sErr } = await supabase.from("standing_slots").select("id, plan_key, is_active, capacity, day_of_week, start_time, end_time, swim_level").eq("id", new_standing_slot_id).maybeSingle();
+    if (sErr) return errResult(sErr.message);
+    if (!slot) return errResult("Destination slot not found");
+    if (!slot.is_active) return errResult("Destination slot is not active");
+    if (slot.plan_key !== m.plan_key)
+      return errResult(`Plan mismatch: membership is ${m.plan_key}, slot is ${slot.plan_key}`);
+    const { count, error: cErr } = await supabase.from("memberships").select("id", { count: "exact", head: true }).eq("standing_slot_id", new_standing_slot_id).in("status", ["active", "past_due", "pending"]);
+    if (cErr) return errResult(cErr.message);
+    const enrolled = count ?? 0;
+    if (enrolled >= (slot.capacity ?? 0))
+      return errResult(`Destination slot is full (${enrolled}/${slot.capacity})`);
+    if (!confirm) {
+      return refuseUnconfirmed(
+        `Would move membership ${membership_id} from slot ${m.standing_slot_id} to ${new_standing_slot_id}.`,
+        { destination: slot, current_enrolled: enrolled }
+      );
+    }
+    const { data, error } = await supabase.from("memberships").update({ standing_slot_id: new_standing_slot_id }).eq("id", membership_id).select("id, standing_slot_id").maybeSingle();
+    if (error) return errResult(error.message);
+    return okResult({ ...data, destination_slot: slot });
+  }
+});
+
+// src/lib/mcp/tools/update-standing-slot.ts
+import { defineTool as defineTool17 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z17 } from "npm:zod@^3.23.8";
+var update_standing_slot_default = defineTool17({
+  name: "update_standing_slot",
+  title: "Update standing slot",
+  description: "Update editable fields on a standing slot (capacity, day_of_week, start_time, end_time, swim_level, instructor_id, location, is_active). Only provided fields change. Requires confirm=true.",
+  inputSchema: {
+    id: z17.string().uuid(),
+    capacity: z17.number().int().min(0).max(50).optional(),
+    day_of_week: z17.number().int().min(0).max(6).optional(),
+    start_time: z17.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+    end_time: z17.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+    swim_level: z17.enum(["white", "red", "yellow", "blue", "green"]).nullable().optional(),
+    instructor_id: z17.string().uuid().nullable().optional(),
+    location: z17.string().max(200).nullable().optional(),
+    is_active: z17.boolean().optional(),
+    confirm: z17.boolean().default(false)
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async (input, ctx) => {
+    if (!ctx.isAuthenticated()) return notAuthed();
+    const { id, confirm, ...rest } = input;
+    const updates = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== void 0));
+    if (Object.keys(updates).length === 0) return errResult("No fields provided to update");
+    if (!confirm) {
+      return refuseUnconfirmed(`Would update standing slot ${id}.`, { id, updates });
+    }
+    const supabase = adminClient(ctx);
+    const { data, error } = await supabase.from("standing_slots").update(updates).eq("id", id).select("*").maybeSingle();
+    if (error) return errResult(error.message);
+    if (!data) return errResult("Standing slot not found");
+    return okResult(data);
+  }
+});
+
+// src/lib/mcp/tools/cancel-private-lesson-occurrence.ts
+import { defineTool as defineTool18 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z18 } from "npm:zod@^3.23.8";
+var cancel_private_lesson_occurrence_default = defineTool18({
+  name: "cancel_private_lesson_occurrence",
+  title: "Cancel a private lesson occurrence",
+  description: "Mark a single lesson_booking_occurrences row as cancelled (admin cancel \u2014 skips charge). Requires confirm=true.",
+  inputSchema: {
+    occurrence_id: z18.string().uuid(),
+    reason: z18.string().max(500).optional(),
+    skip_charge: z18.boolean().default(true).describe("If true (default), sets charge_status to 'skipped' so the family is not billed."),
+    confirm: z18.boolean().default(false)
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  handler: async ({ occurrence_id, reason, skip_charge, confirm }, ctx) => {
+    if (!ctx.isAuthenticated()) return notAuthed();
+    if (!confirm) {
+      return refuseUnconfirmed(`Would cancel private lesson occurrence ${occurrence_id}.`, {
+        occurrence_id,
+        reason,
+        skip_charge
+      });
+    }
+    const supabase = adminClient(ctx);
+    const updates = {
+      status: "cancelled",
+      cancelled_at: (/* @__PURE__ */ new Date()).toISOString(),
+      cancel_reason: reason ?? "Admin cancellation via MCP"
+    };
+    if (skip_charge) updates.charge_status = "skipped";
+    const { data, error } = await supabase.from("lesson_booking_occurrences").update(updates).eq("id", occurrence_id).select("id, status, cancel_reason, charge_status, occurrence_date").maybeSingle();
+    if (error) return errResult(error.message);
+    if (!data) return errResult("Occurrence not found");
+    return okResult(data);
+  }
+});
+
+// src/lib/mcp/tools/reassign-private-lesson-instructor.ts
+import { defineTool as defineTool19 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z19 } from "npm:zod@^3.23.8";
+var reassign_private_lesson_instructor_default = defineTool19({
+  name: "reassign_private_lesson_instructor",
+  title: "Reassign instructor on a private lesson occurrence",
+  description: "Override the instructor on a single lesson_booking_occurrences row (does not change other occurrences in the series). Requires confirm=true.",
+  inputSchema: {
+    occurrence_id: z19.string().uuid(),
+    new_instructor_id: z19.string().uuid(),
+    confirm: z19.boolean().default(false)
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async ({ occurrence_id, new_instructor_id, confirm }, ctx) => {
+    if (!ctx.isAuthenticated()) return notAuthed();
+    const supabase = adminClient(ctx);
+    const { data: instructor, error: iErr } = await supabase.from("instructors").select("id, name").eq("id", new_instructor_id).maybeSingle();
+    if (iErr) return errResult(iErr.message);
+    if (!instructor) return errResult("Instructor not found");
+    if (!confirm) {
+      return refuseUnconfirmed(
+        `Would reassign occurrence ${occurrence_id} to ${instructor.name}.`,
+        { occurrence_id, instructor }
+      );
+    }
+    const { data, error } = await supabase.from("lesson_booking_occurrences").update({
+      instructor_override_id: instructor.id,
+      instructor_override_name: instructor.name
+    }).eq("id", occurrence_id).select("id, occurrence_date, instructor_override_id, instructor_override_name").maybeSingle();
+    if (error) return errResult(error.message);
+    if (!data) return errResult("Occurrence not found");
+    return okResult(data);
+  }
+});
+
+// src/lib/mcp/tools/reschedule-private-lesson-occurrence.ts
+import { defineTool as defineTool20 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z20 } from "npm:zod@^3.23.8";
+var reschedule_private_lesson_occurrence_default = defineTool20({
+  name: "reschedule_private_lesson_occurrence",
+  title: "Reschedule a private lesson occurrence",
+  description: "Move a single lesson_booking_occurrences row to a new date and/or start/end time. Does NOT check instructor availability \u2014 verify with list_open_private_slots first. Requires confirm=true.",
+  inputSchema: {
+    occurrence_id: z20.string().uuid(),
+    new_date: z20.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    new_start_time: z20.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+    new_end_time: z20.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+    confirm: z20.boolean().default(false)
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async ({ occurrence_id, new_date, new_start_time, new_end_time, confirm }, ctx) => {
+    if (!ctx.isAuthenticated()) return notAuthed();
+    const updates = {};
+    if (new_date) updates.occurrence_date = new_date;
+    if (new_start_time) updates.start_time_override = new_start_time;
+    if (new_end_time) updates.end_time_override = new_end_time;
+    if (Object.keys(updates).length === 0) return errResult("Provide at least one of new_date, new_start_time, new_end_time");
+    if (!confirm) {
+      return refuseUnconfirmed(`Would reschedule occurrence ${occurrence_id}.`, {
+        occurrence_id,
+        updates
+      });
+    }
+    const supabase = adminClient(ctx);
+    const { data, error } = await supabase.from("lesson_booking_occurrences").update(updates).eq("id", occurrence_id).select("id, occurrence_date, start_time_override, end_time_override, status").maybeSingle();
+    if (error) return errResult(error.message);
+    if (!data) return errResult("Occurrence not found");
+    return okResult(data);
+  }
+});
+
+// src/lib/mcp/tools/update-swim-enrollment.ts
+import { defineTool as defineTool21 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z21 } from "npm:zod@^3.23.8";
+var update_swim_enrollment_default = defineTool21({
+  name: "update_swim_enrollment",
+  title: "Update a swim enrollment",
+  description: "Update editable fields on a swim_enrollments row: parent_phone, swim_level, status, session_fee_status, session_fee_payment_method, session_fee_payment_reference. Only provided fields change. Requires confirm=true.",
+  inputSchema: {
+    id: z21.string().uuid(),
+    parent_phone: z21.string().min(5).max(30).optional(),
+    swim_level: z21.enum(["white", "red", "yellow", "blue", "green"]).optional(),
+    status: z21.enum(["active", "cancelled", "pending", "waitlist"]).optional(),
+    session_fee_status: z21.enum(["paid", "unpaid", "refunded", "waived"]).optional(),
+    session_fee_payment_method: z21.string().max(50).optional(),
+    session_fee_payment_reference: z21.string().max(200).optional(),
+    confirm: z21.boolean().default(false)
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async (input, ctx) => {
+    if (!ctx.isAuthenticated()) return notAuthed();
+    const { id, confirm, ...rest } = input;
+    const updates = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== void 0));
+    if (Object.keys(updates).length === 0) return errResult("No fields provided to update");
+    if (!confirm) {
+      return refuseUnconfirmed(`Would update swim_enrollments ${id}.`, { id, updates });
+    }
+    const supabase = adminClient(ctx);
+    const { data, error } = await supabase.from("swim_enrollments").update(updates).eq("id", id).select("id, parent_phone, swim_level, status, session_fee_status, session_fee_payment_method, session_fee_payment_reference").maybeSingle();
+    if (error) return errResult(error.message);
+    if (!data) return errResult("Enrollment not found");
+    return okResult(data);
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "jilrijklnehbfuulykty";
 var mcp_default = defineMcp({
@@ -941,7 +1263,15 @@ var mcp_default = defineMcp({
     get_membership_default,
     get_membership_billing_status_default,
     read_repo_file_default,
-    list_repo_dir_default
+    list_repo_dir_default,
+    cancel_membership_default,
+    set_membership_status_default,
+    move_membership_slot_default,
+    update_standing_slot_default,
+    cancel_private_lesson_occurrence_default,
+    reassign_private_lesson_instructor_default,
+    reschedule_private_lesson_occurrence_default,
+    update_swim_enrollment_default
   ]
 });
 

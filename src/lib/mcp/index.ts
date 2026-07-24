@@ -12,6 +12,14 @@ import getMembership from "./tools/get-membership";
 import getMembershipBillingStatus from "./tools/get-membership-billing-status";
 import readRepoFile from "./tools/read-repo-file";
 import listRepoDir from "./tools/list-repo-dir";
+import cancelMembership from "./tools/cancel-membership";
+import setMembershipStatus from "./tools/set-membership-status";
+import moveMembershipSlot from "./tools/move-membership-slot";
+import updateStandingSlot from "./tools/update-standing-slot";
+import cancelPrivateLessonOccurrence from "./tools/cancel-private-lesson-occurrence";
+import reassignPrivateLessonInstructor from "./tools/reassign-private-lesson-instructor";
+import reschedulePrivateLessonOccurrence from "./tools/reschedule-private-lesson-occurrence";
+import updateSwimEnrollment from "./tools/update-swim-enrollment";
 
 
 // Build the issuer from the project ref so the OAuth issuer matches the direct
@@ -42,6 +50,14 @@ export default defineMcp({
     getMembershipBillingStatus,
     readRepoFile,
     listRepoDir,
+    cancelMembership,
+    setMembershipStatus,
+    moveMembershipSlot,
+    updateStandingSlot,
+    cancelPrivateLessonOccurrence,
+    reassignPrivateLessonInstructor,
+    reschedulePrivateLessonOccurrence,
+    updateSwimEnrollment,
   ],
 
 });
