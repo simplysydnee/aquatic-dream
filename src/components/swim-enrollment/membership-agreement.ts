@@ -11,7 +11,7 @@ Monthly Membership & Automatic Renewal
 Your Aquatic Dreams membership is a month-to-month program that renews automatically on the 1st of each month. By enrolling, you authorize Aquatic Dreams to charge the payment method on file the flat monthly rate for your selected program on the 1st of every month until you cancel. Your membership will continue to renew each month without further action from you.
 
 Flat Rate — Missed Lessons
-Your monthly membership fee is a flat rate that reserves your weekly lesson time. It is not a per-lesson charge. Lessons you miss — for any reason, including illness, travel, weather, or personal schedule conflicts — are non-refundable and are not eligible for makeups. Some months contain 4 lessons and some contain 5; the monthly rate does not change.
+Your monthly membership fee is a flat rate that reserves your weekly lesson time. It is not a per-lesson charge. If your swimmer misses a scheduled lesson that Aquatic Dreams holds — for any reason, including illness, travel, or personal schedule conflicts — that lesson is non-refundable and is not eligible for a makeup. Lessons that Aquatic Dreams cancels are addressed separately under Holidays & Closures below. Some months contain 4 lessons and some contain 5; the monthly rate does not change.
 
 Holidays & Closures
 Aquatic Dreams observes major holidays and an annual winter break. On these planned closure dates there is no class, and no makeup or credit is issued — holiday weeks are already accounted for in your flat monthly rate. Posted closure dates for the season are shown in your enrollment materials and in your account.
