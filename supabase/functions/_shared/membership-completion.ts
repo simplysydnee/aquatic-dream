@@ -13,10 +13,13 @@ export interface MembershipCompletionResult {
   alreadyProcessed: boolean;
 }
 
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-);
+const supabaseUrl = Deno.env.get("SUPABASE_URL");
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error("Missing backend service configuration");
+}
+
+const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 function asRecord(value: unknown): JsonObject {
   return value && typeof value === "object" && !Array.isArray(value)
