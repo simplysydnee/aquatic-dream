@@ -62,7 +62,9 @@ serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const obj = event.data.object;
-        if (obj?.metadata?.type === "membership") {
+        if (obj?.metadata?.type === "membership_setup") {
+          await handleMembershipSetupCompleted(obj, env);
+        } else if (obj?.metadata?.type === "membership") {
           await handleMembershipCheckoutCompleted(obj, env);
         } else if (obj?.metadata?.type === "registration_fee" && obj?.metadata?.enrollmentId) {
           await handleRegistrationFeePaid(obj);
@@ -754,4 +756,133 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
   }
 
   console.log("[membership webhook] membership created", newMembership.id);
+}
+
+// ---------------- Membership (setup-mode flow) ----------------
+// Setup-mode Checkout Session saved a payment method. Now create the
+// subscription with add_invoice_items so the first invoice charges exactly
+// the prorated amount shown on the /join review screen, and anchor the
+// recurring cycle to the 1st of the month after the first-lesson month.
+
+async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
+  const pendingId: string | undefined = session?.metadata?.pending_membership_id;
+  if (!pendingId) {
+    console.error("[membership setup] missing pending_membership_id", session?.id);
+    return;
+  }
+  const setupIntentId: string | undefined = session?.setup_intent;
+  if (!setupIntentId) {
+    console.error("[membership setup] no setup_intent on session", session?.id);
+    return;
+  }
+  const customerId: string | undefined = session?.customer;
+  if (!customerId) {
+    console.error("[membership setup] no customer on session", session?.id);
+    return;
+  }
+
+  const stripe = createStripeClient(env);
+
+  const { data: pend, error: pendErr } = await supabase
+    .from("pending_memberships")
+    .select("payload")
+    .eq("id", pendingId)
+    .maybeSingle();
+  if (pendErr || !pend) {
+    console.error("[membership setup] pending row missing", pendingId, pendErr);
+    return;
+  }
+  const payload = (pend.payload as Record<string, any>) || {};
+
+  // Idempotency: pending payload records the created subscription id.
+  if (payload.stripe_subscription_id) {
+    console.log("[membership setup] already processed", session.id, payload.stripe_subscription_id);
+    return;
+  }
+
+
+  const stripePriceId: string | undefined = payload.stripe_price_id;
+  const stripeProductId: string | undefined = payload.stripe_product_id;
+  const firstChargeCents: number = Number(payload.first_charge_cents ?? 0);
+  const anchorUnix: number = Number(payload.billing_anchor_unix ?? 0);
+  if (!stripePriceId || !anchorUnix) {
+    console.error("[membership setup] missing price/anchor in pending payload", pendingId);
+    return;
+  }
+
+  // Retrieve the saved PaymentMethod from the SetupIntent, attach & default it.
+  let paymentMethodId: string | undefined;
+  try {
+    const si = await stripe.setupIntents.retrieve(setupIntentId);
+    paymentMethodId = (si as any).payment_method as string | undefined;
+  } catch (e: any) {
+    console.error("[membership setup] setupIntent retrieve failed", e?.message);
+    return;
+  }
+  if (!paymentMethodId) {
+    console.error("[membership setup] no payment_method on setup_intent", setupIntentId);
+    return;
+  }
+  try {
+    await stripe.customers.update(customerId, {
+      invoice_settings: { default_payment_method: paymentMethodId },
+    });
+  } catch (e: any) {
+    console.error("[membership setup] set default PM failed", e?.message);
+  }
+
+  // Create the subscription. add_invoice_items adds the prorated first-month
+  // amount to the first invoice; billing_cycle_anchor + proration_behavior
+  // 'none' means Stripe charges only that add_invoice_items amount now (no
+  // pro-rated recurring line), then flat monthly on the 1st.
+  let subscription: any;
+  try {
+    const params: any = {
+      customer: customerId,
+      items: [{ price: stripePriceId }],
+      default_payment_method: paymentMethodId,
+      billing_cycle_anchor: anchorUnix,
+      proration_behavior: "none",
+      payment_behavior: "error_if_incomplete",
+      metadata: { type: "membership", pending_membership_id: pendingId },
+    };
+    if (firstChargeCents > 0 && stripeProductId) {
+      params.add_invoice_items = [{
+        price_data: {
+          currency: "usd",
+          product: stripeProductId,
+          unit_amount: firstChargeCents,
+        },
+        quantity: 1,
+      }];
+    }
+    subscription = await stripe.subscriptions.create(params);
+  } catch (e: any) {
+    console.error("[membership setup] subscription create failed", {
+      type: e?.type, code: e?.code, message: e?.message, raw: e?.raw?.message, param: e?.param,
+    });
+    return;
+  }
+
+  // Persist subscription id in pending payload so a retried webhook is a no-op.
+  await supabase
+    .from("pending_memberships")
+    .update({ payload: { ...payload, stripe_subscription_id: subscription.id } })
+    .eq("id", pendingId);
+
+
+  // Reuse the existing membership insert path by shaping a synthetic session
+  // object with the new subscription id + this session id (for idempotency).
+  await handleMembershipCheckoutCompleted(
+    {
+      id: session.id,
+      customer: customerId,
+      subscription: subscription.id,
+      metadata: {
+        type: "membership",
+        pending_membership_id: pendingId,
+      },
+    },
+    env,
+  );
 }
