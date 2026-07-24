@@ -274,6 +274,9 @@ async function ensureMembershipRecord(options: {
 
   const occurrenceCount = await ensureOccurrences(membership.id as string, options.payload);
   console.log("[membership completion] membership created", membership.id, "pending", options.pendingId);
+  await sendWelcomeIfNeeded(membership.id as string, options.payload).catch((e) =>
+    console.error("[membership completion] welcome send failed", errorMessage(e)),
+  );
 
   return {
     membershipId: membership.id as string,
