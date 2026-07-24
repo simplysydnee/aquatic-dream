@@ -616,15 +616,21 @@ var list_memberships_default = defineTool9({
         if (!firstDates.has(o.membership_id)) firstDates.set(o.membership_id, o.occurrence_date);
       }
     }
+    const { data: plans } = await supabase.from("membership_plans").select("plan_key, name, monthly_price_cents");
+    const planMap = /* @__PURE__ */ new Map();
+    for (const p of plans ?? []) {
+      planMap.set(p.plan_key, { name: p.name ?? null, monthly_price_cents: p.monthly_price_cents ?? null });
+    }
     const rows = (data ?? []).map((m) => {
       const slot = m.standing_slots;
       const swimmer = [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim();
       const parent = [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim();
+      const plan = planMap.get(m.plan_key);
       return {
         id: m.id,
         swimmer_name: swimmer || null,
         plan_key: m.plan_key,
-        program: m.membership_plans?.name ?? null,
+        program: plan?.name ?? null,
         slot: slot ? {
           day_of_week: slot.day_of_week,
           day_name: DAY_NAMES2[slot.day_of_week] ?? null,
@@ -636,7 +642,7 @@ var list_memberships_default = defineTool9({
         status: m.status,
         start_date: m.start_date,
         first_lesson_date: firstDates.get(m.id) ?? null,
-        monthly_price_cents: m.membership_plans?.monthly_price_cents ?? null,
+        monthly_price_cents: plan?.monthly_price_cents ?? null,
         stripe_subscription_id: m.stripe_subscription_id,
         current_period_start: m.current_period_start,
         current_period_end: m.current_period_end,

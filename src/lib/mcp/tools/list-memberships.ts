@@ -71,15 +71,24 @@ export default defineTool({
       }
     }
 
+    const { data: plans } = await supabase
+      .from("membership_plans")
+      .select("plan_key, name, monthly_price_cents");
+    const planMap = new Map<string, { name: string | null; monthly_price_cents: number | null }>();
+    for (const p of (plans as any[]) ?? []) {
+      planMap.set(p.plan_key, { name: p.name ?? null, monthly_price_cents: p.monthly_price_cents ?? null });
+    }
+
     const rows = (data ?? []).map((m: any) => {
       const slot = m.standing_slots;
       const swimmer = [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim();
       const parent = [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim();
+      const plan = planMap.get(m.plan_key);
       return {
         id: m.id,
         swimmer_name: swimmer || null,
         plan_key: m.plan_key,
-        program: m.membership_plans?.name ?? null,
+        program: plan?.name ?? null,
         slot: slot
           ? {
               day_of_week: slot.day_of_week,
@@ -93,7 +102,7 @@ export default defineTool({
         status: m.status,
         start_date: m.start_date,
         first_lesson_date: firstDates.get(m.id) ?? null,
-        monthly_price_cents: m.membership_plans?.monthly_price_cents ?? null,
+        monthly_price_cents: plan?.monthly_price_cents ?? null,
         stripe_subscription_id: m.stripe_subscription_id,
         current_period_start: m.current_period_start,
         current_period_end: m.current_period_end,
