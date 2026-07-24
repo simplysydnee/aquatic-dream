@@ -19,9 +19,20 @@ const PLAN_NAMES: Record<string, string> = {
 const ALLOWED_REASONS = ["too_busy", "graduated", "cost", "moved", "other"] as const;
 type Reason = (typeof ALLOWED_REASONS)[number];
 
-function addOneMonth(unixSeconds: number): number {
+// Returns the UNIX timestamp for the 1st of the month AFTER the given
+// unix seconds, at 00:00 America/Los_Angeles. One more cycle bills on that
+// next 1st; membership stays active through the end of that final paid
+// month and cancels at the following 1st.
+function firstOfMonthAfter(unixSeconds: number): number {
   const d = new Date(unixSeconds * 1000);
-  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
+  // Move to the month AFTER current_period_end, then to the 1st of the
+  // month AFTER that (i.e. end of the final paid month = start of the
+  // month following the final paid month).
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth();
+  // final paid month = month + 1 (the one that bills on the next 1st)
+  // cancel at start of month + 2 (LA midnight ≈ 08:00 UTC during PDT / 07:00 UTC otherwise; use 12:00 UTC to be safely inside the day)
+  const target = new Date(Date.UTC(year, month + 2, 1, 12, 0, 0));
   return Math.floor(target.getTime() / 1000);
 }
 
