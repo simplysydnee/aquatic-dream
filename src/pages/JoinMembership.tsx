@@ -111,10 +111,16 @@ export default function JoinMembership() {
       const { data: planRows, error: planErr } = await supabase
         .from("membership_plans")
         .select("id, plan_key, name, monthly_price_cents")
-        .eq("active", true)
-        .order("monthly_price_cents", { ascending: true });
-      if (planErr) toast.error("Could not load plans");
-      else setPlans((planRows as Plan[]) || []);
+      .eq("active", true)
+      .order("monthly_price_cents", { ascending: true });
+    if (planErr) toast.error("Could not load plans");
+    else {
+      const order = ["kid_group", "private", "adult_group"];
+      const sorted = ((planRows as Plan[]) || []).sort(
+        (a, b) => order.indexOf(a.plan_key) - order.indexOf(b.plan_key)
+      );
+      setPlans(sorted);
+    }
       setLoading(false);
     })();
   }, []);
