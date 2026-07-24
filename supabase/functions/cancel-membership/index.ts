@@ -144,20 +144,21 @@ Deno.serve(async (req) => {
     if (!Number.isSafeInteger(cancelAt)) {
       throw new Error("Calculated cancellation timestamp is invalid");
     }
-    console.log("[cancel-membership] cancel_at", cancelAt, typeof cancelAt);
-
-    // Schedule Stripe cancellation. cancel_at MUST be a unix timestamp
-    // (integer seconds), not an ISO string. proration_behavior:'none'
-    // prevents any partial refund on the final period.
-    await stripe.subscriptions.update(stripeSubId, {
+    const updateParams = {
       cancel_at: cancelAt,
-      proration_behavior: 'none',
+      proration_behavior: "none" as const,
       metadata: {
         ...(sub.metadata || {}),
         cancel_reason: reason as string,
         cancel_requested_at: new Date().toISOString(),
       },
-    });
+    };
+    console.log("[cancel-membership] cancel_at", updateParams.cancel_at, typeof updateParams.cancel_at);
+
+    // Schedule Stripe cancellation. cancel_at MUST be a unix timestamp
+    // (integer seconds), not an ISO string. proration_behavior:'none'
+    // prevents any partial refund on the final period.
+    await stripe.subscriptions.update(stripeSubId, updateParams);
 
     const nowIso = new Date().toISOString();
     const effectiveDate = new Date(cancelAt * 1000).toISOString().slice(0, 10);
