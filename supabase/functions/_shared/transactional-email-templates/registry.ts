@@ -31,7 +31,9 @@ import { template as cashReceipt } from './cash-receipt.tsx'
 import { template as privateLessonRescheduled } from './private-lesson-rescheduled.tsx'
 import { template as lessonBookingConfirmationManual } from './lesson-booking-confirmation-manual.tsx'
 import { template as membershipWelcome } from './membership-welcome.tsx'
-
+import { template as membershipManageLink } from './membership-manage-link.tsx'
+import { template as membershipCancellationConfirmation } from './membership-cancellation-confirmation.tsx'
+import { template as internalMembershipCancellationAlert } from './internal-membership-cancellation-alert.tsx'
 
 
 
@@ -59,5 +61,8 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'private-lesson-rescheduled': privateLessonRescheduled,
   'lesson-booking-confirmation-manual': lessonBookingConfirmationManual,
   'membership-welcome': membershipWelcome,
+  'membership-manage-link': membershipManageLink,
+  'membership-cancellation-confirmation': membershipCancellationConfirmation,
+  'internal-membership-cancellation-alert': internalMembershipCancellationAlert,
 }
 
