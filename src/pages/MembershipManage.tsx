@@ -187,6 +187,19 @@ export default function MembershipManage() {
           </CardContent>
         </Card>
 
+        {!isCancelled && token && (
+          <div>
+            <a
+              href={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/membership-calendar-ics?token=${encodeURIComponent(token)}`}
+              className="inline-flex items-center justify-center rounded-md bg-[#2a5e84] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a3a8a]"
+              download
+            >
+              Add this month's lessons to your calendar
+            </a>
+          </div>
+        )}
+
+
         {!isCancelled && (
           <Card>
             <CardHeader><CardTitle className="text-lg">Upcoming closures</CardTitle></CardHeader>
