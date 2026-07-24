@@ -140,13 +140,17 @@ Deno.serve(async (req) => {
     // We want to allow ONE more charge then cancel at end of that final paid month.
     const nextChargeUnix = sub.current_period_end; // next billing date (the "one more" charge)
     const finalPeriodEndUnix = firstOfMonthAfter(nextChargeUnix);
-    const cancelAtUnix = Math.floor(finalPeriodEndUnix); // integer seconds
+    const cancelAt = Math.floor(finalPeriodEndUnix); // integer seconds
+    if (!Number.isSafeInteger(cancelAt)) {
+      throw new Error("Calculated cancellation timestamp is invalid");
+    }
+    console.log("[cancel-membership] cancel_at", cancelAt, typeof cancelAt);
 
     // Schedule Stripe cancellation. cancel_at MUST be a unix timestamp
     // (integer seconds), not an ISO string. proration_behavior:'none'
     // prevents any partial refund on the final period.
     await stripe.subscriptions.update(stripeSubId, {
-      cancel_at: cancelAtUnix,
+      cancel_at: cancelAt,
       proration_behavior: 'none',
       metadata: {
         ...(sub.metadata || {}),
@@ -156,7 +160,7 @@ Deno.serve(async (req) => {
     });
 
     const nowIso = new Date().toISOString();
-    const effectiveDate = new Date(cancelAtUnix * 1000).toISOString().slice(0, 10);
+    const effectiveDate = new Date(cancelAt * 1000).toISOString().slice(0, 10);
 
     // Update membership.
     const { error: updErr } = await supabase
