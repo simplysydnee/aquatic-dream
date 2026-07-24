@@ -522,7 +522,7 @@ var list_standing_slots_default = defineTool8({
     }
     const supabase = client7(ctx);
     let q = supabase.from("standing_slots").select(
-      "id, plan_key, swim_level, day_of_week, start_time, end_time, capacity, location, active, instructor_id, instructors(name), membership_plans!inner(name)"
+      "id, plan_key, swim_level, day_of_week, start_time, end_time, capacity, location, active, instructor_id, instructors(name)"
     );
     if (activeOnly) q = q.eq("active", true);
     if (program) q = q.eq("plan_key", program);
@@ -530,6 +530,9 @@ var list_standing_slots_default = defineTool8({
     if (typeof day === "number") q = q.eq("day_of_week", day);
     const { data: slots, error } = await q.order("day_of_week").order("start_time");
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const { data: plans } = await supabase.from("membership_plans").select("plan_key, name");
+    const planNames = /* @__PURE__ */ new Map();
+    for (const p of plans ?? []) planNames.set(p.plan_key, p.name ?? null);
     const slotIds = (slots ?? []).map((s) => s.id);
     const counts = /* @__PURE__ */ new Map();
     if (slotIds.length) {
@@ -543,7 +546,7 @@ var list_standing_slots_default = defineTool8({
       return {
         id: s.id,
         plan_key: s.plan_key,
-        program_name: s.membership_plans?.name ?? null,
+        program_name: planNames.get(s.plan_key) ?? null,
         swim_level: s.swim_level,
         instructor_name: s.instructors?.name ?? null,
         day_of_week: s.day_of_week,
@@ -591,13 +594,12 @@ var list_memberships_default = defineTool9({
     }
     const supabase = client8(ctx);
     let q = supabase.from("memberships").select(
-      `id, plan_key, status, start_date, monthly_price_cents:membership_plans(monthly_price_cents),
+      `id, plan_key, status, start_date,
          child_first_name, child_last_name,
          parent_first_name, parent_last_name, parent_email, parent_phone,
          stripe_subscription_id, current_period_start, current_period_end,
          standing_slot_id,
-         standing_slots(day_of_week, start_time, end_time, swim_level, instructors(name)),
-         membership_plans(name, monthly_price_cents)`
+         standing_slots(day_of_week, start_time, end_time, swim_level, instructors(name))`
     ).order("created_at", { ascending: false }).limit(limit);
     if (status) q = q.eq("status", status);
     if (plan_key) q = q.eq("plan_key", plan_key);
@@ -617,15 +619,21 @@ var list_memberships_default = defineTool9({
         if (!firstDates.has(o.membership_id)) firstDates.set(o.membership_id, o.occurrence_date);
       }
     }
+    const { data: plans } = await supabase.from("membership_plans").select("plan_key, name, monthly_price_cents");
+    const planMap = /* @__PURE__ */ new Map();
+    for (const p of plans ?? []) {
+      planMap.set(p.plan_key, { name: p.name ?? null, monthly_price_cents: p.monthly_price_cents ?? null });
+    }
     const rows = (data ?? []).map((m) => {
       const slot = m.standing_slots;
       const swimmer = [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim();
       const parent = [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim();
+      const plan = planMap.get(m.plan_key);
       return {
         id: m.id,
         swimmer_name: swimmer || null,
         plan_key: m.plan_key,
-        program: m.membership_plans?.name ?? null,
+        program: plan?.name ?? null,
         slot: slot ? {
           day_of_week: slot.day_of_week,
           day_name: DAY_NAMES2[slot.day_of_week] ?? null,
@@ -637,7 +645,7 @@ var list_memberships_default = defineTool9({
         status: m.status,
         start_date: m.start_date,
         first_lesson_date: firstDates.get(m.id) ?? null,
-        monthly_price_cents: m.membership_plans?.monthly_price_cents ?? null,
+        monthly_price_cents: plan?.monthly_price_cents ?? null,
         stripe_subscription_id: m.stripe_subscription_id,
         current_period_start: m.current_period_start,
         current_period_end: m.current_period_end,
@@ -677,11 +685,12 @@ var get_membership_default = defineTool10({
     const supabase = client9(ctx);
     const { data: membership, error } = await supabase.from("memberships").select(
       `*,
-         standing_slots(day_of_week, start_time, end_time, swim_level, location, instructors(name)),
-         membership_plans(name, monthly_price_cents)`
+         standing_slots(day_of_week, start_time, end_time, swim_level, location, instructors(name))`
     ).eq("id", id).maybeSingle();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     if (!membership) return { content: [{ type: "text", text: "Membership not found" }], isError: true };
+    const { data: plan } = await supabase.from("membership_plans").select("plan_key, name, monthly_price_cents").eq("plan_key", membership.plan_key).maybeSingle();
+    membership.membership_plans = plan ? { name: plan.name, monthly_price_cents: plan.monthly_price_cents } : null;
     const { data: occs, error: occErr } = await supabase.from("membership_occurrences").select("id, occurrence_date, start_time, end_time, status, closure_type, cancel_reason, instructor_id, instructors:instructor_id(name)").eq("membership_id", id).order("occurrence_date", { ascending: true });
     if (occErr) return { content: [{ type: "text", text: occErr.message }], isError: true };
     const payload = {

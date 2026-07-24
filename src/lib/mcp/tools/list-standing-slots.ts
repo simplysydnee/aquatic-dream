@@ -32,7 +32,7 @@ export default defineTool({
     let q = supabase
       .from("standing_slots")
       .select(
-        "id, plan_key, swim_level, day_of_week, start_time, end_time, capacity, location, active, instructor_id, instructors(name), membership_plans!inner(name)",
+        "id, plan_key, swim_level, day_of_week, start_time, end_time, capacity, location, active, instructor_id, instructors(name)",
       );
     if (activeOnly) q = q.eq("active", true);
     if (program) q = q.eq("plan_key", program);
@@ -40,6 +40,12 @@ export default defineTool({
     if (typeof day === "number") q = q.eq("day_of_week", day);
     const { data: slots, error } = await q.order("day_of_week").order("start_time");
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+
+    const { data: plans } = await supabase
+      .from("membership_plans")
+      .select("plan_key, name");
+    const planNames = new Map<string, string | null>();
+    for (const p of (plans as any[]) ?? []) planNames.set(p.plan_key, p.name ?? null);
 
     const slotIds = (slots ?? []).map((s: any) => s.id);
     const counts = new Map<string, number>();
@@ -59,7 +65,7 @@ export default defineTool({
       return {
         id: s.id,
         plan_key: s.plan_key,
-        program_name: s.membership_plans?.name ?? null,
+        program_name: planNames.get(s.plan_key) ?? null,
         swim_level: s.swim_level,
         instructor_name: s.instructors?.name ?? null,
         day_of_week: s.day_of_week,
