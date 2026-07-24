@@ -546,7 +546,7 @@ var list_standing_slots_default = defineTool8({
       return {
         id: s.id,
         plan_key: s.plan_key,
-        program_name: s.membership_plans?.name ?? null,
+        program_name: planNames.get(s.plan_key) ?? null,
         swim_level: s.swim_level,
         instructor_name: s.instructors?.name ?? null,
         day_of_week: s.day_of_week,
