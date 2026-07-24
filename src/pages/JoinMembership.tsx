@@ -454,7 +454,7 @@ export default function JoinMembership() {
                           <div className="font-semibold text-[#1a3a8a]">{p.name}</div>
                           <div className="text-sm text-[#2a5e84]">
                             {p.plan_key === "kid_group"
-                              ? "Kids group class · we'll match your swimmer to the right level"
+                              ? "Kids group class · group sizes no more than 3 · we'll match your swimmer to the right level"
                               : p.plan_key === "private"
                               ? "One-on-one coaching"
                               : "Adult group class"}
