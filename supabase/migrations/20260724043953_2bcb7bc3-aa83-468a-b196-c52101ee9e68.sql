@@ -1,0 +1,1 @@
+ALTER TABLE public.memberships ADD COLUMN IF NOT EXISTS welcome_sent_at timestamptz;
