@@ -200,10 +200,9 @@ serve(async (req) => {
     }
 
     // SETUP-mode embedded Checkout: collects and saves the card only; no
-    // charge here. The webhook then creates the subscription with
-    // add_invoice_items (=== prorated first charge from the quote) and
-    // billing_cycle_anchor on the 1st of the next month, proration_behavior
-    // 'none' so the amount charged exactly equals what the parent reviewed.
+    // charge here. Keep this session creation deliberately minimal: all
+    // subscription, anchor, proration, and invoice-item logic belongs in the
+    // webhook after Stripe confirms the saved payment method.
     const origin = req.headers.get("origin") || "";
     let session: any;
     try {
@@ -211,13 +210,9 @@ serve(async (req) => {
         mode: "setup",
         ui_mode: "embedded",
         customer: customer.id,
-        payment_method_types: ["card"],
+        currency: "usd",
         return_url:
           returnUrl || `${origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
-        metadata: {
-          type: "membership_setup",
-          pending_membership_id: pending.id,
-        },
       });
     } catch (e: any) {
       console.error("[create-membership-checkout] session create failed", {
@@ -232,7 +227,25 @@ serve(async (req) => {
     }
 
     if (!session.client_secret) {
-      return json({ error: "Stripe did not return a client_secret", debug: { id: session?.id, ui_mode: (session as any)?.ui_mode } }, 500);
+      console.error("[create-membership-checkout] session missing client_secret", {
+        id: session?.id,
+        mode: session?.mode,
+        ui_mode: session?.ui_mode,
+        status: session?.status,
+        message: session?.message || session?.error?.message,
+        type: session?.type || session?.error?.type,
+        code: session?.code || session?.error?.code,
+        raw: session?.raw?.message,
+      });
+      const gatewayMessage = session?.message || session?.error?.message || session?.raw?.message;
+      return json({
+        error: gatewayMessage
+          ? `Stripe session creation failed: ${gatewayMessage}`
+          : "Stripe did not return a client_secret",
+        stripe_type: session?.type || session?.error?.type,
+        stripe_code: session?.code || session?.error?.code,
+        debug: { id: session?.id, mode: session?.mode, ui_mode: session?.ui_mode, status: session?.status },
+      }, 500);
     }
 
     await supabaseAdmin
