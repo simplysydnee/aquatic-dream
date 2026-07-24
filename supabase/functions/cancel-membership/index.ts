@@ -1,0 +1,227 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createStripeClient, type StripeEnv } from "../_shared/stripe.ts";
+
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+);
+
+// /join is currently pinned to sandbox — mirror that here.
+const ENV: StripeEnv = "sandbox";
+
+const PLAN_NAMES: Record<string, string> = {
+  kid_group: "Small Group Swim",
+  private: "Private Swim",
+  adult_group: "Adult Swim",
+};
+
+const ALLOWED_REASONS = ["too_busy", "graduated", "cost", "moved", "other"] as const;
+type Reason = (typeof ALLOWED_REASONS)[number];
+
+function addOneMonth(unixSeconds: number): number {
+  const d = new Date(unixSeconds * 1000);
+  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
+  return Math.floor(target.getTime() / 1000);
+}
+
+function fmtDate(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/Los_Angeles",
+  });
+}
+
+async function sendEmail(templateName: string, recipientEmail: string, templateData: Record<string, unknown>, idempotencyKey: string) {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const res = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceRoleKey}` },
+      body: JSON.stringify({ templateName, recipientEmail, idempotencyKey, purpose: "transactional", templateData }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`[cancel-membership] ${templateName} email failed`, res.status, body.slice(0, 300));
+    }
+  } catch (e) {
+    console.error(`[cancel-membership] ${templateName} email threw`, e);
+  }
+}
+
+async function notifyAdminSms(text: string) {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminPhone = Deno.env.get("ADMIN_ALERT_PHONE") || Deno.env.get("ADMIN_PHONE") || "";
+    if (!adminPhone) return;
+    await fetch(`${supabaseUrl}/functions/v1/send-sms-message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceRoleKey}` },
+      body: JSON.stringify({ to: adminPhone, message: text }),
+    });
+  } catch (e) {
+    console.error("[cancel-membership] admin SMS failed", e);
+  }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  try {
+    const { token, reason, reasonDetail } = await req.json();
+    if (typeof token !== "string" || !token) {
+      return new Response(JSON.stringify({ error: "Missing token" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!ALLOWED_REASONS.includes(reason as Reason)) {
+      return new Response(JSON.stringify({ error: "Invalid reason" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const reasonDetailClean =
+      typeof reasonDetail === "string" ? reasonDetail.slice(0, 1000) : null;
+
+    const { data: m, error } = await supabase
+      .from("memberships")
+      .select("*")
+      .eq("manage_token", token)
+      .maybeSingle();
+
+    if (error || !m) {
+      return new Response(JSON.stringify({ error: "Not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Idempotency: if already scheduled/cancelled, return current state.
+    if (m.status === "pending_cancel" || m.status === "cancelled" || m.status === "canceled") {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          alreadyProcessed: true,
+          effectiveDate: m.cancel_effective_date,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const stripeSubId = m.stripe_subscription_id as string | null;
+    if (!stripeSubId) {
+      return new Response(JSON.stringify({ error: "No active subscription on file" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const stripe = createStripeClient(ENV);
+    const sub = await stripe.subscriptions.retrieve(stripeSubId);
+
+    // Determine final charge date and final period end.
+    // During trial: current_period_end == trial_end (next billing date).
+    // After trial: current_period_end == next billing date.
+    // We want to allow ONE more charge then cancel at end of that final paid month.
+    const nextChargeUnix = sub.current_period_end; // next billing date
+    const finalPeriodEndUnix = addOneMonth(nextChargeUnix);
+
+    // Schedule Stripe cancellation.
+    await stripe.subscriptions.update(stripeSubId, {
+      cancel_at: finalPeriodEndUnix,
+      metadata: {
+        ...(sub.metadata || {}),
+        cancel_reason: reason as string,
+        cancel_requested_at: new Date().toISOString(),
+      },
+    });
+
+    const nowIso = new Date().toISOString();
+    const effectiveDate = new Date(finalPeriodEndUnix * 1000).toISOString().slice(0, 10);
+
+    // Update membership.
+    const { error: updErr } = await supabase
+      .from("memberships")
+      .update({
+        status: "pending_cancel",
+        cancel_requested_at: nowIso,
+        cancel_effective_date: effectiveDate,
+      })
+      .eq("id", m.id);
+    if (updErr) console.error("[cancel-membership] membership update failed", updErr);
+
+    // Insert cancellation record.
+    const { error: cancelErr } = await supabase
+      .from("membership_cancellations")
+      .insert({
+        membership_id: m.id,
+        requested_at: nowIso,
+        effective_date: effectiveDate,
+        reason,
+        reason_detail: reasonDetailClean,
+      });
+    if (cancelErr) console.error("[cancel-membership] cancellation insert failed", cancelErr);
+
+    const planName = PLAN_NAMES[String(m.plan_key)] || "swim";
+    const familyName = (m.parent_first_name as string | null) || undefined;
+    const swimmerName =
+      [(m.child_first_name as string | null) || "", (m.child_last_name as string | null) || ""].join(" ").trim() ||
+      undefined;
+    const monthlyCents = Number(m.recurring_consent_amount_cents || 0);
+    const monthlyPrice = monthlyCents > 0 ? `$${(monthlyCents / 100).toFixed(monthlyCents % 100 === 0 ? 0 : 2)}` : undefined;
+    const finalChargeDate = fmtDate(nextChargeUnix);
+    const effectiveEndDate = fmtDate(finalPeriodEndUnix);
+
+    // Parent confirmation email.
+    const parentEmail = m.parent_email as string | null;
+    if (parentEmail) {
+      await sendEmail(
+        "membership-cancellation-confirmation",
+        parentEmail,
+        { familyName, swimmerName, programName: planName, finalChargeDate, effectiveEndDate, monthlyPrice },
+        `membership-cancel-confirmation-${m.id}`,
+      );
+    }
+
+    // Admin alert email + SMS.
+    await sendEmail(
+      "internal-membership-cancellation-alert",
+      "info@aquaticdreamsswim.com",
+      {
+        familyName,
+        swimmerName,
+        programName: planName,
+        parentEmail,
+        parentPhone: m.parent_phone,
+        reason,
+        reasonDetail: reasonDetailClean,
+        finalChargeDate,
+        effectiveEndDate,
+      },
+      `membership-cancel-admin-${m.id}`,
+    );
+
+    await notifyAdminSms(
+      `Cancellation requested: ${swimmerName || familyName || "member"} (${planName}). Final charge ${finalChargeDate}, ends ${effectiveEndDate}. Reason: ${reason}.`,
+    );
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        effectiveDate,
+        finalChargeDate,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  } catch (e) {
+    console.error("[cancel-membership] error", e);
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Something went wrong" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

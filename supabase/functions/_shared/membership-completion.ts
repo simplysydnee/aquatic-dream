@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { type StripeEnv, createStripeClient } from "./stripe.ts";
 import { firstLessonDate } from "./membership-pricing.ts";
 import { formatPTDate, formatPTTime, sendAndLogBookingConfirmation } from "./textmagic.ts";
+import { buildManageLink } from "./manage-link.ts";
 
 type JsonObject = Record<string, unknown>;
 
@@ -365,7 +366,7 @@ async function sendWelcomeIfNeeded(membershipId: string, payload: JsonObject): P
   // Idempotency: only send once per membership.
   const { data: current, error: readErr } = await supabase
     .from("memberships")
-    .select("id, welcome_sent_at, parent_email, parent_phone, parent_first_name, child_first_name, plan_key, sms_consent, start_date")
+    .select("id, welcome_sent_at, parent_email, parent_phone, parent_first_name, child_first_name, plan_key, sms_consent, start_date, manage_token")
     .eq("id", membershipId)
     .maybeSingle();
   if (readErr) throw new Error(`Membership read failed: ${readErr.message}`);
@@ -431,6 +432,7 @@ async function sendWelcomeIfNeeded(membershipId: string, payload: JsonObject): P
             firstLessonDate: longDate,
             classTime: prettyTime,
             monthlyPrice,
+            manageUrl: current.manage_token ? buildManageLink(String(current.manage_token)) : undefined,
           },
         }),
       });

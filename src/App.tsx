@@ -48,6 +48,8 @@ import UnsubscribeMarketing from "./pages/UnsubscribeMarketing";
 import ScrollToTop from "./components/ScrollToTop";
 import OAuthConsent from "./pages/OAuthConsent";
 import JoinMembership from "./pages/JoinMembership";
+import MembershipCancelRequest from "./pages/MembershipCancelRequest";
+import MembershipManage from "./pages/MembershipManage";
 
 const queryClient = new QueryClient();
 
@@ -115,6 +117,8 @@ const App = () => (
 
             {/* Standalone membership sign-up (no public chrome) */}
             <Route path="/join" element={<JoinMembership />} />
+            <Route path="/cancel" element={<MembershipCancelRequest />} />
+            <Route path="/manage/:token" element={<MembershipManage />} />
 
             {/* Public routes */}
             <Route element={<PublicLayout />}>
