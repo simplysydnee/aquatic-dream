@@ -62,7 +62,7 @@ serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const obj = event.data.object;
-        if (obj?.metadata?.type === "membership_setup") {
+        if (obj?.metadata?.type === "membership_setup" || (obj?.mode === "setup" && !obj?.metadata?.type)) {
           await handleMembershipSetupCompleted(obj, env);
         } else if (obj?.metadata?.type === "membership") {
           await handleMembershipCheckoutCompleted(obj, env);
@@ -765,11 +765,6 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
 // recurring cycle to the 1st of the month after the first-lesson month.
 
 async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
-  const pendingId: string | undefined = session?.metadata?.pending_membership_id;
-  if (!pendingId) {
-    console.error("[membership setup] missing pending_membership_id", session?.id);
-    return;
-  }
   const setupIntentId: string | undefined = session?.setup_intent;
   if (!setupIntentId) {
     console.error("[membership setup] no setup_intent on session", session?.id);
@@ -782,6 +777,20 @@ async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
   }
 
   const stripe = createStripeClient(env);
+
+  let pendingId: string | undefined = session?.metadata?.pending_membership_id;
+  if (!pendingId) {
+    const { data: pendingBySession, error: lookupErr } = await supabase
+      .from("pending_memberships")
+      .select("id")
+      .eq("stripe_session_id", session.id)
+      .maybeSingle();
+    if (lookupErr || !pendingBySession?.id) {
+      console.error("[membership setup] pending row missing for setup session", session?.id, lookupErr);
+      return;
+    }
+    pendingId = pendingBySession.id;
+  }
 
   const { data: pend, error: pendErr } = await supabase
     .from("pending_memberships")
