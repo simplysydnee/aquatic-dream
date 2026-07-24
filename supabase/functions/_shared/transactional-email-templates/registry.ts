@@ -58,5 +58,6 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'cash-receipt': cashReceipt,
   'private-lesson-rescheduled': privateLessonRescheduled,
   'lesson-booking-confirmation-manual': lessonBookingConfirmationManual,
+  'membership-welcome': membershipWelcome,
 }
 
