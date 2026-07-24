@@ -789,6 +789,11 @@ export default function JoinMembership() {
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
                 <h2 className="mb-4 text-xl font-semibold text-[#1a3a8a]">Agreement & consent</h2>
+                <ClosureScheduleNote
+                  className="mb-4 rounded-lg border border-[#2a5e84]/20 bg-[#f7f3ee] p-3"
+                  title="Upcoming closures"
+                />
+
                 {waiverOnFile && (
                   <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#2a5e84]/20 bg-[#2a5e84]/5 p-3 text-sm text-[#1a3a8a]">
                     <ShieldCheck className="mt-0.5 h-4 w-4 text-[#2a5e84]" />
