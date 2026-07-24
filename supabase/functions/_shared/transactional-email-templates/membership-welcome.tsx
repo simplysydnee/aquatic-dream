@@ -101,4 +101,5 @@ const cardLabel = { color: '#666', fontSize: '12px', textTransform: 'uppercase' 
 const cardValue = { color: '#1a3a8a', fontSize: '16px', fontWeight: 600, margin: '4px 0 8px' }
 const hr = { borderColor: '#e5ded3', margin: '10px 0' }
 const link = { color: '#2a5e84', textDecoration: 'underline' }
+const small = { color: '#666', fontSize: '13px', lineHeight: '20px', margin: '12px 0 0' }
 const footer = { color: '#888', fontSize: '12px', marginTop: '24px', textAlign: 'center' as const }
