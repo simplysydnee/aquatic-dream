@@ -366,7 +366,7 @@ async function sendWelcomeIfNeeded(membershipId: string, payload: JsonObject): P
   // Idempotency: only send once per membership.
   const { data: current, error: readErr } = await supabase
     .from("memberships")
-    .select("id, welcome_sent_at, parent_email, parent_phone, parent_first_name, child_first_name, plan_key, sms_consent, start_date")
+    .select("id, welcome_sent_at, parent_email, parent_phone, parent_first_name, child_first_name, plan_key, sms_consent, start_date, manage_token")
     .eq("id", membershipId)
     .maybeSingle();
   if (readErr) throw new Error(`Membership read failed: ${readErr.message}`);
