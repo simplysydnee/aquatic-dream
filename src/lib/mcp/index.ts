@@ -6,6 +6,10 @@ import getClassRoster from "./tools/get-class-roster";
 import listOpenPrivateSlots from "./tools/list-open-private-slots";
 import listPastPrivateFamilies from "./tools/list-past-private-families";
 import sendPrivateOpeningsSms from "./tools/send-private-openings-sms";
+import listStandingSlots from "./tools/list-standing-slots";
+import listMemberships from "./tools/list-memberships";
+import getMembership from "./tools/get-membership";
+import getMembershipBillingStatus from "./tools/get-membership-billing-status";
 
 
 // Build the issuer from the project ref so the OAuth issuer matches the direct
@@ -30,6 +34,10 @@ export default defineMcp({
     listOpenPrivateSlots,
     listPastPrivateFamilies,
     sendPrivateOpeningsSms,
+    listStandingSlots,
+    listMemberships,
+    getMembership,
+    getMembershipBillingStatus,
   ],
 
 });
