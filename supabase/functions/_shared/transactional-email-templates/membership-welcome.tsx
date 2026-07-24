@@ -26,6 +26,7 @@ const MembershipWelcomeEmail = ({
   classTime,
   monthlyPrice,
   facilityAddress,
+  manageUrl,
 }: Props) => {
   const address = facilityAddress || DEFAULT_ADDRESS
   const mapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
