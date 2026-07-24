@@ -522,7 +522,7 @@ var list_standing_slots_default = defineTool8({
     }
     const supabase = client7(ctx);
     let q = supabase.from("standing_slots").select(
-      "id, plan_key, swim_level, day_of_week, start_time, end_time, capacity, location, active, instructor_id, instructors(name), membership_plans!inner(name)"
+      "id, plan_key, swim_level, day_of_week, start_time, end_time, capacity, location, active, instructor_id, instructors(name)"
     );
     if (activeOnly) q = q.eq("active", true);
     if (program) q = q.eq("plan_key", program);
@@ -530,6 +530,9 @@ var list_standing_slots_default = defineTool8({
     if (typeof day === "number") q = q.eq("day_of_week", day);
     const { data: slots, error } = await q.order("day_of_week").order("start_time");
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const { data: plans } = await supabase.from("membership_plans").select("plan_key, name");
+    const planNames = /* @__PURE__ */ new Map();
+    for (const p of plans ?? []) planNames.set(p.plan_key, p.name ?? null);
     const slotIds = (slots ?? []).map((s) => s.id);
     const counts = /* @__PURE__ */ new Map();
     if (slotIds.length) {
