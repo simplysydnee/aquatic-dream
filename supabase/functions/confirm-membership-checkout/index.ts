@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { completeMembershipFromSetupSessionId } from "../_shared/membership-completion.ts";
 
 type StripeEnv = "sandbox" | "live";
@@ -15,10 +16,26 @@ serve(async (req) => {
     const sessionId = typeof body?.sessionId === "string" ? body.sessionId : "";
     if (!sessionIdRe.test(sessionId)) return json({ error: "Invalid checkout session" }, 400);
 
-    // /join is intentionally pinned to sandbox until the deliberate go-live step.
     const environment: StripeEnv = "sandbox";
     const result = await completeMembershipFromSetupSessionId(sessionId, environment);
-    return json({ success: true, ...result });
+
+    let manageToken: string | null = null;
+    try {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data } = await supabase
+        .from("memberships")
+        .select("manage_token")
+        .eq("id", result.membershipId)
+        .maybeSingle();
+      manageToken = (data?.manage_token as string | null) ?? null;
+    } catch (e) {
+      console.error("[confirm-membership-checkout] manage_token lookup failed", e);
+    }
+
+    return json({ success: true, manageToken, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[confirm-membership-checkout] failed", message);
