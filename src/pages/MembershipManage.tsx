@@ -76,19 +76,6 @@ export default function MembershipManage() {
     (async () => {
       if (!token) return;
       try {
-        const { data, error } = await supabase.functions.invoke("get-membership-by-token", {
-          body: undefined,
-          method: "GET",
-          headers: {},
-        } as never);
-        // supabase-js doesn't support GET with query params directly; use fetch via SUPABASE_URL.
-        void data;
-        void error;
-      } catch {
-        /* handled below via direct fetch */
-      }
-
-      try {
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-membership-by-token?token=${encodeURIComponent(token)}`;
         const res = await fetch(url, {
           headers: {
