@@ -355,3 +355,99 @@ async function ensureOccurrences(membershipId: string, payload: JsonObject): Pro
   if (insertErr) throw new Error(`Membership occurrence insert failed: ${insertErr.message}`);
   return rows.length;
 }
+const PLAN_NAMES: Record<string, string> = {
+  kid_group: "Small Group Swim",
+  private: "Private Swim",
+  adult_group: "Adult Swim",
+};
+
+async function sendWelcomeIfNeeded(membershipId: string, payload: JsonObject): Promise<void> {
+  // Idempotency: only send once per membership.
+  const { data: current, error: readErr } = await supabase
+    .from("memberships")
+    .select("id, welcome_sent_at, parent_email, parent_phone, parent_first_name, child_first_name, plan_key, sms_consent, start_date")
+    .eq("id", membershipId)
+    .maybeSingle();
+  if (readErr) throw new Error(`Membership read failed: ${readErr.message}`);
+  if (!current || current.welcome_sent_at) return;
+
+  const { data: firstOcc } = await supabase
+    .from("membership_occurrences")
+    .select("occurrence_date, start_time")
+    .eq("membership_id", membershipId)
+    .order("occurrence_date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const occDate = (firstOcc?.occurrence_date as string | undefined) || (current.start_date as string | undefined) || "";
+  const startTime = (firstOcc?.start_time as string | undefined) || "";
+  const planName = PLAN_NAMES[String(current.plan_key)] || "swim";
+  const swimmerName = asNullableString(current.child_first_name) || asNullableString(payload.child_first_name) || "your swimmer";
+  const familyName = asNullableString(current.parent_first_name) || asNullableString(payload.parent_first_name) || undefined;
+  const monthlyCents = asNumber(payload.recurring_consent_amount_cents);
+  const monthlyPrice = monthlyCents > 0 ? `$${(monthlyCents / 100).toFixed(monthlyCents % 100 === 0 ? 0 : 2)}` : "";
+
+  const weekday = occDate ? formatPTDate(occDate, { weekday: "long" }) : "";
+  const monthDay = occDate ? formatPTDate(occDate, { month: "long", day: "numeric" }) : "";
+  const longDate = occDate ? formatPTDate(occDate, { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "";
+  const prettyTime = formatPTTime(startTime);
+
+  // 1) SMS via TextMagic — only when the parent consented and we have a phone.
+  const phone = asNullableString(current.parent_phone) || asNullableString(payload.parent_phone);
+  if (current.sms_consent === true && phone) {
+    const message = `Welcome to Aquatic Dreams! ${swimmerName}'s first ${planName} lesson is ${weekday} ${monthDay}${prettyTime ? ` at ${prettyTime}` : ""}, 1212 Kansas Ave, Modesto, CA. See you there!`;
+    const smsResult = await sendAndLogBookingConfirmation(supabase, {
+      phoneRaw: phone,
+      message,
+      swimmer_name: swimmerName,
+      reminder_kind: "membership_welcome",
+    });
+    if (!smsResult.ok && !smsResult.skipped) {
+      console.error("[membership completion] welcome SMS failed", membershipId, smsResult.error);
+    }
+  }
+
+  // 2) Email via send-transactional-email.
+  const parentEmail = asNullableString(current.parent_email) || asNullableString(payload.parent_email);
+  if (parentEmail) {
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          templateName: "membership-welcome",
+          recipientEmail: parentEmail,
+          idempotencyKey: `membership-welcome-${membershipId}`,
+          purpose: "transactional",
+          templateData: {
+            familyName,
+            swimmerName,
+            programName: planName,
+            firstLessonDate: longDate,
+            classTime: prettyTime,
+            monthlyPrice,
+          },
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        console.error("[membership completion] welcome email failed", res.status, body.slice(0, 300));
+      }
+    } catch (e) {
+      console.error("[membership completion] welcome email threw", errorMessage(e));
+    }
+  }
+
+  // Mark sent even if one channel failed — we log errors above; don't spam retries.
+  const { error: updErr } = await supabase
+    .from("memberships")
+    .update({ welcome_sent_at: new Date().toISOString() })
+    .eq("id", membershipId)
+    .is("welcome_sent_at", null);
+  if (updErr) console.error("[membership completion] welcome_sent_at update failed", updErr.message);
+}
