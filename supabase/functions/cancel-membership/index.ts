@@ -201,6 +201,16 @@ Deno.serve(async (req) => {
       .eq("id", m.id);
     if (updErr) console.error("[cancel-membership] membership update failed", updErr);
 
+    // Cancel occurrences on/after the effective end date (final paid month
+    // runs UP TO but not including effectiveDate).
+    const { error: occErr } = await supabase
+      .from("membership_occurrences")
+      .update({ status: "cancelled", cancel_reason: "membership_cancelled" })
+      .eq("membership_id", m.id)
+      .gte("occurrence_date", effectiveDate)
+      .neq("status", "cancelled");
+    if (occErr) console.error("[cancel-membership] occurrence prune failed", occErr);
+
     // Insert cancellation record.
     const { error: cancelErr } = await supabase
       .from("membership_cancellations")
