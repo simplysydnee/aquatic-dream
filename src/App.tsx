@@ -48,6 +48,8 @@ import UnsubscribeMarketing from "./pages/UnsubscribeMarketing";
 import ScrollToTop from "./components/ScrollToTop";
 import OAuthConsent from "./pages/OAuthConsent";
 import JoinMembership from "./pages/JoinMembership";
+import MembershipCancelRequest from "./pages/MembershipCancelRequest";
+import MembershipManage from "./pages/MembershipManage";
 
 const queryClient = new QueryClient();
 
