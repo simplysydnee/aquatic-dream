@@ -369,11 +369,37 @@ export default function JoinMembership() {
   }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId]);
 
   const [returned, setReturned] = useState(false);
+  const [returnFinalizing, setReturnFinalizing] = useState(false);
+  const [returnError, setReturnError] = useState<string | null>(null);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get("membership") === "success") {
       setReturned(true);
       setStep(8);
+      const sessionId = p.get("session_id");
+      if (!sessionId) {
+        setReturnError("Missing checkout session. Please contact us so we can confirm your membership.");
+        return;
+      }
+      setReturnFinalizing(true);
+      supabase.functions
+        .invoke("confirm-membership-checkout", {
+          body: { sessionId, environment: getStripeEnvironment() },
+        })
+        .then(({ data, error }) => {
+          if (error || !data?.success) {
+            throw new Error(error?.message || data?.error || "Could not confirm membership");
+          }
+          setCharges({
+            firstChargeCents: data.firstChargeCents ?? 0,
+            monthlyCents: data.monthlyCents ?? 0,
+          });
+          setReturnError(null);
+        })
+        .catch((error) => {
+          setReturnError(error instanceof Error ? error.message : "Could not confirm membership");
+        })
+        .finally(() => setReturnFinalizing(false));
     }
   }, []);
 
@@ -945,17 +971,38 @@ export default function JoinMembership() {
             {step === 8 && (
               <div className="py-6 text-center">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#F58B76]/15">
-                  <Check className="h-7 w-7 text-[#F58B76]" />
+                  {returnFinalizing ? (
+                    <Loader2 className="h-7 w-7 animate-spin text-[#F58B76]" />
+                  ) : (
+                    <Check className="h-7 w-7 text-[#F58B76]" />
+                  )}
                 </div>
-                <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">You're enrolled!</h2>
-                <p className="text-[#2a5e84]">
-                  {charges
-                    ? `First payment of ${fmtPrice(charges.firstChargeCents)} today, then ${fmtPrice(charges.monthlyCents)}/month on the 1st.`
-                    : "Your membership is confirmed. Watch your email for confirmation."}
-                </p>
-                <p className="mt-2 text-sm text-[#2a5e84]/80">
-                  We'll send a welcome email with your first class details shortly.
-                </p>
+                {returnFinalizing ? (
+                  <>
+                    <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">Finalizing enrollment…</h2>
+                    <p className="text-[#2a5e84]">Please keep this page open while we confirm your membership.</p>
+                  </>
+                ) : returnError ? (
+                  <>
+                    <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">Payment saved</h2>
+                    <p className="text-[#2a5e84]">
+                      We saved your card, but could not finish the membership record automatically.
+                    </p>
+                    <p className="mt-2 break-words text-sm text-[#2a5e84]/80">{returnError}</p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">You're enrolled!</h2>
+                    <p className="text-[#2a5e84]">
+                      {charges
+                        ? `First payment of ${fmtPrice(charges.firstChargeCents)} today, then ${fmtPrice(charges.monthlyCents)}/month on the 1st.`
+                        : "Your membership is confirmed. Watch your email for confirmation."}
+                    </p>
+                    <p className="mt-2 text-sm text-[#2a5e84]/80">
+                      We'll send a welcome email with your first class details shortly.
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </Card>
