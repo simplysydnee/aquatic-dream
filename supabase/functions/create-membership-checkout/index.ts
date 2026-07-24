@@ -14,8 +14,6 @@ const supabaseAdmin = createClient(
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const emailRe = /^\S+@\S+\.\S+$/;
 
-
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -100,40 +98,45 @@ serve(async (req) => {
 
     const stripe = createStripeClient(ENV);
 
-    // Cache Stripe product/price IDs PER ENVIRONMENT — a live price ID
-    // does not exist in the sandbox account and vice versa.
+    // Cache Stripe product/price IDs PER ENVIRONMENT.
     const priceCol = ENV === "sandbox" ? "stripe_price_id_sandbox" : "stripe_price_id_live";
     const productCol = ENV === "sandbox" ? "stripe_product_id_sandbox" : "stripe_product_id_live";
     let stripePriceId = (plan as any)[priceCol] as string | null;
     let stripeProductId = (plan as any)[productCol] as string | null;
-    if (!stripePriceId) {
-      if (!stripeProductId) {
-        const product = await stripe.products.create({ name: plan.name });
-        stripeProductId = product.id;
+    try {
+      if (!stripePriceId) {
+        if (!stripeProductId) {
+          const product = await stripe.products.create({ name: plan.name });
+          stripeProductId = product.id;
+        }
+        const price = await stripe.prices.create({
+          product: stripeProductId!,
+          unit_amount: plan.monthly_price_cents,
+          currency: "usd",
+          recurring: { interval: "month" },
+          nickname: `${plan.name} monthly`,
+        });
+        stripePriceId = price.id;
+        await supabaseAdmin
+          .from("membership_plans")
+          .update({ [productCol]: stripeProductId, [priceCol]: stripePriceId })
+          .eq("id", plan.id);
       }
-      const price = await stripe.prices.create({
-        product: stripeProductId!,
-        unit_amount: plan.monthly_price_cents,
-        currency: "usd",
-        recurring: { interval: "month" },
-        nickname: `${plan.name} monthly`,
+    } catch (e: any) {
+      console.error("[create-membership-checkout] product/price provisioning failed", {
+        type: e?.type, code: e?.code, message: e?.message, raw: e?.raw?.message,
       });
-      stripePriceId = price.id;
-      await supabaseAdmin
-        .from("membership_plans")
-        .update({ [productCol]: stripeProductId, [priceCol]: stripePriceId })
-        .eq("id", plan.id);
+      return json({ error: `Stripe product/price setup failed: ${e?.message || "unknown"}`, stripe_type: e?.type, stripe_code: e?.code }, 500);
     }
 
     const quote = computeMembershipQuote(slot.day_of_week, plan.monthly_price_cents);
     const firstChargeCents = quote.firstChargeCents;
-    // Anchor to the 1st of the month AFTER the first-lesson month, so the
-    // first-lesson month is covered by the prorated first invoice (charged now)
-    // and the next flat charge lands on the 1st of the following month.
-    const anchor = quote.billingAnchorUnix;
+    const anchorUnix = quote.billingAnchorUnix;
 
-
-    // ----- Stage every field before checkout so nothing is lost via Stripe metadata limits -----
+    // Stage every field before checkout. We also stash the resolved Stripe
+    // price/product IDs, prorated first charge, and billing anchor so the
+    // webhook can create the subscription with add_invoice_items without
+    // having to recompute (guaranteeing the charge matches the quote shown).
     const payload = {
       plan_id: plan.id,
       plan_key: plan.plan_key,
@@ -155,6 +158,10 @@ serve(async (req) => {
       waiver_id: waiver_id || null,
       recurring_consent_amount_cents: plan.monthly_price_cents,
       first_charge_cents: firstChargeCents,
+      billing_anchor_unix: anchorUnix,
+      stripe_price_id: stripePriceId,
+      stripe_product_id: stripeProductId,
+      environment: ENV,
       sms_consent: sms_consent === true,
       sms_consent_text: sms_consent === true ? (sms_consent_text || null) : null,
       sms_consent_version: sms_consent === true ? (sms_consent_version || null) : null,
@@ -174,64 +181,58 @@ serve(async (req) => {
       return json({ error: "Could not stage enrollment" }, 500);
     }
 
-    console.log("[create-membership-checkout] looking up stripe customer", parent_email);
     let customer: any;
     try {
       const existing = await stripe.customers.list({ email: parent_email, limit: 1 });
       customer = existing?.data?.[0];
-    } catch (e) {
-      console.error("[create-membership-checkout] customers.list failed", e);
-    }
-    if (!customer) {
-      customer = await stripe.customers.create({
-        email: parent_email,
-        name: payload.parent_name || undefined,
-        phone: payload.parent_phone || undefined,
+      if (!customer) {
+        customer = await stripe.customers.create({
+          email: parent_email,
+          name: payload.parent_name || undefined,
+          phone: payload.parent_phone || undefined,
+        });
+      }
+    } catch (e: any) {
+      console.error("[create-membership-checkout] customer resolve failed", {
+        type: e?.type, code: e?.code, message: e?.message, raw: e?.raw?.message,
       });
+      return json({ error: `Stripe customer setup failed: ${e?.message || "unknown"}`, stripe_type: e?.type, stripe_code: e?.code }, 500);
     }
-    console.log("[create-membership-checkout] customer", customer?.id);
 
-    const lineItems: any[] = [{ price: stripePriceId, quantity: 1 }];
-    // Bill the prorated first-lesson-month amount immediately as a one-time
-    // line item, then start the recurring monthly cycle on `anchor` (1st of
-    // the month after the first-lesson month). We use `trial_end` instead of
-    // `billing_cycle_anchor` because Stripe requires the anchor to be within
-    // one billing interval of "now"; `trial_end` accepts any future date.
-    if (firstChargeCents > 0) {
-      lineItems.push({
-        price_data: {
-          currency: "usd",
-          product: stripeProductId!,
-          unit_amount: firstChargeCents,
-        },
-        quantity: 1,
-      });
-    }
-    const subscriptionData: any = {
-      trial_end: anchor,
-      metadata: { type: "membership", pending_membership_id: pending.id },
-    };
-
-
+    // SETUP-mode embedded Checkout: collects and saves the card only; no
+    // charge here. The webhook then creates the subscription with
+    // add_invoice_items (=== prorated first charge from the quote) and
+    // billing_cycle_anchor on the 1st of the next month, proration_behavior
+    // 'none' so the amount charged exactly equals what the parent reviewed.
     const origin = req.headers.get("origin") || "";
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      ui_mode: "embedded_page",
-      customer: customer.id,
-      payment_method_types: ["card"],
-      line_items: lineItems,
-      subscription_data: subscriptionData,
-      return_url:
-        returnUrl || `${origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
-      metadata: {
-        type: "membership",
-        pending_membership_id: pending.id,
-      },
-    });
-    console.log("[create-membership-checkout] session", JSON.stringify({ id: session?.id, ui_mode: (session as any)?.ui_mode, has_secret: !!session?.client_secret, url: session?.url }));
+    let session: any;
+    try {
+      session = await stripe.checkout.sessions.create({
+        mode: "setup",
+        ui_mode: "embedded",
+        customer: customer.id,
+        payment_method_types: ["card"],
+        return_url:
+          returnUrl || `${origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
+        metadata: {
+          type: "membership_setup",
+          pending_membership_id: pending.id,
+        },
+      });
+    } catch (e: any) {
+      console.error("[create-membership-checkout] session create failed", {
+        type: e?.type, code: e?.code, message: e?.message, raw: e?.raw?.message, param: e?.param,
+      });
+      return json({
+        error: `Stripe session creation failed: ${e?.message || "unknown"}`,
+        stripe_type: e?.type,
+        stripe_code: e?.code,
+        stripe_param: e?.param,
+      }, 500);
+    }
 
     if (!session.client_secret) {
-      return json({ error: "Stripe did not return a client_secret", debug: { id: session?.id, ui_mode: (session as any)?.ui_mode, url: session?.url } }, 500);
+      return json({ error: "Stripe did not return a client_secret", debug: { id: session?.id, ui_mode: (session as any)?.ui_mode } }, 500);
     }
 
     await supabaseAdmin
@@ -244,9 +245,11 @@ serve(async (req) => {
       firstChargeCents,
       monthlyCents: plan.monthly_price_cents,
     });
-  } catch (e) {
-    console.error("[create-membership-checkout] error", e);
-    return json({ error: (e as Error).message }, 500);
+  } catch (e: any) {
+    console.error("[create-membership-checkout] error", {
+      type: e?.type, code: e?.code, message: e?.message, raw: e?.raw?.message, stack: e?.stack,
+    });
+    return json({ error: (e as Error).message, stripe_type: e?.type, stripe_code: e?.code }, 500);
   }
 });
 
