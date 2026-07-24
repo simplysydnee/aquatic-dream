@@ -94,6 +94,8 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.create-membership-checkout]
     verify_jwt = false
+  [functions.confirm-membership-checkout]
+    verify_jwt = false
 
 
 

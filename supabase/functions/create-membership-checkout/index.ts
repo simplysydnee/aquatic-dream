@@ -162,6 +162,8 @@ serve(async (req) => {
       waiver_id: waiver_id || null,
       recurring_consent_amount_cents: plan.monthly_price_cents,
       first_charge_cents: firstChargeCents,
+      first_lesson_date: quote.firstLessonDate,
+      billing_start: quote.billingStart,
       billing_anchor_unix: anchorUnix,
       stripe_price_id: stripePriceId,
       stripe_product_id: stripeProductId,
