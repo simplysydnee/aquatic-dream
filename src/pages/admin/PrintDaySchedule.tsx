@@ -119,9 +119,10 @@ export default function PrintDaySchedule() {
           .eq("lesson_date", date),
         supabase
           .from("lesson_booking_occurrences")
-          .select("id, status, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_phone, child_name, child_age, start_time, end_time, pool_area, notes, status)")
+          .select("id, status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_phone, child_name, child_age, start_time, end_time, pool_area, notes, status, booking_source, stripe_payment_method_id)")
           .eq("occurrence_date", date)
-          .neq("status", "cancelled"),
+          .not("status", "in", DEAD_STATUS_FILTER),
+
       ]);
       if (s.data) setSessions(s.data as Session[]);
       if (e.data) setEnrollments(e.data as Enrollment[]);
