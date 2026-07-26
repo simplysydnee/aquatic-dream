@@ -309,7 +309,7 @@ const CalendarDayView = ({
         end_time: p.end_time,
         pool_area: p.pool_area || "shallow",
         instructor_name: p.instructor_name,
-        notes: p.booking_status === "pending_card" ? "⚠ Card on file pending" : (p.notes || null),
+        notes: p.booking_status === "pending_card" ? `⚠ ${CARD_AT_DESK_LABEL}` : (p.notes || null),
         is_recurring: !!p.recurring,
         __privateLesson: p,
       })) as (CalendarPoolEvent & { __privateLesson?: PrivateLessonBooking })[];
