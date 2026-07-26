@@ -505,7 +505,15 @@ export default function PrintDaySchedule() {
                           <div style={{ color: "#555" }}>{p.parent_phone || "—"}</div>
                         </td>
                         <td><span style={{ color: "#aaa" }}>—</span></td>
-                        <td>{p.notes || "—"}</td>
+                        <td>
+                          {p.needs_card && (
+                            <div style={{ fontWeight: 700, color: "#92400e" }}>
+                              ⚠ {CARD_AT_DESK_LABEL}
+                            </div>
+                          )}
+                          {p.notes || (p.needs_card ? "" : "—")}
+                        </td>
+
                       </tr>,
                     ];
                   })}
