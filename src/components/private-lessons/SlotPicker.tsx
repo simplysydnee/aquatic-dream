@@ -38,6 +38,19 @@ function slotKey(s: Slot) {
   return `${s.instructor_id}|${s.slot_date}|${s.start_time}`;
 }
 
+// Same start time with different coaches is real availability, not a duplicate.
+// Group so the time prints once with a coach button each.
+function groupByTime(daySlots: Slot[]): [string, Slot[]][] {
+  const m = new Map<string, Slot[]>();
+  for (const s of daySlots) {
+    if (!m.has(s.start_time)) m.set(s.start_time, []);
+    m.get(s.start_time)!.push(s);
+  }
+  for (const arr of m.values()) arr.sort((a, b) => a.instructor_name.localeCompare(b.instructor_name));
+  return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
+
 interface RecurringPattern {
   key: string; // instructorId|dow|startTime
   instructorId: string;
@@ -198,6 +211,20 @@ export default function SlotPicker({ sessionToken, onContinue, onBack, initialSe
     );
     return list;
   }, [slots, timeFilter, dayFilter]);
+
+  // Group recurring patterns that share a day + time so two coaches on the same
+  // hours read as one time with a coach choice, not as duplicate rows.
+  const groupedPatterns = useMemo<[string, RecurringPattern[]][]>(() => {
+    const m = new Map<string, RecurringPattern[]>();
+    for (const p of recurringPatterns) {
+      const k = `${p.dow}|${p.startTime}`;
+      if (!m.has(k)) m.set(k, []);
+      m.get(k)!.push(p);
+    }
+    return [...m.entries()].sort(([, a], [, b]) =>
+      a[0].dow - b[0].dow || a[0].startTime.localeCompare(b[0].startTime));
+  }, [recurringPatterns]);
+
 
   const activePattern = useMemo(
     () => recurringPatterns.find((p) => p.key === activePatternKey) || null,
@@ -361,25 +388,38 @@ export default function SlotPicker({ sessionToken, onContinue, onBack, initialSe
         ) : (
           <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
             <p className="text-xs text-muted-foreground mb-1">
-              Each option is a recurring day and time that repeats weekly. Pick one to see all available dates.
+              Each option is a recurring day and time that repeats weekly. Pick a coach to see all available dates.
             </p>
-            {recurringPatterns.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => choosePattern(p)}
-                className="w-full text-left border border-border rounded-lg p-3 hover:border-primary hover:bg-muted/40 transition"
-              >
+            {groupedPatterns.map(([groupKey, group]) => (
+              <div key={groupKey} className="border border-border rounded-lg p-3">
                 <p className="text-sm font-semibold">
-                  {WEEKDAYS_PLURAL[p.dow]} at {formatTime(p.startTime)}
+                  {WEEKDAYS_PLURAL[group[0].dow]} at {formatTime(group[0].startTime)}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {p.instructorName} · {p.slots.length} {p.slots.length === 1 ? "session" : "sessions"} available
-                </p>
-              </button>
+                {group.length > 1 && (
+                  <p className="text-[11px] text-muted-foreground mb-1.5">
+                    {group.length} coaches available at this time
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  {group.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => choosePattern(p)}
+                      className="text-left border border-border rounded-md px-3 py-1.5 hover:border-primary hover:bg-muted/40 transition"
+                    >
+                      <span className="text-xs font-medium block">{p.instructorName}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {p.slots.length} {p.slots.length === 1 ? "session" : "sessions"} available
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )
+
       ) : byDate.length === 0 ? (
         <div className="border border-border rounded-lg p-8 text-center bg-muted/30">
           {slots.length === 0 ? (
@@ -405,32 +445,40 @@ export default function SlotPicker({ sessionToken, onContinue, onBack, initialSe
             return (
               <div key={date} className="border border-border rounded-lg p-3">
                 <p className="text-sm font-semibold mb-2">{label}</p>
-                <div className="flex flex-wrap gap-2">
-                  {daySlots.map((s) => {
-                    const k = slotKey(s);
-                    const isSel = !!selected[k];
-                    const promo = isPromoDate(s.slot_date);
-                    const blockedByInstructor = !!lockedInstructorId && lockedInstructorId !== s.instructor_id && !isSel;
-                    return (
-                      <button
-                        key={k}
-                        onClick={() => toggle(s)}
-                        type="button"
-                        disabled={blockedByInstructor}
-                        title={blockedByInstructor ? `Different instructor — clear selection to switch to ${s.instructor_name}` : undefined}
-                        className={`px-3 py-1.5 text-xs rounded-md border transition ${isSel
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : blockedByInstructor
-                          ? "bg-muted/40 text-muted-foreground border-dashed border-border opacity-50 cursor-not-allowed"
-                          : "bg-background hover:bg-muted border-border"}`}>
-                        {formatTime(s.start_time)} · {s.instructor_name}
-                        {promo && (
-                          <span className={`ml-1.5 font-semibold ${isSel ? "text-primary-foreground" : "text-coral"}`}>${PRIVATE_PROMO_PRICE}</span>
-                        )}
-                      </button>
-                    );
-                  })}
+                <div className="space-y-1.5">
+                  {groupByTime(daySlots).map(([time, timeSlots]) => (
+                    <div key={time} className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground tabular-nums min-w-[68px]">
+                        {formatTime(time)}
+                      </span>
+                      {timeSlots.map((s) => {
+                        const k = slotKey(s);
+                        const isSel = !!selected[k];
+                        const promo = isPromoDate(s.slot_date);
+                        const blockedByInstructor = !!lockedInstructorId && lockedInstructorId !== s.instructor_id && !isSel;
+                        return (
+                          <button
+                            key={k}
+                            onClick={() => toggle(s)}
+                            type="button"
+                            disabled={blockedByInstructor}
+                            title={blockedByInstructor ? `Different instructor — clear selection to switch to ${s.instructor_name}` : undefined}
+                            className={`px-3 py-1.5 text-xs rounded-md border transition ${isSel
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : blockedByInstructor
+                              ? "bg-muted/40 text-muted-foreground border-dashed border-border opacity-50 cursor-not-allowed"
+                              : "bg-background hover:bg-muted border-border"}`}>
+                            {s.instructor_name}
+                            {promo && (
+                              <span className={`ml-1.5 font-semibold ${isSel ? "text-primary-foreground" : "text-coral"}`}>${PRIVATE_PROMO_PRICE}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
+
               </div>
             );
           })}

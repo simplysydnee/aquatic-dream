@@ -63,6 +63,16 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
     () => openSlots.filter((s) => s.slot_date === dateStr).sort((a, b) => a.start_time.localeCompare(b.start_time) || a.instructor_name.localeCompare(b.instructor_name)),
     [openSlots, dateStr]
   );
+  // Two coaches on the same hour is real availability, not a duplicate row.
+  const slotsByTime = useMemo<[string, OpenPrivateSlot[]][]>(() => {
+    const m = new Map<string, OpenPrivateSlot[]>();
+    for (const s of slots) {
+      if (!m.has(s.start_time)) m.set(s.start_time, []);
+      m.get(s.start_time)!.push(s);
+    }
+    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [slots]);
+
 
   const handleBookSlot = (s?: OpenPrivateSlot) => {
     setPrefill(
@@ -212,21 +222,31 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
         {slots.length > 0 && (
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Open slots</p>
-            <div className="flex flex-wrap gap-1.5">
-              {slots.map((s, i) => (
-                <button
-                  key={`${s.instructor_id}-${s.start_time}-${i}`}
-                  onClick={() => handleBookSlot(s)}
-                  className="rounded border border-dashed border-primary/40 hover:border-primary hover:bg-primary/5 px-2 py-1.5 text-left transition-colors"
-                  title={`Book ${s.instructor_name} at ${fmtTime(s.start_time)}`}
-                >
-                  <div className="text-[11px] font-semibold text-foreground">{fmtTime(s.start_time)}</div>
-                  <div className="text-[10px] text-muted-foreground">{s.instructor_name}</div>
-                </button>
+            <div className="space-y-1.5">
+              {slotsByTime.map(([time, group]) => (
+                <div key={time} className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-muted-foreground tabular-nums min-w-[64px]">
+                    {fmtTime(time)}
+                  </span>
+                  {group.map((s, i) => (
+                    <button
+                      key={`${s.instructor_id}-${i}`}
+                      onClick={() => handleBookSlot(s)}
+                      className="rounded border border-dashed border-primary/40 hover:border-primary hover:bg-primary/5 px-2 py-1 text-[10px] text-foreground transition-colors"
+                      title={`Book ${s.instructor_name} at ${fmtTime(s.start_time)}`}
+                    >
+                      {s.instructor_name}
+                    </button>
+                  ))}
+                  {group.length > 1 && (
+                    <span className="text-[10px] text-muted-foreground">({group.length} coaches open)</span>
+                  )}
+                </div>
               ))}
             </div>
           </div>
         )}
+
 
         {todays.length === 0 && slots.length === 0 && (
           <p className="text-xs text-muted-foreground italic">No private lessons or open slots for this day.</p>

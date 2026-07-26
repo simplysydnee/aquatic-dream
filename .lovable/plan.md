@@ -1,38 +1,37 @@
-## Goal
+## What's actually happening
 
-Every morning, email a report of yesterday's private and semi-private lessons showing whether each one was actually paid, verified directly against Stripe, with links into Stripe for each payment. Any lesson not billed is flagged at the top. Runs until the monthly membership switch on Aug 17.
+Verified against the availability data: nothing is double-booked. The slot picker renders one card per instructor, and two coaches are scheduled on the same hours:
 
-## What the email contains
+- Tuesdays 3:00 to 6:00 PM (Jul 14 to Aug 4): Faith Mailoux and Sophia Cheney
+- Thursdays 3:00 to 6:00 PM (Jul 16 to Aug 6): Leona Cheney and Sophia Cheney
 
-Subject: `Lesson billing audit — Sat, Jul 25 — 2 unbilled ($100)`
+So each 30 minute time renders twice, once per coach, and the weekly options list shows the same day and time pattern twice. Since both coaches really do work those hours, the cards are correct. The problem is that they read as duplicates.
 
-Sections:
-1. **Needs attention** (first, only if any) — one row per unpaid/failed lesson: swimmer, parent name + phone, lesson type, time, instructor, amount owed, reason (no card on file / charge failed with Stripe's error / never charged / payment link sent but never completed).
-2. **Paid** — swimmer, amount, how it was paid (card on file charge, payment link, cash/check/comp), and a `Stripe ↗` link to the exact PaymentIntent or Checkout Session, matching the style in your screenshot (method + reference id + link).
-3. **Cancelled / no-charge** — cancelled or comped lessons, listed so nothing looks silently missing.
-4. Totals footer: lessons, collected, outstanding.
+## Fix: keep per coach cards, make the coach the obvious difference
 
-## How payment is verified
+### 1. Public booking page, day grid
+Group each day's slots by start time. Times with a single coach look exactly as they do today. Times with more than one coach render as one time heading with the coach buttons side by side underneath, for example:
 
-For each occurrence dated yesterday (excluding abandoned bookings):
-- If `stripe_payment_intent_id` exists, retrieve it from Stripe and trust Stripe's status, not the database. Report a mismatch explicitly (e.g. "DB says paid, Stripe says requires_payment_method").
-- If `stripe_session_id` exists, retrieve the Checkout Session and check `payment_status`.
-- If neither exists and payment_method is cash/check/comp, treat as paid offline (no Stripe lookup).
-- If neither exists and no offline method, flag as **never billed**.
+```text
+Tuesday, Jul 28
+  3:00 PM   [ Faith Mailoux ]  [ Sophia Cheney ]
+  3:30 PM   [ Faith Mailoux ]  [ Sophia Cheney ]
+  4:00 PM   [ Sophia Cheney ]
+```
 
-No writes to the database and no charging. This is report-only, as asked.
+The time is printed once, each coach stays individually selectable, and the existing one instructor per booking lock and promo pricing badge behavior is unchanged.
 
-Stripe links use `https://dashboard.stripe.com/payments/{pi_id}` (or `/checkout/sessions/{cs_id}`), same pattern as the enrollment card in your screenshot.
+### 2. Public booking page, weekly options
+Same treatment: group recurring patterns by day and time, and when two coaches offer it, show one row for "Tuesdays at 3:00 PM" with a coach choice on that row rather than two near identical rows.
 
-## Technical details
+### 3. Admin calendar, Private Lessons panel open slots
+The open slot chips get the same grouping: one time label per row with a coach chip per available coach, so the front desk can see at a glance that 3:00 PM means two rooms open, not a duplicate entry.
 
-- New edge function `send-lesson-billing-audit`, using `createStripeClient("live")` from `_shared/stripe.ts` and pricing from `_shared/private-lesson-pricing.ts` so the $50 Summer Special is reflected in amounts owed.
-- Query `lesson_booking_occurrences` joined to `lesson_bookings` where `occurrence_date = yesterday (America/Los_Angeles)` and lesson type is private or semi-private, filtered through the existing `isRealLessonOccurrence` rules so abandoned carts never appear.
-- New React Email template `lesson-billing-audit.tsx` registered in `transactional-email-templates/registry.ts`, sent via the existing `send-transactional-email` function, one send per recipient, with an idempotency key of `lesson-billing-audit-{date}-{recipient}` so a retry never double-sends.
-- Recipients: `sutton@aquaticdreams.com` and `sydnee@icanswim209.com`.
-- Scheduled with pg_cron at 7:00 AM Pacific daily. If yesterday had zero private/semi-private lessons, no email is sent.
-- Supports a manual `{ date: "2026-07-25" }` body override so you can re-run any past day on demand, plus `dry_run: true` to return the JSON report without emailing.
+### 4. Small data cleanup note (no writes without your say so)
+Sophia Cheney has two Tuesday 3:00 to 6:00 PM blocks whose date ranges nearly repeat the same weeks (Jun 9 to Jun 30 and Jun 11 to Jul 2), plus the current Jul 14 to Aug 4 block. The picker already collapses these so they cause no visible duplicate, but the stale June rows are clutter. I will flag them for you rather than delete anything.
 
-## Not included
+## Technical notes
 
-Group session enrollments, any auto-charging, and any database reconciliation — the report only tells you what to act on.
+- Files touched: `src/components/private-lessons/SlotPicker.tsx` (day grid and recurring pattern rendering) and `src/components/admin/calendar/PrivateLessonsPanel.tsx` (open slots section).
+- Presentation only. No changes to `privateBooking-core.ts` slot composition, `useCalendarData.ts` slot math, availability blocks, holds, or booking writes.
+- The existing dedupe key (instructor, date, start time) stays as is; it already prevents true duplicates from overlapping blocks belonging to the same coach.
