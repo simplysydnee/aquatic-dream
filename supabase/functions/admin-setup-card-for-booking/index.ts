@@ -128,12 +128,14 @@ Deno.serve(async (req) => {
         return j({ error: "No reusable card found for this parent" }, 400);
       }
       // Defense in depth: require the source booking the UI showed the admin
-      // is the one we'd actually attach. Prevents stale-UI races.
-      if (result.source_booking_id !== body.source_booking_id) {
+      // is the one we'd actually attach. Prevents stale-UI races. A card found
+      // directly in Stripe has no source booking, so skip the check then.
+      if (result.source_booking_id && result.source_booking_id !== body.source_booking_id) {
         return j({
           error: "Selected card no longer matches the parent's most recent card",
         }, 409);
       }
+
 
       await supabaseAdmin.from("lesson_bookings").update({
         stripe_payment_method_id: result.stripe_payment_method_id,
