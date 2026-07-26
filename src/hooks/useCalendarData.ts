@@ -264,20 +264,21 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     }
 
     // ── Map private lesson occurrences ──
-    // Hide stale pending_card rows (abandoned self-serve checkouts > 30 min old)
-    // so they don't appear as real bookings on the calendar.
-    // Admin-created bookings are NEVER hidden — admin manually placed the slot
-    // and it must stay visible until they explicitly cancel it.
-    const STALE_PENDING_MS = 30 * 60 * 1000;
+    // Abandoned self-serve checkouts never count as real bookings.
+    // Admin-created bookings are NEVER hidden — admin placed the slot on purpose
+    // and simply needs to collect a card at the front desk.
     const _now = Date.now();
     const privates: PrivateLessonBooking[] = ((privateOccRes.data as any[]) || [])
-      .filter((o) => {
-        if (o.status !== "pending_card") return true;
-        const src = o.lesson_bookings?.booking_source;
-        if (src === "admin" || src === "admin_manual") return true;
-        const created = o.created_at ? new Date(o.created_at).getTime() : 0;
-        return (_now - created) <= STALE_PENDING_MS;
-      })
+      .filter((o) =>
+        isRealLessonOccurrence({
+          occurrenceStatus: o.status,
+          bookingStatus: o.lesson_bookings?.status,
+          bookingSource: o.lesson_bookings?.booking_source,
+          createdAt: o.created_at,
+          now: _now,
+        })
+      )
+
       .map((o) => {
       const b = o.lesson_bookings;
       const effInstructorId = o.instructor_override_id || b?.instructor_id || null;
