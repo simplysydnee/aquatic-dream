@@ -159,6 +159,55 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─────────────────────────────────────── REPAIR ──────────────────────────────────────
+    // Backfill a card that already exists (on another booking row, or in
+    // Stripe under this parent's customer) onto a booking that lost it.
+    // Never charges anything.
+    if (body.action === "repair") {
+      if (!booking.parent_email) return j({ error: "Booking missing parent email" }, 400);
+
+      if (booking.stripe_payment_method_id) {
+        // Card already stamped — just make sure occurrences reflect it.
+        await supabaseAdmin.from("lesson_booking_occurrences")
+          .update({ payment_status: "card_on_file", charge_status: "pending", charge_error: null })
+          .eq("booking_id", booking.id)
+          .neq("status", "cancelled")
+          .neq("payment_status", "paid");
+        return j({ repaired: false, already_had_card: true });
+      }
+
+      const result = await findReusableCardForEmail(supabaseAdmin, stripe, booking.parent_email);
+      if (!result.found) {
+        return j({ repaired: false, reason: result.reason });
+      }
+
+      await supabaseAdmin.from("lesson_bookings").update({
+        stripe_payment_method_id: result.stripe_payment_method_id,
+        stripe_customer_id: result.stripe_customer_id,
+      }).eq("id", booking.id);
+
+      const { data: updated } = await supabaseAdmin.from("lesson_booking_occurrences")
+        .update({
+          payment_status: "card_on_file",
+          charge_status: "pending",
+          charge_error: null,
+        })
+        .eq("booking_id", booking.id)
+        .neq("status", "cancelled")
+        .neq("payment_status", "paid")
+        .select("id");
+
+      return j({
+        repaired: true,
+        payment_method_id: result.stripe_payment_method_id,
+        customer_id: result.stripe_customer_id,
+        brand: result.brand,
+        last4: result.last4,
+        occurrences_updated: (updated as any[] | null)?.length ?? 0,
+      });
+    }
+
+
     // ─────────────────────────────────────── START ───────────────────────────────────────
     if (body.action === "start") {
       let customerId = booking.stripe_customer_id as string | null;
