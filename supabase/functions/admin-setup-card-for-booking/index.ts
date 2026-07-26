@@ -35,6 +35,11 @@ const StartSchema = z.object({
   booking_id: z.string().uuid(),
   environment: Env,
 });
+const RepairSchema = z.object({
+  action: z.literal("repair"),
+  booking_id: z.string().uuid(),
+  environment: Env,
+});
 const FinalizeSchema = z.object({
   action: z.literal("finalize"),
   booking_id: z.string().uuid(),
@@ -45,8 +50,10 @@ const BodySchema = z.discriminatedUnion("action", [
   CheckSchema,
   AttachExistingSchema,
   StartSchema,
+  RepairSchema,
   FinalizeSchema,
 ]);
+
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
