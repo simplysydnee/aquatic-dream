@@ -123,6 +123,7 @@ export default function PrivateLessonsAdmin() {
         .select("*, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
 
         .in("lesson_type", ["private", "semi_private"])
+        .not("status", "in", DEAD_STATUS_FILTER)
         .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(200),
       supabase.from("lesson_bookings")
@@ -130,7 +131,8 @@ export default function PrivateLessonsAdmin() {
         .in("lesson_type", ["private", "semi_private"])
         // Include pending_card so the slot grid marks the time as taken
         // while we wait for the parent to save their card.
-        .neq("status", "cancelled"),
+        .not("status", "in", DEAD_STATUS_FILTER),
+
     ]);
     setInstructors((ins as any[]) || []);
     setBlocks((bks as any[]) || []);
