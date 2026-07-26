@@ -75,6 +75,8 @@ serve(async (req) => {
           await handleAdminPhoneCheckoutPaid(obj);
         } else if (obj?.metadata?.type === "lesson_booking_occurrence" && obj?.metadata?.occurrenceId) {
           await handleLessonBookingPaid(obj);
+        } else if (obj?.metadata?.type === "lesson_occurrence_multi" && obj?.metadata?.occurrenceIds) {
+          await handleLessonOccurrenceMultiPaid(obj, env);
         } else if (obj?.metadata?.type === "lesson_booking_series" && obj?.metadata?.bookingId) {
           await handleLessonSeriesPaid(obj);
         } else {
