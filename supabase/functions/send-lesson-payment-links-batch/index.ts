@@ -73,6 +73,11 @@ Deno.serve(async (req) => {
       ? body.occurrence_ids
       : null;
     const includeCardOnFile: boolean = body?.include_card_on_file === true;
+    // Optional sentence inserted after the greeting, e.g. "Our attempt to charge
+    // your card on June 9 did not go through."
+    const note: string | null = typeof body?.note === "string" && body.note.trim()
+      ? body.note.trim()
+      : null;
     const today = new Date().toISOString().slice(0, 10);
 
     let query = supabase
@@ -205,7 +210,7 @@ Deno.serve(async (req) => {
         .map((l) => formatPTDate(l.date, { month: "numeric", day: "numeric" }))
         .join(", ");
       const message =
-        `Hi ${parentFirst}, this is Aquatic Dreams. We still show a balance of $${total.toFixed(0)} for ${swimmerLabel}'s lesson${
+        `Hi ${parentFirst}, this is Aquatic Dreams. ${note ? `${note} ` : ""}We still show a balance of $${total.toFixed(0)} for ${swimmerLabel}'s lesson${
           lessons.length > 1 ? "s" : ""
         } on ${dateList}. You can pay securely here: ${report.payment_link} — Reply STOP to opt out.`;
 
