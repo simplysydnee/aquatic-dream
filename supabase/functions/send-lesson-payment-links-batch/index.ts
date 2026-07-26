@@ -21,6 +21,9 @@ const corsHeaders = {
 
 const DEAD = ["cancelled", "abandoned"];
 
+const isSemi = (t: string | null | undefined): boolean =>
+  String(t || "").replace(/-/g, "_") === "semi_private";
+
 interface OccRow {
   id: string;
   booking_id: string;
@@ -158,8 +161,8 @@ Deno.serve(async (req) => {
             price_data: {
               currency: "usd",
               product_data: {
-                name: `${l.type === "semi_private" ? "Semi-Private" : "Private"} Lesson${
-                  l.type !== "semi_private" && isPromoDate(l.date) ? ` (${PROMO_LABEL})` : ""
+                name: `${isSemi(l.type) ? "Semi-Private" : "Private"} Lesson${
+                  !isSemi(l.type) && isPromoDate(l.date) ? ` (${PROMO_LABEL})` : ""
                 } — ${formatPTDate(l.date, { month: "short", day: "numeric", year: "numeric" })}`,
               },
               unit_amount: Math.round(l.amount * 100),
