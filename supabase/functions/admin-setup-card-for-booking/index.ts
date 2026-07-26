@@ -181,10 +181,17 @@ Deno.serve(async (req) => {
         return j({ repaired: false, reason: result.reason });
       }
 
-      await supabaseAdmin.from("lesson_bookings").update({
+      const bookingUpdate: Record<string, unknown> = {
         stripe_payment_method_id: result.stripe_payment_method_id,
         stripe_customer_id: result.stripe_customer_id,
-      }).eq("id", booking.id);
+      };
+      if (booking.status === "pending_card") bookingUpdate.status = "active";
+      await supabaseAdmin.from("lesson_bookings").update(bookingUpdate).eq("id", booking.id);
+
+      await supabaseAdmin.from("lesson_booking_occurrences")
+        .update({ status: "scheduled" })
+        .eq("booking_id", booking.id)
+        .eq("status", "pending_card");
 
       const { data: updated } = await supabaseAdmin.from("lesson_booking_occurrences")
         .update({
@@ -196,6 +203,7 @@ Deno.serve(async (req) => {
         .neq("status", "cancelled")
         .neq("payment_status", "paid")
         .select("id");
+
 
       return j({
         repaired: true,
