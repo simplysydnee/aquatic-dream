@@ -23,6 +23,13 @@ import { getPrivateLessonPrice, isPromoDate, PRIVATE_PROMO_PRICE, PRIVATE_REGULA
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
 import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
 import ChargeConfirmDialog from "@/components/admin/calendar/ChargeConfirmDialog";
+import {
+  CARD_AT_DESK_LABEL,
+  DEAD_STATUS_FILTER,
+  STALE_PENDING_MS,
+  isAdminBookingSource,
+} from "@/lib/lessonBookingStatus";
+
 
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
