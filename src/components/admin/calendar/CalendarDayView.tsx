@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { CARD_AT_DESK_LABEL } from "@/lib/lessonBookingStatus";
+
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import type {
   CalendarSwimSession,
