@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
         .map((l) => formatPTDate(l.date, { month: "numeric", day: "numeric" }))
         .join(", ");
       const message =
-        `Hi ${parentFirst}, this is Aquatic Dreams. We still show a balance of $${total.toFixed(0)} for ${swimmerLabel}'s lesson${
+        `Hi ${parentFirst}, this is Aquatic Dreams. ${note ? `${note} ` : ""}We still show a balance of $${total.toFixed(0)} for ${swimmerLabel}'s lesson${
           lessons.length > 1 ? "s" : ""
         } on ${dateList}. You can pay securely here: ${report.payment_link} — Reply STOP to opt out.`;
 
