@@ -373,7 +373,10 @@ Deno.serve(async (req) => {
             conflicts.push(`${d} ${cs}-${ce}`);
             break;
           }
-    }
+        }
+      }
+
+
 
     // Availability guard: every proposed date must fall inside a
     // non-blackout instructor_booking_blocks window for this instructor.
