@@ -543,6 +543,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Safety net: a returning family almost always already has a card saved
+    // (on another booking row or directly on their Stripe customer). If we
+    // still have no PaymentMethod and the admin did not explicitly choose
+    // "no card", attach the existing one so the booking is chargeable later.
+    // This never charges anything.
+    if (!stripePaymentMethodId && explicitSource !== "none") {
+      try {
+        const fallback = await findReusableCardForEmail(
+          supabaseAdmin,
+          createStripeClient(env),
+          p.parent_email,
+        );
+        if (fallback.found) {
+          stripePaymentMethodId = fallback.stripe_payment_method_id;
+          stripeCustomerId = fallback.stripe_customer_id;
+          cardOnFileSourceUsed = "reuse";
+          reuseInfo = {
+            source_booking_id: fallback.source_booking_id,
+            brand: fallback.brand,
+            last4: fallback.last4,
+            exp_month: fallback.exp_month,
+            exp_year: fallback.exp_year,
+          };
+        }
+      } catch (e) {
+        console.warn("admin-create-private-booking: card fallback failed", e instanceof Error ? e.message : String(e));
+      }
+    }
+
+
+
     // Effective card-on-file flag for occurrence rows: only true when we
     // actually stamped a PaymentMethod.
     const effectiveCardOnFile = !!stripePaymentMethodId;
