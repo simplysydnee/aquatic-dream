@@ -1,93 +1,41 @@
-## Add 3 MCP tools to the existing Aquatic Dreams MCP server
+## What I found in the data
 
-All three tools are added to the existing `@lovable.dev/mcp-js` server that already exposes `search_swimmers`, `list_active_sessions`, etc. — same OAuth, same admin-scoped auth, no schema changes, no new admin UI.
+These bookings were created with **no `stripe_customer_id` / `stripe_payment_method_id`**, so their lesson occurrences are `payment_status = unpaid`, `charge_status = skipped` and cannot be charged:
 
-### Files
+| Family | Booking(s) | Prior card in our records? |
+|---|---|---|
+| Karanveer Singh (Paramdip Singh) | Jul 18 / Jul 25 / Aug 1 | Yes — `pm_...eBcQ0lnO` on the Jun 13 booking |
+| Nanak Singh (Gurpreet Singh) | Jul 28, 30, Aug 4, Aug 6 | Yes — `pm_...PQ28eGBg` on the Jul 23 booking |
+| Leonel Valencia Perez | Jul 23, Jul 28, Jul 30 | Yes — `pm_...SBIZRWA0` on earlier bookings |
+| Mustafa Ziadeh | Aug 4 (`pending_card`) | Yes — `pm_...N1MKK9kr` on earlier bookings |
+| Aiden Carrera (Lizvett Leon) | Jul 16, 23, 30 | No card anywhere in our DB |
+| Laine Price (Alex Tompkins-Price) | Jul 21 (+2 older `pending_card` rows) | No payment method saved; only a Stripe customer id `cus_UlV...` |
 
-New files:
-- `src/lib/mcp/tools/list-open-private-slots.ts`
-- `src/lib/mcp/tools/list-past-private-families.ts`
-- `src/lib/mcp/tools/send-private-openings-sms.ts`
+So there are two distinct problems: **(1)** a card we already have was not carried onto the new booking, and **(2)** for Aiden and Laine we may never have captured one (or it was captured in Stripe but never written back).
 
-Edited files:
-- `src/lib/mcp/index.ts` — import the three tools and add to `tools: [...]`.
+## Root cause
 
-After edits: run `app_mcp_server--extract_mcp_manifest`, then `supabase--deploy_edge_functions` for the `mcp` function. No other backend or frontend changes.
+The reuse helper (`_shared/card-on-file.ts`) only looks at other `lesson_bookings` rows in our database, and it is only invoked when an admin explicitly clicks the reuse banner. New bookings created without that click get no card, even when the same parent email already has a valid one. Nothing repairs them afterwards.
 
-### Tool 1 — `list_open_private_slots`
+## The fix
 
-**Purpose:** enumerate open private-lesson slots for a specific date (e.g. next Saturday) using the same public RPCs the `/book-private-lesson` picker uses.
+**1. Make the card lookup also ask Stripe directly**
+Extend `findReusableCardForEmail` so that when no usable payment method is found on our own booking rows, it falls back to: find the Stripe customer by email (or by a `stripe_customer_id` already on any of that parent's bookings), list their attached card payment methods, and use the newest unexpired one. This is what will recover Laine Price and, if a card exists there, Aiden Carrera.
 
-**Input:**
-- `date` (required, YYYY-MM-DD)
-- `instructorIds?: string[]` (optional filter)
+**2. Add a repair action to `admin-setup-card-for-booking`**
+New `action: "repair"` that, for a given booking, runs the extended lookup and — when a valid card is found — stamps `stripe_customer_id` + `stripe_payment_method_id` on the booking and flips its non-cancelled, non-paid occurrences to `payment_status = card_on_file`, `charge_status = pending`. This reuses the existing attach logic and stays admin-gated. No charges are made by this action.
 
-**Handler:** Uses the user's bearer token via the shared `client(ctx)` pattern. Calls, in parallel:
-- `rpc("get_active_instructors_public")`
-- `rpc("get_public_booking_blocks", { _instructor_ids })`
-- `rpc("get_public_taken_occurrences", { p_from_date: date, p_to_date: date })`
-- `rpc("get_active_slot_holds",       { p_from_date: date, p_to_date: date, p_session_token: null })`
+**3. Run the repair for the six bookings above**
+Executed through the edge function against live Stripe. Expected outcome: the four Singh/Valencia/Ziadeh families flip to "Card on file" immediately. Aiden and Laine flip only if Stripe actually holds a card; if not, the repair reports "no card found" for them.
 
-Then runs the same slot-composition logic as `src/lib/privateBooking.ts::fetchOpenSlots` (weekly/date_range + break windows + blackouts + taken/holds subtraction) but scoped to the single date. Returns `{ rows: [{ instructor_id, instructor_name, slot_date, start_time, end_time }] }` sorted by `start_time` then `instructor_name`.
+**4. Fallback for anyone with no card in Stripe**
+For those families, use the existing "Send card-on-file link" flow (`admin-card-on-file-link`) so the parent saves a card, which then makes their lessons chargeable. Laine's two outstanding lessons become chargeable once that lands.
 
-To avoid duplicating that ~80 lines of code, extract the pure slot-composition helper from `src/lib/privateBooking.ts` into `src/lib/privateBooking-core.ts` (no supabase imports; take blocks/taken/holds/instructors as arguments) and have both the browser flow and this MCP tool call it. The current `privateBooking.ts` keeps its network calls and imports the helper.
+**5. Prevent the recurrence**
+When a booking is created for a parent email that already has a valid reusable card, attach it automatically instead of waiting for the admin to notice the reuse banner. The admin can still replace the card from the lesson detail dialog.
 
-### Tool 2 — `list_past_private_families`
+## Notes
 
-**Purpose:** dedup'd list of families who've had at least one private/semi-private lesson, with a valid phone number.
-
-**Input:**
-- `sinceDate?` (YYYY-MM-DD; default: 12 months ago) — only families with an occurrence on/after this date
-- `includeSemiPrivate?: boolean` (default true)
-- `limit?: number` (1–1000, default 500)
-
-**Handler:** Selects from `lesson_bookings` joined via `lesson_booking_occurrences`:
-```
-select b.parent_name, b.parent_first_name, b.parent_last_name,
-       b.parent_phone, b.child_first_name, b.child_name,
-       max(o.occurrence_date) as last_lesson_date
-  from lesson_bookings b
-  join lesson_booking_occurrences o on o.booking_id = b.id
- where b.lesson_type in ('private'[,'semi-private'])
-   and b.status <> 'cancelled'
-   and o.status  <> 'cancelled'
-   and o.occurrence_date >= :sinceDate
-   and b.parent_phone is not null
- group by ...
-```
-Client-side: normalize phones via same rules as `_shared/textmagic.ts::normalizePhone`, dedupe by normalized phone, merge child first names into `childNames: string[]`, sort by `last_lesson_date desc`, cap to `limit`. Returns `{ rows: [{ phone, parent_name, childNames, last_lesson_date }] }`.
-
-Runs under the admin's JWT; existing `lesson_bookings` RLS already grants admins read access.
-
-### Tool 3 — `send_private_openings_sms`
-
-**Purpose:** Send the outreach blast by delegating to the existing admin-only edge function `send-bulk-outreach-sms` — no new SMS wiring.
-
-**Input:**
-- `template` (5–1000 chars; may include `{{childNames}}` and `{{date}}` — resolved server-side per recipient)
-- `dateLabel` (e.g. "Sat Aug 30") — passed as `startDateLabel` to the existing function
-- `recipients: [{ phone: string, childNames?: string[] }]` (1–500)
-- `reminderKind?: string` (default `"saturday_openings_sms"`)
-
-**Annotations:** `readOnlyHint: false`, `destructiveHint: false`, `openWorldHint: true`. Include `needsApproval: true` semantics by requiring an explicit `confirm: true` boolean input; the tool refuses to send otherwise. This gives assistants a two-turn preview/confirm loop without adding UI.
-
-**Handler:** POSTs to `${SUPABASE_URL}/functions/v1/send-bulk-outreach-sms` with:
-- `Authorization: Bearer ${ctx.getToken()}` (admin role check happens inside the existing function)
-- Body: `{ template, startDateLabel: dateLabel, recipients, reminderKind }`
-
-Returns the function's JSON summary (`{ sent, failed, ... }`) as `structuredContent`. On non-2xx, returns `isError: true` with the response body text.
-
-### Assistant usage flow (no in-app UI)
-
-The user tells their connected assistant: "Show me open private slots for Sat Aug 30 and text everyone who's had a private lesson in the last 6 months."
-
-1. Assistant calls `list_open_private_slots({ date: "2026-08-29" })`.
-2. Assistant calls `list_past_private_families({ sinceDate: "2026-02-28" })`.
-3. Assistant drafts a message referencing the slots and `/book-private-lesson`, shows the user for approval.
-4. On confirm, assistant calls `send_private_openings_sms({ template, dateLabel, recipients, confirm: true })`.
-
-### Post-implementation checks
-
-- `app_mcp_server--extract_mcp_manifest` reports all 7 tools (4 existing + 3 new) without errors.
-- `supabase--deploy_edge_functions` for the `mcp` function.
-- Sanity check via `supabase--curl_edge_functions` on `/functions/v1/mcp` tool listing (or by reconnecting Claude/ChatGPT).
+- No existing rows are deleted, no RLS changes, no schema changes.
+- All Stripe calls stay inside edge functions; nothing is charged as part of this repair.
+- Laine's charge for two lessons is done afterwards through the normal charge dialog once her card is on file.

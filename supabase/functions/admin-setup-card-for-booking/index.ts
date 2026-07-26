@@ -35,6 +35,11 @@ const StartSchema = z.object({
   booking_id: z.string().uuid(),
   environment: Env,
 });
+const RepairSchema = z.object({
+  action: z.literal("repair"),
+  booking_id: z.string().uuid(),
+  environment: Env,
+});
 const FinalizeSchema = z.object({
   action: z.literal("finalize"),
   booking_id: z.string().uuid(),
@@ -45,8 +50,10 @@ const BodySchema = z.discriminatedUnion("action", [
   CheckSchema,
   AttachExistingSchema,
   StartSchema,
+  RepairSchema,
   FinalizeSchema,
 ]);
+
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -82,7 +89,7 @@ Deno.serve(async (req) => {
 
     const { data: booking, error: bErr } = await supabaseAdmin
       .from("lesson_bookings")
-      .select("id, parent_name, parent_email, parent_phone, stripe_customer_id, stripe_payment_method_id")
+      .select("id, status, parent_name, parent_email, parent_phone, stripe_customer_id, stripe_payment_method_id")
       .eq("id", body.booking_id)
       .maybeSingle();
     if (bErr || !booking) return j({ error: "Booking not found" }, 404);
@@ -121,12 +128,14 @@ Deno.serve(async (req) => {
         return j({ error: "No reusable card found for this parent" }, 400);
       }
       // Defense in depth: require the source booking the UI showed the admin
-      // is the one we'd actually attach. Prevents stale-UI races.
-      if (result.source_booking_id !== body.source_booking_id) {
+      // is the one we'd actually attach. Prevents stale-UI races. A card found
+      // directly in Stripe has no source booking, so skip the check then.
+      if (result.source_booking_id && result.source_booking_id !== body.source_booking_id) {
         return j({
           error: "Selected card no longer matches the parent's most recent card",
         }, 409);
       }
+
 
       await supabaseAdmin.from("lesson_bookings").update({
         stripe_payment_method_id: result.stripe_payment_method_id,
@@ -151,6 +160,63 @@ Deno.serve(async (req) => {
         last4: result.last4,
       });
     }
+
+    // ─────────────────────────────────────── REPAIR ──────────────────────────────────────
+    // Backfill a card that already exists (on another booking row, or in
+    // Stripe under this parent's customer) onto a booking that lost it.
+    // Never charges anything.
+    if (body.action === "repair") {
+      if (!booking.parent_email) return j({ error: "Booking missing parent email" }, 400);
+
+      if (booking.stripe_payment_method_id) {
+        // Card already stamped — just make sure occurrences reflect it.
+        await supabaseAdmin.from("lesson_booking_occurrences")
+          .update({ payment_status: "card_on_file", charge_status: "pending", charge_error: null })
+          .eq("booking_id", booking.id)
+          .neq("status", "cancelled")
+          .neq("payment_status", "paid");
+        return j({ repaired: false, already_had_card: true });
+      }
+
+      const result = await findReusableCardForEmail(supabaseAdmin, stripe, booking.parent_email);
+      if (!result.found) {
+        return j({ repaired: false, reason: result.reason });
+      }
+
+      const bookingUpdate: Record<string, unknown> = {
+        stripe_payment_method_id: result.stripe_payment_method_id,
+        stripe_customer_id: result.stripe_customer_id,
+      };
+      if (booking.status === "pending_card") bookingUpdate.status = "active";
+      await supabaseAdmin.from("lesson_bookings").update(bookingUpdate).eq("id", booking.id);
+
+      await supabaseAdmin.from("lesson_booking_occurrences")
+        .update({ status: "scheduled" })
+        .eq("booking_id", booking.id)
+        .eq("status", "pending_card");
+
+      const { data: updated } = await supabaseAdmin.from("lesson_booking_occurrences")
+        .update({
+          payment_status: "card_on_file",
+          charge_status: "pending",
+          charge_error: null,
+        })
+        .eq("booking_id", booking.id)
+        .neq("status", "cancelled")
+        .neq("payment_status", "paid")
+        .select("id");
+
+
+      return j({
+        repaired: true,
+        payment_method_id: result.stripe_payment_method_id,
+        customer_id: result.stripe_customer_id,
+        brand: result.brand,
+        last4: result.last4,
+        occurrences_updated: (updated as any[] | null)?.length ?? 0,
+      });
+    }
+
 
     // ─────────────────────────────────────── START ───────────────────────────────────────
     if (body.action === "start") {

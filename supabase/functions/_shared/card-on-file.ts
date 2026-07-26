@@ -29,6 +29,7 @@ export interface NoReusableCard {
 
 export type ReusableCardResult = ReusableCard | NoReusableCard;
 
+
 function isExpired(month: number, year: number): boolean {
   const now = new Date();
   const y = now.getUTCFullYear();
@@ -36,6 +37,57 @@ function isExpired(month: number, year: number): boolean {
   if (year < y) return true;
   if (year === y && month < m) return true;
   return false;
+}
+
+// Fallback: ask Stripe directly for a saved card. Used when none of the
+// parent's own booking rows carry a usable PaymentMethod (e.g. the card was
+// collected through a hosted setup link that never wrote back to our rows).
+async function findCardInStripe(
+  stripe: Stripe,
+  email: string,
+  knownCustomerIds: string[],
+): Promise<ReusableCardResult> {
+  const customerIds: string[] = [];
+  for (const id of knownCustomerIds) {
+    if (id && !customerIds.includes(id)) customerIds.push(id);
+  }
+  try {
+    const byEmail = await stripe.customers.list({ email, limit: 10 });
+    for (const c of byEmail.data) {
+      if (!customerIds.includes(c.id)) customerIds.push(c.id);
+    }
+  } catch (e) {
+    console.warn("card-on-file: stripe customer lookup failed", e instanceof Error ? e.message : String(e));
+  }
+
+  if (customerIds.length === 0) return { found: false, reason: "no_prior_pm" };
+
+  for (const customerId of customerIds) {
+    try {
+      const pms = await stripe.paymentMethods.list({ customer: customerId, type: "card", limit: 20 });
+      const usable = pms.data
+        .filter((pm) => pm.card && !isExpired(pm.card.exp_month, pm.card.exp_year))
+        .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0];
+      if (!usable?.card) continue;
+      return {
+        found: true,
+        brand: usable.card.brand,
+        last4: usable.card.last4,
+        exp_month: usable.card.exp_month,
+        exp_year: usable.card.exp_year,
+        stripe_customer_id: customerId,
+        stripe_payment_method_id: usable.id,
+        source_booking_id: "",
+        source_child_name: null,
+        source_instructor_name: null,
+      };
+    } catch (e) {
+      console.warn("card-on-file: stripe pm list failed", customerId, e instanceof Error ? e.message : String(e));
+      continue;
+    }
+  }
+
+  return { found: false, reason: "all_candidates_invalid" };
 }
 
 export async function findReusableCardForEmail(
@@ -67,7 +119,18 @@ export async function findReusableCardForEmail(
     updated_at: string;
   }>;
 
-  if (candidates.length === 0) return { found: false, reason: "no_prior_pm" };
+  // Any Stripe customer ids we already know for this parent, even on rows
+  // that never got a PaymentMethod stamped.
+  const { data: custRows } = await supabaseAdmin
+    .from("lesson_bookings")
+    .select("stripe_customer_id, updated_at")
+    .ilike("parent_email", email)
+    .not("stripe_customer_id", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(20);
+  const knownCustomerIds = (((custRows as any[]) || []) as Array<{ stripe_customer_id: string }>)
+    .map((r) => r.stripe_customer_id)
+    .filter(Boolean);
 
   const seen = new Set<string>();
   const ordered = candidates.filter((c) => {
@@ -106,5 +169,6 @@ export async function findReusableCardForEmail(
     }
   }
 
-  return { found: false, reason: "all_candidates_invalid" };
+  return await findCardInStripe(stripe, email, knownCustomerIds);
 }
+
