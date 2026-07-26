@@ -22,8 +22,11 @@ export function getPrivateLessonPrice(
   lessonType: string,
   occurrenceDateISO: string,
 ): number {
-  if (lessonType === "semi_private") return SEMI_PRIVATE_PRICE;
+  // Legacy rows use "semi-private"; newer rows use "semi_private".
+  const normalized = String(lessonType || "").replace(/-/g, "_");
+  if (normalized === "semi_private") return SEMI_PRIVATE_PRICE;
   return isPromoDate(occurrenceDateISO)
     ? PRIVATE_PROMO_PRICE
     : PRIVATE_REGULAR_PRICE;
 }
+
