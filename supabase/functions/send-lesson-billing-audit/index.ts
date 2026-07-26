@@ -297,23 +297,39 @@ Deno.serve(async (req) => {
 
     const emailed: string[] = [];
     for (const recipient of recipients) {
-      const { error: invokeErr } = await supabase.functions.invoke(
-        "send-transactional-email",
-        {
-          body: {
-            templateName: "lesson-billing-audit",
-            recipientEmail: recipient,
-            idempotencyKey: `lesson-billing-audit-${targetDate}-${recipient}`,
-            templateData,
+      try {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-transactional-email`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${SERVICE_ROLE}`,
+              apikey: SERVICE_ROLE,
+            },
+            body: JSON.stringify({
+              templateName: "lesson-billing-audit",
+              recipientEmail: recipient,
+              idempotencyKey: `lesson-billing-audit-${targetDate}-${recipient}`,
+              templateData,
+            }),
           },
-        },
-      );
-      if (invokeErr) {
-        console.error("billing audit email failed for", recipient, invokeErr.message);
-      } else {
-        emailed.push(recipient);
+        );
+        if (!res.ok) {
+          console.error(
+            "billing audit email failed for",
+            recipient,
+            res.status,
+            await res.text(),
+          );
+        } else {
+          emailed.push(recipient);
+        }
+      } catch (e) {
+        console.error("billing audit email threw for", recipient, e);
       }
     }
+
 
     return json({
       date: targetDate,
