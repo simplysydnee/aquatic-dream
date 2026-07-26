@@ -66,5 +66,7 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'membership-manage-link': membershipManageLink,
   'membership-cancellation-confirmation': membershipCancellationConfirmation,
   'internal-membership-cancellation-alert': internalMembershipCancellationAlert,
+  'lesson-billing-audit': lessonBillingAudit,
+
 }
 
