@@ -432,32 +432,40 @@ export default function SlotPicker({ sessionToken, onContinue, onBack, initialSe
             return (
               <div key={date} className="border border-border rounded-lg p-3">
                 <p className="text-sm font-semibold mb-2">{label}</p>
-                <div className="flex flex-wrap gap-2">
-                  {daySlots.map((s) => {
-                    const k = slotKey(s);
-                    const isSel = !!selected[k];
-                    const promo = isPromoDate(s.slot_date);
-                    const blockedByInstructor = !!lockedInstructorId && lockedInstructorId !== s.instructor_id && !isSel;
-                    return (
-                      <button
-                        key={k}
-                        onClick={() => toggle(s)}
-                        type="button"
-                        disabled={blockedByInstructor}
-                        title={blockedByInstructor ? `Different instructor — clear selection to switch to ${s.instructor_name}` : undefined}
-                        className={`px-3 py-1.5 text-xs rounded-md border transition ${isSel
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : blockedByInstructor
-                          ? "bg-muted/40 text-muted-foreground border-dashed border-border opacity-50 cursor-not-allowed"
-                          : "bg-background hover:bg-muted border-border"}`}>
-                        {formatTime(s.start_time)} · {s.instructor_name}
-                        {promo && (
-                          <span className={`ml-1.5 font-semibold ${isSel ? "text-primary-foreground" : "text-coral"}`}>${PRIVATE_PROMO_PRICE}</span>
-                        )}
-                      </button>
-                    );
-                  })}
+                <div className="space-y-1.5">
+                  {groupByTime(daySlots).map(([time, timeSlots]) => (
+                    <div key={time} className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground tabular-nums min-w-[68px]">
+                        {formatTime(time)}
+                      </span>
+                      {timeSlots.map((s) => {
+                        const k = slotKey(s);
+                        const isSel = !!selected[k];
+                        const promo = isPromoDate(s.slot_date);
+                        const blockedByInstructor = !!lockedInstructorId && lockedInstructorId !== s.instructor_id && !isSel;
+                        return (
+                          <button
+                            key={k}
+                            onClick={() => toggle(s)}
+                            type="button"
+                            disabled={blockedByInstructor}
+                            title={blockedByInstructor ? `Different instructor — clear selection to switch to ${s.instructor_name}` : undefined}
+                            className={`px-3 py-1.5 text-xs rounded-md border transition ${isSel
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : blockedByInstructor
+                              ? "bg-muted/40 text-muted-foreground border-dashed border-border opacity-50 cursor-not-allowed"
+                              : "bg-background hover:bg-muted border-border"}`}>
+                            {s.instructor_name}
+                            {promo && (
+                              <span className={`ml-1.5 font-semibold ${isSel ? "text-primary-foreground" : "text-coral"}`}>${PRIVATE_PROMO_PRICE}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
+
               </div>
             );
           })}
