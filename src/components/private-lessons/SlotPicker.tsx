@@ -199,6 +199,20 @@ export default function SlotPicker({ sessionToken, onContinue, onBack, initialSe
     return list;
   }, [slots, timeFilter, dayFilter]);
 
+  // Group recurring patterns that share a day + time so two coaches on the same
+  // hours read as one time with a coach choice, not as duplicate rows.
+  const groupedPatterns = useMemo<[string, RecurringPattern[]][]>(() => {
+    const m = new Map<string, RecurringPattern[]>();
+    for (const p of recurringPatterns) {
+      const k = `${p.dow}|${p.startTime}`;
+      if (!m.has(k)) m.set(k, []);
+      m.get(k)!.push(p);
+    }
+    return [...m.entries()].sort(([, a], [, b]) =>
+      a[0].dow - b[0].dow || a[0].startTime.localeCompare(b[0].startTime));
+  }, [recurringPatterns]);
+
+
   const activePattern = useMemo(
     () => recurringPatterns.find((p) => p.key === activePatternKey) || null,
     [recurringPatterns, activePatternKey],
