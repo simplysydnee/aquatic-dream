@@ -38,6 +38,19 @@ function slotKey(s: Slot) {
   return `${s.instructor_id}|${s.slot_date}|${s.start_time}`;
 }
 
+// Same start time with different coaches is real availability, not a duplicate.
+// Group so the time prints once with a coach button each.
+function groupByTime(daySlots: Slot[]): [string, Slot[]][] {
+  const m = new Map<string, Slot[]>();
+  for (const s of daySlots) {
+    if (!m.has(s.start_time)) m.set(s.start_time, []);
+    m.get(s.start_time)!.push(s);
+  }
+  for (const arr of m.values()) arr.sort((a, b) => a.instructor_name.localeCompare(b.instructor_name));
+  return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
+
 interface RecurringPattern {
   key: string; // instructorId|dow|startTime
   instructorId: string;
