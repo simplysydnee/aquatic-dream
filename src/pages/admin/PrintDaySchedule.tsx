@@ -138,8 +138,18 @@ export default function PrintDaySchedule() {
       if (a.data) setAgreements(a.data as Agreement[]);
       if (ld.data) setLessonDates(ld.data as any);
       if (po.data) {
+        const now = Date.now();
         const mapped: PrivateOccurrence[] = (po.data as any[])
-          .filter((o) => o.lesson_bookings && o.lesson_bookings.status !== "cancelled")
+          .filter((o) =>
+            o.lesson_bookings &&
+            isRealLessonOccurrence({
+              occurrenceStatus: o.status,
+              bookingStatus: o.lesson_bookings.status,
+              bookingSource: o.lesson_bookings.booking_source,
+              createdAt: o.created_at,
+              now,
+            })
+          )
           .map((o) => {
             const b = o.lesson_bookings;
             return {
@@ -155,8 +165,14 @@ export default function PrintDaySchedule() {
               parent_name: b.parent_name || "",
               parent_phone: b.parent_phone || null,
               notes: b.notes || null,
+              needs_card:
+                needsCardAtDesk({
+                  bookingStatus: b.status,
+                  bookingSource: b.booking_source,
+                }) || !b.stripe_payment_method_id,
             };
           });
+
         setPrivateOccs(mapped);
       }
       setLoading(false);
