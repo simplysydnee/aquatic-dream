@@ -73,6 +73,11 @@ Deno.serve(async (req) => {
       ? body.occurrence_ids
       : null;
     const includeCardOnFile: boolean = body?.include_card_on_file === true;
+    // Optional sentence inserted after the greeting, e.g. "Our attempt to charge
+    // your card on June 9 did not go through."
+    const note: string | null = typeof body?.note === "string" && body.note.trim()
+      ? body.note.trim()
+      : null;
     const today = new Date().toISOString().slice(0, 10);
 
     let query = supabase
