@@ -361,25 +361,38 @@ export default function SlotPicker({ sessionToken, onContinue, onBack, initialSe
         ) : (
           <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
             <p className="text-xs text-muted-foreground mb-1">
-              Each option is a recurring day and time that repeats weekly. Pick one to see all available dates.
+              Each option is a recurring day and time that repeats weekly. Pick a coach to see all available dates.
             </p>
-            {recurringPatterns.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => choosePattern(p)}
-                className="w-full text-left border border-border rounded-lg p-3 hover:border-primary hover:bg-muted/40 transition"
-              >
+            {groupedPatterns.map(([groupKey, group]) => (
+              <div key={groupKey} className="border border-border rounded-lg p-3">
                 <p className="text-sm font-semibold">
-                  {WEEKDAYS_PLURAL[p.dow]} at {formatTime(p.startTime)}
+                  {WEEKDAYS_PLURAL[group[0].dow]} at {formatTime(group[0].startTime)}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {p.instructorName} · {p.slots.length} {p.slots.length === 1 ? "session" : "sessions"} available
-                </p>
-              </button>
+                {group.length > 1 && (
+                  <p className="text-[11px] text-muted-foreground mb-1.5">
+                    {group.length} coaches available at this time
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  {group.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => choosePattern(p)}
+                      className="text-left border border-border rounded-md px-3 py-1.5 hover:border-primary hover:bg-muted/40 transition"
+                    >
+                      <span className="text-xs font-medium block">{p.instructorName}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {p.slots.length} {p.slots.length === 1 ? "session" : "sessions"} available
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )
+
       ) : byDate.length === 0 ? (
         <div className="border border-border rounded-lg p-8 text-center bg-muted/30">
           {slots.length === 0 ? (
