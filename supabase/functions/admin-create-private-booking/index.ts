@@ -14,6 +14,8 @@ import {
   formatAvailabilityError,
   type BookingBlock,
 } from "../_shared/availability.ts";
+import { findReusableCardForEmail } from "../_shared/card-on-file.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
