@@ -34,6 +34,8 @@ import { template as membershipWelcome } from './membership-welcome.tsx'
 import { template as membershipManageLink } from './membership-manage-link.tsx'
 import { template as membershipCancellationConfirmation } from './membership-cancellation-confirmation.tsx'
 import { template as internalMembershipCancellationAlert } from './internal-membership-cancellation-alert.tsx'
+import { template as lessonBillingAudit } from './lesson-billing-audit.tsx'
+
 
 
 
@@ -64,5 +66,7 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'membership-manage-link': membershipManageLink,
   'membership-cancellation-confirmation': membershipCancellationConfirmation,
   'internal-membership-cancellation-alert': internalMembershipCancellationAlert,
+  'lesson-billing-audit': lessonBillingAudit,
+
 }
 

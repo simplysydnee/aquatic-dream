@@ -1,54 +1,38 @@
-## What I found in the database
+## Goal
 
-Checking the flagged names against `lesson_booking_occurrences` (past, non-cancelled, non-test):
+Every morning, email a report of yesterday's private and semi-private lessons showing whether each one was actually paid, verified directly against Stripe, with links into Stripe for each payment. Any lesson not billed is flagged at the top. Runs until the monthly membership switch on Aug 17.
 
-| Family | Lessons in question | Card on file | Current DB state |
-|---|---|---|---|
-| Amanat Pahal | 6/16 | Yes | scheduled, `card_on_file`, uncharged |
-| Cindy Castillo | 6/8, 6/15, 6/22 | No | unpaid |
-| Sierra Perez | 6/15, 6/22, 6/29 | No | unpaid (6/8 already marked paid) |
-| Diego Capistran | 7/13, 7/20 | No | unpaid, `charge_status=skipped` |
-| Ryker (sutton@icanswim209.com) | 5/12, 5/19 | No | test booking |
-| Ryker Lucas | 6/16 | No | already abandoned |
-| Holden Hamby | 5/5 | No | unpaid (5/4 and 5/6 already paid) |
-| Maria Reyes | 7/25 | No | unpaid, $10 row |
-| Remi Hein | 7/2 (two duplicate bookings) | No | one unpaid, one already paid |
+## What the email contains
 
-## Plan
+Subject: `Lesson billing audit — Sat, Jul 25 — 2 unbilled ($100)`
 
-### 1. Stripe invoice audit (read only, reported in chat)
-Query Stripe for all invoices belonging to `cindycastillo9109@gmail.com`, `sierrabperez@gmail.com`, and `dcgiovanny@gmail.com`. For each invoice I will report: amount, created date, status (draft / open / paid / void / uncollectible), whether it was actually sent (finalized and emailed), and the hosted invoice URL.
+Sections:
+1. **Needs attention** (first, only if any) — one row per unpaid/failed lesson: swimmer, parent name + phone, lesson type, time, instructor, amount owed, reason (no card on file / charge failed with Stripe's error / never charged / payment link sent but never completed).
+2. **Paid** — swimmer, amount, how it was paid (card on file charge, payment link, cash/check/comp), and a `Stripe ↗` link to the exact PaymentIntent or Checkout Session, matching the style in your screenshot (method + reference id + link).
+3. **Cancelled / no-charge** — cancelled or comped lessons, listed so nothing looks silently missing.
+4. Totals footer: lessons, collected, outstanding.
 
-Actions based on status:
-- **Draft** — never sent. Finalize and send it.
-- **Open** — sent but unpaid. Re-send the invoice email. No lesson status change.
-- **Paid** — mark the matching lesson occurrences `paid` with the invoice's charge/payment intent as the reference, and attach the card used (see step 2).
-- **Void / none found** — report back so you can decide.
+## How payment is verified
 
-### 2. Save cards from paid invoices
-For any invoice that was paid with a reusable card, attach that `customer` + `payment_method` to that family's `lesson_bookings` rows that currently have no payment method, so future lessons show "card on file" and are chargeable. Existing payment methods are never overwritten.
+For each occurrence dated yesterday (excluding abandoned bookings):
+- If `stripe_payment_intent_id` exists, retrieve it from Stripe and trust Stripe's status, not the database. Report a mismatch explicitly (e.g. "DB says paid, Stripe says requires_payment_method").
+- If `stripe_session_id` exists, retrieve the Checkout Session and check `payment_status`.
+- If neither exists and payment_method is cash/check/comp, treat as paid offline (no Stripe lookup).
+- If neither exists and no offline method, flag as **never billed**.
 
-### 3. Reconcile the resolved items
-Direct data updates:
-- **Amanat Pahal 6/16** — mark cancelled (called out), `charge_status = skipped`, so it drops off the unbilled list.
-- **Ryker** (both records) — mark the bookings and occurrences `abandoned` / test so they disappear from schedules and audits. Rows are not deleted, per the no-delete rule.
-- **Holden Hamby 5/5** — mark paid, `payment_method = cash`.
-- **Maria Reyes 7/25** — mark the occurrence rescheduled/cancelled so it stops showing as owed. Tell me the new date if there is one and I will point it there instead.
-- **Remi Hein 7/2** — void the duplicate unpaid booking (`abandoned`), keep the already-paid row as the real lesson.
+No writes to the database and no charging. This is report-only, as asked.
 
-### 4. One-time batch charge edge function
-New `admin-charge-lesson-occurrences-batch` function, admin-authenticated, modeled on the existing `admin-charge-private-lesson-occurrence`:
-- Accepts an explicit array of occurrence IDs plus `dryRun`.
-- Per occurrence: skips anything already paid or already holding a payment intent, resolves the card (with the existing sibling-card fallback by parent email), prices via `getPrivateLessonPrice`, and creates an off-session PaymentIntent with idempotency key `occ_<id>`.
-- Writes the charge record first, then the paid stamp, exactly like the single-occurrence function.
-- Returns a per-occurrence result table (charged / skipped / failed with reason).
+Stripe links use `https://dashboard.stripe.com/payments/{pi_id}` (or `/checkout/sessions/{cs_id}`), same pattern as the enrollment card in your screenshot.
 
-I will run it in `dryRun` first, show you the list and totals, and only run the real charges after you confirm. Remi Hein's remaining lesson will be included once the duplicate is voided, along with any of the invoiced families that turn out to have a saved card and no paid invoice.
+## Technical details
 
-### 5. Front-end
-No new UI. The existing calendar, print schedule, and billing views read the same statuses, so they update automatically once the rows are reconciled. I will re-run the unbilled audit afterward and give you the clean list.
+- New edge function `send-lesson-billing-audit`, using `createStripeClient("live")` from `_shared/stripe.ts` and pricing from `_shared/private-lesson-pricing.ts` so the $50 Summer Special is reflected in amounts owed.
+- Query `lesson_booking_occurrences` joined to `lesson_bookings` where `occurrence_date = yesterday (America/Los_Angeles)` and lesson type is private or semi-private, filtered through the existing `isRealLessonOccurrence` rules so abandoned carts never appear.
+- New React Email template `lesson-billing-audit.tsx` registered in `transactional-email-templates/registry.ts`, sent via the existing `send-transactional-email` function, one send per recipient, with an idempotency key of `lesson-billing-audit-{date}-{recipient}` so a retry never double-sends.
+- Recipients: `sutton@aquaticdreams.com` and `sydnee@icanswim209.com`.
+- Scheduled with pg_cron at 7:00 AM Pacific daily. If yesterday had zero private/semi-private lessons, no email is sent.
+- Supports a manual `{ date: "2026-07-25" }` body override so you can re-run any past day on demand, plus `dry_run: true` to return the JSON report without emailing.
 
-## Technical notes
-- Stripe calls go through `createStripeClient` in `_shared/stripe.ts` (live env for these).
-- Card lookup reuses `findReusableCardForEmail` from `_shared/card-on-file.ts`.
-- Data corrections use insert/update statements, not migrations; no rows are deleted and no RLS policy changes.
+## Not included
+
+Group session enrollments, any auto-charging, and any database reconciliation — the report only tells you what to act on.
