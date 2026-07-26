@@ -63,6 +63,16 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
     () => openSlots.filter((s) => s.slot_date === dateStr).sort((a, b) => a.start_time.localeCompare(b.start_time) || a.instructor_name.localeCompare(b.instructor_name)),
     [openSlots, dateStr]
   );
+  // Two coaches on the same hour is real availability, not a duplicate row.
+  const slotsByTime = useMemo<[string, OpenPrivateSlot[]][]>(() => {
+    const m = new Map<string, OpenPrivateSlot[]>();
+    for (const s of slots) {
+      if (!m.has(s.start_time)) m.set(s.start_time, []);
+      m.get(s.start_time)!.push(s);
+    }
+    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [slots]);
+
 
   const handleBookSlot = (s?: OpenPrivateSlot) => {
     setPrefill(
