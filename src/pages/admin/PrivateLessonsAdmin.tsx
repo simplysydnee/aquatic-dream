@@ -293,7 +293,6 @@ export default function PrivateLessonsAdmin() {
   // Some admin-created bookings store only instructor_name (instructor_id is null),
   // so we resolve the id via the active instructors list before keying.
   const bookingMap = useMemo(() => {
-    const STALE_PENDING_MS = 30 * 60 * 1000;
     const now = Date.now();
     const nameToId = new Map<string, string>();
     for (const i of instructors) nameToId.set(i.name.trim().toLowerCase(), i.id);
@@ -305,12 +304,13 @@ export default function PrivateLessonsAdmin() {
       if (!b.start_time) continue;
       const baseT = normTime(b.start_time);
       for (const o of (b.lesson_booking_occurrences || [])) {
-        if (o.status === "cancelled") continue;
+        if (o.status === "cancelled" || o.status === "abandoned") continue;
         // Skip stale pending-card holds (abandoned self-serve checkouts) so they
         // don't permanently lock the slot in the grid. Admin-created bookings
         // are NEVER auto-hidden — they stay until an admin cancels them.
-        const isAdminSrc = b.booking_source === "admin" || b.booking_source === "admin_manual";
+        const isAdminSrc = isAdminBookingSource(b.booking_source);
         if (!isAdminSrc && o.status === "pending_card" && o.created_at && (now - new Date(o.created_at).getTime()) > STALE_PENDING_MS) continue;
+
         const instructorId = o.instructor_override_id || baseInstructorId;
         if (!instructorId) continue;
         const t = o.start_time_override ? normTime(o.start_time_override) : baseT;
