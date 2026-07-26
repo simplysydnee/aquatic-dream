@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { CARD_AT_DESK_LABEL } from "@/lib/lessonBookingStatus";
+
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
 import type {
   CalendarSwimSession,
@@ -309,7 +311,7 @@ const CalendarDayView = ({
         end_time: p.end_time,
         pool_area: p.pool_area || "shallow",
         instructor_name: p.instructor_name,
-        notes: p.booking_status === "pending_card" ? "⚠ Card on file pending" : (p.notes || null),
+        notes: p.booking_status === "pending_card" ? `⚠ ${CARD_AT_DESK_LABEL}` : (p.notes || null),
         is_recurring: !!p.recurring,
         __privateLesson: p,
       })) as (CalendarPoolEvent & { __privateLesson?: PrivateLessonBooking })[];

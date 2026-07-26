@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { DEAD_STATUS_FILTER, isRealLessonOccurrence } from "@/lib/lessonBookingStatus";
+
 
 export interface CalendarSwimSession {
   id: string;
@@ -203,7 +205,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .select("id, booking_id, occurrence_date, status, payment_status, charge_status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id, confirmation_email_status, confirmation_email_sent_at, confirmation_email_error, status, booking_source)")
         .gte("occurrence_date", rangeStart)
         .lte("occurrence_date", rangeEnd)
-        .neq("status", "cancelled"),
+        .not("status", "in", DEAD_STATUS_FILTER),
       supabase.rpc("get_public_booking_blocks", { _instructor_ids: null }),
       supabase.rpc("get_active_instructors_public"),
       supabase
@@ -262,20 +264,21 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     }
 
     // ── Map private lesson occurrences ──
-    // Hide stale pending_card rows (abandoned self-serve checkouts > 30 min old)
-    // so they don't appear as real bookings on the calendar.
-    // Admin-created bookings are NEVER hidden — admin manually placed the slot
-    // and it must stay visible until they explicitly cancel it.
-    const STALE_PENDING_MS = 30 * 60 * 1000;
+    // Abandoned self-serve checkouts never count as real bookings.
+    // Admin-created bookings are NEVER hidden — admin placed the slot on purpose
+    // and simply needs to collect a card at the front desk.
     const _now = Date.now();
     const privates: PrivateLessonBooking[] = ((privateOccRes.data as any[]) || [])
-      .filter((o) => {
-        if (o.status !== "pending_card") return true;
-        const src = o.lesson_bookings?.booking_source;
-        if (src === "admin" || src === "admin_manual") return true;
-        const created = o.created_at ? new Date(o.created_at).getTime() : 0;
-        return (_now - created) <= STALE_PENDING_MS;
-      })
+      .filter((o) =>
+        isRealLessonOccurrence({
+          occurrenceStatus: o.status,
+          bookingStatus: o.lesson_bookings?.status,
+          bookingSource: o.lesson_bookings?.booking_source,
+          createdAt: o.created_at,
+          now: _now,
+        })
+      )
+
       .map((o) => {
       const b = o.lesson_bookings;
       const effInstructorId = o.instructor_override_id || b?.instructor_id || null;

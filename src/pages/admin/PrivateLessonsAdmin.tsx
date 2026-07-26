@@ -23,6 +23,13 @@ import { getPrivateLessonPrice, isPromoDate, PRIVATE_PROMO_PRICE, PRIVATE_REGULA
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
 import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
 import ChargeConfirmDialog from "@/components/admin/calendar/ChargeConfirmDialog";
+import {
+  CARD_AT_DESK_LABEL,
+  DEAD_STATUS_FILTER,
+  STALE_PENDING_MS,
+  isAdminBookingSource,
+} from "@/lib/lessonBookingStatus";
+
 
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -123,6 +130,7 @@ export default function PrivateLessonsAdmin() {
         .select("*, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
 
         .in("lesson_type", ["private", "semi_private"])
+        .not("status", "in", DEAD_STATUS_FILTER)
         .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(200),
       supabase.from("lesson_bookings")
@@ -130,7 +138,8 @@ export default function PrivateLessonsAdmin() {
         .in("lesson_type", ["private", "semi_private"])
         // Include pending_card so the slot grid marks the time as taken
         // while we wait for the parent to save their card.
-        .neq("status", "cancelled"),
+        .not("status", "in", DEAD_STATUS_FILTER),
+
     ]);
     setInstructors((ins as any[]) || []);
     setBlocks((bks as any[]) || []);
@@ -284,7 +293,6 @@ export default function PrivateLessonsAdmin() {
   // Some admin-created bookings store only instructor_name (instructor_id is null),
   // so we resolve the id via the active instructors list before keying.
   const bookingMap = useMemo(() => {
-    const STALE_PENDING_MS = 30 * 60 * 1000;
     const now = Date.now();
     const nameToId = new Map<string, string>();
     for (const i of instructors) nameToId.set(i.name.trim().toLowerCase(), i.id);
@@ -296,12 +304,13 @@ export default function PrivateLessonsAdmin() {
       if (!b.start_time) continue;
       const baseT = normTime(b.start_time);
       for (const o of (b.lesson_booking_occurrences || [])) {
-        if (o.status === "cancelled") continue;
+        if (o.status === "cancelled" || o.status === "abandoned") continue;
         // Skip stale pending-card holds (abandoned self-serve checkouts) so they
         // don't permanently lock the slot in the grid. Admin-created bookings
         // are NEVER auto-hidden — they stay until an admin cancels them.
-        const isAdminSrc = b.booking_source === "admin" || b.booking_source === "admin_manual";
+        const isAdminSrc = isAdminBookingSource(b.booking_source);
         if (!isAdminSrc && o.status === "pending_card" && o.created_at && (now - new Date(o.created_at).getTime()) > STALE_PENDING_MS) continue;
+
         const instructorId = o.instructor_override_id || baseInstructorId;
         if (!instructorId) continue;
         const t = o.start_time_override ? normTime(o.start_time_override) : baseT;
@@ -837,7 +846,7 @@ export default function PrivateLessonsAdmin() {
                                       ) : s.booking ? (
                                         <div className="flex flex-col items-end gap-0.5">
                                           {s.booking.status === "pending_card" ? (
-                                            <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300" title="Parent has not saved a card on file yet">⚠ Pending card</Badge>
+                                            <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300" title="Booked lesson. Collect and save the card at the front desk.">⚠ {CARD_AT_DESK_LABEL}</Badge>
                                           ) : (
                                             <Badge variant="default" className="text-[10px]">
                                               {s.booking.lesson_type === "semi_private" ? "Semi" : "Private"}
@@ -846,9 +855,10 @@ export default function PrivateLessonsAdmin() {
                                           <span className="text-[11px] font-medium truncate max-w-[140px]">{s.booking.child_name}</span>
                                           <span className="text-[10px] text-muted-foreground capitalize">
                                             {s.booking.status === "pending_card"
-                                              ? "Awaiting card on file"
+                                              ? "Booked · collect card"
                                               : (s.booking.charge_status === "succeeded" ? "paid" : (s.booking.payment_status || "unpaid"))}
                                           </span>
+
                                         </div>
                                       ) : (
                                         <Badge variant="outline" className="text-[10px]">Open · {s.defaultLessonType === "semi_private" ? "Semi" : "Private"}</Badge>

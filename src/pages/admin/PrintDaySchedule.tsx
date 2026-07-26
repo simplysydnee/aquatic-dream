@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
+import {
+  CARD_AT_DESK_LABEL,
+  DEAD_STATUS_FILTER,
+  isRealLessonOccurrence,
+  needsCardAtDesk,
+} from "@/lib/lessonBookingStatus";
 import { format } from "date-fns";
+
 
 interface Session {
   id: string;
@@ -62,7 +69,9 @@ interface PrivateOccurrence {
   parent_name: string;
   parent_phone: string | null;
   notes: string | null;
+  needs_card: boolean;
 }
+
 
 function fmtTime(t: string) {
   const [h, m] = t.split(":");
@@ -119,17 +128,28 @@ export default function PrintDaySchedule() {
           .eq("lesson_date", date),
         supabase
           .from("lesson_booking_occurrences")
-          .select("id, status, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_phone, child_name, child_age, start_time, end_time, pool_area, notes, status)")
+          .select("id, status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_phone, child_name, child_age, start_time, end_time, pool_area, notes, status, booking_source, stripe_payment_method_id)")
           .eq("occurrence_date", date)
-          .neq("status", "cancelled"),
+          .not("status", "in", DEAD_STATUS_FILTER),
+
       ]);
       if (s.data) setSessions(s.data as Session[]);
       if (e.data) setEnrollments(e.data as Enrollment[]);
       if (a.data) setAgreements(a.data as Agreement[]);
       if (ld.data) setLessonDates(ld.data as any);
       if (po.data) {
+        const now = Date.now();
         const mapped: PrivateOccurrence[] = (po.data as any[])
-          .filter((o) => o.lesson_bookings && o.lesson_bookings.status !== "cancelled")
+          .filter((o) =>
+            o.lesson_bookings &&
+            isRealLessonOccurrence({
+              occurrenceStatus: o.status,
+              bookingStatus: o.lesson_bookings.status,
+              bookingSource: o.lesson_bookings.booking_source,
+              createdAt: o.created_at,
+              now,
+            })
+          )
           .map((o) => {
             const b = o.lesson_bookings;
             return {
@@ -145,8 +165,14 @@ export default function PrintDaySchedule() {
               parent_name: b.parent_name || "",
               parent_phone: b.parent_phone || null,
               notes: b.notes || null,
+              needs_card:
+                needsCardAtDesk({
+                  bookingStatus: b.status,
+                  bookingSource: b.booking_source,
+                }) || !b.stripe_payment_method_id,
             };
           });
+
         setPrivateOccs(mapped);
       }
       setLoading(false);
@@ -479,7 +505,15 @@ export default function PrintDaySchedule() {
                           <div style={{ color: "#555" }}>{p.parent_phone || "—"}</div>
                         </td>
                         <td><span style={{ color: "#aaa" }}>—</span></td>
-                        <td>{p.notes || "—"}</td>
+                        <td>
+                          {p.needs_card && (
+                            <div style={{ fontWeight: 700, color: "#92400e" }}>
+                              ⚠ {CARD_AT_DESK_LABEL}
+                            </div>
+                          )}
+                          {p.notes || (p.needs_card ? "" : "—")}
+                        </td>
+
                       </tr>,
                     ];
                   })}
