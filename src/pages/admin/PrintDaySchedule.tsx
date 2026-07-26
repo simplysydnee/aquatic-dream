@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { LEVEL_DISPLAY, type SwimLevel } from "@/components/swim-enrollment/types";
+import {
+  CARD_AT_DESK_LABEL,
+  DEAD_STATUS_FILTER,
+  isRealLessonOccurrence,
+  needsCardAtDesk,
+} from "@/lib/lessonBookingStatus";
 import { format } from "date-fns";
+
 
 interface Session {
   id: string;
