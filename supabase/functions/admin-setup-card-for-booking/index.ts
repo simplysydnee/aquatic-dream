@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
 
     const { data: booking, error: bErr } = await supabaseAdmin
       .from("lesson_bookings")
-      .select("id, parent_name, parent_email, parent_phone, stripe_customer_id, stripe_payment_method_id")
+      .select("id, status, parent_name, parent_email, parent_phone, stripe_customer_id, stripe_payment_method_id")
       .eq("id", body.booking_id)
       .maybeSingle();
     if (bErr || !booking) return j({ error: "Booking not found" }, 404);
