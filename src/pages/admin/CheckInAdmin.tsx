@@ -110,7 +110,7 @@ const CheckInAdmin = () => {
         .from("lesson_booking_occurrences")
         .select("id, occurrence_date, status, checked_in_at, lesson_bookings!inner(id, lesson_type, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, status)")
         .eq("occurrence_date", dateStr)
-        .not("status", "in", "(cancelled,pending_card)") as any,
+        .not("status", "in", "(cancelled,abandoned)") as any,
     ]);
 
     const sessions = (sessionsRes.data || []) as any[];
