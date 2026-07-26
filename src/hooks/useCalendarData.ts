@@ -205,7 +205,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .select("id, booking_id, occurrence_date, status, payment_status, charge_status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id, confirmation_email_status, confirmation_email_sent_at, confirmation_email_error, status, booking_source)")
         .gte("occurrence_date", rangeStart)
         .lte("occurrence_date", rangeEnd)
-        .neq("status", "cancelled"),
+        .not("status", "in", DEAD_STATUS_FILTER),
       supabase.rpc("get_public_booking_blocks", { _instructor_ids: null }),
       supabase.rpc("get_active_instructors_public"),
       supabase
