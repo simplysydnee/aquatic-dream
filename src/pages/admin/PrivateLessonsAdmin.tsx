@@ -846,7 +846,7 @@ export default function PrivateLessonsAdmin() {
                                       ) : s.booking ? (
                                         <div className="flex flex-col items-end gap-0.5">
                                           {s.booking.status === "pending_card" ? (
-                                            <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300" title="Parent has not saved a card on file yet">⚠ Pending card</Badge>
+                                            <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300" title="Booked lesson. Collect and save the card at the front desk.">⚠ {CARD_AT_DESK_LABEL}</Badge>
                                           ) : (
                                             <Badge variant="default" className="text-[10px]">
                                               {s.booking.lesson_type === "semi_private" ? "Semi" : "Private"}
@@ -855,9 +855,10 @@ export default function PrivateLessonsAdmin() {
                                           <span className="text-[11px] font-medium truncate max-w-[140px]">{s.booking.child_name}</span>
                                           <span className="text-[10px] text-muted-foreground capitalize">
                                             {s.booking.status === "pending_card"
-                                              ? "Awaiting card on file"
+                                              ? "Booked · collect card"
                                               : (s.booking.charge_status === "succeeded" ? "paid" : (s.booking.payment_status || "unpaid"))}
                                           </span>
+
                                         </div>
                                       ) : (
                                         <Badge variant="outline" className="text-[10px]">Open · {s.defaultLessonType === "semi_private" ? "Semi" : "Private"}</Badge>
