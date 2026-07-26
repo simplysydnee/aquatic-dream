@@ -555,6 +555,62 @@ async function handleLessonBookingPaid(checkoutSession: any) {
   }
 }
 
+// Payment Link covering several past lesson occurrences for one family.
+// Marks each occurrence paid and saves the card for future off-session charges.
+async function handleLessonOccurrenceMultiPaid(checkoutSession: any, env: StripeEnv) {
+  const ids = String(checkoutSession.metadata?.occurrenceIds || "")
+    .split(",")
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+  if (!ids.length) {
+    console.warn("lesson_occurrence_multi callback missing occurrenceIds");
+    return;
+  }
+  if (checkoutSession.payment_status !== "paid" || !checkoutSession.payment_intent) {
+    console.warn("lesson_occurrence_multi webhook ignored — not paid or missing PI");
+    return;
+  }
+  const stripeId = checkoutSession.payment_intent;
+  const { error } = await supabase
+    .from("lesson_booking_occurrences")
+    .update({
+      payment_status: "paid",
+      stripe_session_id: stripeId,
+      payment_method: "stripe",
+      payment_reference: stripeId,
+      paid_at: new Date().toISOString(),
+    })
+    .in("id", ids);
+  if (error) {
+    console.error("Failed to mark multi lesson occurrences paid:", ids, error);
+  } else {
+    console.log(`lesson_occurrence_multi marked paid (${ids.length})`);
+  }
+
+  // Save the card on the family's booking so future lessons can be charged.
+  const bookingId = checkoutSession.metadata?.bookingId;
+  if (!bookingId) return;
+  try {
+    const stripe = createStripeClient(env);
+    const pi = await stripe.paymentIntents.retrieve(stripeId);
+    const customerId = typeof pi.customer === "string" ? pi.customer : pi.customer?.id;
+    const pmId = typeof pi.payment_method === "string" ? pi.payment_method : pi.payment_method?.id;
+    if (customerId && pmId) {
+      await supabase
+        .from("lesson_bookings")
+        .update({
+          stripe_customer_id: customerId,
+          stripe_payment_method_id: pmId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", bookingId);
+      console.log("Saved card on file from multi payment link for booking:", bookingId);
+    }
+  } catch (e) {
+    console.error("Failed to save card from multi payment link:", e instanceof Error ? e.message : String(e));
+  }
+}
+
 async function handleLessonSeriesPaid(checkoutSession: any) {
   const bookingId = checkoutSession.metadata?.bookingId;
   if (!bookingId) {
