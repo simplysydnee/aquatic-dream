@@ -69,7 +69,9 @@ interface PrivateOccurrence {
   parent_name: string;
   parent_phone: string | null;
   notes: string | null;
+  needs_card: boolean;
 }
+
 
 function fmtTime(t: string) {
   const [h, m] = t.split(":");
