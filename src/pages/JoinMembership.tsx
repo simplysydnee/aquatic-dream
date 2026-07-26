@@ -462,7 +462,7 @@ export default function JoinMembership() {
                               ? "Kids group class · group sizes no more than 3 · we'll match your swimmer to the right level"
                               : p.plan_key === "private"
                               ? "One-on-one coaching"
-                              : "Adult group class"}
+                              : "Adult group class · 2 adults max per group"}
                           </div>
                         </div>
                         <div className="text-lg font-bold text-[#F58B76]">
