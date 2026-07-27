@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DEAD_STATUSES, DEAD_STATUS_FILTER } from "@/lib/lessonBookingStatus";
 
 interface Props {
   open: boolean;
