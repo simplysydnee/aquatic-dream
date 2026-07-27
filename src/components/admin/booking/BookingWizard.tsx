@@ -1855,7 +1855,7 @@ function ReviewStep({
           notes: draft.notes || null,
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(await invokeErrorMessage(error, "Failed to create enrollment"));
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success("Group enrollment created");
       onDone?.();
