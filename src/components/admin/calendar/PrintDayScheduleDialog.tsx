@@ -94,7 +94,7 @@ export default function PrintDayScheduleDialog({ open, onOpenChange, defaultDate
       }
       for (const o of (occRes.data || []) as any[]) {
         const b = o.lesson_bookings;
-        if (b && b.status === "cancelled") continue;
+        if (b && DEAD_STATUSES.includes(b.status)) continue;
         const iid = o.instructor_override_id || b?.instructor_id;
         if (iid) ids.add(iid);
       }
