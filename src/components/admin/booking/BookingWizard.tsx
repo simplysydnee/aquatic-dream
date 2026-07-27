@@ -1354,9 +1354,9 @@ function OneTimeChooser({
   const [showCustom, setShowCustom] = useState(false);
 
   // Load slots directly from booking blocks (same source as RecurringChooser),
-  // expand across the 7 date chips ignoring start_date/end_date so admins see
-  // every weekday-matching slot, then subtract real conflicts only (existing
-  // occurrences + active slot holds for those dates).
+  // expand across the 7 date chips (honoring each block's start_date/end_date so
+  // the picker matches the server availability guard), then subtract real
+  // conflicts only (existing occurrences + active slot holds for those dates).
   useEffect(() => {
     let cancelled = false;
     (async () => {
