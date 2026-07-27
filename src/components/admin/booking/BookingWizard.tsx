@@ -1260,7 +1260,7 @@ function RecurringSlotChooser({
               </p>
               <p className="text-xs text-muted-foreground">{slot.instructorName} · {slot.poolArea}</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => onChange({ ...slot, blockId: undefined, selectedDates: [] })}>Change</Button>
+            <Button variant="ghost" size="sm" onClick={() => onChange({ ...slot, blockId: undefined, blockStartDate: undefined, blockEndDate: undefined, selectedDates: [] })}>Change</Button>
           </div>
 
           <div className="flex items-center gap-3">
