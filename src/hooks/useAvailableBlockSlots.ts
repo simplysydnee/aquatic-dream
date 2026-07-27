@@ -61,7 +61,7 @@ export function useAvailableBlockSlots(
           .from("lesson_booking_occurrences")
           .select("occurrence_date, status, start_time_override, end_time_override, instructor_override_id, lesson_bookings!inner(instructor_id, start_time, end_time)")
           .eq("occurrence_date", dateStr)
-          .neq("status", "cancelled"),
+          .not("status", "in", DEAD_STATUS_FILTER),
         supabase
           .from("pool_events")
           .select("start_time, end_time, pool_area")
