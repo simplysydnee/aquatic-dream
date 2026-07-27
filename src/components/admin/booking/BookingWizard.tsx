@@ -1268,7 +1268,7 @@ function RecurringSlotChooser({
             <Select value={String(seriesWeeks)} onValueChange={(v) => {
               const n = Number(v);
               setSeriesWeeks(n);
-              const dates = generateRecurringDates(slot.weekday!, n, null, null);
+              const dates = generateRecurringDates(slot.weekday!, n, slot.blockStartDate ?? null, slot.blockEndDate ?? null);
               onChange({ ...slot, selectedDates: dates });
             }}>
               <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
