@@ -1166,6 +1166,8 @@ function RecurringSlotChooser({
     onChange({
       mode: "recurring",
       blockId: b.id,
+      blockStartDate: b.start_date,
+      blockEndDate: b.end_date,
       instructorId: b.instructor_id,
       instructorName: b.instructor_name,
       weekday: b.day_of_week,
