@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DEAD_STATUSES, DEAD_STATUS_FILTER } from "@/lib/lessonBookingStatus";
 
 interface Props {
   open: boolean;
@@ -71,7 +72,7 @@ export default function PrintDayScheduleDialog({ open, onOpenChange, defaultDate
           .from("lesson_booking_occurrences")
           .select("status, instructor_override_id, lesson_bookings!inner(instructor_id, status)")
           .eq("occurrence_date", date)
-          .neq("status", "cancelled"),
+          .not("status", "in", DEAD_STATUS_FILTER),
       ]);
 
       if (cancelled) return;
@@ -93,7 +94,7 @@ export default function PrintDayScheduleDialog({ open, onOpenChange, defaultDate
       }
       for (const o of (occRes.data || []) as any[]) {
         const b = o.lesson_bookings;
-        if (b && b.status === "cancelled") continue;
+        if (b && DEAD_STATUSES.includes(b.status)) continue;
         const iid = o.instructor_override_id || b?.instructor_id;
         if (iid) ids.add(iid);
       }

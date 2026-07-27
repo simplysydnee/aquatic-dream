@@ -22,6 +22,27 @@ import { getPrivateLessonPrice, isPromoDate, PROMO_LABEL } from "@/lib/privateLe
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { LEVEL_DISPLAY } from "@/components/swim-enrollment/types";
+import { DEAD_STATUS_FILTER } from "@/lib/lessonBookingStatus";
+
+/**
+ * supabase.functions.invoke throws/returns a generic FunctionsHttpError whose
+ * message is always "Edge Function returned a non-2xx status code". The real
+ * reason lives in the JSON body, so pull it out when we can.
+ */
+async function invokeErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const ctx = (error as { context?: Response })?.context;
+  if (ctx && typeof (ctx as Response).json === "function") {
+    try {
+      const body = await (ctx as Response).clone().json();
+      const msg = (body as { error?: unknown })?.error;
+      if (typeof msg === "string" && msg.trim()) return msg;
+    } catch {
+      // Non-JSON body (e.g. a gateway 502) — fall through.
+    }
+  }
+  const msg = (error as { message?: string })?.message;
+  return msg || fallback;
+}
 
 // ────────────────────────────────────────────────────────────────────────
 // Types
@@ -97,6 +118,10 @@ interface SlotDraft {
   poolArea?: string;
   // recurring expansion
   blockId?: string;
+  // Availability window of the selected block, so every recurring date
+  // generation honors the same bounds the server validates against.
+  blockStartDate?: string | null;
+  blockEndDate?: string | null;
   weekday?: number;
   selectedDates?: string[]; // kept dates
   // group
@@ -365,6 +390,7 @@ function ClientStep({ client, onChange }: { client: ClientDraft; onChange: (c: C
       const [b, e, r] = await Promise.all([
         supabase.from("lesson_bookings")
           .select("parent_first_name,parent_last_name,parent_name,parent_email,parent_phone,child_first_name,child_last_name,child_name,child_dob,updated_at,stripe_payment_method_id")
+          .not("status", "in", DEAD_STATUS_FILTER)
           .or(`parent_email.ilike.${like},parent_first_name.ilike.${like},parent_last_name.ilike.${like},parent_name.ilike.${like},child_first_name.ilike.${like},child_last_name.ilike.${like},child_name.ilike.${like},parent_phone.ilike.${like}`)
           .order("updated_at", { ascending: false })
           .limit(20),
@@ -1140,6 +1166,8 @@ function RecurringSlotChooser({
     onChange({
       mode: "recurring",
       blockId: b.id,
+      blockStartDate: b.start_date,
+      blockEndDate: b.end_date,
       instructorId: b.instructor_id,
       instructorName: b.instructor_name,
       weekday: b.day_of_week,
@@ -1232,7 +1260,7 @@ function RecurringSlotChooser({
               </p>
               <p className="text-xs text-muted-foreground">{slot.instructorName} · {slot.poolArea}</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => onChange({ ...slot, blockId: undefined, selectedDates: [] })}>Change</Button>
+            <Button variant="ghost" size="sm" onClick={() => onChange({ ...slot, blockId: undefined, blockStartDate: undefined, blockEndDate: undefined, selectedDates: [] })}>Change</Button>
           </div>
 
           <div className="flex items-center gap-3">
@@ -1240,7 +1268,7 @@ function RecurringSlotChooser({
             <Select value={String(seriesWeeks)} onValueChange={(v) => {
               const n = Number(v);
               setSeriesWeeks(n);
-              const dates = generateRecurringDates(slot.weekday!, n, null, null);
+              const dates = generateRecurringDates(slot.weekday!, n, slot.blockStartDate ?? null, slot.blockEndDate ?? null);
               onChange({ ...slot, selectedDates: dates });
             }}>
               <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -1255,7 +1283,7 @@ function RecurringSlotChooser({
             {(slot.selectedDates || []).length === 0 && (
               <p className="col-span-full text-sm text-muted-foreground text-center py-4">No dates — increase the series window.</p>
             )}
-            {generateRecurringDates(slot.weekday!, seriesWeeks, null, null).map((d) => {
+            {generateRecurringDates(slot.weekday!, seriesWeeks, slot.blockStartDate ?? null, slot.blockEndDate ?? null).map((d) => {
               const on = (slot.selectedDates || []).includes(d);
               return (
                 <label key={d} className={cn(
@@ -1326,9 +1354,9 @@ function OneTimeChooser({
   const [showCustom, setShowCustom] = useState(false);
 
   // Load slots directly from booking blocks (same source as RecurringChooser),
-  // expand across the 7 date chips ignoring start_date/end_date so admins see
-  // every weekday-matching slot, then subtract real conflicts only (existing
-  // occurrences + active slot holds for those dates).
+  // expand across the 7 date chips (honoring each block's start_date/end_date so
+  // the picker matches the server availability guard), then subtract real
+  // conflicts only (existing occurrences + active slot holds for those dates).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -1348,7 +1376,7 @@ function OneTimeChooser({
             )
             .gte("occurrence_date", firstDate)
             .lte("occurrence_date", lastDate)
-            .neq("status", "cancelled"),
+            .not("status", "in", DEAD_STATUS_FILTER),
           supabase
             .from("slot_holds")
             .select("instructor_id,slot_date,start_time,end_time,held_until")
@@ -1396,8 +1424,10 @@ function OneTimeChooser({
           for (const b of raw) {
             if (b.is_blackout) continue;
             if (b.day_of_week == null || b.day_of_week !== dow) continue;
-            // NOTE: intentionally NOT filtering by b.start_date / b.end_date —
-            // admin one-time view shows all weekday-matching slots.
+            // Honor the block's availability window — the server rejects
+            // occurrences outside it (422 instructor_unavailable).
+            if (b.start_date && dateStr < b.start_date) continue;
+            if (b.end_date && dateStr > b.end_date) continue;
             let t = normTime(b.start_time);
             const end = normTime(b.end_time);
             const brkS = b.break_start_time ? normTime(b.break_start_time) : null;
@@ -1825,7 +1855,7 @@ function ReviewStep({
           notes: draft.notes || null,
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(await invokeErrorMessage(error, "Failed to create enrollment"));
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success("Group enrollment created");
       onDone?.();
@@ -1885,7 +1915,7 @@ function ReviewStep({
         body.partner_parent_phone = sw2.partner_parent_phone || null;
       }
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking", { body });
-      if (error) throw error;
+      if (error) throw new Error(await invokeErrorMessage(error, "Failed to create booking"));
       if ((data as any)?.error) throw new Error((data as any).error);
       const used = (data as any)?.card_on_file_source;
       const occ = (data as any)?.occurrences ?? occurrenceDates.length;
@@ -1925,7 +1955,7 @@ function ReviewStep({
           parent_phone: draft.client.parent_phone || null,
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(await invokeErrorMessage(error, "Could not start card setup"));
       if ((data as any)?.error) throw new Error((data as any).error);
       setSetupClientSecret((data as any).client_secret);
       setCheckoutSessionId((data as any).checkout_session_id);

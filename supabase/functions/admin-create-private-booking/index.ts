@@ -354,16 +354,23 @@ Deno.serve(async (req) => {
       const endT = p.end_time.slice(0, 5);
       const { data: existing } = await supabaseAdmin
         .from("lesson_booking_occurrences")
-        .select("occurrence_date, status, created_at, start_time_override, end_time_override, instructor_override_id, lesson_bookings!inner(instructor_id, start_time, end_time)")
+        .select("occurrence_date, status, created_at, start_time_override, end_time_override, instructor_override_id, lesson_bookings!inner(instructor_id, start_time, end_time, status, booking_source)")
         .in("occurrence_date", dates)
-        .neq("status", "cancelled");
-      const STALE_MS = 30 * 60 * 1000;
+        .not("status", "in", "(cancelled,abandoned)");
+      // Keep in sync with STALE_PENDING_MS in src/lib/lessonBookingStatus.ts.
+      const STALE_MS = 15 * 60 * 1000;
       const nowMs = Date.now();
       const conflicts: string[] = [];
       for (const d of dates) {
         for (const row of (existing as any[]) || []) {
           if (row.occurrence_date !== d) continue;
-          if (row.status === "pending_card" && row.created_at && (nowMs - new Date(row.created_at).getTime()) > STALE_MS) continue;
+          if (["cancelled", "abandoned"].includes(row.lesson_bookings?.status)) continue;
+          const isAdminHold = row.lesson_bookings?.booking_source === "admin"
+            || row.lesson_bookings?.booking_source === "admin_manual";
+          if (
+            row.status === "pending_card" && !isAdminHold && row.created_at &&
+            (nowMs - new Date(row.created_at).getTime()) > STALE_MS
+          ) continue;
           const lb = row.lesson_bookings;
           const instId = row.instructor_override_id || lb?.instructor_id;
           if (instId !== p.instructor_id) continue;
