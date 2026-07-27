@@ -1283,7 +1283,7 @@ function RecurringSlotChooser({
             {(slot.selectedDates || []).length === 0 && (
               <p className="col-span-full text-sm text-muted-foreground text-center py-4">No dates — increase the series window.</p>
             )}
-            {generateRecurringDates(slot.weekday!, seriesWeeks, null, null).map((d) => {
+            {generateRecurringDates(slot.weekday!, seriesWeeks, slot.blockStartDate ?? null, slot.blockEndDate ?? null).map((d) => {
               const on = (slot.selectedDates || []).includes(d);
               return (
                 <label key={d} className={cn(
