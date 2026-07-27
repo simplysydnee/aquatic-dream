@@ -71,7 +71,7 @@ export default function PrintDayScheduleDialog({ open, onOpenChange, defaultDate
           .from("lesson_booking_occurrences")
           .select("status, instructor_override_id, lesson_bookings!inner(instructor_id, status)")
           .eq("occurrence_date", date)
-          .neq("status", "cancelled"),
+          .not("status", "in", DEAD_STATUS_FILTER),
       ]);
 
       if (cancelled) return;
