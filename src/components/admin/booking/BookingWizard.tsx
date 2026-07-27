@@ -118,6 +118,10 @@ interface SlotDraft {
   poolArea?: string;
   // recurring expansion
   blockId?: string;
+  // Availability window of the selected block, so every recurring date
+  // generation honors the same bounds the server validates against.
+  blockStartDate?: string | null;
+  blockEndDate?: string | null;
   weekday?: number;
   selectedDates?: string[]; // kept dates
   // group
