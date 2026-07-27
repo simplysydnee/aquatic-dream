@@ -22,7 +22,7 @@ import { getPrivateLessonPrice, isPromoDate, PROMO_LABEL } from "@/lib/privateLe
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { LEVEL_DISPLAY } from "@/components/swim-enrollment/types";
-import { DEAD_STATUSES, DEAD_STATUS_FILTER } from "@/lib/lessonBookingStatus";
+import { DEAD_STATUS_FILTER } from "@/lib/lessonBookingStatus";
 
 /**
  * supabase.functions.invoke throws/returns a generic FunctionsHttpError whose
