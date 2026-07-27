@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { DEAD_STATUS_FILTER } from "@/lib/lessonBookingStatus";
 
 export interface BlockSlot {
   instructorId: string;
