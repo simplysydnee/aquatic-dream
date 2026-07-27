@@ -1376,7 +1376,7 @@ function OneTimeChooser({
             )
             .gte("occurrence_date", firstDate)
             .lte("occurrence_date", lastDate)
-            .neq("status", "cancelled"),
+            .not("status", "in", DEAD_STATUS_FILTER),
           supabase
             .from("slot_holds")
             .select("instructor_id,slot_date,start_time,end_time,held_until")
