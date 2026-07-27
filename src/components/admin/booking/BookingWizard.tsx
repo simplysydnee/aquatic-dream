@@ -1424,8 +1424,10 @@ function OneTimeChooser({
           for (const b of raw) {
             if (b.is_blackout) continue;
             if (b.day_of_week == null || b.day_of_week !== dow) continue;
-            // NOTE: intentionally NOT filtering by b.start_date / b.end_date —
-            // admin one-time view shows all weekday-matching slots.
+            // Honor the block's availability window — the server rejects
+            // occurrences outside it (422 instructor_unavailable).
+            if (b.start_date && dateStr < b.start_date) continue;
+            if (b.end_date && dateStr > b.end_date) continue;
             let t = normTime(b.start_time);
             const end = normTime(b.end_time);
             const brkS = b.break_start_time ? normTime(b.break_start_time) : null;
