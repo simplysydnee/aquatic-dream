@@ -1955,7 +1955,7 @@ function ReviewStep({
           parent_phone: draft.client.parent_phone || null,
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(await invokeErrorMessage(error, "Could not start card setup"));
       if ((data as any)?.error) throw new Error((data as any).error);
       setSetupClientSecret((data as any).client_secret);
       setCheckoutSessionId((data as any).checkout_session_id);
