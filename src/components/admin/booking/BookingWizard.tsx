@@ -1915,7 +1915,7 @@ function ReviewStep({
         body.partner_parent_phone = sw2.partner_parent_phone || null;
       }
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking", { body });
-      if (error) throw error;
+      if (error) throw new Error(await invokeErrorMessage(error, "Failed to create booking"));
       if ((data as any)?.error) throw new Error((data as any).error);
       const used = (data as any)?.card_on_file_source;
       const occ = (data as any)?.occurrences ?? occurrenceDates.length;
