@@ -100,6 +100,7 @@ const CalendarAdmin = () => {
     icsSessions,
     lessonDates,
     privateLessons,
+    membershipLessons,
     openPrivateSlots,
     enrollmentDateMoves,
     loading,
