@@ -353,19 +353,49 @@ const CheckInAdmin = () => {
     );
   };
 
+  // Attendance record only — nothing bills off these columns.
+  const setMembershipAttendance = async (row: Row, checkedIn: boolean) => {
+    setBusyId(row.id);
+    const { error } = await (supabase
+      .from("membership_occurrences") as any)
+      .update({
+        checked_in_at: checkedIn ? new Date().toISOString() : null,
+        checked_in_by: checkedIn ? checkedInBy : null,
+      })
+      .eq("id", row.id);
+    setBusyId(null);
+    if (error) {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setSlots((prev) =>
+      prev.map((g) => ({
+        ...g,
+        rows: g.rows.map((r) =>
+          r.id === row.id
+            ? { ...r, checked_in: checkedIn, checked_in_at: checkedIn ? new Date().toISOString() : null }
+            : r
+        ),
+      }))
+    );
+  };
+
   const handleCheckInClick = (row: Row) => {
     if (!row.has_waiver) {
       setWaiverPrompt(row);
       return;
     }
     if (row.kind === "group") setGroupAttendance(row, { checked_in: true, notes: null });
+    else if (row.kind === "membership") setMembershipAttendance(row, true);
     else setPrivateAttendance(row, true);
   };
 
   const handleUndo = (row: Row) => {
     if (row.kind === "group") setGroupAttendance(row, { checked_in: false, notes: null });
+    else if (row.kind === "membership") setMembershipAttendance(row, false);
     else setPrivateAttendance(row, false);
   };
+
 
   const emailWaiverLink = async (row: Row) => {
     if (row.kind !== "group") {
