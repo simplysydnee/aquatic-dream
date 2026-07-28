@@ -525,7 +525,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
 
   return {
     swimSessions, enrollments, poolEvents, attendance, agreements,
-    icsSessions, lessonDates, privateLessons, openPrivateSlots, enrollmentDateMoves,
+    icsSessions, lessonDates, privateLessons, membershipLessons, openPrivateSlots, enrollmentDateMoves,
     loading, refetch: fetchData,
   };
 }
