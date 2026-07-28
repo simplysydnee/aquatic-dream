@@ -2181,6 +2181,34 @@ function ReviewStep({
           : "Continue to card on file"}
       </Button>
 
+      <AlertDialog open={!!unavailablePrompt} onOpenChange={(o) => { if (!o) setUnavailablePrompt(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {unavailablePrompt?.blackout ? "Instructor marked unavailable" : "Outside instructor availability"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {unavailablePrompt?.message}
+              {". "}
+              {unavailablePrompt?.blackout
+                ? "This instructor blocked off that time, so please confirm with them before booking over it."
+                : "There is no availability window covering that time, which usually means the schedule expired or was never set."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const retry = unavailablePrompt?.retry;
+                setUnavailablePrompt(null);
+                retry?.();
+              }}
+            >
+              Book anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
