@@ -240,6 +240,7 @@ async function ensureMembershipRecord(options: {
     .insert({
       plan_key: asString(options.payload.plan_key),
       standing_slot_id: asString(options.payload.standing_slot_id),
+      swim_level: asNullableString(options.payload.swim_level),
       child_first_name: asNullableString(options.payload.child_first_name),
       child_last_name: asNullableString(options.payload.child_last_name),
       child_dob: asNullableString(options.payload.child_dob),
