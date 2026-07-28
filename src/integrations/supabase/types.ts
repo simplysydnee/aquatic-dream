@@ -1611,6 +1611,7 @@ export type Database = {
           status: Database["public"]["Enums"]["membership_status"]
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          swim_level: string | null
           waiver_id: string | null
           welcome_sent_at: string | null
         }
@@ -1649,6 +1650,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["membership_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          swim_level?: string | null
           waiver_id?: string | null
           welcome_sent_at?: string | null
         }
@@ -1687,6 +1689,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["membership_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          swim_level?: string | null
           waiver_id?: string | null
           welcome_sent_at?: string | null
         }

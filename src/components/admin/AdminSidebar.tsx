@@ -79,6 +79,7 @@ export function AdminSidebar() {
       items: [
         { title: "Sessions", url: "/admin/sessions", icon: Layers, badge: 0 },
         { title: "Standing Slots", url: "/admin/standing-slots", icon: CalendarClock, badge: 0 },
+        { title: "Memberships", url: "/admin/memberships", icon: IdCard, badge: 0 },
         { title: "Holidays & Closures", url: "/admin/holidays", icon: CalendarClock, badge: 0 },
 
         { title: "Private Lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: 0 },

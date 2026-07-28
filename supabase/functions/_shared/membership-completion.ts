@@ -4,6 +4,8 @@ import { firstLessonDate } from "./membership-pricing.ts";
 import { formatPTDate, formatPTTime, sendAndLogBookingConfirmation } from "./textmagic.ts";
 import { buildManageLink } from "./manage-link.ts";
 import { fetchClosureDateSet, fetchClosureSchedule } from "./closure-schedule.ts";
+import { buildMembershipOccurrenceRows } from "./membership-occurrences.ts";
+
 
 
 type JsonObject = Record<string, unknown>;
@@ -334,35 +336,21 @@ async function ensureOccurrences(membershipId: string, payload: JsonObject): Pro
     .maybeSingle();
   if (slotErr || !slot) throw new Error(`Standing slot lookup failed: ${slotErr?.message || "not found"}`);
 
-  const [y, m, d] = (await resolveStartDate(payload)).split("-").map(Number);
-  let cursor = new Date(Date.UTC(y, m - 1, d));
-  const targetDow = asNumber(slot.day_of_week);
-  while (cursor.getUTCDay() !== targetDow) {
-    cursor = new Date(cursor.getTime() + 86400000);
-  }
-
   // Load closure dates so we skip weeks that fall on a studio closure.
   const closureDates = await fetchClosureDateSet();
 
-  const rows: JsonObject[] = [];
-  let generated = 0;
-  let guard = 0;
-  while (generated < 8 && guard < 52) {
-    const iso = cursor.toISOString().slice(0, 10);
-    if (!closureDates.has(iso)) {
-      rows.push({
-        membership_id: membershipId,
-        occurrence_date: iso,
-        start_time: slot.start_time,
-        end_time: slot.end_time,
-        instructor_id: slot.instructor_id,
-        status: "scheduled",
-      });
-      generated += 1;
-    }
-    cursor = new Date(cursor.getTime() + 7 * 86400000);
-    guard += 1;
-  }
+  const rows = buildMembershipOccurrenceRows({
+    membershipId,
+    slot: {
+      day_of_week: asNumber(slot.day_of_week),
+      start_time: (slot.start_time as string | null) ?? null,
+      end_time: (slot.end_time as string | null) ?? null,
+      instructor_id: (slot.instructor_id as string | null) ?? null,
+    },
+    startISO: await resolveStartDate(payload),
+    closureDates,
+  });
+
 
   const { error: insertErr } = await supabase.from("membership_occurrences").insert(rows);
   if (insertErr) throw new Error(`Membership occurrence insert failed: ${insertErr.message}`);
