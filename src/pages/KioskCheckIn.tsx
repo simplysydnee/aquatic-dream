@@ -349,7 +349,8 @@ const KioskCheckIn = () => {
                 : null;
               const isDone = group.phase === "done";
               const isNow = group.phase === "now";
-              const isPrivate = group.lesson_type !== "group";
+              const isMembership = group.lesson_type === "membership";
+              const isPrivate = group.lesson_type !== "group" && !isMembership;
               return (
                 <Card
                   key={group.key}
@@ -366,7 +367,11 @@ const KioskCheckIn = () => {
                             "h:mm a"
                           )}
                         </span>
-                        {isPrivate ? (
+                        {isMembership ? (
+                          <Badge variant="outline" className="bg-teal-50 text-teal-800 border-teal-200">
+                            {group.session_name}
+                          </Badge>
+                        ) : isPrivate ? (
                           <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
                             {group.lesson_type === "semi_private" ? "Semi-Private" : "Private"}
                           </Badge>
