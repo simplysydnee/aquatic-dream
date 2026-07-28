@@ -120,6 +120,29 @@ export interface PrivateLessonBooking {
   confirmation_email_error: string | null;
 }
 
+export interface MembershipLesson {
+  occurrence_id: string;
+  membership_id: string;
+  plan_key: string;
+  plan_name: string;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  swimmer_name: string;
+  parent_name: string;
+  parent_email: string;
+  parent_phone: string | null;
+  occurrence_date: string;
+  start_time: string;
+  end_time: string;
+  location: string | null;
+  swim_level: string | null;
+  notes: string | null;
+  medical_notes: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relationship: string | null;
+}
+
 export interface OpenPrivateSlot {
   instructor_id: string;
   instructor_name: string;
