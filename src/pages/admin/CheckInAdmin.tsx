@@ -115,7 +115,7 @@ const CheckInAdmin = () => {
         .not("status", "in", "(cancelled,abandoned)") as any,
       (supabase
         .from("membership_occurrences") as any)
-        .select("id, occurrence_date, start_time, end_time, instructor_id, status, memberships!inner(id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, waiver_id, medical_notes, standing_slots(id, day_of_week, start_time, end_time, instructor_id, capacity))")
+        .select("id, occurrence_date, start_time, end_time, instructor_id, status, checked_in_at, checked_in_by, memberships!inner(id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, waiver_id, medical_notes, standing_slots(id, day_of_week, start_time, end_time, instructor_id, capacity))")
         .eq("occurrence_date", dateStr)
         .eq("status", "scheduled"),
       supabase.from("membership_plans").select("plan_key, name"),
