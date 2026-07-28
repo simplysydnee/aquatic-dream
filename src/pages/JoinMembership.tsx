@@ -1126,9 +1126,102 @@ export default function JoinMembership() {
           </Card>
         )}
       </div>
+
+      <Dialog open={!!waitlistSlot} onOpenChange={(o) => { if (!o) closeWaitlist(); }}>
+        <DialogContent className="max-w-md">
+          {waitlistSaved ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-[#1a3a8a]">You're on our interest list</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-[#2a5e84]">
+                We have not enrolled you and you have not been charged. We will contact you when a
+                spot opens in this class or when we add another class. This is an interest list, not
+                a numbered queue, so we cannot promise a place in line or an automatic offer.
+              </p>
+              <div className="flex justify-end">
+                <Button type="button" onClick={closeWaitlist} className="bg-[#F58B76] hover:bg-[#F58B76]/90">
+                  Done
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-[#1a3a8a]">Join the waitlist</DialogTitle>
+              </DialogHeader>
+              {waitlistSlot && (
+                <p className="text-sm text-[#2a5e84]">
+                  {plan?.name} · {DAYS[waitlistSlot.day_of_week]}{" "}
+                  {fmtTime(waitlistSlot.start_time)}–{fmtTime(waitlistSlot.end_time)}
+                  {plan?.plan_key === "kid_group" && swimLevel ? ` · ${LEVEL_LABELS[swimLevel]}` : ""}
+                </p>
+              )}
+              <div className="grid gap-3">
+                <div>
+                  <Label>Swimmer name</Label>
+                  <Input
+                    value={waitlistForm.swimmer_name}
+                    onChange={(e) => setWaitlistForm({ ...waitlistForm, swimmer_name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Parent name</Label>
+                  <Input
+                    value={waitlistForm.parent_name}
+                    onChange={(e) => setWaitlistForm({ ...waitlistForm, parent_name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={waitlistForm.parent_email}
+                    onChange={(e) => setWaitlistForm({ ...waitlistForm, parent_email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input
+                    type="tel"
+                    value={waitlistForm.parent_phone}
+                    onChange={(e) => setWaitlistForm({ ...waitlistForm, parent_phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Anything else? (optional)</Label>
+                  <Textarea
+                    rows={3}
+                    value={waitlistForm.notes}
+                    onChange={(e) => setWaitlistForm({ ...waitlistForm, notes: e.target.value })}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-[#2a5e84]">
+                This only tells us you are interested. No enrollment, no charge, no place in line.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={closeWaitlist} disabled={waitlistSubmitting}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={submitWaitlist}
+                  disabled={waitlistSubmitting}
+                  className="bg-[#F58B76] hover:bg-[#F58B76]/90"
+                >
+                  {waitlistSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Submit
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
