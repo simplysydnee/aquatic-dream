@@ -132,7 +132,7 @@ export default function PrintDaySchedule() {
 
   useEffect(() => {
     (async () => {
-      const [s, e, a, ld, po] = await Promise.all([
+      const [s, e, a, ld, po, mo, instr] = await Promise.all([
         supabase
           .from("swim_sessions")
           .select(
@@ -157,7 +157,15 @@ export default function PrintDaySchedule() {
           .select("id, status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_phone, child_name, child_age, start_time, end_time, pool_area, notes, status, booking_source, stripe_payment_method_id)")
           .eq("occurrence_date", date)
           .not("status", "in", DEAD_STATUS_FILTER),
-
+        // Membership lessons: scheduling only, no payment fields exist on these rows.
+        supabase
+          .from("membership_occurrences")
+          .select(
+            "id, occurrence_date, start_time, end_time, instructor_id, status, memberships!inner(plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_phone, notes, medical_notes, standing_slots(start_time, end_time, instructor_id, location, swim_level), visitor_waivers(emergency_contact_first_name, emergency_contact_last_name, emergency_contact_phone, emergency_contact_relationship))"
+          )
+          .eq("occurrence_date", date)
+          .eq("status", "scheduled"),
+        supabase.from("instructors").select("id, name"),
       ]);
       if (s.data) setSessions(s.data as Session[]);
       if (e.data) setEnrollments(e.data as Enrollment[]);
