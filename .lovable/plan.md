@@ -1,30 +1,38 @@
-## What I found
+## Goal
+Make step 2 ("Pick a slot") on `/join` usable when Private Swim returns ~52 slots: add a filter bar, group results by day, show a count, and give a clean empty state for over-filtering.
 
-I read every file named in the request. Nearly all of it is already in place:
+All work is inside `src/pages/JoinMembership.tsx`. No query, edge function, checkout, pricing, or consent changes.
 
-- **Change 1** — `invokeErrorMessage(error, fallback)` already exists in `BookingWizard.tsx` (reads `error.context`, clones and parses JSON, uses the `error` field, try/catch fallback to `error.message`). It is applied to `admin-create-private-booking`, `admin-create-private-booking-setup`, and `admin-create-enrollment`. `formatAvailabilityError` in `_shared/availability.ts` already includes the time window ("Instructor has no availability on 2026-08-10 at 19:30-20:00").
-- **Change 2** — the edge conflict query already uses `.not("status","in","(cancelled,abandoned)")` and skips rows whose parent booking status is cancelled or abandoned. `BookingWizard` `occRes`, `useAvailableBlockSlots.ts`, and `PrintDayScheduleDialog.tsx` all already use `DEAD_STATUS_FILTER`, and the print dialog also skips parent bookings in `DEAD_STATUSES`.
-- **Change 3** — the "intentionally NOT filtering" bypass is gone; `OneTimeChooser` now skips blocks where `dateStr < b.start_date` or `dateStr > b.end_date`. `SlotDraft` carries `blockStartDate` / `blockEndDate`, and both `generateRecurringDates` call sites (the week-count handler and the checkbox grid) pass them.
-- **Change 4** — `STALE_MS` is already `15 * 60 * 1000` with a comment tying it to `STALE_PENDING_MS`, and the stale skip now only applies when `booking_source` is not `admin` / `admin_manual`.
-- **Change 5** — the `lesson_bookings` search query in `ClientStep` already has `.not("status","in",DEAD_STATUS_FILTER)`, so the `cardEmails` set built from those rows is filtered too.
+## 1. Filter state
+Add three pieces of state: `filterDay` ("any" or a day index), `filterInstructor` ("any" or instructor name), `filterTime` ("any" | "morning" | "afternoon" | "evening"), all defaulting to "any".
 
-## The one remaining gap
+Reset all three to "any" whenever:
+- a program is selected in `selectPlan`
+- the parent taps Back from step 2 to step 1
+- the Small Group "Recommended level" dropdown changes
 
-The fourth invoke, `lookup-parent-card-on-file`, does not use the helper. On any error it silently sets `existingCardHint = { found: false }`, so a real backend failure looks identical to "this parent has no card on file" and the admin gets no signal.
+## 2. Options built from returned slots
+Derive option lists from the current `planSlots` array (not hardcoded):
+- Day: unique `day_of_week` values present, sorted Sunday to Saturday, labelled from the existing `DAYS` array.
+- Instructor: unique non-null `instructor_name` values, alphabetical.
+- Time: fixed three buckets, but they are simple ranges over `start_time` — Morning before 12:00, Afternoon 12:00 up to 17:00, Evening 17:00 and later.
 
-## Proposed change
+## 3. Filter bar rendering
+Render the bar above the slot list only when `planSlots.length > 8`, so Adult (6) and Small Group (2) are unchanged. Three shadcn `Select` dropdowns styled to match the existing controls on the page, each defaulting to "Any". Filters combine with AND.
 
-In `BookingWizard.tsx`, in the card-lookup effect:
+## 4. Grouping and count
+Apply the filters to `planSlots` to get `visibleSlots`. Group `visibleSlots` by `day_of_week`, render day headings in Sunday-to-Saturday order, times ascending inside each day. Grouping applies whether or not the filter bar is visible.
 
-- Keep the existing behavior of setting `{ found: false }` so the review step still renders and the admin can proceed with a new card.
-- Additionally, when `error` (or `data.error`) is present, resolve the real message via `await invokeErrorMessage(error, "Could not check for a card on file")` and show it as a non-blocking `toast.error`, guarded by the existing `cancelled` flag so an unmounted / superseded lookup stays silent.
+Above the list, show the count, for example "12 times available" (singular "1 time available").
 
-No other file changes. No changes to validation, Stripe, RLS, schema, the public booking flow, `useCalendarData.ts`, or `PrintDaySchedule.tsx`.
+Each slot card keeps its exact current markup: open slots stay tappable buttons that set the slot and advance to step 3; full slots keep the dashed "Class full" treatment with the working "Join waitlist" button. No auto-selection.
 
-## Verification
+## 5. Empty states
+Two distinct cases:
+- `planSlots.length === 0` (genuinely no slots): keep the existing copy exactly as it is today, including the level-specific Small Group variant.
+- `planSlots.length > 0` but filters match nothing: show "No times match these filters" plus a "Clear filters" button that resets all three dropdowns to "Any".
 
-1. Book a date outside an instructor's block window and confirm the toast names the instructor, date, and time window.
-2. Confirm that date is absent from the one-time picker.
-3. Select a recurring block, change 8 weeks to 12, and confirm no dates past the block's `end_date` are generated.
-4. Confirm a slot whose only conflict is an `abandoned` occurrence is bookable.
-5. Confirm the public private-lesson page still loads slots and books end to end.
+## Technical notes
+- Filtering and grouping are `useMemo` values derived from `planSlots`; the `get-open-slots` invoke, `loadSlots`, and the `planSlots` level-matching logic stay untouched.
+- Time bucketing compares the `HH:MM` string prefix of `start_time`, no date parsing needed.
+- Instructor filter matches on `instructor_name`; slots with a null instructor are only excluded when a specific instructor is chosen.
