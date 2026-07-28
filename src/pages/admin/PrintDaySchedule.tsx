@@ -554,6 +554,58 @@ export default function PrintDaySchedule() {
                       return rows;
                     }
 
+                    if (it.kind === "membership") {
+                      const ml = it.occ;
+                      const stripe = MEMBERSHIP_STRIPE[ml.plan_key] || MEMBERSHIP_STRIPE.private;
+                      const classLabel =
+                        ml.plan_key === "kid_group" && ml.swim_level
+                          ? `${ml.plan_name} · ${ml.swim_level}`
+                          : ml.plan_name;
+                      return [
+                        <tr key={ml.id} className="class-group-first">
+                          <td className="time-cell" style={{ borderLeftColor: stripe }}>
+                            {fmtTime(ml.start_time)}<br />
+                            <span style={{ fontWeight: 400, color: "#666" }}>{fmtTime(ml.end_time)}</span>
+                            <div>
+                              <span className="cap">Membership</span>
+                            </div>
+                          </td>
+                          <td className="class-cell">
+                            <div className="lvl">{classLabel}</div>
+                            {ml.location && (
+                              <div style={{ fontSize: "7.5pt", color: "#555" }}>{ml.location}</div>
+                            )}
+                          </td>
+                          <td className="swimmer-cell">{ml.swimmer_name || "—"}</td>
+                          <td>
+                            {firstName(ml.parent_name)}
+                            <div style={{ color: "#555" }}>{ml.parent_phone || "—"}</div>
+                          </td>
+                          <td>
+                            {ml.emergency_contact_name ? (
+                              <>
+                                {ml.emergency_contact_name}
+                                {ml.emergency_contact_relationship && (
+                                  <div style={{ color: "#555" }}>{ml.emergency_contact_relationship}</div>
+                                )}
+                                {ml.emergency_contact_phone && (
+                                  <div style={{ color: "#555" }}>{ml.emergency_contact_phone}</div>
+                                )}
+                              </>
+                            ) : (
+                              <span style={{ color: "#aaa" }}>—</span>
+                            )}
+                          </td>
+                          <td>
+                            {ml.medical_notes && (
+                              <div style={{ fontWeight: 700, color: "#92400e" }}>{ml.medical_notes}</div>
+                            )}
+                            {ml.notes || (ml.medical_notes ? "" : "—")}
+                          </td>
+                        </tr>,
+                      ];
+                    }
+
                     // private / semi-private occurrence
                     const p = it.occ;
                     const isSemi = p.lesson_type === "semi_private" || p.lesson_type === "semi-private";
