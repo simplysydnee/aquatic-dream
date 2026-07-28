@@ -11,8 +11,8 @@ import { Waves, CheckCircle2, ShieldAlert } from "lucide-react";
 type Phase = "now" | "upcoming" | "done";
 
 interface RosterItem {
-  // kind: 'group' uses enrollment_id, 'private'/'semi_private' uses occurrence_id
-  kind: "group" | "private" | "semi_private";
+  // kind: 'group' uses enrollment_id, others use occurrence_id
+  kind: "group" | "private" | "semi_private" | "membership";
   id: string; // enrollment_id or occurrence_id
   session_id: string | null; // group sessions only
   child_name: string;
@@ -31,9 +31,10 @@ interface Slot {
   age_group: string | null;
   session_name: string | null;
   instructor_name: string | null;
-  lesson_type: "group" | "private" | "semi_private";
+  lesson_type: "group" | "private" | "semi_private" | "membership";
   items: RosterItem[];
 }
+
 
 const phaseFor = (start: string, end: string, now: Date): Phase => {
   const [sh, sm] = start.split(":").map(Number);
@@ -68,7 +69,7 @@ const KioskCheckIn = () => {
   const dateStr = format(today, "yyyy-MM-dd");
 
   const fetchData = async () => {
-    const [sessionsRes, enrollmentsRes, attendanceRes, occRes] = await Promise.all([
+    const [sessionsRes, enrollmentsRes, attendanceRes, occRes, memOccRes, plansRes, instrRes] = await Promise.all([
       supabase
         .from("swim_sessions")
         .select("id, start_time, end_time, swim_level, age_group, session_name, instructor_id, session_start_date, session_end_date, instructors(name)")
@@ -89,7 +90,15 @@ const KioskCheckIn = () => {
         .select("id, occurrence_date, status, checked_in_at, lesson_bookings!inner(id, lesson_type, instructor_name, parent_name, child_name, child_age, start_time, end_time, status)")
         .eq("occurrence_date", dateStr)
         .not("status", "in", "(cancelled,abandoned)") as any,
+      (supabase
+        .from("membership_occurrences") as any)
+        .select("id, occurrence_date, start_time, end_time, instructor_id, status, checked_in_at, checked_in_by, memberships!inner(id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, waiver_id, standing_slots(id, start_time, end_time, instructor_id))")
+        .eq("occurrence_date", dateStr)
+        .eq("status", "scheduled"),
+      supabase.from("membership_plans").select("plan_key, name"),
+      supabase.from("instructors").select("id, name"),
     ]);
+
 
     const sessions = (sessionsRes.data || []) as any[];
     const enrollments = (enrollmentsRes.data || []) as any[];
@@ -181,7 +190,56 @@ const KioskCheckIn = () => {
       };
     });
 
-    setSlots([...groupSlots, ...privateSlots]);
+    // Membership occurrences (scheduled only), grouped by standing slot + start time.
+    // Attendance record only, never used for billing.
+    const planNameByKey = new Map<string, string>(
+      ((plansRes.data as any[]) || []).map((p) => [p.plan_key, p.name])
+    );
+    const instrNameById = new Map<string, string>(
+      ((instrRes.data as any[]) || []).map((i) => [i.id, i.name])
+    );
+    const membershipGroups = new Map<string, Slot>();
+    for (const o of ((memOccRes as any).data || []) as any[]) {
+      const m = o.memberships || {};
+      const slot = m.standing_slots || null;
+      const startTime = (o.start_time || slot?.start_time || "").slice(0, 8);
+      const endTime = (o.end_time || slot?.end_time || "").slice(0, 8);
+      const instructorId = o.instructor_id || slot?.instructor_id || null;
+      const planName = planNameByKey.get(m.plan_key) || "Membership";
+      const groupKey = `m:${slot?.id || m.id}:${startTime}`;
+      const item: RosterItem = {
+        kind: "membership",
+        id: o.id,
+        session_id: null,
+        child_name:
+          [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim() ||
+          [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim() ||
+          "(no name)",
+        child_age: null,
+        parent_name: [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim(),
+        has_waiver: !!m.waiver_id,
+        checked_in: !!o.checked_in_at,
+        checked_in_at: o.checked_in_at ?? null,
+      };
+      const existing = membershipGroups.get(groupKey);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        membershipGroups.set(groupKey, {
+          key: groupKey,
+          start_time: startTime,
+          end_time: endTime,
+          swim_level: null,
+          age_group: null,
+          session_name: planName,
+          instructor_name: instructorId ? instrNameById.get(instructorId) || null : null,
+          lesson_type: "membership",
+          items: [item],
+        });
+      }
+    }
+
+    setSlots([...groupSlots, ...privateSlots, ...Array.from(membershipGroups.values())]);
     setLoading(false);
   };
 
@@ -241,6 +299,11 @@ const KioskCheckIn = () => {
         },
         { onConflict: "enrollment_id,lesson_date" }
       );
+    } else if (item.kind === "membership") {
+      await (supabase
+        .from("membership_occurrences") as any)
+        .update({ checked_in_at: new Date().toISOString(), checked_in_by: "kiosk" })
+        .eq("id", item.id);
     } else {
       await (supabase
         .from("lesson_booking_occurrences") as any)
@@ -286,7 +349,8 @@ const KioskCheckIn = () => {
                 : null;
               const isDone = group.phase === "done";
               const isNow = group.phase === "now";
-              const isPrivate = group.lesson_type !== "group";
+              const isMembership = group.lesson_type === "membership";
+              const isPrivate = group.lesson_type !== "group" && !isMembership;
               return (
                 <Card
                   key={group.key}
@@ -303,7 +367,11 @@ const KioskCheckIn = () => {
                             "h:mm a"
                           )}
                         </span>
-                        {isPrivate ? (
+                        {isMembership ? (
+                          <Badge variant="outline" className="bg-teal-50 text-teal-800 border-teal-200">
+                            {group.session_name}
+                          </Badge>
+                        ) : isPrivate ? (
                           <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
                             {group.lesson_type === "semi_private" ? "Semi-Private" : "Private"}
                           </Badge>
