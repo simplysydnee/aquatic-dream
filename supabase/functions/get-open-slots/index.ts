@@ -41,7 +41,7 @@ serve(async (req) => {
 
     const { data: slots, error: slotsErr } = await supabase
       .from("standing_slots")
-      .select("id, plan_key, instructor_id, day_of_week, start_time, end_time, capacity, active, swim_level")
+      .select("id, plan_key, instructor_id, day_of_week, start_time, end_time, capacity, active, swim_level, accepted_levels")
       .eq("active", true)
       .in("plan_key", planKeys);
     if (slotsErr) throw slotsErr;
