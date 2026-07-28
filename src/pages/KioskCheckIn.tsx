@@ -11,8 +11,8 @@ import { Waves, CheckCircle2, ShieldAlert } from "lucide-react";
 type Phase = "now" | "upcoming" | "done";
 
 interface RosterItem {
-  // kind: 'group' uses enrollment_id, 'private'/'semi_private' uses occurrence_id
-  kind: "group" | "private" | "semi_private";
+  // kind: 'group' uses enrollment_id, others use occurrence_id
+  kind: "group" | "private" | "semi_private" | "membership";
   id: string; // enrollment_id or occurrence_id
   session_id: string | null; // group sessions only
   child_name: string;
@@ -31,9 +31,10 @@ interface Slot {
   age_group: string | null;
   session_name: string | null;
   instructor_name: string | null;
-  lesson_type: "group" | "private" | "semi_private";
+  lesson_type: "group" | "private" | "semi_private" | "membership";
   items: RosterItem[];
 }
+
 
 const phaseFor = (start: string, end: string, now: Date): Phase => {
   const [sh, sm] = start.split(":").map(Number);
