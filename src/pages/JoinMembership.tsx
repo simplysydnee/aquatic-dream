@@ -620,16 +620,9 @@ export default function JoinMembership() {
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {planSlots.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => {
-                          setSlot(s);
-                          setStep(3);
-                        }}
-                        className="flex w-full items-center justify-between rounded-lg border-2 border-[#2a5e84]/20 p-4 text-left transition hover:border-[#F58B76] hover:bg-[#F58B76]/5"
-                      >
+                    {planSlots.map((s) => {
+                      const full = s.is_full ?? s.spots_left <= 0;
+                      const header = (
                         <div>
                           <div className="font-semibold text-[#1a3a8a]">
                             {DAYS[s.day_of_week]} {fmtTime(s.start_time)}–{fmtTime(s.end_time)}
@@ -638,13 +631,52 @@ export default function JoinMembership() {
                             <div className="text-sm text-[#2a5e84]">Coach {s.instructor_name}</div>
                           )}
                         </div>
-                        <div className="text-sm font-medium text-[#F58B76]">
-                          {s.spots_left} spot{s.spots_left === 1 ? "" : "s"} left
-                        </div>
-                      </button>
-                    ))}
+                      );
+                      if (full) {
+                        return (
+                          <div
+                            key={s.id}
+                            className="flex w-full items-center justify-between gap-3 rounded-lg border-2 border-dashed border-[#2a5e84]/25 bg-[#2a5e84]/5 p-4 text-left opacity-90"
+                          >
+                            {header}
+                            <div className="flex flex-col items-end gap-2">
+                              <span className="text-sm font-medium text-[#2a5e84]">Class full</span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="border-[#F58B76] text-[#1a3a8a] hover:bg-[#F58B76]/10"
+                                onClick={() => {
+                                  setWaitlistSaved(false);
+                                  setWaitlistSlot(s);
+                                }}
+                              >
+                                Join waitlist
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setSlot(s);
+                            setStep(3);
+                          }}
+                          className="flex w-full items-center justify-between rounded-lg border-2 border-[#2a5e84]/20 p-4 text-left transition hover:border-[#F58B76] hover:bg-[#F58B76]/5"
+                        >
+                          {header}
+                          <div className="text-sm font-medium text-[#F58B76]">
+                            {s.spots_left} spot{s.spots_left === 1 ? "" : "s"} left
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
+
               </>
             )}
 
