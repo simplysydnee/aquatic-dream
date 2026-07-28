@@ -216,7 +216,63 @@ const CheckInAdmin = () => {
       };
     });
 
-    const all = [...groupSlots, ...privateSlots].sort((a, b) => {
+    // ── Membership occurrences (scheduled only) ──
+    // Attendance record only. Membership billing is calendar-based and never
+    // reads these fields.
+    const planNameByKey = new Map<string, string>(
+      ((plansRes.data as any[]) || []).map((p) => [p.plan_key, p.name])
+    );
+    const instrNameById = new Map<string, string>(
+      ((instrRes.data as any[]) || []).map((i) => [i.id, i.name])
+    );
+    const membershipGroups = new Map<string, Slot>();
+    for (const o of ((memOccRes as any).data || []) as any[]) {
+      const m = o.memberships || {};
+      const slot = m.standing_slots || null;
+      const startTime = (o.start_time || slot?.start_time || "").slice(0, 8);
+      const endTime = (o.end_time || slot?.end_time || "").slice(0, 8);
+      const instructorId = o.instructor_id || slot?.instructor_id || null;
+      const planName = planNameByKey.get(m.plan_key) || "Membership";
+      const groupKey = `m:${slot?.id || m.id}:${startTime}`;
+      const row: Row = {
+        kind: "membership",
+        id: o.id,
+        session_id: null,
+        child_name:
+          [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim() ||
+          [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim() ||
+          "(no name)",
+        child_age: null,
+        parent_name: [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim(),
+        parent_email: m.parent_email || "",
+        parent_phone: m.parent_phone || null,
+        has_waiver: !!m.waiver_id,
+        checked_in: !!o.checked_in_at,
+        checked_in_at: o.checked_in_at ?? null,
+        no_show: false,
+        notes: null,
+        medical_notes: m.medical_notes || null,
+      };
+      const existing = membershipGroups.get(groupKey);
+      if (existing) {
+        existing.rows.push(row);
+      } else {
+        membershipGroups.set(groupKey, {
+          key: groupKey,
+          start_time: startTime,
+          end_time: endTime,
+          swim_level: null,
+          session_name: planName,
+          instructor_name: instructorId ? instrNameById.get(instructorId) || null : null,
+          lesson_type: "membership",
+          rows: [row],
+        });
+      }
+    }
+    const membershipSlots = Array.from(membershipGroups.values());
+
+    const all = [...groupSlots, ...privateSlots, ...membershipSlots].sort((a, b) => {
+
       if (a.start_time !== b.start_time) return a.start_time.localeCompare(b.start_time);
       const ia = (a.instructor_name || "zzz").toLowerCase();
       const ib = (b.instructor_name || "zzz").toLowerCase();
