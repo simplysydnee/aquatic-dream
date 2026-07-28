@@ -952,9 +952,6 @@ export default function JoinMembership() {
                 >
                   <Check className="mr-2 h-4 w-4" /> Continue to secure payment
                 </Button>
-                <p className="mt-2 text-center text-xs text-[#2a5e84]">
-                  Test mode — use card 4242 4242 4242 4242 with any future expiry & CVC.
-                </p>
               </>
             )}
 
