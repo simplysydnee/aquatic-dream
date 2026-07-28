@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -55,7 +56,9 @@ type Slot = {
   start_time: string;
   end_time: string;
   spots_left: number;
+  is_full?: boolean;
   swim_level: SwimLevel | null;
+  accepted_levels: SwimLevel[] | null;
 };
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -157,10 +160,66 @@ export default function JoinMembership() {
     if (!plan) return [];
     let list = slots.filter((s) => s.plan_key === plan.plan_key);
     if (plan.plan_key === "kid_group" && swimLevel) {
-      list = list.filter((s) => s.swim_level === swimLevel);
+      list = list.filter((s) =>
+        s.accepted_levels && s.accepted_levels.length > 0
+          ? s.accepted_levels.includes(swimLevel)
+          : s.swim_level === swimLevel,
+      );
     }
     return list;
   }, [plan, slots, swimLevel]);
+
+  // Membership waitlist — only ever populated by an explicit tap, never automatically.
+  const [waitlistSlot, setWaitlistSlot] = useState<Slot | null>(null);
+  const [waitlistSaved, setWaitlistSaved] = useState(false);
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
+  const [waitlistForm, setWaitlistForm] = useState({
+    swimmer_name: "",
+    parent_name: "",
+    parent_email: "",
+    parent_phone: "",
+    notes: "",
+  });
+
+  const submitWaitlist = async () => {
+    if (!waitlistSlot || !plan) return;
+    if (
+      !waitlistForm.swimmer_name.trim() ||
+      !waitlistForm.parent_name.trim() ||
+      !/\S+@\S+\.\S+/.test(waitlistForm.parent_email) ||
+      waitlistForm.parent_phone.trim().length < 10
+    ) {
+      toast.error("Please complete all required fields");
+      return;
+    }
+    setWaitlistSubmitting(true);
+    const { error } = await supabase.from("membership_waitlist").insert({
+      plan_key: plan.plan_key,
+      standing_slot_id: waitlistSlot.id,
+      swim_level: plan.plan_key === "kid_group" ? swimLevel : null,
+      preferred_day: waitlistSlot.day_of_week,
+      preferred_time: waitlistSlot.start_time,
+      swimmer_name: waitlistForm.swimmer_name.trim(),
+      parent_name: waitlistForm.parent_name.trim(),
+      parent_email: waitlistForm.parent_email.trim(),
+      parent_phone: waitlistForm.parent_phone.trim(),
+      notes: waitlistForm.notes.trim() || null,
+      status: "open",
+    });
+    setWaitlistSubmitting(false);
+    if (error) {
+      toast.error("Could not save your request. Please call (209) 577-3483.");
+      return;
+    }
+    setWaitlistSaved(true);
+  };
+
+  const closeWaitlist = () => {
+    setWaitlistSlot(null);
+    setWaitlistSaved(false);
+    setWaitlistForm({ swimmer_name: "", parent_name: "", parent_email: "", parent_phone: "", notes: "" });
+  };
+
 
   const selectPlan = (p: Plan) => {
     setPlan(p);
@@ -562,16 +621,9 @@ export default function JoinMembership() {
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {planSlots.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => {
-                          setSlot(s);
-                          setStep(3);
-                        }}
-                        className="flex w-full items-center justify-between rounded-lg border-2 border-[#2a5e84]/20 p-4 text-left transition hover:border-[#F58B76] hover:bg-[#F58B76]/5"
-                      >
+                    {planSlots.map((s) => {
+                      const full = s.is_full ?? s.spots_left <= 0;
+                      const header = (
                         <div>
                           <div className="font-semibold text-[#1a3a8a]">
                             {DAYS[s.day_of_week]} {fmtTime(s.start_time)}–{fmtTime(s.end_time)}
@@ -580,13 +632,52 @@ export default function JoinMembership() {
                             <div className="text-sm text-[#2a5e84]">Coach {s.instructor_name}</div>
                           )}
                         </div>
-                        <div className="text-sm font-medium text-[#F58B76]">
-                          {s.spots_left} spot{s.spots_left === 1 ? "" : "s"} left
-                        </div>
-                      </button>
-                    ))}
+                      );
+                      if (full) {
+                        return (
+                          <div
+                            key={s.id}
+                            className="flex w-full items-center justify-between gap-3 rounded-lg border-2 border-dashed border-[#2a5e84]/25 bg-[#2a5e84]/5 p-4 text-left opacity-90"
+                          >
+                            {header}
+                            <div className="flex flex-col items-end gap-2">
+                              <span className="text-sm font-medium text-[#2a5e84]">Class full</span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="border-[#F58B76] text-[#1a3a8a] hover:bg-[#F58B76]/10"
+                                onClick={() => {
+                                  setWaitlistSaved(false);
+                                  setWaitlistSlot(s);
+                                }}
+                              >
+                                Join waitlist
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setSlot(s);
+                            setStep(3);
+                          }}
+                          className="flex w-full items-center justify-between rounded-lg border-2 border-[#2a5e84]/20 p-4 text-left transition hover:border-[#F58B76] hover:bg-[#F58B76]/5"
+                        >
+                          {header}
+                          <div className="text-sm font-medium text-[#F58B76]">
+                            {s.spots_left} spot{s.spots_left === 1 ? "" : "s"} left
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
+
               </>
             )}
 
@@ -1036,9 +1127,102 @@ export default function JoinMembership() {
           </Card>
         )}
       </div>
+
+      <Dialog open={!!waitlistSlot} onOpenChange={(o) => { if (!o) closeWaitlist(); }}>
+        <DialogContent className="max-w-md">
+          {waitlistSaved ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-[#1a3a8a]">You're on our interest list</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-[#2a5e84]">
+                We have not enrolled you and you have not been charged. We will contact you when a
+                spot opens in this class or when we add another class. This is an interest list, not
+                a numbered queue, so we cannot promise a place in line or an automatic offer.
+              </p>
+              <div className="flex justify-end">
+                <Button type="button" onClick={closeWaitlist} className="bg-[#F58B76] hover:bg-[#F58B76]/90">
+                  Done
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-[#1a3a8a]">Join the waitlist</DialogTitle>
+              </DialogHeader>
+              {waitlistSlot && (
+                <p className="text-sm text-[#2a5e84]">
+                  {plan?.name} · {DAYS[waitlistSlot.day_of_week]}{" "}
+                  {fmtTime(waitlistSlot.start_time)}–{fmtTime(waitlistSlot.end_time)}
+                  {plan?.plan_key === "kid_group" && swimLevel ? ` · ${LEVEL_LABELS[swimLevel]}` : ""}
+                </p>
+              )}
+              <div className="grid gap-3">
+                <div>
+                  <Label>Swimmer name</Label>
+                  <Input
+                    value={waitlistForm.swimmer_name}
+                    onChange={(e) => setWaitlistForm({ ...waitlistForm, swimmer_name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Parent name</Label>
+                  <Input
+                    value={waitlistForm.parent_name}
+                    onChange={(e) => setWaitlistForm({ ...waitlistForm, parent_name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={waitlistForm.parent_email}
+                    onChange={(e) => setWaitlistForm({ ...waitlistForm, parent_email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input
+                    type="tel"
+                    value={waitlistForm.parent_phone}
+                    onChange={(e) => setWaitlistForm({ ...waitlistForm, parent_phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Anything else? (optional)</Label>
+                  <Textarea
+                    rows={3}
+                    value={waitlistForm.notes}
+                    onChange={(e) => setWaitlistForm({ ...waitlistForm, notes: e.target.value })}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-[#2a5e84]">
+                This only tells us you are interested. No enrollment, no charge, no place in line.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={closeWaitlist} disabled={waitlistSubmitting}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={submitWaitlist}
+                  disabled={waitlistSubmitting}
+                  className="bg-[#F58B76] hover:bg-[#F58B76]/90"
+                >
+                  {waitlistSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Submit
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (

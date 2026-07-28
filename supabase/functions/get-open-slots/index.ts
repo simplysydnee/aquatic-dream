@@ -41,7 +41,7 @@ serve(async (req) => {
 
     const { data: slots, error: slotsErr } = await supabase
       .from("standing_slots")
-      .select("id, plan_key, instructor_id, day_of_week, start_time, end_time, capacity, active, swim_level")
+      .select("id, plan_key, instructor_id, day_of_week, start_time, end_time, capacity, active, swim_level, accepted_levels")
       .eq("active", true)
       .in("plan_key", planKeys);
     if (slotsErr) throw slotsErr;
@@ -88,15 +88,22 @@ serve(async (req) => {
           end_time: s.end_time,
           capacity: s.capacity,
           swim_level: s.swim_level ?? null,
+          accepted_levels: (s.accepted_levels as string[] | null) ?? null,
           enrolled_count: enrolled,
           spots_left,
+          is_full: spots_left <= 0,
         };
-      })
-      .filter((s) => s.spots_left > 0);
+      });
 
-    // Optional level filter — only applies to kid_group (Small Group Swim)
+    // Optional level filter — only applies to kid_group (Small Group Swim).
+    // Match against accepted_levels when present, falling back to swim_level.
     if (swimLevel) {
-      result = result.filter((s) => s.plan_key !== "kid_group" || s.swim_level === swimLevel);
+      result = result.filter((s) => {
+        if (s.plan_key !== "kid_group") return true;
+        return s.accepted_levels && s.accepted_levels.length > 0
+          ? s.accepted_levels.includes(swimLevel)
+          : s.swim_level === swimLevel;
+      });
     }
 
     return new Response(
