@@ -1431,6 +1431,52 @@ const CalendarDayView = ({
         enrollmentDateMoves={enrollmentDateMoves}
       />
 
+      {/* ── Membership lesson detail (read only, no billing actions) ── */}
+      <Dialog open={!!membershipDetail} onOpenChange={(open) => !open && setMembershipDetail(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {membershipDetail?.swimmer_name || membershipDetail?.parent_name || "Membership lesson"}
+            </DialogTitle>
+            <DialogDescription>
+              {membershipDetail?.plan_name} membership
+            </DialogDescription>
+          </DialogHeader>
+          {membershipDetail && (
+            <div className="space-y-2 text-sm">
+              <p>
+                {fmtTime(membershipDetail.start_time)} – {fmtTime(membershipDetail.end_time)}
+              </p>
+              <p>Instructor: {membershipDetail.instructor_name || "Unassigned"}</p>
+              {membershipDetail.swim_level && <p>Level: {membershipDetail.swim_level}</p>}
+              {membershipDetail.location && <p>Area: {membershipDetail.location}</p>}
+              <p>
+                Parent: {membershipDetail.parent_name || "—"}
+                {membershipDetail.parent_phone ? ` · ${membershipDetail.parent_phone}` : ""}
+              </p>
+              {membershipDetail.parent_email && (
+                <p className="text-muted-foreground">{membershipDetail.parent_email}</p>
+              )}
+              {membershipDetail.emergency_contact_name && (
+                <p>
+                  Emergency: {membershipDetail.emergency_contact_name}
+                  {membershipDetail.emergency_contact_relationship
+                    ? ` (${membershipDetail.emergency_contact_relationship})`
+                    : ""}
+                  {membershipDetail.emergency_contact_phone
+                    ? ` · ${membershipDetail.emergency_contact_phone}`
+                    : ""}
+                </p>
+              )}
+              {membershipDetail.medical_notes && (
+                <p className="text-destructive">Medical: {membershipDetail.medical_notes}</p>
+              )}
+              {membershipDetail.notes && <p>{membershipDetail.notes}</p>}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* ── Delete confirmation ── */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
