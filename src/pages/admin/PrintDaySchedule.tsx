@@ -124,6 +124,7 @@ export default function PrintDaySchedule() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [lessonDates, setLessonDates] = useState<{ session_id: string; is_cancelled: boolean }[]>([]);
   const [privateOccs, setPrivateOccs] = useState<PrivateOccurrence[]>([]);
+  const [membershipOccs, setMembershipOccs] = useState<MembershipOccurrence[]>([]);
   const [loading, setLoading] = useState(true);
 
   const dayName = format(new Date(date + "T12:00:00"), "EEEE");
