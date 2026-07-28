@@ -55,6 +55,11 @@ const LEVEL_STRIPE: Record<string, string> = {
 
 const PRIVATE_STRIPE = "#26215C";
 const SEMI_PRIVATE_STRIPE = "#4B1528";
+const MEMBERSHIP_STRIPE: Record<string, string> = {
+  private: "#2a5e84",
+  adult_group: "#F58B76",
+  kid_group: "#1a3a8a",
+};
 
 interface PrivateOccurrence {
   id: string;
@@ -70,6 +75,26 @@ interface PrivateOccurrence {
   parent_phone: string | null;
   notes: string | null;
   needs_card: boolean;
+}
+
+interface MembershipOccurrence {
+  id: string;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  plan_key: string;
+  plan_name: string;
+  start_time: string;
+  end_time: string;
+  location: string | null;
+  swim_level: string | null;
+  swimmer_name: string;
+  parent_name: string;
+  parent_phone: string | null;
+  notes: string | null;
+  medical_notes: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relationship: string | null;
 }
 
 
@@ -99,6 +124,7 @@ export default function PrintDaySchedule() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [lessonDates, setLessonDates] = useState<{ session_id: string; is_cancelled: boolean }[]>([]);
   const [privateOccs, setPrivateOccs] = useState<PrivateOccurrence[]>([]);
+  const [membershipOccs, setMembershipOccs] = useState<MembershipOccurrence[]>([]);
   const [loading, setLoading] = useState(true);
 
   const dayName = format(new Date(date + "T12:00:00"), "EEEE");
@@ -106,7 +132,7 @@ export default function PrintDaySchedule() {
 
   useEffect(() => {
     (async () => {
-      const [s, e, a, ld, po] = await Promise.all([
+      const [s, e, a, ld, po, mo, instr, plans] = await Promise.all([
         supabase
           .from("swim_sessions")
           .select(
@@ -131,7 +157,16 @@ export default function PrintDaySchedule() {
           .select("id, status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_phone, child_name, child_age, start_time, end_time, pool_area, notes, status, booking_source, stripe_payment_method_id)")
           .eq("occurrence_date", date)
           .not("status", "in", DEAD_STATUS_FILTER),
-
+        // Membership lessons: scheduling only, no payment fields exist on these rows.
+        supabase
+          .from("membership_occurrences")
+          .select(
+            "id, occurrence_date, start_time, end_time, instructor_id, status, memberships!inner(plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_phone, notes, medical_notes, standing_slots(start_time, end_time, instructor_id, location, swim_level), visitor_waivers(emergency_contact_first_name, emergency_contact_last_name, emergency_contact_phone, emergency_contact_relationship))"
+          )
+          .eq("occurrence_date", date)
+          .eq("status", "scheduled"),
+        supabase.from("instructors").select("id, name"),
+        supabase.from("membership_plans").select("plan_key, name"),
       ]);
       if (s.data) setSessions(s.data as Session[]);
       if (e.data) setEnrollments(e.data as Enrollment[]);
@@ -175,6 +210,43 @@ export default function PrintDaySchedule() {
 
         setPrivateOccs(mapped);
       }
+      if (mo.data) {
+        const instrNames = new Map<string, string>(
+          ((instr.data as { id: string; name: string }[] | null) || []).map((i) => [i.id, i.name])
+        );
+        const planNames = new Map<string, string>(
+          ((plans.data as { plan_key: string; name: string }[] | null) || []).map((p) => [p.plan_key, p.name])
+        );
+        const mappedM: MembershipOccurrence[] = (mo.data as unknown as Record<string, any>[]).map((o) => {
+          const m = o.memberships;
+          const slot = m?.standing_slots || null;
+          const waiver = m?.visitor_waivers || null;
+          const instructorId = o.instructor_id || slot?.instructor_id || null;
+          const ecFirst = waiver?.emergency_contact_first_name || "";
+          const ecLast = waiver?.emergency_contact_last_name || "";
+          const ecName = `${ecFirst} ${ecLast}`.trim();
+          return {
+            id: o.id,
+            instructor_id: instructorId,
+            instructor_name: instructorId ? instrNames.get(instructorId) || null : null,
+            plan_key: m?.plan_key || "private",
+            plan_name: planNames.get(m?.plan_key) || "Membership",
+            start_time: (o.start_time || slot?.start_time || "").slice(0, 8),
+            end_time: (o.end_time || slot?.end_time || "").slice(0, 8),
+            location: slot?.location || null,
+            swim_level: slot?.swim_level || null,
+            swimmer_name: `${m?.child_first_name || ""} ${m?.child_last_name || ""}`.trim(),
+            parent_name: `${m?.parent_first_name || ""} ${m?.parent_last_name || ""}`.trim(),
+            parent_phone: m?.parent_phone || null,
+            notes: m?.notes || null,
+            medical_notes: m?.medical_notes || null,
+            emergency_contact_name: ecName || null,
+            emergency_contact_phone: waiver?.emergency_contact_phone || null,
+            emergency_contact_relationship: waiver?.emergency_contact_relationship || null,
+          };
+        });
+        setMembershipOccs(mappedM);
+      }
       setLoading(false);
     })();
   }, [date]);
@@ -202,6 +274,12 @@ export default function PrintDaySchedule() {
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [privateOccs, allowedInstructorIds]);
 
+  const todayMembership = useMemo(() => {
+    return membershipOccs
+      .filter((m) => allowedInstructorIds === null || (m.instructor_id !== null && allowedInstructorIds.has(m.instructor_id)))
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [membershipOccs, allowedInstructorIds]);
+
   const agreementByEnrollment = useMemo(() => {
     const m = new Map<string, Agreement>();
     for (const a of agreements) if (a.enrollment_id) m.set(a.enrollment_id, a);
@@ -210,9 +288,10 @@ export default function PrintDaySchedule() {
 
   type Item =
     | { kind: "group"; start_time: string; session: Session }
-    | { kind: "private"; start_time: string; occ: PrivateOccurrence };
+    | { kind: "private"; start_time: string; occ: PrivateOccurrence }
+    | { kind: "membership"; start_time: string; occ: MembershipOccurrence };
 
-  // Group by instructor; include group sessions and private/semi-private occurrences
+  // Group by instructor; include group sessions, private occurrences and membership lessons
   const grouped = useMemo(() => {
     const m = new Map<string, { name: string; items: Item[] }>();
     for (const s of todaySessions) {
@@ -226,6 +305,12 @@ export default function PrintDaySchedule() {
       const name = p.instructor_name || "Unassigned";
       if (!m.has(key)) m.set(key, { name, items: [] });
       m.get(key)!.items.push({ kind: "private", start_time: p.start_time, occ: p });
+    }
+    for (const ml of todayMembership) {
+      const key = ml.instructor_id || "unassigned";
+      const name = ml.instructor_name || "Unassigned";
+      if (!m.has(key)) m.set(key, { name, items: [] });
+      m.get(key)!.items.push({ kind: "membership", start_time: ml.start_time, occ: ml });
     }
     return [...m.values()]
       .map((g) => {
@@ -244,7 +329,7 @@ export default function PrintDaySchedule() {
       })
       .filter((g) => g.totalSwimmers > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [todaySessions, todayPrivate, enrollments]);
+  }, [todaySessions, todayPrivate, todayMembership, enrollments]);
 
   useEffect(() => {
     if (!loading && grouped.length > 0) {
@@ -467,6 +552,58 @@ export default function PrintDaySchedule() {
                         );
                       }
                       return rows;
+                    }
+
+                    if (it.kind === "membership") {
+                      const ml = it.occ;
+                      const stripe = MEMBERSHIP_STRIPE[ml.plan_key] || MEMBERSHIP_STRIPE.private;
+                      const classLabel =
+                        ml.plan_key === "kid_group" && ml.swim_level
+                          ? `${ml.plan_name} · ${ml.swim_level}`
+                          : ml.plan_name;
+                      return [
+                        <tr key={ml.id} className="class-group-first">
+                          <td className="time-cell" style={{ borderLeftColor: stripe }}>
+                            {fmtTime(ml.start_time)}<br />
+                            <span style={{ fontWeight: 400, color: "#666" }}>{fmtTime(ml.end_time)}</span>
+                            <div>
+                              <span className="cap">Membership</span>
+                            </div>
+                          </td>
+                          <td className="class-cell">
+                            <div className="lvl">{classLabel}</div>
+                            {ml.location && (
+                              <div style={{ fontSize: "7.5pt", color: "#555" }}>{ml.location}</div>
+                            )}
+                          </td>
+                          <td className="swimmer-cell">{ml.swimmer_name || "—"}</td>
+                          <td>
+                            {firstName(ml.parent_name)}
+                            <div style={{ color: "#555" }}>{ml.parent_phone || "—"}</div>
+                          </td>
+                          <td>
+                            {ml.emergency_contact_name ? (
+                              <>
+                                {ml.emergency_contact_name}
+                                {ml.emergency_contact_relationship && (
+                                  <div style={{ color: "#555" }}>{ml.emergency_contact_relationship}</div>
+                                )}
+                                {ml.emergency_contact_phone && (
+                                  <div style={{ color: "#555" }}>{ml.emergency_contact_phone}</div>
+                                )}
+                              </>
+                            ) : (
+                              <span style={{ color: "#aaa" }}>—</span>
+                            )}
+                          </td>
+                          <td>
+                            {ml.medical_notes && (
+                              <div style={{ fontWeight: 700, color: "#92400e" }}>{ml.medical_notes}</div>
+                            )}
+                            {ml.notes || (ml.medical_notes ? "" : "—")}
+                          </td>
+                        </tr>,
+                      ];
                     }
 
                     // private / semi-private occurrence

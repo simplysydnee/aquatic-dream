@@ -120,6 +120,29 @@ export interface PrivateLessonBooking {
   confirmation_email_error: string | null;
 }
 
+export interface MembershipLesson {
+  occurrence_id: string;
+  membership_id: string;
+  plan_key: string;
+  plan_name: string;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  swimmer_name: string;
+  parent_name: string;
+  parent_email: string;
+  parent_phone: string | null;
+  occurrence_date: string;
+  start_time: string;
+  end_time: string;
+  location: string | null;
+  swim_level: string | null;
+  notes: string | null;
+  medical_notes: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relationship: string | null;
+}
+
 export interface OpenPrivateSlot {
   instructor_id: string;
   instructor_name: string;
@@ -157,6 +180,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
   const [icsSessions, setIcsSessions] = useState<ICSSession[]>([]);
   const [lessonDates, setLessonDates] = useState<LessonDate[]>([]);
   const [privateLessons, setPrivateLessons] = useState<PrivateLessonBooking[]>([]);
+  const [membershipLessons, setMembershipLessons] = useState<MembershipLesson[]>([]);
   const [openPrivateSlots, setOpenPrivateSlots] = useState<OpenPrivateSlot[]>([]);
   const [enrollmentDateMoves, setEnrollmentDateMoves] = useState<EnrollmentDateMove[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,7 +196,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
 
     const [
       sessionsRes, enrollmentsRes, eventsRes, attendanceRes, agreementsRes, lessonDatesRes,
-      privateOccRes, blocksRes, instructorsRes, movesRes,
+      privateOccRes, blocksRes, instructorsRes, movesRes, membershipOccRes, plansRes,
     ] = await Promise.all([
       supabase
         .from("swim_sessions")
@@ -213,6 +237,13 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .select("id, enrollment_id, lesson_date, target_session_id, reason")
         .gte("lesson_date", rangeStart)
         .lte("lesson_date", rangeEnd),
+      supabase
+        .from("membership_occurrences")
+        .select("id, membership_id, occurrence_date, start_time, end_time, instructor_id, status, memberships!inner(id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, notes, medical_notes, standing_slots(id, start_time, end_time, instructor_id, location, swim_level), visitor_waivers(emergency_contact_first_name, emergency_contact_last_name, emergency_contact_phone, emergency_contact_relationship))")
+        .gte("occurrence_date", rangeStart)
+        .lte("occurrence_date", rangeEnd)
+        .eq("status", "scheduled"),
+      supabase.from("membership_plans").select("plan_key, name"),
     ]);
 
     if (sessionsRes.data) setSwimSessions(sessionsRes.data);
@@ -346,6 +377,52 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     }
     setPrivateLessons(privates);
 
+    // ── Map membership occurrences (scheduled only; closed/cancelled excluded) ──
+    // Scheduling only: membership_occurrences intentionally carries no payment
+    // data, so nothing here reads or exposes charge / card state.
+    const planNameByKey = new Map<string, string>(
+      ((plansRes.data as any[]) || []).map((p) => [p.plan_key, p.name]),
+    );
+    const memberships: MembershipLesson[] = ((membershipOccRes.data as any[]) || []).map((o) => {
+      const m = o.memberships || {};
+      const slot = m.standing_slots || null;
+      const waiver = m.visitor_waivers || null;
+      const instructorId = o.instructor_id || slot?.instructor_id || null;
+      const emergencyName = waiver
+        ? [waiver.emergency_contact_first_name, waiver.emergency_contact_last_name]
+            .filter(Boolean)
+            .join(" ")
+            .trim()
+        : "";
+      return {
+        occurrence_id: o.id,
+        membership_id: o.membership_id,
+        plan_key: m.plan_key || "",
+        plan_name: planNameByKey.get(m.plan_key) || "Membership lesson",
+        instructor_id: instructorId,
+        instructor_name: instructorId
+          ? (_instructorNameMap.get(instructorId) || null)
+          : null,
+        swimmer_name: [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim(),
+        parent_name: [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim(),
+        parent_email: m.parent_email || "",
+        parent_phone: m.parent_phone || null,
+        occurrence_date: o.occurrence_date,
+        start_time: (o.start_time || slot?.start_time || "").slice(0, 5),
+        end_time: (o.end_time || slot?.end_time || "").slice(0, 5),
+        location: slot?.location || null,
+        swim_level: slot?.swim_level || null,
+        notes: m.notes || null,
+        medical_notes: m.medical_notes || null,
+        emergency_contact_name: emergencyName || null,
+        emergency_contact_phone: waiver?.emergency_contact_phone || null,
+        emergency_contact_relationship: waiver?.emergency_contact_relationship || null,
+      };
+    });
+    setMembershipLessons(memberships);
+
+
+
     // ── Compute open private slots from booking blocks minus taken occurrences ──
     const instructorMap = new Map<string, string>(
       ((instructorsRes.data as any[]) || []).map((i) => [i.id, i.name])
@@ -448,7 +525,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
 
   return {
     swimSessions, enrollments, poolEvents, attendance, agreements,
-    icsSessions, lessonDates, privateLessons, openPrivateSlots, enrollmentDateMoves,
+    icsSessions, lessonDates, privateLessons, membershipLessons, openPrivateSlots, enrollmentDateMoves,
     loading, refetch: fetchData,
   };
 }

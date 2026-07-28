@@ -100,6 +100,7 @@ const CalendarAdmin = () => {
     icsSessions,
     lessonDates,
     privateLessons,
+    membershipLessons,
     openPrivateSlots,
     enrollmentDateMoves,
     loading,
@@ -300,6 +301,7 @@ const CalendarAdmin = () => {
           lessonDates={lessonDates}
           enrollmentDateMoves={enrollmentDateMoves}
           privateLessons={privateLessons}
+          membershipLessons={membershipLessons}
           onPrivateLessonClick={(p) => setActivePrivateLesson(p)}
           activeFilters={activeFilters}
           onAttendanceChange={refetch}

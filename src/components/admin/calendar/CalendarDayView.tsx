@@ -13,6 +13,7 @@ import type {
   LessonDate,
   EnrollmentDateMove,
   PrivateLessonBooking,
+  MembershipLesson,
 } from "@/hooks/useCalendarData";
 import { Lock, Plus, Pencil, Trash2, Camera } from "lucide-react";
 import {
@@ -26,6 +27,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import CalendarBlockDetail from "./CalendarBlockDetail";
 import type { BlockInfo } from "./CalendarBlockDetail";
@@ -67,6 +75,9 @@ const BLOCK_COLORS: Record<string, { bg: string; border: string; text: string }>
   "swim-lesson":        { bg: "#e8f5e9", border: "#2e7d32", text: "#2e7d32" },
   "private-lesson":     { bg: "#EEEDFE", border: "#26215C", text: "#26215C" },
   "semi-private-lesson":{ bg: "#FBEAF0", border: "#4B1528", text: "#4B1528" },
+  "membership-private": { bg: "#d9ecf3", border: "#2a5e84", text: "#1d4761" },
+  "membership-adult":   { bg: "#fde5de", border: "#F58B76", text: "#8c3a26" },
+  "membership-group":   { bg: "#dde4fa", border: "#1a3a8a", text: "#152e6e" },
   "dive-session":       { bg: "#FAEEDA", border: "#633806", text: "#633806" },
   "pool-rental":        { bg: "#F1EFE8", border: "#2C2C2A", text: "#2C2C2A" },
   "maintenance":        { bg: "#F3F3F3", border: "#666",    text: "#333" },
@@ -123,6 +134,7 @@ interface Props {
   lessonDates: LessonDate[];
   enrollmentDateMoves?: EnrollmentDateMove[];
   privateLessons?: PrivateLessonBooking[];
+  membershipLessons?: MembershipLesson[];
   onPrivateLessonClick?: (booking: PrivateLessonBooking) => void;
   activeFilters: Set<ActivityType>;
   onAttendanceChange: () => void;
@@ -151,6 +163,7 @@ const CalendarDayView = ({
   lessonDates,
   enrollmentDateMoves = [],
   privateLessons = [],
+  membershipLessons = [],
   onPrivateLessonClick,
   activeFilters,
   onAttendanceChange,
@@ -161,6 +174,7 @@ const CalendarDayView = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [detailBlock, setDetailBlock] = useState<BlockInfo | null>(null);
+  const [membershipDetail, setMembershipDetail] = useState<MembershipLesson | null>(null);
   const [hoverSlot, setHoverSlot] = useState<{ colId: string; y: number } | null>(null);
   const [now, setNow] = useState(new Date());
   const [openInstructor, setOpenInstructor] = useState<string | null>(null);
@@ -317,6 +331,31 @@ const CalendarDayView = ({
       })) as (CalendarPoolEvent & { __privateLesson?: PrivateLessonBooking })[];
   }, [privateLessons, dateStr]);
 
+  // ── Map membership lessons for this date into the grid ──
+  // Scheduling only: membership rows carry no payment or card state.
+  const membershipGridEvents = useMemo(() => {
+    return membershipLessons
+      .filter((m) => m.occurrence_date === dateStr)
+      .map((m) => ({
+        id: `ml:${m.occurrence_id}`,
+        event_type:
+          m.plan_key === "adult_group"
+            ? "membership-adult"
+            : m.plan_key === "kid_group"
+            ? "membership-group"
+            : "membership-private",
+        title: m.swimmer_name || m.parent_name || m.plan_name,
+        event_date: m.occurrence_date,
+        start_time: m.start_time,
+        end_time: m.end_time,
+        pool_area: m.location || "shallow",
+        instructor_name: m.instructor_name,
+        notes: m.notes,
+        is_recurring: true,
+        __membershipLesson: m,
+      })) as (CalendarPoolEvent & { __membershipLesson?: MembershipLesson })[];
+  }, [membershipLessons, dateStr]);
+
   const lessonEvents = [
     ...adEventsAll.filter((e) => e.event_type === "private-lesson" || e.event_type === "semi-private-lesson"),
     ...privateLessonGridEvents,
@@ -325,7 +364,7 @@ const CalendarDayView = ({
     (e) => e.event_type !== "private-lesson" && e.event_type !== "semi-private-lesson"
   );
   // Keep adEvents for column rendering (all of them render in the AD column)
-  const adEvents = [...adEventsAll, ...privateLessonGridEvents];
+  const adEvents = [...adEventsAll, ...privateLessonGridEvents, ...membershipGridEvents];
   const swimLessonEvents = todayEvents.filter((e) => e.event_type === "swim-lesson");
   const diveRentalEvents = todayEvents.filter(
     (e) => ["dive-session", "pool-rental", "maintenance"].includes(e.event_type)
@@ -557,6 +596,8 @@ const CalendarDayView = ({
 
       adEvents.forEach((e: any) => {
         const isPL = typeof e.id === "string" && e.id.startsWith("pl:");
+        const isML = typeof e.id === "string" && e.id.startsWith("ml:");
+        const ml = e.__membershipLesson as MembershipLesson | undefined;
         items.push({
           key: `event-${e.id}`,
           startMins: timeToMinutes(e.start_time),
@@ -564,11 +605,15 @@ const CalendarDayView = ({
           startLabel: fmtTime(e.start_time),
           endLabel: fmtTime(e.end_time),
           colorKey: e.event_type,
-          title: e.title,
-          subtitle: e.instructor_name || e.pool_area,
-          dimmed: !activeFilters.has(e.event_type as ActivityType),
+          title: isML && ml ? `${e.title} · Membership` : e.title,
+          subtitle: isML && ml
+            ? `${ml.plan_name} · ${ml.instructor_name || "Unassigned"}`
+            : e.instructor_name || e.pool_area,
+          dimmed: isML ? false : !activeFilters.has(e.event_type as ActivityType),
           onClick: () => {
-            if (isPL && e.__privateLesson && onPrivateLessonClick) {
+            if (isML && ml) {
+              setMembershipDetail(ml);
+            } else if (isPL && e.__privateLesson && onPrivateLessonClick) {
               onPrivateLessonClick(e.__privateLesson);
             } else {
               setDetailBlock({ kind: "event", event: e });
@@ -1206,11 +1251,15 @@ const CalendarDayView = ({
                 const startMins = timeToMinutes(e.start_time);
                 const endMins = timeToMinutes(e.end_time);
                 const colorKey = e.event_type;
-                const dimmed = !activeFilters.has(e.event_type as ActivityType);
-                const laneInfo = adEventLanes.get(e.id);
                 const isPL = typeof e.id === "string" && e.id.startsWith("pl:");
+                const isML = typeof e.id === "string" && e.id.startsWith("ml:");
+                const ml = e.__membershipLesson as MembershipLesson | undefined;
+                const dimmed = isML ? false : !activeFilters.has(e.event_type as ActivityType);
+                const laneInfo = adEventLanes.get(e.id);
                 const handleClick = () => {
-                  if (isPL && e.__privateLesson && onPrivateLessonClick) {
+                  if (isML && ml) {
+                    setMembershipDetail(ml);
+                  } else if (isPL && e.__privateLesson && onPrivateLessonClick) {
                     onPrivateLessonClick(e.__privateLesson);
                   } else {
                     setDetailBlock({ kind: "event", event: e });
@@ -1222,12 +1271,14 @@ const CalendarDayView = ({
                   startMins,
                   endMins,
                   colorKey,
-                  e.title,
-                  e.instructor_name || e.pool_area,
+                  isML && ml ? `${e.title} · Membership` : e.title,
+                  isML && ml
+                    ? `${ml.plan_name} · ${ml.instructor_name || "Unassigned"}`
+                    : e.instructor_name || e.pool_area,
                   dimmed,
                   handleClick,
                   false,
-                  isPL ? null : (
+                  isPL || isML ? null : (
                     <div className="flex shrink-0 gap-0.5">
                       <button
                         onClick={(ev) => { ev.stopPropagation(); onEditEvent?.(e); }}
@@ -1243,14 +1294,25 @@ const CalendarDayView = ({
                       </button>
                     </div>
                   ),
-                  <div className="space-y-1 text-xs">
-                    <p className="font-semibold">{e.title}</p>
-                    <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
-                    <p className="capitalize">Type: {e.event_type.replace(/-/g, " ")}</p>
-                    {e.instructor_name && <p>Instructor: {e.instructor_name}</p>}
-                    {e.pool_area && <p>Area: {e.pool_area}</p>}
-                    {e.notes && <p className="opacity-80">{e.notes}</p>}
-                  </div>,
+                  isML && ml ? (
+                    <div className="space-y-1 text-xs">
+                      <p className="font-semibold">{ml.swimmer_name || ml.parent_name}</p>
+                      <p>{ml.plan_name} membership</p>
+                      <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
+                      <p>Instructor: {ml.instructor_name || "Unassigned"}</p>
+                      {ml.medical_notes && <p className="opacity-80">Medical: {ml.medical_notes}</p>}
+                      {ml.notes && <p className="opacity-80">{ml.notes}</p>}
+                    </div>
+                  ) : (
+                    <div className="space-y-1 text-xs">
+                      <p className="font-semibold">{e.title}</p>
+                      <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
+                      <p className="capitalize">Type: {e.event_type.replace(/-/g, " ")}</p>
+                      {e.instructor_name && <p>Instructor: {e.instructor_name}</p>}
+                      {e.pool_area && <p>Area: {e.pool_area}</p>}
+                      {e.notes && <p className="opacity-80">{e.notes}</p>}
+                    </div>
+                  ),
                   laneInfo?.lane,
                   laneInfo?.laneCount
                 );
@@ -1375,6 +1437,52 @@ const CalendarDayView = ({
         lessonDates={lessonDates}
         enrollmentDateMoves={enrollmentDateMoves}
       />
+
+      {/* ── Membership lesson detail (read only, no billing actions) ── */}
+      <Dialog open={!!membershipDetail} onOpenChange={(open) => !open && setMembershipDetail(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {membershipDetail?.swimmer_name || membershipDetail?.parent_name || "Membership lesson"}
+            </DialogTitle>
+            <DialogDescription>
+              {membershipDetail?.plan_name} membership
+            </DialogDescription>
+          </DialogHeader>
+          {membershipDetail && (
+            <div className="space-y-2 text-sm">
+              <p>
+                {fmtTime(membershipDetail.start_time)} – {fmtTime(membershipDetail.end_time)}
+              </p>
+              <p>Instructor: {membershipDetail.instructor_name || "Unassigned"}</p>
+              {membershipDetail.swim_level && <p>Level: {membershipDetail.swim_level}</p>}
+              {membershipDetail.location && <p>Area: {membershipDetail.location}</p>}
+              <p>
+                Parent: {membershipDetail.parent_name || "—"}
+                {membershipDetail.parent_phone ? ` · ${membershipDetail.parent_phone}` : ""}
+              </p>
+              {membershipDetail.parent_email && (
+                <p className="text-muted-foreground">{membershipDetail.parent_email}</p>
+              )}
+              {membershipDetail.emergency_contact_name && (
+                <p>
+                  Emergency: {membershipDetail.emergency_contact_name}
+                  {membershipDetail.emergency_contact_relationship
+                    ? ` (${membershipDetail.emergency_contact_relationship})`
+                    : ""}
+                  {membershipDetail.emergency_contact_phone
+                    ? ` · ${membershipDetail.emergency_contact_phone}`
+                    : ""}
+                </p>
+              )}
+              {membershipDetail.medical_notes && (
+                <p className="text-destructive">Medical: {membershipDetail.medical_notes}</p>
+              )}
+              {membershipDetail.notes && <p>{membershipDetail.notes}</p>}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── Delete confirmation ── */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
