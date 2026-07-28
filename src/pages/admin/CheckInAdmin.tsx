@@ -553,7 +553,13 @@ const CheckInAdmin = () => {
                             {e.child_age != null ? `Age ${e.child_age} · ` : ""}{e.parent_name}
                             {e.parent_phone ? ` · ${e.parent_phone}` : ""}
                           </p>
+                          {e.medical_notes && (
+                            <p className="mt-1 text-xs font-medium text-destructive">
+                              Medical: {e.medical_notes}
+                            </p>
+                          )}
                         </div>
+
                         <div className="flex gap-1.5 shrink-0">
                           {e.checked_in ? (
                             <>
