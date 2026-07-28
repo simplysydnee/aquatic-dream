@@ -490,7 +490,8 @@ const CheckInAdmin = () => {
         filtered.map((g) => {
           const levelInfo = g.swim_level ? LEVEL_DISPLAY[g.swim_level as SwimLevel] : null;
           const checked = g.rows.filter((e) => e.checked_in).length;
-          const isPrivate = g.lesson_type !== "group";
+          const isMembership = g.lesson_type === "membership";
+          const isPrivate = g.lesson_type !== "group" && !isMembership;
           return (
             <Card key={g.key}>
               <CardContent className="p-4">
@@ -499,7 +500,11 @@ const CheckInAdmin = () => {
                     <span className="font-semibold text-lg">
                       {format(new Date(`2000-01-01T${g.start_time}`), "h:mm a")}
                     </span>
-                    {isPrivate ? (
+                    {isMembership ? (
+                      <Badge variant="outline" className="bg-teal-50 text-teal-800 border-teal-200">
+                        {g.session_name}
+                      </Badge>
+                    ) : isPrivate ? (
                       <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
                         {g.lesson_type === "semi_private" ? "Semi-Private" : "Private"}
                       </Badge>
@@ -511,10 +516,11 @@ const CheckInAdmin = () => {
                     {g.instructor_name && (
                       <span className="text-xs text-muted-foreground">w/ {g.instructor_name}</span>
                     )}
-                    {!isPrivate && g.session_name && (
+                    {!isPrivate && !isMembership && g.session_name && (
                       <span className="text-xs text-muted-foreground">{g.session_name}</span>
                     )}
                   </div>
+
                   <span className="text-sm text-muted-foreground">
                     {checked}/{g.rows.length} checked in
                   </span>
