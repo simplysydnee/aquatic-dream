@@ -301,6 +301,7 @@ const CalendarAdmin = () => {
           lessonDates={lessonDates}
           enrollmentDateMoves={enrollmentDateMoves}
           privateLessons={privateLessons}
+          membershipLessons={membershipLessons}
           onPrivateLessonClick={(p) => setActivePrivateLesson(p)}
           activeFilters={activeFilters}
           onAttendanceChange={refetch}
