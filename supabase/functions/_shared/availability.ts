@@ -110,17 +110,21 @@ export function validateOccurrencesAgainstBlocks(
   return failures;
 }
 
-export function formatAvailabilityError(failures: AvailabilityFailure[]): string {
+export function formatAvailabilityError(
+  failures: AvailabilityFailure[],
+  instructorName?: string,
+): string {
+  const who = instructorName?.trim() || "Instructor";
   const describe = (f: AvailabilityFailure) =>
     `${f.date} at ${f.start_time}-${f.end_time}`;
   const noAvail = failures.filter((f) => f.reason === "no_availability").map(describe);
   const blackout = failures.filter((f) => f.reason === "blackout").map(describe);
   const parts: string[] = [];
   if (noAvail.length) {
-    parts.push(`Instructor has no availability on ${noAvail.join(", ")}`);
+    parts.push(`${who} has no availability on ${noAvail.join(", ")}`);
   }
   if (blackout.length) {
-    parts.push(`Instructor is closed on ${blackout.join(", ")}`);
+    parts.push(`${who} is closed on ${blackout.join(", ")}`);
   }
   return parts.join(". ");
 }
