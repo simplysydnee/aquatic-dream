@@ -237,6 +237,13 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .select("id, enrollment_id, lesson_date, target_session_id, reason")
         .gte("lesson_date", rangeStart)
         .lte("lesson_date", rangeEnd),
+      supabase
+        .from("membership_occurrences")
+        .select("id, membership_id, occurrence_date, start_time, end_time, instructor_id, status, memberships!inner(id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, notes, medical_notes, standing_slots(id, start_time, end_time, instructor_id, location, swim_level), visitor_waivers(emergency_contact_first_name, emergency_contact_last_name, emergency_contact_phone, emergency_contact_relationship))")
+        .gte("occurrence_date", rangeStart)
+        .lte("occurrence_date", rangeEnd)
+        .eq("status", "scheduled"),
+      supabase.from("membership_plans").select("plan_key, name"),
     ]);
 
     if (sessionsRes.data) setSwimSessions(sessionsRes.data);
