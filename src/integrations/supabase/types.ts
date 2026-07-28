@@ -1401,6 +1401,8 @@ export type Database = {
       membership_occurrences: {
         Row: {
           cancel_reason: string | null
+          checked_in_at: string | null
+          checked_in_by: string | null
           closure_id: string | null
           closure_type: Database["public"]["Enums"]["closure_type"] | null
           created_at: string
@@ -1414,6 +1416,8 @@ export type Database = {
         }
         Insert: {
           cancel_reason?: string | null
+          checked_in_at?: string | null
+          checked_in_by?: string | null
           closure_id?: string | null
           closure_type?: Database["public"]["Enums"]["closure_type"] | null
           created_at?: string
@@ -1427,6 +1431,8 @@ export type Database = {
         }
         Update: {
           cancel_reason?: string | null
+          checked_in_at?: string | null
+          checked_in_by?: string | null
           closure_id?: string | null
           closure_type?: Database["public"]["Enums"]["closure_type"] | null
           created_at?: string

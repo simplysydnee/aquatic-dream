@@ -29,11 +29,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import FrontDeskEnrollmentWaiverDialog from "@/components/admin/calendar/FrontDeskEnrollmentWaiverDialog";
 
-type RowKind = "group" | "private" | "semi_private";
+type RowKind = "group" | "private" | "semi_private" | "membership";
 
 interface Row {
   kind: RowKind;
-  id: string; // enrollment_id (group) or occurrence_id (private)
+  id: string; // enrollment_id (group), occurrence_id (private / membership)
   session_id: string | null;
   child_name: string;
   child_age: number | null;
@@ -45,6 +45,7 @@ interface Row {
   checked_in_at: string | null;
   no_show: boolean;
   notes: string | null;
+  medical_notes?: string | null;
 }
 
 interface Slot {
@@ -57,6 +58,7 @@ interface Slot {
   lesson_type: RowKind;
   rows: Row[];
 }
+
 
 const daysForToday = (d: Date): string[] => {
   switch (format(d, "EEEE")) {
@@ -90,7 +92,7 @@ const CheckInAdmin = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [sessionsRes, enrollRes, attendanceRes, occRes] = await Promise.all([
+    const [sessionsRes, enrollRes, attendanceRes, occRes, memOccRes, plansRes, instrRes] = await Promise.all([
       supabase
         .from("swim_sessions")
         .select("id, start_time, end_time, swim_level, age_group, session_name, instructor_id, session_start_date, session_end_date, instructors(name)")
@@ -111,7 +113,15 @@ const CheckInAdmin = () => {
         .select("id, occurrence_date, status, checked_in_at, lesson_bookings!inner(id, lesson_type, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, status)")
         .eq("occurrence_date", dateStr)
         .not("status", "in", "(cancelled,abandoned)") as any,
+      (supabase
+        .from("membership_occurrences") as any)
+        .select("id, occurrence_date, start_time, end_time, instructor_id, status, checked_in_at, checked_in_by, memberships!inner(id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, waiver_id, medical_notes, standing_slots(id, day_of_week, start_time, end_time, instructor_id, capacity))")
+        .eq("occurrence_date", dateStr)
+        .eq("status", "scheduled"),
+      supabase.from("membership_plans").select("plan_key, name"),
+      supabase.from("instructors").select("id, name"),
     ]);
+
 
     const sessions = (sessionsRes.data || []) as any[];
     const enrollments = (enrollRes.data || []) as any[];
@@ -206,7 +216,63 @@ const CheckInAdmin = () => {
       };
     });
 
-    const all = [...groupSlots, ...privateSlots].sort((a, b) => {
+    // ── Membership occurrences (scheduled only) ──
+    // Attendance record only. Membership billing is calendar-based and never
+    // reads these fields.
+    const planNameByKey = new Map<string, string>(
+      ((plansRes.data as any[]) || []).map((p) => [p.plan_key, p.name])
+    );
+    const instrNameById = new Map<string, string>(
+      ((instrRes.data as any[]) || []).map((i) => [i.id, i.name])
+    );
+    const membershipGroups = new Map<string, Slot>();
+    for (const o of ((memOccRes as any).data || []) as any[]) {
+      const m = o.memberships || {};
+      const slot = m.standing_slots || null;
+      const startTime = (o.start_time || slot?.start_time || "").slice(0, 8);
+      const endTime = (o.end_time || slot?.end_time || "").slice(0, 8);
+      const instructorId = o.instructor_id || slot?.instructor_id || null;
+      const planName = planNameByKey.get(m.plan_key) || "Membership";
+      const groupKey = `m:${slot?.id || m.id}:${startTime}`;
+      const row: Row = {
+        kind: "membership",
+        id: o.id,
+        session_id: null,
+        child_name:
+          [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim() ||
+          [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim() ||
+          "(no name)",
+        child_age: null,
+        parent_name: [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim(),
+        parent_email: m.parent_email || "",
+        parent_phone: m.parent_phone || null,
+        has_waiver: !!m.waiver_id,
+        checked_in: !!o.checked_in_at,
+        checked_in_at: o.checked_in_at ?? null,
+        no_show: false,
+        notes: null,
+        medical_notes: m.medical_notes || null,
+      };
+      const existing = membershipGroups.get(groupKey);
+      if (existing) {
+        existing.rows.push(row);
+      } else {
+        membershipGroups.set(groupKey, {
+          key: groupKey,
+          start_time: startTime,
+          end_time: endTime,
+          swim_level: null,
+          session_name: planName,
+          instructor_name: instructorId ? instrNameById.get(instructorId) || null : null,
+          lesson_type: "membership",
+          rows: [row],
+        });
+      }
+    }
+    const membershipSlots = Array.from(membershipGroups.values());
+
+    const all = [...groupSlots, ...privateSlots, ...membershipSlots].sort((a, b) => {
+
       if (a.start_time !== b.start_time) return a.start_time.localeCompare(b.start_time);
       const ia = (a.instructor_name || "zzz").toLowerCase();
       const ib = (b.instructor_name || "zzz").toLowerCase();
@@ -287,19 +353,49 @@ const CheckInAdmin = () => {
     );
   };
 
+  // Attendance record only — nothing bills off these columns.
+  const setMembershipAttendance = async (row: Row, checkedIn: boolean) => {
+    setBusyId(row.id);
+    const { error } = await (supabase
+      .from("membership_occurrences") as any)
+      .update({
+        checked_in_at: checkedIn ? new Date().toISOString() : null,
+        checked_in_by: checkedIn ? checkedInBy : null,
+      })
+      .eq("id", row.id);
+    setBusyId(null);
+    if (error) {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setSlots((prev) =>
+      prev.map((g) => ({
+        ...g,
+        rows: g.rows.map((r) =>
+          r.id === row.id
+            ? { ...r, checked_in: checkedIn, checked_in_at: checkedIn ? new Date().toISOString() : null }
+            : r
+        ),
+      }))
+    );
+  };
+
   const handleCheckInClick = (row: Row) => {
     if (!row.has_waiver) {
       setWaiverPrompt(row);
       return;
     }
     if (row.kind === "group") setGroupAttendance(row, { checked_in: true, notes: null });
+    else if (row.kind === "membership") setMembershipAttendance(row, true);
     else setPrivateAttendance(row, true);
   };
 
   const handleUndo = (row: Row) => {
     if (row.kind === "group") setGroupAttendance(row, { checked_in: false, notes: null });
+    else if (row.kind === "membership") setMembershipAttendance(row, false);
     else setPrivateAttendance(row, false);
   };
+
 
   const emailWaiverLink = async (row: Row) => {
     if (row.kind !== "group") {
@@ -394,7 +490,8 @@ const CheckInAdmin = () => {
         filtered.map((g) => {
           const levelInfo = g.swim_level ? LEVEL_DISPLAY[g.swim_level as SwimLevel] : null;
           const checked = g.rows.filter((e) => e.checked_in).length;
-          const isPrivate = g.lesson_type !== "group";
+          const isMembership = g.lesson_type === "membership";
+          const isPrivate = g.lesson_type !== "group" && !isMembership;
           return (
             <Card key={g.key}>
               <CardContent className="p-4">
@@ -403,7 +500,11 @@ const CheckInAdmin = () => {
                     <span className="font-semibold text-lg">
                       {format(new Date(`2000-01-01T${g.start_time}`), "h:mm a")}
                     </span>
-                    {isPrivate ? (
+                    {isMembership ? (
+                      <Badge variant="outline" className="bg-teal-50 text-teal-800 border-teal-200">
+                        {g.session_name}
+                      </Badge>
+                    ) : isPrivate ? (
                       <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
                         {g.lesson_type === "semi_private" ? "Semi-Private" : "Private"}
                       </Badge>
@@ -415,10 +516,11 @@ const CheckInAdmin = () => {
                     {g.instructor_name && (
                       <span className="text-xs text-muted-foreground">w/ {g.instructor_name}</span>
                     )}
-                    {!isPrivate && g.session_name && (
+                    {!isPrivate && !isMembership && g.session_name && (
                       <span className="text-xs text-muted-foreground">{g.session_name}</span>
                     )}
                   </div>
+
                   <span className="text-sm text-muted-foreground">
                     {checked}/{g.rows.length} checked in
                   </span>
@@ -451,7 +553,13 @@ const CheckInAdmin = () => {
                             {e.child_age != null ? `Age ${e.child_age} · ` : ""}{e.parent_name}
                             {e.parent_phone ? ` · ${e.parent_phone}` : ""}
                           </p>
+                          {e.medical_notes && (
+                            <p className="mt-1 text-xs font-medium text-destructive">
+                              Medical: {e.medical_notes}
+                            </p>
+                          )}
                         </div>
+
                         <div className="flex gap-1.5 shrink-0">
                           {e.checked_in ? (
                             <>
