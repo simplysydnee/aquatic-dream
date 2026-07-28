@@ -167,6 +167,7 @@ const CalendarDayView = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [detailBlock, setDetailBlock] = useState<BlockInfo | null>(null);
+  const [membershipDetail, setMembershipDetail] = useState<MembershipLesson | null>(null);
   const [hoverSlot, setHoverSlot] = useState<{ colId: string; y: number } | null>(null);
   const [now, setNow] = useState(new Date());
   const [openInstructor, setOpenInstructor] = useState<string | null>(null);
