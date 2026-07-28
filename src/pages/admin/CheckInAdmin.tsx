@@ -92,7 +92,7 @@ const CheckInAdmin = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [sessionsRes, enrollRes, attendanceRes, occRes] = await Promise.all([
+    const [sessionsRes, enrollRes, attendanceRes, occRes, memOccRes, plansRes, instrRes] = await Promise.all([
       supabase
         .from("swim_sessions")
         .select("id, start_time, end_time, swim_level, age_group, session_name, instructor_id, session_start_date, session_end_date, instructors(name)")
@@ -113,7 +113,15 @@ const CheckInAdmin = () => {
         .select("id, occurrence_date, status, checked_in_at, lesson_bookings!inner(id, lesson_type, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, status)")
         .eq("occurrence_date", dateStr)
         .not("status", "in", "(cancelled,abandoned)") as any,
+      (supabase
+        .from("membership_occurrences") as any)
+        .select("id, occurrence_date, start_time, end_time, instructor_id, status, memberships!inner(id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, waiver_id, medical_notes, standing_slots(id, day_of_week, start_time, end_time, instructor_id, capacity))")
+        .eq("occurrence_date", dateStr)
+        .eq("status", "scheduled"),
+      supabase.from("membership_plans").select("plan_key, name"),
+      supabase.from("instructors").select("id, name"),
     ]);
+
 
     const sessions = (sessionsRes.data || []) as any[];
     const enrollments = (enrollRes.data || []) as any[];
