@@ -55,6 +55,11 @@ const LEVEL_STRIPE: Record<string, string> = {
 
 const PRIVATE_STRIPE = "#26215C";
 const SEMI_PRIVATE_STRIPE = "#4B1528";
+const MEMBERSHIP_STRIPE: Record<string, string> = {
+  private: "#2a5e84",
+  adult_group: "#F58B76",
+  kid_group: "#1a3a8a",
+};
 
 interface PrivateOccurrence {
   id: string;
@@ -70,6 +75,26 @@ interface PrivateOccurrence {
   parent_phone: string | null;
   notes: string | null;
   needs_card: boolean;
+}
+
+interface MembershipOccurrence {
+  id: string;
+  instructor_id: string | null;
+  instructor_name: string | null;
+  plan_key: string;
+  plan_name: string;
+  start_time: string;
+  end_time: string;
+  location: string | null;
+  swim_level: string | null;
+  swimmer_name: string;
+  parent_name: string;
+  parent_phone: string | null;
+  notes: string | null;
+  medical_notes: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relationship: string | null;
 }
 
 
