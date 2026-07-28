@@ -166,6 +166,7 @@ export default function PrintDaySchedule() {
           .eq("occurrence_date", date)
           .eq("status", "scheduled"),
         supabase.from("instructors").select("id, name"),
+        supabase.from("membership_plans").select("plan_key, name"),
       ]);
       if (s.data) setSessions(s.data as Session[]);
       if (e.data) setEnrollments(e.data as Enrollment[]);
