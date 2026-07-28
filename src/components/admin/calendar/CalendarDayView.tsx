@@ -13,6 +13,7 @@ import type {
   LessonDate,
   EnrollmentDateMove,
   PrivateLessonBooking,
+  MembershipLesson,
 } from "@/hooks/useCalendarData";
 import { Lock, Plus, Pencil, Trash2, Camera } from "lucide-react";
 import {
