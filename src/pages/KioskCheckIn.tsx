@@ -190,7 +190,56 @@ const KioskCheckIn = () => {
       };
     });
 
-    setSlots([...groupSlots, ...privateSlots]);
+    // Membership occurrences (scheduled only), grouped by standing slot + start time.
+    // Attendance record only, never used for billing.
+    const planNameByKey = new Map<string, string>(
+      ((plansRes.data as any[]) || []).map((p) => [p.plan_key, p.name])
+    );
+    const instrNameById = new Map<string, string>(
+      ((instrRes.data as any[]) || []).map((i) => [i.id, i.name])
+    );
+    const membershipGroups = new Map<string, Slot>();
+    for (const o of ((memOccRes as any).data || []) as any[]) {
+      const m = o.memberships || {};
+      const slot = m.standing_slots || null;
+      const startTime = (o.start_time || slot?.start_time || "").slice(0, 8);
+      const endTime = (o.end_time || slot?.end_time || "").slice(0, 8);
+      const instructorId = o.instructor_id || slot?.instructor_id || null;
+      const planName = planNameByKey.get(m.plan_key) || "Membership";
+      const groupKey = `m:${slot?.id || m.id}:${startTime}`;
+      const item: RosterItem = {
+        kind: "membership",
+        id: o.id,
+        session_id: null,
+        child_name:
+          [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim() ||
+          [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim() ||
+          "(no name)",
+        child_age: null,
+        parent_name: [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim(),
+        has_waiver: !!m.waiver_id,
+        checked_in: !!o.checked_in_at,
+        checked_in_at: o.checked_in_at ?? null,
+      };
+      const existing = membershipGroups.get(groupKey);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        membershipGroups.set(groupKey, {
+          key: groupKey,
+          start_time: startTime,
+          end_time: endTime,
+          swim_level: null,
+          age_group: null,
+          session_name: planName,
+          instructor_name: instructorId ? instrNameById.get(instructorId) || null : null,
+          lesson_type: "membership",
+          items: [item],
+        });
+      }
+    }
+
+    setSlots([...groupSlots, ...privateSlots, ...Array.from(membershipGroups.values())]);
     setLoading(false);
   };
 
