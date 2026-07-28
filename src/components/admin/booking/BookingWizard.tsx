@@ -29,19 +29,23 @@ import { DEAD_STATUS_FILTER } from "@/lib/lessonBookingStatus";
  * message is always "Edge Function returned a non-2xx status code". The real
  * reason lives in the JSON body, so pull it out when we can.
  */
-async function invokeErrorMessage(error: unknown, fallback: string): Promise<string> {
+async function invokeErrorBody(error: unknown): Promise<Record<string, unknown> | null> {
   const ctx = (error as { context?: Response })?.context;
   if (ctx && typeof (ctx as Response).json === "function") {
     try {
-      const body = await (ctx as Response).clone().json();
-      const msg = (body as { error?: unknown })?.error;
-      if (typeof msg === "string" && msg.trim()) return msg;
+      return await (ctx as Response).clone().json();
     } catch {
-      // Non-JSON body (e.g. a gateway 502) — fall through.
+      return null;
     }
   }
-  const msg = (error as { message?: string })?.message;
-  return msg || fallback;
+  return null;
+}
+
+async function invokeErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const body = await invokeErrorBody(error);
+  const msg = (body as { error?: unknown } | null)?.error;
+  if (typeof msg === "string" && msg.trim()) return msg;
+  return (error as { message?: string })?.message || fallback;
 }
 
 // ────────────────────────────────────────────────────────────────────────
