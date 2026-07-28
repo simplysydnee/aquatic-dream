@@ -274,6 +274,12 @@ export default function PrintDaySchedule() {
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [privateOccs, allowedInstructorIds]);
 
+  const todayMembership = useMemo(() => {
+    return membershipOccs
+      .filter((m) => allowedInstructorIds === null || (m.instructor_id !== null && allowedInstructorIds.has(m.instructor_id)))
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [membershipOccs, allowedInstructorIds]);
+
   const agreementByEnrollment = useMemo(() => {
     const m = new Map<string, Agreement>();
     for (const a of agreements) if (a.enrollment_id) m.set(a.enrollment_id, a);
@@ -282,9 +288,10 @@ export default function PrintDaySchedule() {
 
   type Item =
     | { kind: "group"; start_time: string; session: Session }
-    | { kind: "private"; start_time: string; occ: PrivateOccurrence };
+    | { kind: "private"; start_time: string; occ: PrivateOccurrence }
+    | { kind: "membership"; start_time: string; occ: MembershipOccurrence };
 
-  // Group by instructor; include group sessions and private/semi-private occurrences
+  // Group by instructor; include group sessions, private occurrences and membership lessons
   const grouped = useMemo(() => {
     const m = new Map<string, { name: string; items: Item[] }>();
     for (const s of todaySessions) {
@@ -298,6 +305,12 @@ export default function PrintDaySchedule() {
       const name = p.instructor_name || "Unassigned";
       if (!m.has(key)) m.set(key, { name, items: [] });
       m.get(key)!.items.push({ kind: "private", start_time: p.start_time, occ: p });
+    }
+    for (const ml of todayMembership) {
+      const key = ml.instructor_id || "unassigned";
+      const name = ml.instructor_name || "Unassigned";
+      if (!m.has(key)) m.set(key, { name, items: [] });
+      m.get(key)!.items.push({ kind: "membership", start_time: ml.start_time, occ: ml });
     }
     return [...m.values()]
       .map((g) => {
