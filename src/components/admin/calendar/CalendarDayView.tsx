@@ -589,6 +589,8 @@ const CalendarDayView = ({
 
       adEvents.forEach((e: any) => {
         const isPL = typeof e.id === "string" && e.id.startsWith("pl:");
+        const isML = typeof e.id === "string" && e.id.startsWith("ml:");
+        const ml = e.__membershipLesson as MembershipLesson | undefined;
         items.push({
           key: `event-${e.id}`,
           startMins: timeToMinutes(e.start_time),
@@ -596,11 +598,15 @@ const CalendarDayView = ({
           startLabel: fmtTime(e.start_time),
           endLabel: fmtTime(e.end_time),
           colorKey: e.event_type,
-          title: e.title,
-          subtitle: e.instructor_name || e.pool_area,
-          dimmed: !activeFilters.has(e.event_type as ActivityType),
+          title: isML && ml ? `${e.title} · Membership` : e.title,
+          subtitle: isML && ml
+            ? `${ml.plan_name} · ${ml.instructor_name || "Unassigned"}`
+            : e.instructor_name || e.pool_area,
+          dimmed: isML ? false : !activeFilters.has(e.event_type as ActivityType),
           onClick: () => {
-            if (isPL && e.__privateLesson && onPrivateLessonClick) {
+            if (isML && ml) {
+              setMembershipDetail(ml);
+            } else if (isPL && e.__privateLesson && onPrivateLessonClick) {
               onPrivateLessonClick(e.__privateLesson);
             } else {
               setDetailBlock({ kind: "event", event: e });
