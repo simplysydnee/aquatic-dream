@@ -20,6 +20,7 @@ import cancelPrivateLessonOccurrence from "./tools/cancel-private-lesson-occurre
 import reassignPrivateLessonInstructor from "./tools/reassign-private-lesson-instructor";
 import reschedulePrivateLessonOccurrence from "./tools/reschedule-private-lesson-occurrence";
 import updateSwimEnrollment from "./tools/update-swim-enrollment";
+import completeMembershipCheckout from "./tools/complete-membership-checkout";
 
 
 // Build the issuer from the project ref so the OAuth issuer matches the direct
@@ -58,6 +59,7 @@ export default defineMcp({
     reassignPrivateLessonInstructor,
     reschedulePrivateLessonOccurrence,
     updateSwimEnrollment,
+    completeMembershipCheckout,
   ],
 
 });
