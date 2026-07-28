@@ -1762,6 +1762,11 @@ function ReviewStep({
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [stage, setStage] = useState<"review" | "card" | "finalizing">("review");
+  const [unavailablePrompt, setUnavailablePrompt] = useState<{
+    message: string;
+    blackout: boolean;
+    retry: () => void;
+  } | null>(null);
   const [stripeReady, setStripeReady] = useState<any>(null);
   const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
