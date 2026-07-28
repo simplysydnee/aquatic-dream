@@ -390,7 +390,18 @@ Deno.serve(async (req) => {
 
     // Availability guard: every proposed date must fall inside a
     // non-blackout instructor_booking_blocks window for this instructor.
-    {
+    if (p.allow_outside_availability) {
+      console.log(
+        "[admin-create-private-booking] availability override",
+        JSON.stringify({
+          instructor_id: p.instructor_id,
+          instructor_name: instructorName,
+          dates,
+          start_time: p.start_time,
+          end_time: p.end_time,
+        }),
+      );
+    } else {
       const { data: blocksData, error: blocksErr } = await supabaseAdmin
         .rpc("get_public_booking_blocks", { _instructor_ids: [p.instructor_id] });
       if (blocksErr) throw blocksErr;
@@ -405,7 +416,7 @@ Deno.serve(async (req) => {
       if (failures.length) {
         return j(
           {
-            error: formatAvailabilityError(failures),
+            error: formatAvailabilityError(failures, instructorName),
             code: "instructor_unavailable",
             failures,
           },
