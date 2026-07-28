@@ -866,6 +866,37 @@
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
         "outputSchema": null
+      },
+      {
+        "name": "complete_membership_checkout",
+        "title": "Complete membership checkout",
+        "description": "Recovery tool: finish a membership signup from its Stripe checkout session id (cs_...). Creates the Stripe subscription if missing, writes the membership row, generates lesson occurrences, and sends the welcome message. Safe to re-run — it is idempotent. Requires confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "pattern": "^cs_(test|live)_[A-Za-z0-9]+$",
+              "description": "Stripe Checkout session id from the membership signup."
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "session_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
       }
     ]
   }
