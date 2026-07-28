@@ -210,6 +210,43 @@ export default function PrintDaySchedule() {
 
         setPrivateOccs(mapped);
       }
+      if (mo.data) {
+        const instrNames = new Map<string, string>(
+          ((instr.data as { id: string; name: string }[] | null) || []).map((i) => [i.id, i.name])
+        );
+        const planNames = new Map<string, string>(
+          ((plans.data as { plan_key: string; name: string }[] | null) || []).map((p) => [p.plan_key, p.name])
+        );
+        const mappedM: MembershipOccurrence[] = (mo.data as unknown as Record<string, any>[]).map((o) => {
+          const m = o.memberships;
+          const slot = m?.standing_slots || null;
+          const waiver = m?.visitor_waivers || null;
+          const instructorId = o.instructor_id || slot?.instructor_id || null;
+          const ecFirst = waiver?.emergency_contact_first_name || "";
+          const ecLast = waiver?.emergency_contact_last_name || "";
+          const ecName = `${ecFirst} ${ecLast}`.trim();
+          return {
+            id: o.id,
+            instructor_id: instructorId,
+            instructor_name: instructorId ? instrNames.get(instructorId) || null : null,
+            plan_key: m?.plan_key || "private",
+            plan_name: planNames.get(m?.plan_key) || "Membership",
+            start_time: (o.start_time || slot?.start_time || "").slice(0, 8),
+            end_time: (o.end_time || slot?.end_time || "").slice(0, 8),
+            location: slot?.location || null,
+            swim_level: slot?.swim_level || null,
+            swimmer_name: `${m?.child_first_name || ""} ${m?.child_last_name || ""}`.trim(),
+            parent_name: `${m?.parent_first_name || ""} ${m?.parent_last_name || ""}`.trim(),
+            parent_phone: m?.parent_phone || null,
+            notes: m?.notes || null,
+            medical_notes: m?.medical_notes || null,
+            emergency_contact_name: ecName || null,
+            emergency_contact_phone: waiver?.emergency_contact_phone || null,
+            emergency_contact_relationship: waiver?.emergency_contact_relationship || null,
+          };
+        });
+        setMembershipOccs(mappedM);
+      }
       setLoading(false);
     })();
   }, [date]);
