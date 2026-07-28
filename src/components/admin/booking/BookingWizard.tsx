@@ -12,6 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   Check, ChevronLeft, ChevronRight, Loader2, Search, UserPlus, Users,
@@ -29,19 +33,23 @@ import { DEAD_STATUS_FILTER } from "@/lib/lessonBookingStatus";
  * message is always "Edge Function returned a non-2xx status code". The real
  * reason lives in the JSON body, so pull it out when we can.
  */
-async function invokeErrorMessage(error: unknown, fallback: string): Promise<string> {
+async function invokeErrorBody(error: unknown): Promise<Record<string, unknown> | null> {
   const ctx = (error as { context?: Response })?.context;
   if (ctx && typeof (ctx as Response).json === "function") {
     try {
-      const body = await (ctx as Response).clone().json();
-      const msg = (body as { error?: unknown })?.error;
-      if (typeof msg === "string" && msg.trim()) return msg;
+      return await (ctx as Response).clone().json();
     } catch {
-      // Non-JSON body (e.g. a gateway 502) — fall through.
+      return null;
     }
   }
-  const msg = (error as { message?: string })?.message;
-  return msg || fallback;
+  return null;
+}
+
+async function invokeErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const body = await invokeErrorBody(error);
+  const msg = (body as { error?: unknown } | null)?.error;
+  if (typeof msg === "string" && msg.trim()) return msg;
+  return (error as { message?: string })?.message || fallback;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -1754,6 +1762,11 @@ function ReviewStep({
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [stage, setStage] = useState<"review" | "card" | "finalizing">("review");
+  const [unavailablePrompt, setUnavailablePrompt] = useState<{
+    message: string;
+    blackout: boolean;
+    retry: () => void;
+  } | null>(null);
   const [stripeReady, setStripeReady] = useState<any>(null);
   const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
@@ -1873,6 +1886,7 @@ function ReviewStep({
     sessionId: string | null,
     customerId: string | null,
     sourceOverride?: "reuse" | "new" | "none",
+    allowOutsideAvailability = false,
   ) => {
     setStage("finalizing");
     try {
@@ -1918,8 +1932,22 @@ function ReviewStep({
         body.partner_parent_email = sw2.partner_parent_email?.toLowerCase().trim() || null;
         body.partner_parent_phone = sw2.partner_parent_phone || null;
       }
+      if (allowOutsideAvailability) body.allow_outside_availability = true;
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking", { body });
-      if (error) throw new Error(await invokeErrorMessage(error, "Failed to create booking"));
+      if (error) {
+        const errBody = await invokeErrorBody(error);
+        if ((errBody as any)?.code === "instructor_unavailable" && !allowOutsideAvailability) {
+          const failures = ((errBody as any)?.failures || []) as { reason?: string }[];
+          setUnavailablePrompt({
+            message: String((errBody as any)?.error || "Instructor is not available at that time."),
+            blackout: failures.some((f) => f.reason === "blackout"),
+            retry: () => finalizePrivate(sessionId, customerId, sourceOverride, true),
+          });
+          setStage("review");
+          return;
+        }
+        throw new Error(await invokeErrorMessage(error, "Failed to create booking"));
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
       const used = (data as any)?.card_on_file_source;
       const occ = (data as any)?.occurrences ?? occurrenceDates.length;
@@ -2162,6 +2190,34 @@ function ReviewStep({
           : "Continue to card on file"}
       </Button>
 
+      <AlertDialog open={!!unavailablePrompt} onOpenChange={(o) => { if (!o) setUnavailablePrompt(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {unavailablePrompt?.blackout ? "Instructor marked unavailable" : "Outside instructor availability"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {unavailablePrompt?.message}
+              {". "}
+              {unavailablePrompt?.blackout
+                ? "This instructor blocked off that time, so please confirm with them before booking over it."
+                : "There is no availability window covering that time, which usually means the schedule expired or was never set."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const retry = unavailablePrompt?.retry;
+                setUnavailablePrompt(null);
+                retry?.();
+              }}
+            >
+              Book anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

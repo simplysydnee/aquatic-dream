@@ -42,6 +42,9 @@ const CreateSchema = z.object({
   notes: z.string().max(2000).optional().nullable(),
   recurring: z.boolean().default(false),
   series_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  // Admin-only escape hatch: skip the instructor availability window guard.
+  // Never affects the double-booking conflict check.
+  allow_outside_availability: z.boolean().default(false),
   // Optional explicit list of occurrence dates. When provided, overrides
   // the weekly-expansion logic so admins can deselect dates in the wizard.
   occurrence_dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
@@ -387,7 +390,18 @@ Deno.serve(async (req) => {
 
     // Availability guard: every proposed date must fall inside a
     // non-blackout instructor_booking_blocks window for this instructor.
-    {
+    if (p.allow_outside_availability) {
+      console.log(
+        "[admin-create-private-booking] availability override",
+        JSON.stringify({
+          instructor_id: p.instructor_id,
+          instructor_name: instructorName,
+          dates,
+          start_time: p.start_time,
+          end_time: p.end_time,
+        }),
+      );
+    } else {
       const { data: blocksData, error: blocksErr } = await supabaseAdmin
         .rpc("get_public_booking_blocks", { _instructor_ids: [p.instructor_id] });
       if (blocksErr) throw blocksErr;
@@ -402,7 +416,7 @@ Deno.serve(async (req) => {
       if (failures.length) {
         return j(
           {
-            error: formatAvailabilityError(failures),
+            error: formatAvailabilityError(failures, instructorName),
             code: "instructor_unavailable",
             failures,
           },
