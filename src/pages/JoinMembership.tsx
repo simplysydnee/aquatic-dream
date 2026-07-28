@@ -169,8 +169,65 @@ export default function JoinMembership() {
     return list;
   }, [plan, slots, swimLevel]);
 
+  // Slot picker filters (step 2)
+  const [filterDay, setFilterDay] = useState<string>("any");
+  const [filterInstructor, setFilterInstructor] = useState<string>("any");
+  const [filterTime, setFilterTime] = useState<string>("any");
+
+  const resetFilters = useCallback(() => {
+    setFilterDay("any");
+    setFilterInstructor("any");
+    setFilterTime("any");
+  }, []);
+
+  const dayOptions = useMemo(
+    () => Array.from(new Set(planSlots.map((s) => s.day_of_week))).sort((a, b) => a - b),
+    [planSlots],
+  );
+  const instructorOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(planSlots.map((s) => s.instructor_name).filter((n): n is string => !!n)),
+      ).sort((a, b) => a.localeCompare(b)),
+    [planSlots],
+  );
+
+  const timeBucket = (start: string) => {
+    const hour = Number(start.slice(0, 2));
+    if (hour < 12) return "morning";
+    if (hour < 17) return "afternoon";
+    return "evening";
+  };
+
+  const showFilterBar = planSlots.length > 8;
+
+  const visibleSlots = useMemo(() => {
+    if (!showFilterBar) return planSlots;
+    return planSlots.filter((s) => {
+      if (filterDay !== "any" && String(s.day_of_week) !== filterDay) return false;
+      if (filterInstructor !== "any" && s.instructor_name !== filterInstructor) return false;
+      if (filterTime !== "any" && timeBucket(s.start_time) !== filterTime) return false;
+      return true;
+    });
+  }, [planSlots, showFilterBar, filterDay, filterInstructor, filterTime]);
+
+  const groupedSlots = useMemo(() => {
+    const map = new Map<number, Slot[]>();
+    for (const s of visibleSlots) {
+      if (!map.has(s.day_of_week)) map.set(s.day_of_week, []);
+      map.get(s.day_of_week)!.push(s);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([day, list]) => ({
+        day,
+        list: [...list].sort((a, b) => a.start_time.localeCompare(b.start_time)),
+      }));
+  }, [visibleSlots]);
+
   // Membership waitlist — only ever populated by an explicit tap, never automatically.
   const [waitlistSlot, setWaitlistSlot] = useState<Slot | null>(null);
+
   const [waitlistSaved, setWaitlistSaved] = useState(false);
   const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
   const [waitlistForm, setWaitlistForm] = useState({
