@@ -688,40 +688,46 @@ export default function JoinMembership() {
                 ) : (
                   <>
                     {showFilterBar && (
-                      <div className="mb-4 grid gap-2 sm:grid-cols-3">
-                        <Select value={filterDay} onValueChange={setFilterDay}>
-                          <SelectTrigger className="h-9 text-xs" aria-label="Filter by day">
-                            <SelectValue placeholder="Day" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="any">Any day</SelectItem>
-                            {dayOptions.map((d) => (
-                              <SelectItem key={d} value={String(d)}>{DAYS[d]}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={filterInstructor} onValueChange={setFilterInstructor}>
-                          <SelectTrigger className="h-9 text-xs" aria-label="Filter by instructor">
-                            <SelectValue placeholder="Instructor" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="any">Any instructor</SelectItem>
-                            {instructorOptions.map((n) => (
-                              <SelectItem key={n} value={n}>Coach {n}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={filterTime} onValueChange={setFilterTime}>
-                          <SelectTrigger className="h-9 text-xs" aria-label="Filter by time of day">
-                            <SelectValue placeholder="Time" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="any">Any time</SelectItem>
-                            <SelectItem value="morning">Morning (before 12:00pm)</SelectItem>
-                            <SelectItem value="afternoon">Afternoon (12:00–5:00pm)</SelectItem>
-                            <SelectItem value="evening">Evening (5:00pm and later)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div className="mb-4 flex flex-wrap gap-2">
+                        <div className="min-w-[9rem] flex-1">
+                          <Select value={filterDay} onValueChange={setFilterDay}>
+                            <SelectTrigger className="h-9 w-full text-xs" aria-label="Filter by day">
+                              <SelectValue placeholder="Day" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="any">Any day</SelectItem>
+                              {dayOptions.map((d) => (
+                                <SelectItem key={d} value={String(d)}>{DAYS[d]}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="min-w-[9rem] flex-1">
+                          <Select value={filterInstructor} onValueChange={setFilterInstructor}>
+                            <SelectTrigger className="h-9 w-full text-xs" aria-label="Filter by instructor">
+                              <SelectValue placeholder="Instructor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="any">Any instructor</SelectItem>
+                              {instructorOptions.map((n) => (
+                                <SelectItem key={n} value={n}>Coach {n}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="min-w-[9rem] flex-1">
+                          <Select value={filterTime} onValueChange={setFilterTime}>
+                            <SelectTrigger className="h-9 w-full text-xs" aria-label="Filter by time of day">
+                              <SelectValue placeholder="Time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="any">Any time</SelectItem>
+                              <SelectItem value="morning">Morning (before 12:00pm)</SelectItem>
+                              <SelectItem value="afternoon">Afternoon (12:00–5:00pm)</SelectItem>
+                              <SelectItem value="evening">Evening (5:00pm and later)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     )}
 
