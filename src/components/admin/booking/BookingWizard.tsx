@@ -1800,6 +1800,10 @@ function ReviewStep({
         if (cancelled) return;
         if (error || !data || (data as any).error) {
           setExistingCardHint({ found: false });
+          const message = error
+            ? await invokeErrorMessage(error, "Could not check for a card on file")
+            : (data as { error?: string } | null)?.error;
+          if (!cancelled && message) toast.error(message);
         } else {
           setExistingCardHint(data as any);
         }
