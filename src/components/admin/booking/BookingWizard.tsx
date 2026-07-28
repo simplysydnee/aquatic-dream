@@ -1923,8 +1923,22 @@ function ReviewStep({
         body.partner_parent_email = sw2.partner_parent_email?.toLowerCase().trim() || null;
         body.partner_parent_phone = sw2.partner_parent_phone || null;
       }
+      if (allowOutsideAvailability) body.allow_outside_availability = true;
       const { data, error } = await supabase.functions.invoke("admin-create-private-booking", { body });
-      if (error) throw new Error(await invokeErrorMessage(error, "Failed to create booking"));
+      if (error) {
+        const errBody = await invokeErrorBody(error);
+        if ((errBody as any)?.code === "instructor_unavailable" && !allowOutsideAvailability) {
+          const failures = ((errBody as any)?.failures || []) as { reason?: string }[];
+          setUnavailablePrompt({
+            message: String((errBody as any)?.error || "Instructor is not available at that time."),
+            blackout: failures.some((f) => f.reason === "blackout"),
+            retry: () => finalizePrivate(sessionId, customerId, sourceOverride, true),
+          });
+          setStage("review");
+          return;
+        }
+        throw new Error(await invokeErrorMessage(error, "Failed to create booking"));
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
       const used = (data as any)?.card_on_file_source;
       const occ = (data as any)?.occurrences ?? occurrenceDates.length;
