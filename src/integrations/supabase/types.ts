@@ -1516,6 +1516,65 @@ export type Database = {
         }
         Relationships: []
       }
+      membership_waitlist: {
+        Row: {
+          contacted_at: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          parent_email: string
+          parent_name: string
+          parent_phone: string
+          plan_key: string
+          preferred_day: number | null
+          preferred_time: string | null
+          standing_slot_id: string | null
+          status: string
+          swim_level: string | null
+          swimmer_name: string
+        }
+        Insert: {
+          contacted_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          parent_email: string
+          parent_name: string
+          parent_phone: string
+          plan_key: string
+          preferred_day?: number | null
+          preferred_time?: string | null
+          standing_slot_id?: string | null
+          status?: string
+          swim_level?: string | null
+          swimmer_name: string
+        }
+        Update: {
+          contacted_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          parent_email?: string
+          parent_name?: string
+          parent_phone?: string
+          plan_key?: string
+          preferred_day?: number | null
+          preferred_time?: string | null
+          standing_slot_id?: string | null
+          status?: string
+          swim_level?: string | null
+          swimmer_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_waitlist_standing_slot_id_fkey"
+            columns: ["standing_slot_id"]
+            isOneToOne: false
+            referencedRelation: "standing_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           cancel_effective_date: string | null
@@ -2295,6 +2354,7 @@ export type Database = {
       }
       standing_slots: {
         Row: {
+          accepted_levels: string[] | null
           active: boolean
           capacity: number
           created_at: string
@@ -2308,6 +2368,7 @@ export type Database = {
           swim_level: string | null
         }
         Insert: {
+          accepted_levels?: string[] | null
           active?: boolean
           capacity: number
           created_at?: string
@@ -2321,6 +2382,7 @@ export type Database = {
           swim_level?: string | null
         }
         Update: {
+          accepted_levels?: string[] | null
           active?: boolean
           capacity?: number
           created_at?: string
