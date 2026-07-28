@@ -180,6 +180,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
   const [icsSessions, setIcsSessions] = useState<ICSSession[]>([]);
   const [lessonDates, setLessonDates] = useState<LessonDate[]>([]);
   const [privateLessons, setPrivateLessons] = useState<PrivateLessonBooking[]>([]);
+  const [membershipLessons, setMembershipLessons] = useState<MembershipLesson[]>([]);
   const [openPrivateSlots, setOpenPrivateSlots] = useState<OpenPrivateSlot[]>([]);
   const [enrollmentDateMoves, setEnrollmentDateMoves] = useState<EnrollmentDateMove[]>([]);
   const [loading, setLoading] = useState(true);
