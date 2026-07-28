@@ -1877,6 +1877,7 @@ function ReviewStep({
     sessionId: string | null,
     customerId: string | null,
     sourceOverride?: "reuse" | "new" | "none",
+    allowOutsideAvailability = false,
   ) => {
     setStage("finalizing");
     try {
