@@ -156,6 +156,7 @@ const CalendarDayView = ({
   lessonDates,
   enrollmentDateMoves = [],
   privateLessons = [],
+  membershipLessons = [],
   onPrivateLessonClick,
   activeFilters,
   onAttendanceChange,
