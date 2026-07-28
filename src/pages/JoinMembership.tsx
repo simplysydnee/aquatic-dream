@@ -281,6 +281,8 @@ export default function JoinMembership() {
   const selectPlan = (p: Plan) => {
     setPlan(p);
     setSlot(null);
+    resetFilters();
+
     if (p.plan_key === "kid_group") {
       setSwimLevel(null);
       setShowAssessment(true);
