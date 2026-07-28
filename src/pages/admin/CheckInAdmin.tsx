@@ -29,11 +29,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import FrontDeskEnrollmentWaiverDialog from "@/components/admin/calendar/FrontDeskEnrollmentWaiverDialog";
 
-type RowKind = "group" | "private" | "semi_private";
+type RowKind = "group" | "private" | "semi_private" | "membership";
 
 interface Row {
   kind: RowKind;
-  id: string; // enrollment_id (group) or occurrence_id (private)
+  id: string; // enrollment_id (group), occurrence_id (private / membership)
   session_id: string | null;
   child_name: string;
   child_age: number | null;
@@ -45,6 +45,7 @@ interface Row {
   checked_in_at: string | null;
   no_show: boolean;
   notes: string | null;
+  medical_notes?: string | null;
 }
 
 interface Slot {
@@ -57,6 +58,7 @@ interface Slot {
   lesson_type: RowKind;
   rows: Row[];
 }
+
 
 const daysForToday = (d: Date): string[] => {
   switch (format(d, "EEEE")) {
