@@ -377,6 +377,52 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
     }
     setPrivateLessons(privates);
 
+    // ── Map membership occurrences (scheduled only; closed/cancelled excluded) ──
+    // Scheduling only: membership_occurrences intentionally carries no payment
+    // data, so nothing here reads or exposes charge / card state.
+    const planNameByKey = new Map<string, string>(
+      ((plansRes.data as any[]) || []).map((p) => [p.plan_key, p.name]),
+    );
+    const memberships: MembershipLesson[] = ((membershipOccRes.data as any[]) || []).map((o) => {
+      const m = o.memberships || {};
+      const slot = m.standing_slots || null;
+      const waiver = m.visitor_waivers || null;
+      const instructorId = o.instructor_id || slot?.instructor_id || null;
+      const emergencyName = waiver
+        ? [waiver.emergency_contact_first_name, waiver.emergency_contact_last_name]
+            .filter(Boolean)
+            .join(" ")
+            .trim()
+        : "";
+      return {
+        occurrence_id: o.id,
+        membership_id: o.membership_id,
+        plan_key: m.plan_key || "",
+        plan_name: planNameByKey.get(m.plan_key) || "Membership lesson",
+        instructor_id: instructorId,
+        instructor_name: instructorId
+          ? (_instructorNameMap.get(instructorId) || null)
+          : null,
+        swimmer_name: [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim(),
+        parent_name: [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim(),
+        parent_email: m.parent_email || "",
+        parent_phone: m.parent_phone || null,
+        occurrence_date: o.occurrence_date,
+        start_time: (o.start_time || slot?.start_time || "").slice(0, 5),
+        end_time: (o.end_time || slot?.end_time || "").slice(0, 5),
+        location: slot?.location || null,
+        swim_level: slot?.swim_level || null,
+        notes: m.notes || null,
+        medical_notes: m.medical_notes || null,
+        emergency_contact_name: emergencyName || null,
+        emergency_contact_phone: waiver?.emergency_contact_phone || null,
+        emergency_contact_relationship: waiver?.emergency_contact_relationship || null,
+      };
+    });
+    setMembershipLessons(memberships);
+
+
+
     // ── Compute open private slots from booking blocks minus taken occurrences ──
     const instructorMap = new Map<string, string>(
       ((instructorsRes.data as any[]) || []).map((i) => [i.id, i.name])
