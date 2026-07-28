@@ -324,6 +324,31 @@ const CalendarDayView = ({
       })) as (CalendarPoolEvent & { __privateLesson?: PrivateLessonBooking })[];
   }, [privateLessons, dateStr]);
 
+  // ── Map membership lessons for this date into the grid ──
+  // Scheduling only: membership rows carry no payment or card state.
+  const membershipGridEvents = useMemo(() => {
+    return membershipLessons
+      .filter((m) => m.occurrence_date === dateStr)
+      .map((m) => ({
+        id: `ml:${m.occurrence_id}`,
+        event_type:
+          m.plan_key === "adult_group"
+            ? "membership-adult"
+            : m.plan_key === "kid_group"
+            ? "membership-group"
+            : "membership-private",
+        title: m.swimmer_name || m.parent_name || m.plan_name,
+        event_date: m.occurrence_date,
+        start_time: m.start_time,
+        end_time: m.end_time,
+        pool_area: m.location || "shallow",
+        instructor_name: m.instructor_name,
+        notes: m.notes,
+        is_recurring: true,
+        __membershipLesson: m,
+      })) as (CalendarPoolEvent & { __membershipLesson?: MembershipLesson })[];
+  }, [membershipLessons, dateStr]);
+
   const lessonEvents = [
     ...adEventsAll.filter((e) => e.event_type === "private-lesson" || e.event_type === "semi-private-lesson"),
     ...privateLessonGridEvents,
@@ -332,7 +357,7 @@ const CalendarDayView = ({
     (e) => e.event_type !== "private-lesson" && e.event_type !== "semi-private-lesson"
   );
   // Keep adEvents for column rendering (all of them render in the AD column)
-  const adEvents = [...adEventsAll, ...privateLessonGridEvents];
+  const adEvents = [...adEventsAll, ...privateLessonGridEvents, ...membershipGridEvents];
   const swimLessonEvents = todayEvents.filter((e) => e.event_type === "swim-lesson");
   const diveRentalEvents = todayEvents.filter(
     (e) => ["dive-session", "pool-rental", "maintenance"].includes(e.event_type)
