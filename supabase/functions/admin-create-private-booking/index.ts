@@ -42,6 +42,9 @@ const CreateSchema = z.object({
   notes: z.string().max(2000).optional().nullable(),
   recurring: z.boolean().default(false),
   series_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  // Admin-only escape hatch: skip the instructor availability window guard.
+  // Never affects the double-booking conflict check.
+  allow_outside_availability: z.boolean().default(false),
   // Optional explicit list of occurrence dates. When provided, overrides
   // the weekly-expansion logic so admins can deselect dates in the wizard.
   occurrence_dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
