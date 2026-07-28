@@ -132,7 +132,7 @@ export default function PrintDaySchedule() {
 
   useEffect(() => {
     (async () => {
-      const [s, e, a, ld, po, mo, instr] = await Promise.all([
+      const [s, e, a, ld, po, mo, instr, plans] = await Promise.all([
         supabase
           .from("swim_sessions")
           .select(
