@@ -299,6 +299,11 @@ const KioskCheckIn = () => {
         },
         { onConflict: "enrollment_id,lesson_date" }
       );
+    } else if (item.kind === "membership") {
+      await (supabase
+        .from("membership_occurrences") as any)
+        .update({ checked_in_at: new Date().toISOString(), checked_in_by: "kiosk" })
+        .eq("id", item.id);
     } else {
       await (supabase
         .from("lesson_booking_occurrences") as any)
