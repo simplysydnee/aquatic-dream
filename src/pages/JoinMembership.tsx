@@ -159,10 +159,66 @@ export default function JoinMembership() {
     if (!plan) return [];
     let list = slots.filter((s) => s.plan_key === plan.plan_key);
     if (plan.plan_key === "kid_group" && swimLevel) {
-      list = list.filter((s) => s.swim_level === swimLevel);
+      list = list.filter((s) =>
+        s.accepted_levels && s.accepted_levels.length > 0
+          ? s.accepted_levels.includes(swimLevel)
+          : s.swim_level === swimLevel,
+      );
     }
     return list;
   }, [plan, slots, swimLevel]);
+
+  // Membership waitlist — only ever populated by an explicit tap, never automatically.
+  const [waitlistSlot, setWaitlistSlot] = useState<Slot | null>(null);
+  const [waitlistSaved, setWaitlistSaved] = useState(false);
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
+  const [waitlistForm, setWaitlistForm] = useState({
+    swimmer_name: "",
+    parent_name: "",
+    parent_email: "",
+    parent_phone: "",
+    notes: "",
+  });
+
+  const submitWaitlist = async () => {
+    if (!waitlistSlot || !plan) return;
+    if (
+      !waitlistForm.swimmer_name.trim() ||
+      !waitlistForm.parent_name.trim() ||
+      !/\S+@\S+\.\S+/.test(waitlistForm.parent_email) ||
+      waitlistForm.parent_phone.trim().length < 10
+    ) {
+      toast.error("Please complete all required fields");
+      return;
+    }
+    setWaitlistSubmitting(true);
+    const { error } = await supabase.from("membership_waitlist").insert({
+      plan_key: plan.plan_key,
+      standing_slot_id: waitlistSlot.id,
+      swim_level: plan.plan_key === "kid_group" ? swimLevel : null,
+      preferred_day: waitlistSlot.day_of_week,
+      preferred_time: waitlistSlot.start_time,
+      swimmer_name: waitlistForm.swimmer_name.trim(),
+      parent_name: waitlistForm.parent_name.trim(),
+      parent_email: waitlistForm.parent_email.trim(),
+      parent_phone: waitlistForm.parent_phone.trim(),
+      notes: waitlistForm.notes.trim() || null,
+      status: "open",
+    });
+    setWaitlistSubmitting(false);
+    if (error) {
+      toast.error("Could not save your request. Please call (209) 577-3483.");
+      return;
+    }
+    setWaitlistSaved(true);
+  };
+
+  const closeWaitlist = () => {
+    setWaitlistSlot(null);
+    setWaitlistSaved(false);
+    setWaitlistForm({ swimmer_name: "", parent_name: "", parent_email: "", parent_phone: "", notes: "" });
+  };
+
 
   const selectPlan = (p: Plan) => {
     setPlan(p);
