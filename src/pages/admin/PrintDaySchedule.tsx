@@ -329,7 +329,7 @@ export default function PrintDaySchedule() {
       })
       .filter((g) => g.totalSwimmers > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [todaySessions, todayPrivate, enrollments]);
+  }, [todaySessions, todayPrivate, todayMembership, enrollments]);
 
   useEffect(() => {
     if (!loading && grouped.length > 0) {
