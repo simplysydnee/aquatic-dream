@@ -127,6 +127,7 @@ interface Props {
   lessonDates: LessonDate[];
   enrollmentDateMoves?: EnrollmentDateMove[];
   privateLessons?: PrivateLessonBooking[];
+  membershipLessons?: MembershipLesson[];
   onPrivateLessonClick?: (booking: PrivateLessonBooking) => void;
   activeFilters: Set<ActivityType>;
   onAttendanceChange: () => void;
