@@ -1244,11 +1244,15 @@ const CalendarDayView = ({
                 const startMins = timeToMinutes(e.start_time);
                 const endMins = timeToMinutes(e.end_time);
                 const colorKey = e.event_type;
-                const dimmed = !activeFilters.has(e.event_type as ActivityType);
-                const laneInfo = adEventLanes.get(e.id);
                 const isPL = typeof e.id === "string" && e.id.startsWith("pl:");
+                const isML = typeof e.id === "string" && e.id.startsWith("ml:");
+                const ml = e.__membershipLesson as MembershipLesson | undefined;
+                const dimmed = isML ? false : !activeFilters.has(e.event_type as ActivityType);
+                const laneInfo = adEventLanes.get(e.id);
                 const handleClick = () => {
-                  if (isPL && e.__privateLesson && onPrivateLessonClick) {
+                  if (isML && ml) {
+                    setMembershipDetail(ml);
+                  } else if (isPL && e.__privateLesson && onPrivateLessonClick) {
                     onPrivateLessonClick(e.__privateLesson);
                   } else {
                     setDetailBlock({ kind: "event", event: e });
@@ -1260,12 +1264,14 @@ const CalendarDayView = ({
                   startMins,
                   endMins,
                   colorKey,
-                  e.title,
-                  e.instructor_name || e.pool_area,
+                  isML && ml ? `${e.title} · Membership` : e.title,
+                  isML && ml
+                    ? `${ml.plan_name} · ${ml.instructor_name || "Unassigned"}`
+                    : e.instructor_name || e.pool_area,
                   dimmed,
                   handleClick,
                   false,
-                  isPL ? null : (
+                  isPL || isML ? null : (
                     <div className="flex shrink-0 gap-0.5">
                       <button
                         onClick={(ev) => { ev.stopPropagation(); onEditEvent?.(e); }}
@@ -1281,14 +1287,25 @@ const CalendarDayView = ({
                       </button>
                     </div>
                   ),
-                  <div className="space-y-1 text-xs">
-                    <p className="font-semibold">{e.title}</p>
-                    <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
-                    <p className="capitalize">Type: {e.event_type.replace(/-/g, " ")}</p>
-                    {e.instructor_name && <p>Instructor: {e.instructor_name}</p>}
-                    {e.pool_area && <p>Area: {e.pool_area}</p>}
-                    {e.notes && <p className="opacity-80">{e.notes}</p>}
-                  </div>,
+                  isML && ml ? (
+                    <div className="space-y-1 text-xs">
+                      <p className="font-semibold">{ml.swimmer_name || ml.parent_name}</p>
+                      <p>{ml.plan_name} membership</p>
+                      <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
+                      <p>Instructor: {ml.instructor_name || "Unassigned"}</p>
+                      {ml.medical_notes && <p className="opacity-80">Medical: {ml.medical_notes}</p>}
+                      {ml.notes && <p className="opacity-80">{ml.notes}</p>}
+                    </div>
+                  ) : (
+                    <div className="space-y-1 text-xs">
+                      <p className="font-semibold">{e.title}</p>
+                      <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
+                      <p className="capitalize">Type: {e.event_type.replace(/-/g, " ")}</p>
+                      {e.instructor_name && <p>Instructor: {e.instructor_name}</p>}
+                      {e.pool_area && <p>Area: {e.pool_area}</p>}
+                      {e.notes && <p className="opacity-80">{e.notes}</p>}
+                    </div>
+                  ),
                   laneInfo?.lane,
                   laneInfo?.laneCount
                 );
