@@ -618,6 +618,7 @@ export default function JoinMembership() {
                 <button
                   type="button"
                   onClick={() => {
+                    resetFilters();
                     if (plan.plan_key === "kid_group") {
                       setShowAssessment(true);
                       setStep(1);
@@ -641,7 +642,13 @@ export default function JoinMembership() {
                         Parent may override if you'd prefer a different group.
                       </div>
                     </div>
-                    <Select value={swimLevel ?? ""} onValueChange={(v: SwimLevel) => setSwimLevel(v)}>
+                    <Select
+                      value={swimLevel ?? ""}
+                      onValueChange={(v: SwimLevel) => {
+                        resetFilters();
+                        setSwimLevel(v);
+                      }}
+                    >
                       <SelectTrigger className="h-9 w-56 text-xs">
                         <SelectValue placeholder="Choose level…" />
                       </SelectTrigger>
@@ -679,63 +686,133 @@ export default function JoinMembership() {
                       : "No open spots right now — check back soon"}
                   </p>
                 ) : (
-                  <div className="space-y-2">
-                    {planSlots.map((s) => {
-                      const full = s.is_full ?? s.spots_left <= 0;
-                      const header = (
-                        <div>
-                          <div className="font-semibold text-[#1a3a8a]">
-                            {DAYS[s.day_of_week]} {fmtTime(s.start_time)}–{fmtTime(s.end_time)}
-                          </div>
-                          {s.instructor_name && (
-                            <div className="text-sm text-[#2a5e84]">Coach {s.instructor_name}</div>
-                          )}
-                        </div>
-                      );
-                      if (full) {
-                        return (
-                          <div
-                            key={s.id}
-                            className="flex w-full items-center justify-between gap-3 rounded-lg border-2 border-dashed border-[#2a5e84]/25 bg-[#2a5e84]/5 p-4 text-left opacity-90"
-                          >
-                            {header}
-                            <div className="flex flex-col items-end gap-2">
-                              <span className="text-sm font-medium text-[#2a5e84]">Class full</span>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="border-[#F58B76] text-[#1a3a8a] hover:bg-[#F58B76]/10"
-                                onClick={() => {
-                                  setWaitlistSaved(false);
-                                  setWaitlistSlot(s);
-                                }}
-                              >
-                                Join waitlist
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return (
-                        <button
-                          key={s.id}
+                  <>
+                    {showFilterBar && (
+                      <div className="mb-4 grid gap-2 sm:grid-cols-3">
+                        <Select value={filterDay} onValueChange={setFilterDay}>
+                          <SelectTrigger className="h-9 text-xs" aria-label="Filter by day">
+                            <SelectValue placeholder="Day" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="any">Any day</SelectItem>
+                            {dayOptions.map((d) => (
+                              <SelectItem key={d} value={String(d)}>{DAYS[d]}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={filterInstructor} onValueChange={setFilterInstructor}>
+                          <SelectTrigger className="h-9 text-xs" aria-label="Filter by instructor">
+                            <SelectValue placeholder="Instructor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="any">Any instructor</SelectItem>
+                            {instructorOptions.map((n) => (
+                              <SelectItem key={n} value={n}>Coach {n}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={filterTime} onValueChange={setFilterTime}>
+                          <SelectTrigger className="h-9 text-xs" aria-label="Filter by time of day">
+                            <SelectValue placeholder="Time" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="any">Any time</SelectItem>
+                            <SelectItem value="morning">Morning (before 12:00pm)</SelectItem>
+                            <SelectItem value="afternoon">Afternoon (12:00–5:00pm)</SelectItem>
+                            <SelectItem value="evening">Evening (5:00pm and later)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {visibleSlots.length === 0 ? (
+                      <div className="py-8 text-center text-[#2a5e84]">
+                        <p className="mb-3">No times match these filters</p>
+                        <Button
                           type="button"
-                          onClick={() => {
-                            setSlot(s);
-                            setStep(3);
-                          }}
-                          className="flex w-full items-center justify-between rounded-lg border-2 border-[#2a5e84]/20 p-4 text-left transition hover:border-[#F58B76] hover:bg-[#F58B76]/5"
+                          variant="outline"
+                          size="sm"
+                          onClick={resetFilters}
+                          className="border-[#2a5e84]/30 text-[#1a3a8a] hover:bg-[#2a5e84]/5"
                         >
-                          {header}
-                          <div className="text-sm font-medium text-[#F58B76]">
-                            {s.spots_left} spot{s.spots_left === 1 ? "" : "s"} left
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          Clear filters
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="mb-3 text-sm text-[#2a5e84]">
+                          {visibleSlots.length} time{visibleSlots.length === 1 ? "" : "s"} available
+                        </p>
+                        <div className="space-y-5">
+                          {groupedSlots.map(({ day, list }) => (
+                            <div key={day}>
+                              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#1a3a8a]">
+                                {DAYS[day]}
+                              </h3>
+                              <div className="space-y-2">
+                                {list.map((s) => {
+                                  const full = s.is_full ?? s.spots_left <= 0;
+                                  const header = (
+                                    <div>
+                                      <div className="font-semibold text-[#1a3a8a]">
+                                        {DAYS[s.day_of_week]} {fmtTime(s.start_time)}–{fmtTime(s.end_time)}
+                                      </div>
+                                      {s.instructor_name && (
+                                        <div className="text-sm text-[#2a5e84]">Coach {s.instructor_name}</div>
+                                      )}
+                                    </div>
+                                  );
+                                  if (full) {
+                                    return (
+                                      <div
+                                        key={s.id}
+                                        className="flex w-full items-center justify-between gap-3 rounded-lg border-2 border-dashed border-[#2a5e84]/25 bg-[#2a5e84]/5 p-4 text-left opacity-90"
+                                      >
+                                        {header}
+                                        <div className="flex flex-col items-end gap-2">
+                                          <span className="text-sm font-medium text-[#2a5e84]">Class full</span>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-[#F58B76] text-[#1a3a8a] hover:bg-[#F58B76]/10"
+                                            onClick={() => {
+                                              setWaitlistSaved(false);
+                                              setWaitlistSlot(s);
+                                            }}
+                                          >
+                                            Join waitlist
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <button
+                                      key={s.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setSlot(s);
+                                        setStep(3);
+                                      }}
+                                      className="flex w-full items-center justify-between rounded-lg border-2 border-[#2a5e84]/20 p-4 text-left transition hover:border-[#F58B76] hover:bg-[#F58B76]/5"
+                                    >
+                                      {header}
+                                      <div className="text-sm font-medium text-[#F58B76]">
+                                        {s.spots_left} spot{s.spots_left === 1 ? "" : "s"} left
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
                 )}
+
 
               </>
             )}
