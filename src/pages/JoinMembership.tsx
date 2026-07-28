@@ -55,7 +55,9 @@ type Slot = {
   start_time: string;
   end_time: string;
   spots_left: number;
+  is_full?: boolean;
   swim_level: SwimLevel | null;
+  accepted_levels: SwimLevel[] | null;
 };
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
