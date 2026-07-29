@@ -202,7 +202,13 @@ const StandingSlotsAdmin = () => {
       if (!m.standing_slot_id) continue;
       occ[m.standing_slot_id] = (occ[m.standing_slot_id] || 0) + 1;
     }
+    // Live phone holds reserve a spot too, same rule get-open-slots uses.
+    for (const h of ((holdRes.data as { standing_slot_id: string | null }[]) || [])) {
+      if (!h.standing_slot_id) continue;
+      occ[h.standing_slot_id] = (occ[h.standing_slot_id] || 0) + 1;
+    }
     setOccupancyCounts(occ);
+
     setEnrolledCounts(counts);
     setRosterBySlot(roster);
     setLoading(false);
