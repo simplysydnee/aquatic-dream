@@ -110,6 +110,12 @@ export default function JoinMembership() {
   const [waiverChecking, setWaiverChecking] = useState(false);
   const [waiverSubmitting, setWaiverSubmitting] = useState(false);
 
+  // Phone-booked hold state (/join?hold=<token>)
+  const [holdToken, setHoldToken] = useState<string | null>(null);
+  const [holdLoading, setHoldLoading] = useState(false);
+  const [holdError, setHoldError] = useState<string | null>(null);
+
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -297,8 +303,9 @@ export default function JoinMembership() {
     setSwimLevel(level);
     setChildDob(dob);
     setShowAssessment(false);
-    setStep(2);
+    setStep(holdToken ? 3 : 2);
   };
+
 
   const isAdult = plan?.plan_key === "adult_group";
 
@@ -478,7 +485,7 @@ export default function JoinMembership() {
         membership_agreement_version: MEMBERSHIP_AGREEMENT_VERSION,
         membership_agreement_text: MEMBERSHIP_AGREEMENT_TEXT,
         membership_agreement_accepted: agreementAccepted,
-        returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
+        returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}${holdToken ? `&hold=${encodeURIComponent(holdToken)}` : ""}`,
         environment: getStripeEnvironment(),
       },
     });
@@ -492,7 +499,7 @@ export default function JoinMembership() {
       monthlyCents: data.monthlyCents ?? plan.monthly_price_cents,
     });
     return data.clientSecret;
-  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId]);
+  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId, holdToken]);
 
   const [returned, setReturned] = useState(false);
   const [returnFinalizing, setReturnFinalizing] = useState(false);
@@ -523,6 +530,12 @@ export default function JoinMembership() {
           });
           setManageToken((data.manageToken as string | null) ?? null);
           setReturnError(null);
+          const returningHold = p.get("hold");
+          if (returningHold) {
+            void supabase.functions.invoke("get-membership-hold", {
+              body: { token: returningHold, action: "convert" },
+            });
+          }
         })
         .catch((error) => {
           setReturnError(error instanceof Error ? error.message : "Could not confirm membership");
@@ -530,6 +543,75 @@ export default function JoinMembership() {
         .finally(() => setReturnFinalizing(false));
     }
   }, []);
+
+  // Phone-booked hold: /join?hold=<token> skips program and slot selection.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const token = p.get("hold");
+    if (!token || p.get("membership") === "success") return;
+    setHoldLoading(true);
+    (async () => {
+      const { data, error } = await supabase.functions.invoke("get-membership-hold", {
+        body: { token },
+      });
+      if (error || !data?.hold || !data?.plan || !data?.slot) {
+        setHoldError("We could not find that reservation. You can still choose a time below.");
+        setHoldLoading(false);
+        return;
+      }
+      const h = data.hold as {
+        status: string;
+        planKey: PlanKey;
+        swimLevel: SwimLevel | null;
+        swimmerName: string;
+        parentName: string;
+        parentPhone: string;
+        parentEmail: string | null;
+      };
+      if (h.status !== "held") {
+        setHoldError(
+          h.status === "converted"
+            ? "This reservation is already complete. Give us a call if you need anything."
+            : "This reservation has expired. Choose a time below or call us and we will hold it again.",
+        );
+        setHoldLoading(false);
+        return;
+      }
+      const planRow = data.plan as Plan;
+      const s = data.slot as Omit<Slot, "plan_id" | "plan_name" | "monthly_price_cents" | "spots_left">;
+      setHoldToken(token);
+      setPlan(planRow);
+      setSlot({
+        ...s,
+        plan_id: planRow.id,
+        plan_name: planRow.name,
+        monthly_price_cents: planRow.monthly_price_cents,
+        spots_left: 1,
+      } as Slot);
+      const level = h.swimLevel ?? s.swim_level ?? null;
+      setSwimLevel(level);
+      const [swimFirst, ...swimRest] = (h.swimmerName || "").trim().split(/\s+/);
+      const [parentFirst, ...parentRest] = (h.parentName || "").trim().split(/\s+/);
+      setForm((f) => ({
+        ...f,
+        child_first: swimFirst || "",
+        child_last: swimRest.join(" "),
+        parent_first: parentFirst || "",
+        parent_last: parentRest.join(" "),
+        parent_email: h.parentEmail || "",
+        parent_phone: h.parentPhone || "",
+      }));
+      if (planRow.plan_key === "kid_group" && !level) {
+        setShowAssessment(true);
+        setStep(1);
+      } else {
+        setShowAssessment(false);
+        setStep(3);
+      }
+      setHoldLoading(false);
+    })();
+  }, []);
+
 
 
   return (
@@ -539,6 +621,26 @@ export default function JoinMembership() {
           <h1 className="text-3xl font-bold text-[#1a3a8a]">Join Aquatic Dreams</h1>
           <p className="mt-2 text-[#2a5e84]">Monthly swim membership. Cancel anytime.</p>
         </div>
+
+        {holdLoading && (
+          <div className="mb-6 rounded-lg border border-[#2a5e84]/20 bg-white p-4 text-center text-sm text-[#2a5e84]">
+            Pulling up your reserved spot…
+          </div>
+        )}
+        {holdError && (
+          <div className="mb-6 rounded-lg border border-[#F58B76]/40 bg-[#F58B76]/10 p-4 text-sm text-[#1a3a8a]">
+            {holdError}
+          </div>
+        )}
+        {holdToken && slot && plan && step < 8 && (
+          <div className="mb-6 rounded-lg border border-[#2a5e84]/20 bg-white p-4 text-sm text-[#2a5e84]">
+            <span className="font-semibold text-[#1a3a8a]">Your spot is reserved: </span>
+            {plan.name} · {DAYS[slot.day_of_week]} at {fmtTime(slot.start_time)}
+            {slot.instructor_name ? ` with ${slot.instructor_name}` : ""}. Finish below to lock it in.
+          </div>
+        )}
+
+
 
         <div className="mb-6 flex items-center justify-center gap-2">
           {[1, 2, 3, 4, 5, 6, 7].map((n) => (
@@ -825,13 +927,16 @@ export default function JoinMembership() {
 
             {step === 3 && plan && (
               <>
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Back
-                </button>
+                {!holdToken && (
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </button>
+                )}
+
                 <h2 className="mb-1 text-xl font-semibold text-[#1a3a8a]">
                   {isAdult ? "Your info" : "Swimmer & parent info"}
                 </h2>

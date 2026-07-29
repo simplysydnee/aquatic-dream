@@ -1398,6 +1398,80 @@ export type Database = {
           },
         ]
       }
+      membership_holds: {
+        Row: {
+          converted_at: string | null
+          created_at: string
+          created_by: string | null
+          existing_waiver_id: string | null
+          expired_at: string | null
+          held_until: string
+          id: string
+          notes: string | null
+          parent_email: string | null
+          parent_name: string
+          parent_phone: string
+          plan_key: string
+          reminder_sent_at: string | null
+          sms_sent_at: string | null
+          standing_slot_id: string
+          status: string
+          swim_level: string | null
+          swimmer_name: string
+          token: string
+        }
+        Insert: {
+          converted_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          existing_waiver_id?: string | null
+          expired_at?: string | null
+          held_until: string
+          id?: string
+          notes?: string | null
+          parent_email?: string | null
+          parent_name: string
+          parent_phone: string
+          plan_key: string
+          reminder_sent_at?: string | null
+          sms_sent_at?: string | null
+          standing_slot_id: string
+          status?: string
+          swim_level?: string | null
+          swimmer_name: string
+          token: string
+        }
+        Update: {
+          converted_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          existing_waiver_id?: string | null
+          expired_at?: string | null
+          held_until?: string
+          id?: string
+          notes?: string | null
+          parent_email?: string | null
+          parent_name?: string
+          parent_phone?: string
+          plan_key?: string
+          reminder_sent_at?: string | null
+          sms_sent_at?: string | null
+          standing_slot_id?: string
+          status?: string
+          swim_level?: string | null
+          swimmer_name?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_holds_standing_slot_id_fkey"
+            columns: ["standing_slot_id"]
+            isOneToOne: false
+            referencedRelation: "standing_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membership_occurrences: {
         Row: {
           cancel_reason: string | null

@@ -16,6 +16,12 @@ import { toast } from "@/hooks/use-toast";
 import { ArrowUpDown, Plus, Loader2, Save, X, ChevronDown, ChevronRight, Mail, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StandingSlotsSummary } from "@/components/admin/StandingSlotsSummary";
+import {
+  CreateMembershipHoldDialog,
+  type HoldSlotTarget,
+} from "@/components/admin/holds/CreateMembershipHoldDialog";
+import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPanel";
+
 
 interface RosterMember {
   id: string;
@@ -121,6 +127,9 @@ const StandingSlotsAdmin = () => {
   const [enrolledCounts, setEnrolledCounts] = useState<Record<string, number>>({});
   const [rosterBySlot, setRosterBySlot] = useState<Record<string, RosterMember[]>>({});
   const [occupancyCounts, setOccupancyCounts] = useState<Record<string, number>>({});
+  const [holdTarget, setHoldTarget] = useState<HoldSlotTarget | null>(null);
+  const [holdsRefresh, setHoldsRefresh] = useState(0);
+
   const [expandedSlots, setExpandedSlots] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
@@ -141,7 +150,7 @@ const StandingSlotsAdmin = () => {
 
   const loadAll = async () => {
     setLoading(true);
-    const [planRes, instRes, slotRes, memRes, occRes] = await Promise.all([
+    const [planRes, instRes, slotRes, memRes, occRes, holdRes] = await Promise.all([
       supabase.from("membership_plans").select("plan_key, capacity_per_slot, name").eq("active", true),
       supabase.rpc("get_instructors_admin"),
       supabase.from("standing_slots").select("*"),
@@ -153,7 +162,13 @@ const StandingSlotsAdmin = () => {
         .from("memberships")
         .select("standing_slot_id")
         .in("status", ["active", "pending_cancel", "paused"]),
+      supabase
+        .from("membership_holds")
+        .select("standing_slot_id")
+        .eq("status", "held")
+        .gt("held_until", new Date().toISOString()),
     ]);
+
 
 
     if (planRes.error) toast({ title: "Plans load failed", description: planRes.error.message, variant: "destructive" });
@@ -187,7 +202,13 @@ const StandingSlotsAdmin = () => {
       if (!m.standing_slot_id) continue;
       occ[m.standing_slot_id] = (occ[m.standing_slot_id] || 0) + 1;
     }
+    // Live phone holds reserve a spot too, same rule get-open-slots uses.
+    for (const h of ((holdRes.data as { standing_slot_id: string | null }[]) || [])) {
+      if (!h.standing_slot_id) continue;
+      occ[h.standing_slot_id] = (occ[h.standing_slot_id] || 0) + 1;
+    }
     setOccupancyCounts(occ);
+
     setEnrolledCounts(counts);
     setRosterBySlot(roster);
     setLoading(false);
@@ -441,7 +462,35 @@ const StandingSlotsAdmin = () => {
         occupancy={occupancyCounts}
         instructorNames={instructorNameMap}
         loading={loading}
+        onHoldSlot={(slotId) => {
+          const s = slots.find((x) => x.id === slotId);
+          if (!s) return;
+          setHoldTarget({
+            id: s.id,
+            plan_key: s.plan_key,
+            day_of_week: s.day_of_week,
+            start_time: s.start_time,
+            end_time: s.end_time,
+            instructor_name: s.instructor_id ? instructorNameMap[s.instructor_id] ?? null : null,
+            monthly_price_cents: null,
+            swim_level: s.swim_level,
+            accepted_levels: s.accepted_levels ?? null,
+          });
+        }}
       />
+
+      <MembershipHoldsPanel refreshKey={holdsRefresh} onChanged={() => void loadAll()} />
+
+      <CreateMembershipHoldDialog
+        slot={holdTarget}
+        open={!!holdTarget}
+        onOpenChange={(o) => !o && setHoldTarget(null)}
+        onCreated={() => {
+          setHoldsRefresh((n) => n + 1);
+          void loadAll();
+        }}
+      />
+
 
 
 

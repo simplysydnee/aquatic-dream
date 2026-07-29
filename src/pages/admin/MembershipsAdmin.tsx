@@ -25,6 +25,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Search, AlertTriangle, FileWarning, Stethoscope } from "lucide-react";
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
+import { Link } from "react-router-dom";
+import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPanel";
+
 
 type PlanKey = "kid_group" | "private" | "adult_group";
 type SwimLevel = "white" | "red" | "yellow" | "blue" | "green";
@@ -299,10 +302,19 @@ const MembershipsAdmin = () => {
 
   return (
     <div className="p-4 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Memberships</h1>
-        <p className="text-sm text-muted-foreground">Search a family, review their slot, and manage their membership.</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold">Memberships</h1>
+          <p className="text-sm text-muted-foreground">Search a family, review their slot, and manage their membership.</p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link to="/admin/standing-slots">Hold a spot over the phone</Link>
+        </Button>
       </div>
+
+      <MembershipHoldsPanel />
+
+
 
       <Card className="p-3 space-y-3">
         <div className="relative">
