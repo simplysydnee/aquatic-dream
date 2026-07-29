@@ -523,6 +523,12 @@ export default function JoinMembership() {
           });
           setManageToken((data.manageToken as string | null) ?? null);
           setReturnError(null);
+          const returningHold = p.get("hold");
+          if (returningHold) {
+            void supabase.functions.invoke("get-membership-hold", {
+              body: { token: returningHold, action: "convert" },
+            });
+          }
         })
         .catch((error) => {
           setReturnError(error instanceof Error ? error.message : "Could not confirm membership");
@@ -530,6 +536,78 @@ export default function JoinMembership() {
         .finally(() => setReturnFinalizing(false));
     }
   }, []);
+
+  // Phone-booked hold: /join?hold=<token> skips program and slot selection.
+  const [holdToken, setHoldToken] = useState<string | null>(null);
+  const [holdLoading, setHoldLoading] = useState(false);
+  const [holdError, setHoldError] = useState<string | null>(null);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const token = p.get("hold");
+    if (!token || p.get("membership") === "success") return;
+    setHoldLoading(true);
+    (async () => {
+      const { data, error } = await supabase.functions.invoke("get-membership-hold", {
+        body: { token },
+      });
+      if (error || !data?.hold || !data?.plan || !data?.slot) {
+        setHoldError("We could not find that reservation. You can still choose a time below.");
+        setHoldLoading(false);
+        return;
+      }
+      const h = data.hold as {
+        status: string;
+        planKey: PlanKey;
+        swimLevel: SwimLevel | null;
+        swimmerName: string;
+        parentName: string;
+        parentPhone: string;
+        parentEmail: string | null;
+      };
+      if (h.status !== "held") {
+        setHoldError(
+          h.status === "converted"
+            ? "This reservation is already complete. Give us a call if you need anything."
+            : "This reservation has expired. Choose a time below or call us and we will hold it again.",
+        );
+        setHoldLoading(false);
+        return;
+      }
+      const planRow = data.plan as Plan;
+      const s = data.slot as Omit<Slot, "plan_id" | "plan_name" | "monthly_price_cents" | "spots_left">;
+      setHoldToken(token);
+      setPlan(planRow);
+      setSlot({
+        ...s,
+        plan_id: planRow.id,
+        plan_name: planRow.name,
+        monthly_price_cents: planRow.monthly_price_cents,
+        spots_left: 1,
+      } as Slot);
+      const level = h.swimLevel ?? s.swim_level ?? null;
+      setSwimLevel(level);
+      const [swimFirst, ...swimRest] = (h.swimmerName || "").trim().split(/\s+/);
+      const [parentFirst, ...parentRest] = (h.parentName || "").trim().split(/\s+/);
+      setForm((f) => ({
+        ...f,
+        child_first: swimFirst || "",
+        child_last: swimRest.join(" "),
+        parent_first: parentFirst || "",
+        parent_last: parentRest.join(" "),
+        parent_email: h.parentEmail || "",
+        parent_phone: h.parentPhone || "",
+      }));
+      if (planRow.plan_key === "kid_group" && !level) {
+        setShowAssessment(true);
+        setStep(1);
+      } else {
+        setShowAssessment(false);
+        setStep(3);
+      }
+      setHoldLoading(false);
+    })();
+  }, []);
+
 
 
   return (
