@@ -479,7 +479,7 @@ export default function JoinMembership() {
         membership_agreement_version: MEMBERSHIP_AGREEMENT_VERSION,
         membership_agreement_text: MEMBERSHIP_AGREEMENT_TEXT,
         membership_agreement_accepted: agreementAccepted,
-        returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
+        returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}${holdToken ? `&hold=${encodeURIComponent(holdToken)}` : ""}`,
         environment: getStripeEnvironment(),
       },
     });
