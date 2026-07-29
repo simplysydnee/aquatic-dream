@@ -63,6 +63,9 @@ export default defineMcp({
     reschedulePrivateLessonOccurrence,
     updateSwimEnrollment,
     completeMembershipCheckout,
+    runReadonlySql,
+    describeTable,
+    searchRepo,
   ],
 
 });

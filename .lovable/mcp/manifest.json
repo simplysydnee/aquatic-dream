@@ -897,6 +897,113 @@
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
         "outputSchema": null
+      },
+      {
+        "name": "run_readonly_sql",
+        "title": "Run read-only SQL",
+        "description": "Run a single read-only SELECT (or WITH ... SELECT) query against the database and return the rows. Writes and DDL are rejected and the query runs inside a read-only transaction. Admin only. Results are capped.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 10000,
+              "description": "A single SELECT or WITH ... SELECT statement. No semicolon-separated statements."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 200,
+              "description": "Maximum number of rows to return (default 200, max 1000)."
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "describe_table",
+        "title": "Describe table",
+        "description": "Return a table's columns (name, data type, nullability, default), enum labels for USER-DEFINED types, and both outgoing and incoming foreign keys. Read-only, admin only.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "table_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "Table name, e.g. 'memberships'."
+            },
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "default": "public",
+              "description": "Schema name (default 'public')."
+            }
+          },
+          "required": [
+            "table_name"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "search_repo",
+        "title": "Search repo",
+        "description": "Search the aquatic-dream GitHub repository for a pattern and return file path, line number, and the matching line. Read-only. Results are capped.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 200,
+              "description": "Text or regular expression to match against file lines."
+            },
+            "path_prefix": {
+              "type": "string",
+              "maxLength": 300,
+              "description": "Optional repo-relative path prefix to restrict results, e.g. 'src/lib/mcp'."
+            },
+            "max_results": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "description": "Maximum number of matching lines to return (default 50)."
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
       }
     ]
   }
