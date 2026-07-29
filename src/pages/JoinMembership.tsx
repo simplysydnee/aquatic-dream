@@ -907,13 +907,16 @@ export default function JoinMembership() {
 
             {step === 3 && plan && (
               <>
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Back
-                </button>
+                {!holdToken && (
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </button>
+                )}
+
                 <h2 className="mb-1 text-xl font-semibold text-[#1a3a8a]">
                   {isAdult ? "Your info" : "Swimmer & parent info"}
                 </h2>
