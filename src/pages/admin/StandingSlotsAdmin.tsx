@@ -150,7 +150,7 @@ const StandingSlotsAdmin = () => {
 
   const loadAll = async () => {
     setLoading(true);
-    const [planRes, instRes, slotRes, memRes, occRes] = await Promise.all([
+    const [planRes, instRes, slotRes, memRes, occRes, holdRes] = await Promise.all([
       supabase.from("membership_plans").select("plan_key, capacity_per_slot, name").eq("active", true),
       supabase.rpc("get_instructors_admin"),
       supabase.from("standing_slots").select("*"),
