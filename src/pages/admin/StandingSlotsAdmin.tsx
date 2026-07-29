@@ -200,6 +200,12 @@ const StandingSlotsAdmin = () => {
   const instructorName = (id: string | null) =>
     (id && instructors.find((i) => i.id === id)?.name) || "—";
 
+  const instructorNameMap = useMemo(
+    () => Object.fromEntries(instructors.map((i) => [i.id, i.name])),
+    [instructors],
+  );
+
+
   const filtered = useMemo(() => {
     let list = slots.slice();
     if (filterPlan !== "all") list = list.filter((s) => s.plan_key === filterPlan);
