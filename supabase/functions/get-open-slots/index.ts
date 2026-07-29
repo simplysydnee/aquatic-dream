@@ -62,10 +62,24 @@ serve(async (req) => {
           .in("status", ["active", "pending_cancel", "paused"])
       : { data: [] as { standing_slot_id: string; status: string }[] };
 
+    // Phone-booked holds reserve a spot until they expire or are cancelled.
+    const { data: holds } = slotIds.length
+      ? await supabase
+          .from("membership_holds")
+          .select("standing_slot_id")
+          .in("standing_slot_id", slotIds)
+          .eq("status", "held")
+          .gt("held_until", new Date().toISOString())
+      : { data: [] as { standing_slot_id: string }[] };
+
     const counts = new Map<string, number>();
     (memberships || []).forEach((m) => {
       counts.set(m.standing_slot_id, (counts.get(m.standing_slot_id) || 0) + 1);
     });
+    (holds || []).forEach((h) => {
+      counts.set(h.standing_slot_id, (counts.get(h.standing_slot_id) || 0) + 1);
+    });
+
 
     const planMap = new Map((plans || []).map((p) => [p.plan_key, p]));
     const instMap = new Map((instructors || []).map((i) => [i.id, i.name]));
