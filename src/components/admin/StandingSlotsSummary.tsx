@@ -61,7 +61,7 @@ const Chip = ({ children, onClick }: { children: React.ReactNode; onClick?: () =
 };
 
 
-export function StandingSlotsSummary({ slots, occupancy, instructorNames, loading }: Props) {
+export function StandingSlotsSummary({ slots, occupancy, instructorNames, loading, onHoldSlot }: Props) {
   const data = useMemo(() => {
     const activeSlots = slots.filter((s) => s.active);
     const inactiveCount = slots.length - activeSlots.length;
