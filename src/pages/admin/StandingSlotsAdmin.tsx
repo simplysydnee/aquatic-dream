@@ -441,7 +441,35 @@ const StandingSlotsAdmin = () => {
         occupancy={occupancyCounts}
         instructorNames={instructorNameMap}
         loading={loading}
+        onHoldSlot={(slotId) => {
+          const s = slots.find((x) => x.id === slotId);
+          if (!s) return;
+          setHoldTarget({
+            id: s.id,
+            plan_key: s.plan_key,
+            day_of_week: s.day_of_week,
+            start_time: s.start_time,
+            end_time: s.end_time,
+            instructor_name: s.instructor_id ? instructorNameMap[s.instructor_id] ?? null : null,
+            monthly_price_cents: null,
+            swim_level: s.swim_level,
+            accepted_levels: s.accepted_levels ?? null,
+          });
+        }}
       />
+
+      <MembershipHoldsPanel refreshKey={holdsRefresh} onChanged={() => void loadAll()} />
+
+      <CreateMembershipHoldDialog
+        slot={holdTarget}
+        open={!!holdTarget}
+        onOpenChange={(o) => !o && setHoldTarget(null)}
+        onCreated={() => {
+          setHoldsRefresh((n) => n + 1);
+          void loadAll();
+        }}
+      />
+
 
 
 
