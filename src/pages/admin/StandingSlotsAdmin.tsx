@@ -140,7 +140,7 @@ const StandingSlotsAdmin = () => {
 
   const loadAll = async () => {
     setLoading(true);
-    const [planRes, instRes, slotRes, memRes] = await Promise.all([
+    const [planRes, instRes, slotRes, memRes, occRes] = await Promise.all([
       supabase.from("membership_plans").select("plan_key, capacity_per_slot, name").eq("active", true),
       supabase.rpc("get_instructors_admin"),
       supabase.from("standing_slots").select("*"),
@@ -148,7 +148,12 @@ const StandingSlotsAdmin = () => {
         .from("memberships")
         .select("id, standing_slot_id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status")
         .eq("status", "active"),
+      supabase
+        .from("memberships")
+        .select("standing_slot_id")
+        .in("status", ["active", "pending_cancel", "paused"]),
     ]);
+
 
     if (planRes.error) toast({ title: "Plans load failed", description: planRes.error.message, variant: "destructive" });
     if (instRes.error) toast({ title: "Instructors load failed", description: instRes.error.message, variant: "destructive" });
