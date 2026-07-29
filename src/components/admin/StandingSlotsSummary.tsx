@@ -191,7 +191,7 @@ export function StandingSlotsSummary({ slots, occupancy, instructorNames, loadin
                         const levels = acceptedLevelsOf(s);
                         const combined = levels.length > 1;
                         return (
-                          <Chip key={s.id}>
+                          <Chip key={s.id} onClick={onHoldSlot ? () => onHoldSlot(s.id) : undefined}>
                             <span className={cn(combined && "font-semibold")}>
                               {timeLabel(s.start_time)} · {data.open(s)} of {s.capacity} open
                             </span>
