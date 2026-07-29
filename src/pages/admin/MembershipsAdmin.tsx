@@ -25,6 +25,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Search, AlertTriangle, FileWarning, Stethoscope } from "lucide-react";
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
+import { Link } from "react-router-dom";
+import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPanel";
+
 
 type PlanKey = "kid_group" | "private" | "adult_group";
 type SwimLevel = "white" | "red" | "yellow" | "blue" | "green";
