@@ -3478,6 +3478,14 @@ export type Database = {
         Args: { _token: string }
         Returns: string
       }
+      mcp_describe_table: {
+        Args: { _schema?: string; _table_name: string }
+        Returns: Json
+      }
+      mcp_run_readonly_sql: {
+        Args: { _limit?: number; _query: string }
+        Returns: Json
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
