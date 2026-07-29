@@ -539,9 +539,6 @@ export default function JoinMembership() {
   }, []);
 
   // Phone-booked hold: /join?hold=<token> skips program and slot selection.
-  const [holdToken, setHoldToken] = useState<string | null>(null);
-  const [holdLoading, setHoldLoading] = useState(false);
-  const [holdError, setHoldError] = useState<string | null>(null);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const token = p.get("hold");
