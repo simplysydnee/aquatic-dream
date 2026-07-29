@@ -15,6 +15,7 @@ import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { ArrowUpDown, Plus, Loader2, Save, X, ChevronDown, ChevronRight, Mail, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StandingSlotsSummary } from "@/components/admin/StandingSlotsSummary";
 
 interface RosterMember {
   id: string;
@@ -67,6 +68,7 @@ interface Slot {
   location: string | null;
   active: boolean;
   swim_level: SwimLevel | null;
+  accepted_levels?: string[] | null;
 }
 
 interface NewSlot {
@@ -118,6 +120,7 @@ const StandingSlotsAdmin = () => {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [enrolledCounts, setEnrolledCounts] = useState<Record<string, number>>({});
   const [rosterBySlot, setRosterBySlot] = useState<Record<string, RosterMember[]>>({});
+  const [occupancyCounts, setOccupancyCounts] = useState<Record<string, number>>({});
   const [expandedSlots, setExpandedSlots] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
@@ -138,7 +141,7 @@ const StandingSlotsAdmin = () => {
 
   const loadAll = async () => {
     setLoading(true);
-    const [planRes, instRes, slotRes, memRes] = await Promise.all([
+    const [planRes, instRes, slotRes, memRes, occRes] = await Promise.all([
       supabase.from("membership_plans").select("plan_key, capacity_per_slot, name").eq("active", true),
       supabase.rpc("get_instructors_admin"),
       supabase.from("standing_slots").select("*"),
@@ -146,7 +149,12 @@ const StandingSlotsAdmin = () => {
         .from("memberships")
         .select("id, standing_slot_id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status")
         .eq("status", "active"),
+      supabase
+        .from("memberships")
+        .select("standing_slot_id")
+        .in("status", ["active", "pending_cancel", "paused"]),
     ]);
+
 
     if (planRes.error) toast({ title: "Plans load failed", description: planRes.error.message, variant: "destructive" });
     if (instRes.error) toast({ title: "Instructors load failed", description: instRes.error.message, variant: "destructive" });
@@ -174,6 +182,12 @@ const StandingSlotsAdmin = () => {
         (a.child_first_name || "").localeCompare(b.child_first_name || ""),
       );
     }
+    const occ: Record<string, number> = {};
+    for (const m of ((occRes.data as { standing_slot_id: string | null }[]) || [])) {
+      if (!m.standing_slot_id) continue;
+      occ[m.standing_slot_id] = (occ[m.standing_slot_id] || 0) + 1;
+    }
+    setOccupancyCounts(occ);
     setEnrolledCounts(counts);
     setRosterBySlot(roster);
     setLoading(false);
@@ -185,6 +199,12 @@ const StandingSlotsAdmin = () => {
 
   const instructorName = (id: string | null) =>
     (id && instructors.find((i) => i.id === id)?.name) || "—";
+
+  const instructorNameMap = useMemo(
+    () => Object.fromEntries(instructors.map((i) => [i.id, i.name])),
+    [instructors],
+  );
+
 
   const filtered = useMemo(() => {
     let list = slots.slice();
@@ -415,6 +435,15 @@ const StandingSlotsAdmin = () => {
           Add slot
         </Button>
       </div>
+
+      <StandingSlotsSummary
+        slots={slots}
+        occupancy={occupancyCounts}
+        instructorNames={instructorNameMap}
+        loading={loading}
+      />
+
+
 
       {/* Capacity dashboard — at-a-glance fill by program/level */}
       <Card className="p-4">
