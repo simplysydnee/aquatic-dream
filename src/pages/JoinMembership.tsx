@@ -110,6 +110,12 @@ export default function JoinMembership() {
   const [waiverChecking, setWaiverChecking] = useState(false);
   const [waiverSubmitting, setWaiverSubmitting] = useState(false);
 
+  // Phone-booked hold state (/join?hold=<token>)
+  const [holdToken, setHoldToken] = useState<string | null>(null);
+  const [holdLoading, setHoldLoading] = useState(false);
+  const [holdError, setHoldError] = useState<string | null>(null);
+
+
   useEffect(() => {
     (async () => {
       setLoading(true);
