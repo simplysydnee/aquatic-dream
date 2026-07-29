@@ -67,6 +67,7 @@ interface Slot {
   location: string | null;
   active: boolean;
   swim_level: SwimLevel | null;
+  accepted_levels?: string[] | null;
 }
 
 interface NewSlot {
