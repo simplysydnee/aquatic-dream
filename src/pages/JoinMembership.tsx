@@ -493,7 +493,7 @@ export default function JoinMembership() {
       monthlyCents: data.monthlyCents ?? plan.monthly_price_cents,
     });
     return data.clientSecret;
-  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId]);
+  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId, holdToken]);
 
   const [returned, setReturned] = useState(false);
   const [returnFinalizing, setReturnFinalizing] = useState(false);
