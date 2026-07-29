@@ -297,8 +297,9 @@ export default function JoinMembership() {
     setSwimLevel(level);
     setChildDob(dob);
     setShowAssessment(false);
-    setStep(2);
+    setStep(holdToken ? 3 : 2);
   };
+
 
   const isAdult = plan?.plan_key === "adult_group";
 
