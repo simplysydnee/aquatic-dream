@@ -429,6 +429,15 @@ const StandingSlotsAdmin = () => {
         </Button>
       </div>
 
+      <StandingSlotsSummary
+        slots={slots}
+        occupancy={occupancyCounts}
+        instructorNames={instructorNameMap}
+        loading={loading}
+      />
+
+
+
       {/* Capacity dashboard — at-a-glance fill by program/level */}
       <Card className="p-4">
         <div className="flex items-baseline justify-between mb-3">
