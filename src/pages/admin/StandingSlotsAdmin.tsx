@@ -181,6 +181,12 @@ const StandingSlotsAdmin = () => {
         (a.child_first_name || "").localeCompare(b.child_first_name || ""),
       );
     }
+    const occ: Record<string, number> = {};
+    for (const m of ((occRes.data as { standing_slot_id: string | null }[]) || [])) {
+      if (!m.standing_slot_id) continue;
+      occ[m.standing_slot_id] = (occ[m.standing_slot_id] || 0) + 1;
+    }
+    setOccupancyCounts(occ);
     setEnrolledCounts(counts);
     setRosterBySlot(roster);
     setLoading(false);
