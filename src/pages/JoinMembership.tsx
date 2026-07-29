@@ -622,6 +622,26 @@ export default function JoinMembership() {
           <p className="mt-2 text-[#2a5e84]">Monthly swim membership. Cancel anytime.</p>
         </div>
 
+        {holdLoading && (
+          <div className="mb-6 rounded-lg border border-[#2a5e84]/20 bg-white p-4 text-center text-sm text-[#2a5e84]">
+            Pulling up your reserved spot…
+          </div>
+        )}
+        {holdError && (
+          <div className="mb-6 rounded-lg border border-[#F58B76]/40 bg-[#F58B76]/10 p-4 text-sm text-[#1a3a8a]">
+            {holdError}
+          </div>
+        )}
+        {holdToken && slot && plan && step < 8 && (
+          <div className="mb-6 rounded-lg border border-[#2a5e84]/20 bg-white p-4 text-sm text-[#2a5e84]">
+            <span className="font-semibold text-[#1a3a8a]">Your spot is reserved: </span>
+            {plan.name} · {DAYS[slot.day_of_week]} at {fmtTime(slot.start_time)}
+            {slot.instructor_name ? ` with ${slot.instructor_name}` : ""}. Finish below to lock it in.
+          </div>
+        )}
+
+
+
         <div className="mb-6 flex items-center justify-center gap-2">
           {[1, 2, 3, 4, 5, 6, 7].map((n) => (
             <div
