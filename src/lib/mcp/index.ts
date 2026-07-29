@@ -21,6 +21,9 @@ import reassignPrivateLessonInstructor from "./tools/reassign-private-lesson-ins
 import reschedulePrivateLessonOccurrence from "./tools/reschedule-private-lesson-occurrence";
 import updateSwimEnrollment from "./tools/update-swim-enrollment";
 import completeMembershipCheckout from "./tools/complete-membership-checkout";
+import runReadonlySql from "./tools/run-readonly-sql";
+import describeTable from "./tools/describe-table";
+import searchRepo from "./tools/search-repo";
 
 
 // Build the issuer from the project ref so the OAuth issuer matches the direct
