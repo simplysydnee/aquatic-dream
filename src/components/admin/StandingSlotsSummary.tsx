@@ -24,6 +24,8 @@ interface Props {
   occupancy: Record<string, number>;
   instructorNames: Record<string, string>;
   loading?: boolean;
+  /** Clicking an open-time chip starts the phone-booking hold flow. */
+  onHoldSlot?: (slotId: string) => void;
 }
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -45,11 +47,19 @@ const acceptedLevelsOf = (s: SummarySlot): SwimLevel[] => {
   return s.swim_level ? [s.swim_level] : [];
 };
 
-const Chip = ({ children }: { children: React.ReactNode }) => (
-  <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-foreground">
-    {children}
-  </span>
-);
+const Chip = ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => {
+  const className = cn(
+    "inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-foreground",
+    onClick && "cursor-pointer transition-colors hover:border-primary hover:bg-primary/20",
+  );
+  if (!onClick) return <span className={className}>{children}</span>;
+  return (
+    <button type="button" className={className} onClick={onClick} title="Hold this spot over the phone">
+      {children}
+    </button>
+  );
+};
+
 
 export function StandingSlotsSummary({ slots, occupancy, instructorNames, loading }: Props) {
   const data = useMemo(() => {
