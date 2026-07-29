@@ -299,10 +299,19 @@ const MembershipsAdmin = () => {
 
   return (
     <div className="p-4 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Memberships</h1>
-        <p className="text-sm text-muted-foreground">Search a family, review their slot, and manage their membership.</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold">Memberships</h1>
+          <p className="text-sm text-muted-foreground">Search a family, review their slot, and manage their membership.</p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link to="/admin/standing-slots">Hold a spot over the phone</Link>
+        </Button>
       </div>
+
+      <MembershipHoldsPanel />
+
+
 
       <Card className="p-3 space-y-3">
         <div className="relative">
