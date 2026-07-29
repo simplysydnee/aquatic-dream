@@ -15,6 +15,7 @@ import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { ArrowUpDown, Plus, Loader2, Save, X, ChevronDown, ChevronRight, Mail, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StandingSlotsSummary } from "@/components/admin/StandingSlotsSummary";
 
 interface RosterMember {
   id: string;
