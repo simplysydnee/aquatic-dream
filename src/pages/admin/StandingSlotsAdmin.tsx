@@ -162,7 +162,13 @@ const StandingSlotsAdmin = () => {
         .from("memberships")
         .select("standing_slot_id")
         .in("status", ["active", "pending_cancel", "paused"]),
+      supabase
+        .from("membership_holds")
+        .select("standing_slot_id")
+        .eq("status", "held")
+        .gt("held_until", new Date().toISOString()),
     ]);
+
 
 
     if (planRes.error) toast({ title: "Plans load failed", description: planRes.error.message, variant: "destructive" });
