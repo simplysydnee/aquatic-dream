@@ -141,7 +141,8 @@ export function StandingSlotsSummary({ slots, occupancy, instructorNames, loadin
                         </div>
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {d.openSlots.map((s) => (
-                            <Chip key={s.id}>
+                            <Chip key={s.id} onClick={onHoldSlot ? () => onHoldSlot(s.id) : undefined}>
+
                               {timeLabel(s.start_time)} · {data.open(s)} open
                             </Chip>
                           ))}
