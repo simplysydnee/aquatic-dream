@@ -766,7 +766,7 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
       current_period_start: currentPeriodStart,
       current_period_end: currentPeriodEnd,
       recurring_consent_at: new Date().toISOString(),
-      recurring_consent_version: payload.recurring_consent_version || "v1",
+      recurring_consent_version: consentVersion,
       recurring_consent_amount_cents: payload.recurring_consent_amount_cents ?? null,
       membership_agreement_version: payload.membership_agreement_version || null,
       membership_agreement_text: payload.membership_agreement_text || null,

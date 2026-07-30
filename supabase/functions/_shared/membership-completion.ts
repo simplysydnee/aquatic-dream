@@ -260,7 +260,7 @@ async function ensureMembershipRecord(options: {
       current_period_start: periodStart ? new Date(periodStart * 1000).toISOString() : null,
       current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
       recurring_consent_at: new Date().toISOString(),
-      recurring_consent_version: asNullableString(options.payload.recurring_consent_version) || "v1",
+      recurring_consent_version: requireConsentVersion(options.payload),
       recurring_consent_amount_cents: asNumber(options.payload.recurring_consent_amount_cents) || null,
       membership_agreement_version: asNullableString(options.payload.membership_agreement_version),
       membership_agreement_text: asNullableString(options.payload.membership_agreement_text),
