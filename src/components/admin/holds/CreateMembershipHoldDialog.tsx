@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatPhone } from "@/lib/phone";
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
-import { lookupActiveWaiver } from "@/lib/swimmerWaiver";
+import { resolveSwimmerWaiver } from "@/lib/swimmerWaiver";
 
 export interface HoldSlotTarget {
   id: string;
@@ -231,8 +231,14 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
     if (r.child_dob) {
       const { first, last } = splitName(r.swimmer_name);
       setWaiverChecking(true);
-      void lookupActiveWaiver(first, last, r.child_dob)
-        .then((w) => setWaiverId(w?.waiver_id ?? null))
+      void resolveSwimmerWaiver({
+        firstName: first,
+        lastName: last,
+        dob: r.child_dob,
+        parentEmail: r.parent_email,
+        parentPhone: r.parent_phone,
+      })
+        .then((status) => setWaiverId(status.waiverId))
         .finally(() => setWaiverChecking(false));
     }
     setForm((prev) => ({

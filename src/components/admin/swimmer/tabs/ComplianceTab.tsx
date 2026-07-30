@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveSwimmerWaiver } from "@/lib/swimmerWaiver";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ShieldCheck, ShieldAlert, Camera, Phone, User as UserIcon, CircleHelp } from "lucide-react";
@@ -93,17 +94,14 @@ export default function ComplianceTab({ swimmer, onChanged }: { swimmer: Swimmer
       const first = parts[0] || "";
       const last = parts.slice(1).join(" ") || "";
       if (first) {
-        const { data } = await supabase.rpc(
-          "swimmer_has_waiver_on_file" as any,
-          {
-            _first: first,
-            _last: last || null,
-            _dob: swimmer.child_dob || null,
-            _parent_email: swimmer.parent_email || null,
-            _parent_phone: swimmer.parent_phone || null,
-          },
-        );
-        setFamilyWaiverOnFile(!!data);
+        const status = await resolveSwimmerWaiver({
+          firstName: first,
+          lastName: last,
+          dob: swimmer.child_dob,
+          parentEmail: swimmer.parent_email,
+          parentPhone: swimmer.parent_phone,
+        });
+        setFamilyWaiverOnFile(status.onFile);
       } else {
         setFamilyWaiverOnFile(false);
       }

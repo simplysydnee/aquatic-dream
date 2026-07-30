@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, addDays, isBefore, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveSwimmerWaiver } from "@/lib/swimmerWaiver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1800,7 +1801,7 @@ function ReviewStep({
       parentEmail: draft.client.parent_email,
       parentPhone: draft.client.parent_phone,
     }).then((status) => setWaiverOnFile(status.onFile));
-  }, [draft.client.swimmers]);
+  }, [draft.client.swimmers, draft.client.parent_email, draft.client.parent_phone]);
 
   // Card on file lookup — validates against Stripe (attached + not expired).
   useEffect(() => {
