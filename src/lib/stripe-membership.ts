@@ -1,27 +1,33 @@
-// Membership checkout is pinned to Stripe SANDBOX (test mode) until the
-// deliberate go-live step. This lets us verify /join end-to-end with the
-// 4242 test card without touching real money, even in production builds.
-//
-// Do NOT switch this to the live publishable key without also flipping
-// create-membership-checkout off its sandbox pin. See
-// aquatic-dreams-GOLIVE-checklist.md.
+// Membership checkout now follows the same environment as the rest of the
+// app: derived from the VITE_PAYMENTS_CLIENT_TOKEN publishable-key prefix
+// (pk_test_ = sandbox, pk_live_ = live). The server side
+// (create-membership-checkout) uses the environment we send here, so the
+// embedded checkout iframe and the Checkout Session always agree.
 import { loadStripe, Stripe } from "@stripe/stripe-js";
 
-const MEMBERSHIP_TEST_TOKEN =
-  (import.meta.env.VITE_MEMBERSHIP_TEST_TOKEN as string | undefined) ||
-  "pk_test_51TLnBXKA8zyjuHUA4CQmgiqFaiUo9WQYU2AUTqZcGoskKK6poENz94nAsFSJEUGRt9DSVb6MNZdkF9TZsdtcztOv00JF2jtLv3";
+type StripeEnv = "sandbox" | "live";
 
-if (!MEMBERSHIP_TEST_TOKEN.startsWith("pk_test_")) {
-  throw new Error("Membership checkout requires a Stripe TEST publishable key (pk_test_...)");
+const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as string | undefined;
+
+function membershipEnvironment(): StripeEnv {
+  if (clientToken?.startsWith("pk_test_")) return "sandbox";
+  if (clientToken?.startsWith("pk_live_")) return "live";
+  throw new Error(
+    "Stripe payments are not configured for this build. " +
+      "Complete Stripe go-live in your Lovable project to enable production checkout.",
+  );
 }
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
 export function getMembershipStripe(): Promise<Stripe | null> {
-  if (!stripePromise) stripePromise = loadStripe(MEMBERSHIP_TEST_TOKEN);
+  if (!stripePromise) {
+    membershipEnvironment(); // throws on misconfig
+    stripePromise = loadStripe(clientToken as string);
+  }
   return stripePromise;
 }
 
-export function getMembershipStripeEnvironment(): "sandbox" {
-  return "sandbox";
+export function getMembershipStripeEnvironment(): StripeEnv {
+  return membershipEnvironment();
 }
