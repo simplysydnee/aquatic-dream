@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveSwimmerWaiver } from "@/lib/swimmerWaiver";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -92,7 +93,7 @@ const KioskCheckIn = () => {
         .not("status", "in", "(cancelled,abandoned)") as any,
       (supabase
         .from("membership_occurrences") as any)
-        .select("id, occurrence_date, start_time, end_time, instructor_id, status, checked_in_at, checked_in_by, memberships!inner(id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, waiver_id, standing_slots(id, start_time, end_time, instructor_id))")
+        .select("id, occurrence_date, start_time, end_time, instructor_id, status, checked_in_at, checked_in_by, memberships!inner(id, plan_key, child_first_name, child_last_name, child_dob, parent_first_name, parent_last_name, parent_email, parent_phone, waiver_id, standing_slots(id, start_time, end_time, instructor_id))")
         .eq("occurrence_date", dateStr)
         .eq("status", "scheduled"),
       supabase.from("membership_plans").select("plan_key, name"),
@@ -217,7 +218,7 @@ const KioskCheckIn = () => {
           "(no name)",
         child_age: null,
         parent_name: [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim(),
-        has_waiver: !!m.waiver_id,
+        has_waiver: memWaiver.get(m.id) ?? !!m.waiver_id,
         checked_in: !!o.checked_in_at,
         checked_in_at: o.checked_in_at ?? null,
       };
