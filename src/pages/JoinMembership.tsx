@@ -1191,8 +1191,7 @@ export default function JoinMembership() {
                                       key={s.id}
                                       type="button"
                                       onClick={() => {
-                                        setSlot(s);
-                                        setStep(3);
+                                        void chooseSlot(s);
                                       }}
                                       className="flex w-full items-center justify-between rounded-lg border-2 border-[#2a5e84]/20 p-4 text-left transition hover:border-[#F58B76] hover:bg-[#F58B76]/5"
                                     >
