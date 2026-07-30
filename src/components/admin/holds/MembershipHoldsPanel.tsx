@@ -70,7 +70,7 @@ interface Props {
 }
 
 
-export function MembershipHoldsPanel({ refreshKey, onChanged }: Props) {
+export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }: Props) {
   const [rows, setRows] = useState<HoldRow[]>([]);
   const [instructors, setInstructors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
