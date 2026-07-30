@@ -1793,8 +1793,13 @@ function ReviewStep({
   useEffect(() => {
     const sw = draft.client.swimmers[0];
     if (!sw?.first_name || !sw?.last_name || !sw?.dob) { setWaiverOnFile(null); return; }
-    supabase.rpc("swimmer_has_waiver_on_file", { _first: sw.first_name, _last: sw.last_name, _dob: sw.dob })
-      .then(({ data }) => setWaiverOnFile(!!data));
+    void resolveSwimmerWaiver({
+      firstName: sw.first_name,
+      lastName: sw.last_name,
+      dob: sw.dob,
+      parentEmail: draft.client.parent_email,
+      parentPhone: draft.client.parent_phone,
+    }).then((status) => setWaiverOnFile(status.onFile));
   }, [draft.client.swimmers]);
 
   // Card on file lookup — validates against Stripe (attached + not expired).
