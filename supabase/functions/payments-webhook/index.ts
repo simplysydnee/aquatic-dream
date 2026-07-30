@@ -742,6 +742,18 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
 
   const smsConsent = payload.sms_consent === true;
 
+  // A membership must never store a consent version the parent did not see.
+  const consentVersion: string | null =
+    (typeof payload.recurring_consent_version === "string" && payload.recurring_consent_version.trim())
+      ? payload.recurring_consent_version
+      : (typeof payload.membership_agreement_version === "string" && payload.membership_agreement_version.trim())
+        ? payload.membership_agreement_version
+        : null;
+  if (!consentVersion) {
+    console.error("[membership webhook] missing recurring_consent_version", pendingId);
+    return;
+  }
+
   const { data: newMembership, error: insErr } = await supabase
     .from("memberships")
     .insert({
