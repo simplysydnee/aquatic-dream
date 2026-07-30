@@ -110,10 +110,53 @@ export default function JoinMembership() {
   const [waiverChecking, setWaiverChecking] = useState(false);
   const [waiverSubmitting, setWaiverSubmitting] = useState(false);
 
-  // Phone-booked hold state (/join?hold=<token>)
-  const [holdToken, setHoldToken] = useState<string | null>(null);
-  const [holdLoading, setHoldLoading] = useState(false);
-  const [holdError, setHoldError] = useState<string | null>(null);
+  // Phone-booked hold state (/join?hold=<token>).
+  // Decided from the URL before first paint so the program picker never flashes.
+  const [holdToken, setHoldToken] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("membership") === "success") return null;
+    return p.get("hold");
+  });
+  const [holdState, setHoldState] = useState<HoldState>(() =>
+    holdTokenFromUrl() ? "loading" : "none",
+  );
+  const [holdHeldUntil, setHoldHeldUntil] = useState<string | null>(null);
+  const [holdSwimmerFirst, setHoldSwimmerFirst] = useState<string>("");
+  const [releasingHold, setReleasingHold] = useState(false);
+  const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
+  const holdActive = holdState === "ok" && !!holdToken;
+
+  const startNormalEnrollment = useCallback(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("hold");
+    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    setHoldToken(null);
+    setHoldState("none");
+    setHoldHeldUntil(null);
+    setPlan(null);
+    setSlot(null);
+    setSwimLevel(null);
+    setShowAssessment(false);
+    setStep(1);
+  }, []);
+
+  const releaseHoldAndContinue = useCallback(async () => {
+    if (!holdToken) return;
+    setReleasingHold(true);
+    const { error } = await supabase.functions.invoke("release-membership-hold", {
+      body: { token: holdToken },
+    });
+    setReleasingHold(false);
+    if (error) {
+      toast.error("Could not release that spot. Please call us and we will help.");
+      return;
+    }
+    setShowReleaseConfirm(false);
+    toast.success("Spot released. Pick any time that works for you.");
+    startNormalEnrollment();
+  }, [holdToken, startNormalEnrollment]);
+
 
 
   useEffect(() => {
