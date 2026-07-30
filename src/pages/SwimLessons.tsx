@@ -403,11 +403,6 @@ const SwimLessons = () => {
               <p className="text-sm text-secondary-foreground/70">per lesson</p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Semi-Private</p>
-              <p className="font-display text-5xl font-bold text-primary">$45</p>
-              <p className="text-sm text-secondary-foreground/70">per lesson</p>
-            </div>
-            <div className="text-center">
               <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Private</p>
               <p className="font-display text-5xl font-bold text-primary">$65</p>
               <p className="text-sm text-secondary-foreground/70">per lesson</p>
@@ -498,24 +493,22 @@ const SwimLessons = () => {
         </div>
       </section>
 
-      {/* Private / Semi-Private CTA */}
+      {/* Private lessons CTA */}
       <section className="bg-secondary text-secondary-foreground py-16">
         <div className="container text-center">
-          <h2 className="font-display text-3xl font-bold mb-4">Private & Semi-Private Lessons</h2>
+          <h2 className="font-display text-3xl font-bold mb-4">Private Lessons</h2>
           <p className="text-secondary-foreground/70 max-w-xl mx-auto mb-6">
-            Want one-on-one or small group attention? Book a private lesson online
-            ($65/lesson) or request a semi-private ($45/lesson) match.
+            Want one on one attention? Book a private lesson online at $65 per lesson
+            and pick your instructor, day, and time.
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
             <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl">
               <Link to="/book-private-lesson">Book a Private Lesson <ChevronRight className="ml-1 w-4 h-4" /></Link>
             </Button>
-            <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground rounded-xl">
-              <Link to="/swim-enrollment?type=request">Request Semi-Private <ChevronRight className="ml-1 w-4 h-4" /></Link>
-            </Button>
           </div>
         </div>
       </section>
+
 
       {/* Schedule */}
       <section className="py-20">
@@ -536,7 +529,7 @@ const SwimLessons = () => {
               <Users className="w-4 h-4 inline mr-1" /> Every class has a maximum of 3 students per instructor.
             </p>
             <p className="text-muted-foreground text-sm flex items-center justify-center gap-1">
-              <DollarSign className="w-4 h-4" /> $30/lesson (group) · $45 (semi-private) · $65 (private)
+              <DollarSign className="w-4 h-4" /> $30/lesson (group) · $65 (private)
             </p>
           </div>
         </div>

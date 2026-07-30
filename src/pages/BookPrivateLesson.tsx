@@ -59,7 +59,7 @@ const BookPrivateLesson = () => {
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-8">
-          Looking for group classes or semi-private?{" "}
+          Looking for group classes?{" "}
           <Link to="/swim-enrollment" className="text-primary font-medium underline">
             See all enrollment options
           </Link>

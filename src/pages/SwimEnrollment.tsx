@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import SEO from "@/components/SEO";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,8 +10,7 @@ import LegalAgreements, { LegalAgreementData } from "@/components/swim-enrollmen
 import EnrollmentConfirmation from "@/components/swim-enrollment/EnrollmentConfirmation";
 import EnrollmentCheckout from "@/components/swim-enrollment/EnrollmentCheckout";
 import SessionFullFallback from "@/components/swim-enrollment/SessionFullFallback";
-import LessonRequestForm from "@/components/swim-enrollment/LessonRequestForm";
-import PrivateBookingFlow from "@/components/private-lessons/PrivateBookingFlow";
+import { isSeasonStarted } from "@/lib/season";
 import ReturningFamilyEntry, { type ReturningFamilyLookup, type ReturningSwimmer } from "@/components/swim-enrollment/ReturningFamilyEntry";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { SwimLevel, PRICING } from "@/components/swim-enrollment/types";
@@ -97,7 +96,7 @@ const SwimEnrollment = () => {
   const [priorLevel, setPriorLevel] = useState<SwimLevel | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
-  const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
+  
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [totalDue, setTotalDue] = useState(0);
   // Inputs needed to build the create-checkout payload (no DB row yet)
@@ -497,44 +496,17 @@ const SwimEnrollment = () => {
   // Count of swimmers added so far (for the progress indicator)
   const swimmerCount = completedChildren.length + 1;
 
-  if (mode === "request") {
-    return (
-      <main className="min-h-screen bg-background">
-        <PaymentTestModeBanner />
-        <section className="bg-gradient-to-br from-primary/10 to-background py-12">
-          <div className="container">
-            <p className="text-primary font-medium tracking-wider uppercase text-sm mb-2">Private & Semi-Private</p>
-            <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">
-              Book a Private Lesson or Request Semi-Private
-            </h1>
-          </div>
-        </section>
-        <div className="container py-6 pb-16">
-          <div className="flex gap-2 mb-8 flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => setMode("group")}>Group Enrollment</Button>
-            <Button variant="default" size="sm" onClick={() => setMode("request")}>Private / Semi-Private</Button>
-          </div>
-          <div className="grid lg:grid-cols-2 gap-8">
-            <div className="border border-border rounded-xl p-6 bg-card">
-              <h2 className="font-display text-xl font-bold mb-1">Private lessons</h2>
-              <p className="text-sm text-muted-foreground mb-6">Book online. Pick your instructor, days and times, and save a card on file. $65 charged on the day of each lesson.</p>
-              <PrivateBookingFlow />
-            </div>
-            <div className="border border-border rounded-xl p-6 bg-card">
-              <h2 className="font-display text-xl font-bold mb-1">Semi-private (2 swimmers)</h2>
-              <p className="text-sm text-muted-foreground mb-6">Send us a quick request and we'll match you with a partner and schedule your lessons manually.</p>
-              <LessonRequestForm />
-            </div>
-          </div>
-        </div>
-      </main>
-    );
+  // Retired lesson request intake: send visitors to direct private booking
+  // before the season starts, and to memberships after.
+  if (isRequest) {
+    return <Navigate to={isSeasonStarted() ? "/join" : "/book-private-lesson"} replace />;
   }
+
   return (
     <main className="min-h-screen bg-background">
       <SEO
         title="Enroll in Swim Lessons — Aquatic Dreams Swim Modesto"
-        description="Enroll your swimmer at Aquatic Dreams in Modesto. Quick assessment, session pick, secure online checkout for group, semi-private, and private lessons."
+        description="Enroll your swimmer at Aquatic Dreams in Modesto. Quick assessment, session pick, and secure online checkout for group and private lessons."
         path="/swim-enrollment"
       />
       <PaymentTestModeBanner />
@@ -553,10 +525,7 @@ const SwimEnrollment = () => {
       </section>
 
       <div className="container py-6">
-        <div className="flex gap-2 mb-6">
-          <Button variant="default" size="sm" onClick={() => setMode("group")}>Group Enrollment</Button>
-          <Button variant="outline" size="sm" onClick={() => setMode("request")}>Private / Semi-Private</Button>
-        </div>
+
 
         {/* Mobile progress */}
         {step !== "returning" && (
