@@ -399,12 +399,53 @@ export default function JoinMembership() {
     }
   };
 
+  /** Levels a Small Group slot accepts, falling back to its single level. */
+  const acceptedLevelsOf = (s: Slot | null): SwimLevel[] => {
+    if (!s) return [];
+    const arr = (s.accepted_levels || []).filter(Boolean) as SwimLevel[];
+    if (arr.length > 0) return arr;
+    return s.swim_level ? [s.swim_level] : [];
+  };
+
   const handleAssessmentComplete = (level: SwimLevel, _age: number, dob: string) => {
     setSwimLevel(level);
     setChildDob(dob);
     setShowAssessment(false);
+    if (holdToken && plan?.plan_key === "kid_group" && slot) {
+      const accepted = acceptedLevelsOf(slot);
+      if (accepted.length > 0 && !accepted.includes(level)) {
+        // The held class is the wrong level. Offer the classes that fit instead.
+        setHoldLevelMismatch(level);
+        setStep(2);
+        return;
+      }
+      setHoldLevelMismatch(null);
+      setStep(3);
+      return;
+    }
     setStep(holdToken ? 3 : 2);
   };
+
+  /**
+   * Picking a slot other than the held one releases the hold so the spot goes
+   * back into circulation, and the rest of the flow runs as a normal join.
+   */
+  const chooseSlot = async (s: Slot) => {
+    if (holdToken && s.id !== slot?.id) {
+      const token = holdToken;
+      setHoldToken(null);
+      setHoldState("none");
+      setHoldHeldUntil(null);
+      setHoldLevelMismatch(null);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("hold");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      void supabase.functions.invoke("release-membership-hold", { body: { token } });
+    }
+    setSlot(s);
+    setStep(3);
+  };
+
 
 
   const isAdult = plan?.plan_key === "adult_group";
