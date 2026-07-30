@@ -491,6 +491,12 @@ export default function JoinMembership() {
         parent_last: prev.child_last,
       }));
     }
+    // Waiver already matched on the hold: treat it as on file and skip step 4.
+    if (holdWaiverId) {
+      setWaiverId(holdWaiverId);
+      setStep(5);
+      return;
+    }
     setWaiverChecking(true);
     try {
       const existing = await lookupActiveWaiver(form.child_first, form.child_last, childDob);
