@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import SEO from "@/components/SEO";
 import PrivateBookingFlow from "@/components/private-lessons/PrivateBookingFlow";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+import { Button } from "@/components/ui/button";
+import { isSeasonStarted, SEASON_START_LABEL } from "@/lib/season";
 import {
   PROMO_ACTIVE_FOR_TODAY,
   PROMO_LABEL,
@@ -9,7 +11,41 @@ import {
   PRIVATE_REGULAR_PRICE,
 } from "@/lib/privateLessonPricing";
 
+const PrivateLessonsRetired = () => (
+  <main className="min-h-screen bg-background">
+    <SEO
+      title="Private Swim Lessons — Now Swimberships | Aquatic Dreams"
+      description="Private swim lessons at Aquatic Dreams in Modesto are now part of a monthly Swimbership with your own weekly time slot. Join online."
+      path="/book-private-lesson"
+    />
+    <section className="bg-gradient-to-br from-primary/10 to-background py-16">
+      <div className="container max-w-2xl">
+        <p className="text-primary font-medium tracking-wider uppercase text-sm mb-2">
+          Private Swim
+        </p>
+        <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+          Private lessons have moved to Swimberships
+        </h1>
+        <p className="text-muted-foreground mb-3">
+          As of {SEASON_START_LABEL}, private swim is a monthly Swimbership instead of a
+          lesson at a time booking. You keep the same weekly day, time, and instructor all
+          year, and there is no need to rebook each week.
+        </p>
+        <p className="text-muted-foreground mb-8">
+          Already have lessons on the calendar? Nothing changes. Your existing links for
+          cancelling, rescheduling, and payment still work.
+        </p>
+        <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
+          <Link to="/join">Join</Link>
+        </Button>
+      </div>
+    </section>
+  </main>
+);
+
 const BookPrivateLesson = () => {
+  if (isSeasonStarted()) return <PrivateLessonsRetired />;
+
   const promo = PROMO_ACTIVE_FOR_TODAY;
   return (
     <main className="min-h-screen bg-background">
