@@ -659,6 +659,7 @@ export default function JoinMembership() {
         parentName: string;
         parentPhone: string;
         parentEmail: string | null;
+        existingWaiverId: string | null;
         heldUntil: string | null;
       };
       if (h.status !== "held") {
@@ -683,8 +684,17 @@ export default function JoinMembership() {
         monthly_price_cents: planRow.monthly_price_cents,
         spots_left: 1,
       } as Slot);
-      const level = h.swimLevel ?? s.swim_level ?? null;
+      // Small Group: only a level captured on the hold itself counts. A null
+      // level means "not yet known", so the parent takes the assessment.
+      const level =
+        h.swimLevel ?? (planRow.plan_key === "kid_group" ? null : s.swim_level ?? null);
       setSwimLevel(level);
+      // A waiver id on the hold means the front desk matched a waiver already
+      // on file. Null means "not yet known" — the normal check still runs.
+      if (h.existingWaiverId) {
+        setHoldWaiverId(h.existingWaiverId);
+        setWaiverId(h.existingWaiverId);
+      }
       const [swimFirst, ...swimRest] = (h.swimmerName || "").trim().split(/\s+/);
       const [parentFirst, ...parentRest] = (h.parentName || "").trim().split(/\s+/);
       setHoldSwimmerFirst(swimFirst || "");
@@ -706,6 +716,7 @@ export default function JoinMembership() {
         setStep(3);
       }
       setHoldState("ok");
+
     })();
   }, []);
 
