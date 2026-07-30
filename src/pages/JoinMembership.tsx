@@ -640,17 +640,14 @@ export default function JoinMembership() {
 
   // Phone-booked hold: /join?hold=<token> skips program and slot selection.
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const token = p.get("hold");
-    if (!token || p.get("membership") === "success") return;
-    setHoldLoading(true);
+    const token = holdTokenFromUrl();
+    if (!token) return;
     (async () => {
       const { data, error } = await supabase.functions.invoke("get-membership-hold", {
         body: { token },
       });
       if (error || !data?.hold || !data?.plan || !data?.slot) {
-        setHoldError("We could not find that reservation. You can still choose a time below.");
-        setHoldLoading(false);
+        setHoldState("not_found");
         return;
       }
       const h = data.hold as {
@@ -661,19 +658,22 @@ export default function JoinMembership() {
         parentName: string;
         parentPhone: string;
         parentEmail: string | null;
+        heldUntil: string | null;
       };
       if (h.status !== "held") {
-        setHoldError(
+        setHoldState(
           h.status === "converted"
-            ? "This reservation is already complete. Give us a call if you need anything."
-            : "This reservation has expired. Choose a time below or call us and we will hold it again.",
+            ? "converted"
+            : h.status === "cancelled"
+            ? "cancelled"
+            : h.status === "expired"
+            ? "expired"
+            : "not_found",
         );
-        setHoldLoading(false);
         return;
       }
       const planRow = data.plan as Plan;
       const s = data.slot as Omit<Slot, "plan_id" | "plan_name" | "monthly_price_cents" | "spots_left">;
-      setHoldToken(token);
       setPlan(planRow);
       setSlot({
         ...s,
@@ -686,6 +686,8 @@ export default function JoinMembership() {
       setSwimLevel(level);
       const [swimFirst, ...swimRest] = (h.swimmerName || "").trim().split(/\s+/);
       const [parentFirst, ...parentRest] = (h.parentName || "").trim().split(/\s+/);
+      setHoldSwimmerFirst(swimFirst || "");
+      setHoldHeldUntil(h.heldUntil ?? null);
       setForm((f) => ({
         ...f,
         child_first: swimFirst || "",
@@ -702,9 +704,23 @@ export default function JoinMembership() {
         setShowAssessment(false);
         setStep(3);
       }
-      setHoldLoading(false);
+      setHoldState("ok");
     })();
   }, []);
+
+  // Back button must never drop a held parent into program selection.
+  useEffect(() => {
+    const onPop = () => {
+      if (holdTokenFromUrl() && holdState === "ok") {
+        setStep((s) => (s < 3 ? 3 : s));
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [holdState]);
+
+  const heldUntilLabel = fmtHeldUntil(holdHeldUntil);
+
 
 
 
