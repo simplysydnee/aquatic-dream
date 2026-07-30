@@ -65,9 +65,12 @@ const countdown = (iso: string) => {
 interface Props {
   refreshKey?: number;
   onChanged?: () => void;
+  /** Prefix shown on the collapsed one-line state, e.g. "24 slots in reserve". */
+  collapsedPrefix?: string;
 }
 
-export function MembershipHoldsPanel({ refreshKey, onChanged }: Props) {
+
+export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }: Props) {
   const [rows, setRows] = useState<HoldRow[]>([]);
   const [instructors, setInstructors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -124,13 +127,32 @@ export function MembershipHoldsPanel({ refreshKey, onChanged }: Props) {
     onChanged?.();
   };
 
+  // Nothing held and nothing to review collapses to a single muted line.
+  if (!loading && !showExpired && visible.length === 0) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 px-1 text-xs text-muted-foreground">
+        <span>
+          {collapsedPrefix ? `${collapsedPrefix} · ` : ""}No spots held
+        </span>
+        <button
+          type="button"
+          className="underline underline-offset-2 hover:text-foreground"
+          onClick={() => setShowExpired(true)}
+        >
+          Show expired and cancelled
+        </button>
+      </div>
+    );
+  }
+
   return (
     <Card className="p-4 space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
+          <h2 className="text-sm font-semibold text-foreground">
             Pending enrollments
           </h2>
+
           <p className="text-xs text-muted-foreground">
             Spots held over the phone, waiting on the parent to finish forms and card.
           </p>

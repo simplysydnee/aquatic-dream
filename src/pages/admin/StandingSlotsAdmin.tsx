@@ -392,45 +392,9 @@ const StandingSlotsAdmin = () => {
     });
   };
 
-  // Capacity dashboard groups: Small Group broken down by level, plus Private and Adult.
-  const dashboardGroups = useMemo(() => {
-    const activeSlots = slots.filter((s) => s.active);
-    type Group = { key: string; label: string; accent: string; enrolled: number; capacity: number; slotCount: number };
-    const groups: Group[] = [];
+  // Inactive slots are held in reserve and are not bookable.
+  const reserveCount = useMemo(() => slots.filter((s) => !s.active).length, [slots]);
 
-    for (const lv of SWIM_LEVELS) {
-      const bucket = activeSlots.filter((s) => s.plan_key === "kid_group" && s.swim_level === lv);
-      if (!bucket.length) continue;
-      const capacity = bucket.reduce((a, s) => a + s.capacity, 0);
-      const enrolled = bucket.reduce((a, s) => a + (enrolledCounts[s.id] || 0), 0);
-      const accent =
-        lv === "white" ? "bg-slate-400" :
-        lv === "red" ? "bg-rose-500" :
-        lv === "yellow" ? "bg-amber-400" :
-        lv === "blue" ? "bg-sky-500" :
-        "bg-emerald-500";
-      groups.push({ key: `kid_${lv}`, label: LEVEL_LABELS[lv], accent, capacity, enrolled, slotCount: bucket.length });
-    }
-
-    for (const pk of ["private", "adult_group"] as PlanKey[]) {
-      const bucket = activeSlots.filter((s) => s.plan_key === pk);
-      if (!bucket.length) continue;
-      const capacity = bucket.reduce((a, s) => a + s.capacity, 0);
-      const enrolled = bucket.reduce((a, s) => a + (enrolledCounts[s.id] || 0), 0);
-      const accent = pk === "private" ? "bg-primary" : "bg-secondary";
-      groups.push({ key: pk, label: PLAN_LABELS[pk], accent, capacity, enrolled, slotCount: bucket.length });
-    }
-    return groups;
-  }, [slots, enrolledCounts]);
-
-  const fillState = (enrolled: number, capacity: number) => {
-    if (capacity <= 0) return { label: "—", tone: "text-muted-foreground" };
-    const pct = enrolled / capacity;
-    if (enrolled >= capacity) return { label: "FULL", tone: "text-destructive" };
-    if (pct >= 0.8) return { label: "Nearly full", tone: "text-accent" };
-    if (pct >= 0.4) return { label: "Filling", tone: "text-primary" };
-    return { label: "Open", tone: "text-emerald-600" };
-  };
 
   const SortHead = ({ k, children }: { k: SortKey; children: React.ReactNode }) => (
     <button
@@ -479,7 +443,15 @@ const StandingSlotsAdmin = () => {
         }}
       />
 
-      <MembershipHoldsPanel refreshKey={holdsRefresh} onChanged={() => void loadAll()} />
+      <MembershipHoldsPanel
+        refreshKey={holdsRefresh}
+        onChanged={() => void loadAll()}
+        collapsedPrefix={
+          reserveCount > 0
+            ? `${reserveCount} slot${reserveCount === 1 ? "" : "s"} in reserve`
+            : undefined
+        }
+      />
 
       <CreateMembershipHoldDialog
         slot={holdTarget}
@@ -491,54 +463,6 @@ const StandingSlotsAdmin = () => {
         }}
       />
 
-
-
-
-      {/* Capacity dashboard — at-a-glance fill by program/level */}
-      <Card className="p-4">
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-primary">Capacity at a glance</h2>
-          <span className="text-xs text-muted-foreground">Active memberships / total capacity</span>
-        </div>
-        {loading ? (
-          <div className="py-6 text-center text-muted-foreground text-sm">
-            <Loader2 className="inline h-4 w-4 animate-spin mr-2" />Loading capacity…
-          </div>
-        ) : dashboardGroups.length === 0 ? (
-          <div className="py-6 text-center text-muted-foreground text-sm">No active slots yet.</div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {dashboardGroups.map((g) => {
-              const pct = g.capacity > 0 ? Math.min(100, Math.round((g.enrolled / g.capacity) * 100)) : 0;
-              const state = fillState(g.enrolled, g.capacity);
-              return (
-                <div key={g.key} className="rounded-lg border bg-card p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-medium text-sm text-foreground truncate">{g.label}</div>
-                    <span className={cn("text-[11px] font-semibold uppercase tracking-wide", state.tone)}>
-                      {state.label}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-baseline justify-between text-xs text-muted-foreground">
-                    <span>
-                      <span className="text-lg font-semibold text-foreground tabular-nums">{g.enrolled}</span>
-                      <span className="mx-1">/</span>
-                      <span className="tabular-nums">{g.capacity}</span>
-                    </span>
-                    <span>{g.slotCount} slot{g.slotCount === 1 ? "" : "s"}</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={cn("h-full transition-all", g.accent, g.enrolled >= g.capacity && "bg-destructive")}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
 
 
       <Card className="p-3 flex flex-wrap items-end gap-3">
