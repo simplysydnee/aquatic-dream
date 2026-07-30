@@ -972,16 +972,18 @@ export default function JoinMembership() {
 
             {step === 1 && showAssessment && plan?.plan_key === "kid_group" && (
               <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAssessment(false);
-                    setPlan(null);
-                  }}
-                  className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Back to programs
-                </button>
+                {!holdActive && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAssessment(false);
+                      setPlan(null);
+                    }}
+                    className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Back to programs
+                  </button>
+                )}
                 <h2 className="mb-2 text-xl font-semibold text-[#1a3a8a]">Find Your Spot</h2>
                 <p className="mb-6 text-sm text-[#2a5e84]">
                   A quick skill check to match your swimmer to the right group.
