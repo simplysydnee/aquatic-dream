@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -724,7 +725,7 @@ export default function JoinMembership() {
 
 
 
-  const holdShell = (children: React.ReactNode) => (
+  const holdShell = (children: ReactNode) => (
     <div className="min-h-screen bg-[#F7F3EE]">
       <div className="mx-auto max-w-2xl px-4 py-10">
         <div className="mb-8 text-center">
