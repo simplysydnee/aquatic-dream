@@ -869,6 +869,12 @@ export default function JoinMembership() {
                   <dd className="text-[#1a3a8a]">{heldUntilLabel}</dd>
                 </div>
               )}
+              {holdWaiverId && (
+                <div className="flex gap-2">
+                  <dt className="w-24 shrink-0 text-[#2a5e84]/70">Waiver</dt>
+                  <dd className="text-[#1a3a8a]">On file, nothing to sign</dd>
+                </div>
+              )}
             </dl>
             <button
               type="button"
