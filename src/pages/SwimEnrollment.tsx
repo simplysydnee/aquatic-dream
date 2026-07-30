@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import SEO from "@/components/SEO";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,8 +10,7 @@ import LegalAgreements, { LegalAgreementData } from "@/components/swim-enrollmen
 import EnrollmentConfirmation from "@/components/swim-enrollment/EnrollmentConfirmation";
 import EnrollmentCheckout from "@/components/swim-enrollment/EnrollmentCheckout";
 import SessionFullFallback from "@/components/swim-enrollment/SessionFullFallback";
-import LessonRequestForm from "@/components/swim-enrollment/LessonRequestForm";
-import PrivateBookingFlow from "@/components/private-lessons/PrivateBookingFlow";
+import { isSeasonStarted } from "@/lib/season";
 import ReturningFamilyEntry, { type ReturningFamilyLookup, type ReturningSwimmer } from "@/components/swim-enrollment/ReturningFamilyEntry";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { SwimLevel, PRICING } from "@/components/swim-enrollment/types";
