@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
+  AlertTriangle,
   Users,
   Waves,
   MessageSquare,
@@ -84,6 +85,7 @@ export function AdminSidebar() {
 
         { title: "Private Lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: 0 },
         { title: "Reports", url: "/admin/reports", icon: BarChart3, badge: 0 },
+        { title: "Card Gaps", url: "/admin/card-gaps", icon: AlertTriangle, badge: 0 },
       ],
     },
     {
