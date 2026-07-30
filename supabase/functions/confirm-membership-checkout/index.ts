@@ -16,7 +16,10 @@ serve(async (req) => {
     const sessionId = typeof body?.sessionId === "string" ? body.sessionId : "";
     if (!sessionIdRe.test(sessionId)) return json({ error: "Invalid checkout session" }, 400);
 
-    const environment: StripeEnv = "sandbox";
+    // Derive the environment from the session id itself so live sessions
+    // are always completed with the live keys.
+    const environment: StripeEnv = sessionId.startsWith("cs_live_") ? "live" : "sandbox";
+
     const result = await completeMembershipFromSetupSessionId(sessionId, environment);
 
     let manageToken: string | null = null;
