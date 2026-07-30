@@ -724,6 +724,51 @@ export default function JoinMembership() {
 
 
 
+  const holdShell = (children: React.ReactNode) => (
+    <div className="min-h-screen bg-[#F7F3EE]">
+      <div className="mx-auto max-w-2xl px-4 py-10">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-[#1a3a8a]">Join Aquatic Dreams</h1>
+          <p className="mt-2 text-[#2a5e84]">Monthly swim membership. Cancel anytime.</p>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+
+  // Gate the first paint: with a hold token in the URL the program picker
+  // must never render, not even for a frame.
+  if (holdState === "loading") {
+    return holdShell(
+      <Card className="flex flex-col items-center gap-3 p-8 text-center">
+        <Loader2 className="h-6 w-6 animate-spin text-[#2a5e84]" />
+        <p className="text-sm text-[#2a5e84]">Pulling up your reserved spot…</p>
+      </Card>,
+    );
+  }
+
+  if (
+    holdState === "expired" ||
+    holdState === "converted" ||
+    holdState === "cancelled" ||
+    holdState === "not_found"
+  ) {
+    const problem = HOLD_PROBLEMS[holdState];
+    return holdShell(
+      <Card className="p-6">
+        <h2 className="mb-2 text-xl font-semibold text-[#1a3a8a]">{problem.title}</h2>
+        <p className="mb-6 text-sm text-[#2a5e84]">{problem.body}</p>
+        <Button
+          type="button"
+          onClick={startNormalEnrollment}
+          className="bg-[#F58B76] text-white hover:bg-[#F58B76]/90"
+        >
+          Start a new enrollment
+        </Button>
+      </Card>,
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F7F3EE]">
       <div className="mx-auto max-w-2xl px-4 py-10">
@@ -732,23 +777,79 @@ export default function JoinMembership() {
           <p className="mt-2 text-[#2a5e84]">Monthly swim membership. Cancel anytime.</p>
         </div>
 
-        {holdLoading && (
-          <div className="mb-6 rounded-lg border border-[#2a5e84]/20 bg-white p-4 text-center text-sm text-[#2a5e84]">
-            Pulling up your reserved spot…
-          </div>
-        )}
-        {holdError && (
-          <div className="mb-6 rounded-lg border border-[#F58B76]/40 bg-[#F58B76]/10 p-4 text-sm text-[#1a3a8a]">
-            {holdError}
-          </div>
-        )}
-        {holdToken && slot && plan && step < 8 && (
+        {holdActive && slot && plan && step < 8 && (
           <div className="mb-6 rounded-lg border border-[#2a5e84]/20 bg-white p-4 text-sm text-[#2a5e84]">
-            <span className="font-semibold text-[#1a3a8a]">Your spot is reserved: </span>
-            {plan.name} · {DAYS[slot.day_of_week]} at {fmtTime(slot.start_time)}
-            {slot.instructor_name ? ` with ${slot.instructor_name}` : ""}. Finish below to lock it in.
+            <div className="font-semibold text-[#1a3a8a]">Your spot is reserved</div>
+            <dl className="mt-2 space-y-1">
+              <div className="flex gap-2">
+                <dt className="w-24 shrink-0 text-[#2a5e84]/70">Program</dt>
+                <dd className="text-[#1a3a8a]">{plan.name}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-24 shrink-0 text-[#2a5e84]/70">When</dt>
+                <dd className="text-[#1a3a8a]">
+                  {DAYS[slot.day_of_week]} at {fmtTime(slot.start_time)}
+                </dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-24 shrink-0 text-[#2a5e84]/70">Instructor</dt>
+                <dd className="text-[#1a3a8a]">{slot.instructor_name || "To be assigned"}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-24 shrink-0 text-[#2a5e84]/70">Swimmer</dt>
+                <dd className="text-[#1a3a8a]">{holdSwimmerFirst || form.child_first}</dd>
+              </div>
+              {heldUntilLabel && (
+                <div className="flex gap-2">
+                  <dt className="w-24 shrink-0 text-[#2a5e84]/70">Held until</dt>
+                  <dd className="text-[#1a3a8a]">{heldUntilLabel}</dd>
+                </div>
+              )}
+            </dl>
+            <button
+              type="button"
+              onClick={() => setShowReleaseConfirm(true)}
+              className="mt-3 text-sm font-medium text-[#2a5e84] underline underline-offset-2 hover:text-[#1a3a8a]"
+            >
+              Need a different time?
+            </button>
           </div>
         )}
+
+        <Dialog open={showReleaseConfirm} onOpenChange={setShowReleaseConfirm}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-[#1a3a8a]">Release this spot?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-[#2a5e84]">
+              Continuing gives up the time we are holding for you, and someone else may take it. You
+              will then be able to browse every open time and pick a new one.
+            </p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowReleaseConfirm(false)}
+                className="border-[#2a5e84]/30 text-[#1a3a8a]"
+              >
+                Keep my spot
+              </Button>
+              <Button
+                type="button"
+                onClick={releaseHoldAndContinue}
+                disabled={releasingHold}
+                className="bg-[#F58B76] text-white hover:bg-[#F58B76]/90"
+              >
+                {releasingHold ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Release and choose another time"
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
 
 
 
