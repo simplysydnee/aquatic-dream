@@ -104,13 +104,11 @@ export function createStripeClient(env: StripeEnv): Stripe {
 export async function verifyWebhook(req: Request, env: StripeEnv): Promise<{ type: string; data: { object: any } }> {
   const signature = req.headers.get("stripe-signature");
   const body = await req.text();
-  const primary = env === 'sandbox'
+  // Both env secrets are provisioned, so never cross-fall-back: a sandbox
+  // signed payload must not verify as a live event (or vice versa).
+  const secret = env === 'sandbox'
     ? Deno.env.get('PAYMENTS_SANDBOX_WEBHOOK_SECRET')
     : Deno.env.get('PAYMENTS_LIVE_WEBHOOK_SECRET');
-  const fallback = env === 'sandbox'
-    ? Deno.env.get('PAYMENTS_LIVE_WEBHOOK_SECRET')
-    : Deno.env.get('PAYMENTS_SANDBOX_WEBHOOK_SECRET');
-  const secret = primary || fallback;
 
   if (!secret) {
     throw new Error('Webhook secret environment variable is not configured');
