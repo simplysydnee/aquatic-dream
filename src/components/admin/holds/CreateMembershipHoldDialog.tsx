@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatPhone } from "@/lib/phone";
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
+import { lookupActiveWaiver } from "@/lib/swimmerWaiver";
 
 export interface HoldSlotTarget {
   id: string;
@@ -57,6 +58,7 @@ type FamilyMatch = {
   parent_email: string | null;
   parent_phone: string | null;
   swimmer_name: string;
+  child_dob: string | null;
   source: "membership" | "booking" | "enrollment" | "request";
 };
 
@@ -108,7 +110,7 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
       const [mem, bk, en, rq] = await Promise.all([
         supabase
           .from("memberships")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,created_at")
+          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,created_at")
           .or(
             [
               `parent_email.ilike.${like}`,
@@ -124,7 +126,7 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
           .limit(20),
         supabase
           .from("lesson_bookings")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,updated_at")
+          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
           .or(
             [
               `parent_email.ilike.${like}`,
@@ -140,7 +142,7 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
           .limit(20),
         supabase
           .from("swim_enrollments")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,updated_at")
+          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
           .or(
             [
               `parent_email.ilike.${like}`,
@@ -192,6 +194,7 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
           parent_email: email,
           parent_phone: phone,
           swimmer_name: swimmerName,
+          child_dob: (row.child_dob as string | null) || null,
           source,
         });
       };
