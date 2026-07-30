@@ -65,7 +65,10 @@ const countdown = (iso: string) => {
 interface Props {
   refreshKey?: number;
   onChanged?: () => void;
+  /** Prefix shown on the collapsed one-line state, e.g. "24 slots in reserve". */
+  collapsedPrefix?: string;
 }
+
 
 export function MembershipHoldsPanel({ refreshKey, onChanged }: Props) {
   const [rows, setRows] = useState<HoldRow[]>([]);
