@@ -77,6 +77,57 @@ const fmtPrice = (cents: number) => `$${(cents / 100).toFixed(0)}`;
 // 1 program, 2 slot, 3 info, 4 waiver (auto-skip if on file), 5 consent, 6 review, 7 checkout, 8 success
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
+type HoldState = "none" | "loading" | "ok" | "expired" | "converted" | "cancelled" | "not_found";
+
+/** Reads the hold token straight off the URL so first paint can be gated. */
+const holdTokenFromUrl = (): string | null => {
+  if (typeof window === "undefined") return null;
+  const p = new URLSearchParams(window.location.search);
+  if (p.get("membership") === "success") return null;
+  return p.get("hold");
+};
+
+const fmtHeldUntil = (iso: string | null): string | null => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Los_Angeles",
+  });
+};
+
+const HOLD_PROBLEMS: Record<
+  "expired" | "converted" | "cancelled" | "not_found",
+  { title: string; body: string }
+> = {
+  expired: {
+    title: "That hold has expired",
+    body:
+      "We held this spot for a limited time and the window has passed, so the time is open to everyone again. You can enroll now and pick any time that works, or call us and we will hold one again.",
+  },
+  converted: {
+    title: "This enrollment is already complete",
+    body:
+      "Someone already finished signing up with this link, so there is nothing left to do here. If you need to make a change or add another swimmer, give us a call.",
+  },
+  cancelled: {
+    title: "This hold was released",
+    body:
+      "Our front desk released this spot, so it is no longer being saved. You can start a new enrollment and choose any open time.",
+  },
+  not_found: {
+    title: "We could not find that reservation",
+    body:
+      "This link may have been mistyped or is no longer valid. You can start a normal enrollment and pick a time below.",
+  },
+};
+
+
 export default function JoinMembership() {
   const [step, setStep] = useState<Step>(1);
   const [showAssessment, setShowAssessment] = useState(false);
