@@ -72,7 +72,7 @@ export function StandingSlotsSummary({ slots, occupancy, instructorNames, loadin
 
   const openOf = (s: SummarySlot) => Math.max(0, s.capacity - (occupancy[s.id] ?? 0));
 
-  const { tiles, inactiveCount } = useMemo(() => {
+  const { tiles } = useMemo(() => {
     const activeSlots = slots.filter((s) => s.active);
     const open = (s: SummarySlot) => Math.max(0, s.capacity - (occupancy[s.id] ?? 0));
     const daysOf = (list: SummarySlot[]) =>
@@ -270,12 +270,6 @@ export function StandingSlotsSummary({ slots, occupancy, instructorNames, loadin
             </div>
           )}
         </>
-      )}
-
-      {inactiveCount > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {inactiveCount} slot{inactiveCount === 1 ? "" : "s"} in reserve, not bookable.
-        </p>
       )}
     </Card>
   );
