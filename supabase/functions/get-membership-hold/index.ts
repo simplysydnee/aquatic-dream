@@ -76,6 +76,7 @@ Deno.serve(async (req) => {
         parentName: hold.parent_name,
         parentPhone: hold.parent_phone,
         parentEmail: hold.parent_email,
+        existingWaiverId: hold.existing_waiver_id,
         heldUntil: hold.held_until,
       },
       plan: plan ?? null,

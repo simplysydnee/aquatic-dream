@@ -160,6 +160,11 @@ export default function JoinMembership() {
   const [waiverId, setWaiverId] = useState<string | null>(null);
   const [waiverOnFile, setWaiverOnFile] = useState<ActiveWaiver | null>(null);
   const [waiverChecking, setWaiverChecking] = useState(false);
+  // Waiver id carried on the hold (front desk matched an existing family).
+  const [holdWaiverId, setHoldWaiverId] = useState<string | null>(null);
+  // Assessed level that the held Small Group class does not accept.
+  const [holdLevelMismatch, setHoldLevelMismatch] = useState<SwimLevel | null>(null);
+
   const [waiverSubmitting, setWaiverSubmitting] = useState(false);
 
   // Phone-booked hold state (/join?hold=<token>).
@@ -394,12 +399,53 @@ export default function JoinMembership() {
     }
   };
 
+  /** Levels a Small Group slot accepts, falling back to its single level. */
+  const acceptedLevelsOf = (s: Slot | null): SwimLevel[] => {
+    if (!s) return [];
+    const arr = (s.accepted_levels || []).filter(Boolean) as SwimLevel[];
+    if (arr.length > 0) return arr;
+    return s.swim_level ? [s.swim_level] : [];
+  };
+
   const handleAssessmentComplete = (level: SwimLevel, _age: number, dob: string) => {
     setSwimLevel(level);
     setChildDob(dob);
     setShowAssessment(false);
+    if (holdToken && plan?.plan_key === "kid_group" && slot) {
+      const accepted = acceptedLevelsOf(slot);
+      if (accepted.length > 0 && !accepted.includes(level)) {
+        // The held class is the wrong level. Offer the classes that fit instead.
+        setHoldLevelMismatch(level);
+        setStep(2);
+        return;
+      }
+      setHoldLevelMismatch(null);
+      setStep(3);
+      return;
+    }
     setStep(holdToken ? 3 : 2);
   };
+
+  /**
+   * Picking a slot other than the held one releases the hold so the spot goes
+   * back into circulation, and the rest of the flow runs as a normal join.
+   */
+  const chooseSlot = async (s: Slot) => {
+    if (holdToken && s.id !== slot?.id) {
+      const token = holdToken;
+      setHoldToken(null);
+      setHoldState("none");
+      setHoldHeldUntil(null);
+      setHoldLevelMismatch(null);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("hold");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      void supabase.functions.invoke("release-membership-hold", { body: { token } });
+    }
+    setSlot(s);
+    setStep(3);
+  };
+
 
 
   const isAdult = plan?.plan_key === "adult_group";
@@ -444,6 +490,12 @@ export default function JoinMembership() {
         parent_first: prev.child_first,
         parent_last: prev.child_last,
       }));
+    }
+    // Waiver already matched on the hold: treat it as on file and skip step 4.
+    if (holdWaiverId) {
+      setWaiverId(holdWaiverId);
+      setStep(5);
+      return;
     }
     setWaiverChecking(true);
     try {
@@ -659,6 +711,7 @@ export default function JoinMembership() {
         parentName: string;
         parentPhone: string;
         parentEmail: string | null;
+        existingWaiverId: string | null;
         heldUntil: string | null;
       };
       if (h.status !== "held") {
@@ -683,8 +736,17 @@ export default function JoinMembership() {
         monthly_price_cents: planRow.monthly_price_cents,
         spots_left: 1,
       } as Slot);
-      const level = h.swimLevel ?? s.swim_level ?? null;
+      // Small Group: only a level captured on the hold itself counts. A null
+      // level means "not yet known", so the parent takes the assessment.
+      const level =
+        h.swimLevel ?? (planRow.plan_key === "kid_group" ? null : s.swim_level ?? null);
       setSwimLevel(level);
+      // A waiver id on the hold means the front desk matched a waiver already
+      // on file. Null means "not yet known" — the normal check still runs.
+      if (h.existingWaiverId) {
+        setHoldWaiverId(h.existingWaiverId);
+        setWaiverId(h.existingWaiverId);
+      }
       const [swimFirst, ...swimRest] = (h.swimmerName || "").trim().split(/\s+/);
       const [parentFirst, ...parentRest] = (h.parentName || "").trim().split(/\s+/);
       setHoldSwimmerFirst(swimFirst || "");
@@ -706,6 +768,7 @@ export default function JoinMembership() {
         setStep(3);
       }
       setHoldState("ok");
+
     })();
   }, []);
 
@@ -804,6 +867,12 @@ export default function JoinMembership() {
                 <div className="flex gap-2">
                   <dt className="w-24 shrink-0 text-[#2a5e84]/70">Held until</dt>
                   <dd className="text-[#1a3a8a]">{heldUntilLabel}</dd>
+                </div>
+              )}
+              {holdWaiverId && (
+                <div className="flex gap-2">
+                  <dt className="w-24 shrink-0 text-[#2a5e84]/70">Waiver</dt>
+                  <dd className="text-[#1a3a8a]">On file, nothing to sign</dd>
                 </div>
               )}
             </dl>
@@ -909,16 +978,18 @@ export default function JoinMembership() {
 
             {step === 1 && showAssessment && plan?.plan_key === "kid_group" && (
               <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAssessment(false);
-                    setPlan(null);
-                  }}
-                  className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Back to programs
-                </button>
+                {!holdActive && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAssessment(false);
+                      setPlan(null);
+                    }}
+                    className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Back to programs
+                  </button>
+                )}
                 <h2 className="mb-2 text-xl font-semibold text-[#1a3a8a]">Find Your Spot</h2>
                 <p className="mb-6 text-sm text-[#2a5e84]">
                   A quick skill check to match your swimmer to the right group.
@@ -947,6 +1018,20 @@ export default function JoinMembership() {
                 <h2 className="mb-4 text-xl font-semibold text-[#1a3a8a]">
                   Pick a slot — {plan.name}
                 </h2>
+
+                {holdLevelMismatch && (
+                  <div className="mb-4 rounded-lg border border-[#F58B76]/40 bg-[#F58B76]/10 p-3 text-sm text-[#1a3a8a]">
+                    <div className="font-semibold">Let's find a better fit</div>
+                    <p className="mt-1 text-[#2a5e84]">
+                      The class we were holding is not the right level for{" "}
+                      {holdSwimmerFirst || "your swimmer"}. Based on the skill check, the right group
+                      is <span className="font-semibold">{LEVEL_LABELS[holdLevelMismatch]}</span>.
+                      Here are the classes that take that group. Picking one releases the spot we
+                      were holding.
+                    </p>
+                  </div>
+                )}
+
 
                 {plan.plan_key === "kid_group" && (
                   <div className="mb-4 flex items-center gap-3 rounded-lg border border-[#2a5e84]/20 bg-[#2a5e84]/5 p-3">
@@ -1112,8 +1197,7 @@ export default function JoinMembership() {
                                       key={s.id}
                                       type="button"
                                       onClick={() => {
-                                        setSlot(s);
-                                        setStep(3);
+                                        void chooseSlot(s);
                                       }}
                                       className="flex w-full items-center justify-between rounded-lg border-2 border-[#2a5e84]/20 p-4 text-left transition hover:border-[#F58B76] hover:bg-[#F58B76]/5"
                                     >
@@ -1336,7 +1420,7 @@ export default function JoinMembership() {
               <>
                 <button
                   type="button"
-                  onClick={() => setStep(waiverOnFile ? 3 : 4)}
+                  onClick={() => setStep(waiverOnFile || holdWaiverId ? 3 : 4)}
                   className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
@@ -1452,7 +1536,7 @@ export default function JoinMembership() {
                   {form.has_medical === "yes" && (
                     <Row label="Medical" value={form.medical_notes} />
                   )}
-                  <Row label="Waiver" value={waiverOnFile ? "On file" : "Signed today"} />
+                  <Row label="Waiver" value={waiverOnFile || holdWaiverId ? "On file" : "Signed today"} />
                   <div className="space-y-2 border-t border-[#2a5e84]/20 pt-3">
                     {quoteLoading && !quote && (
                       <div className="text-sm text-[#2a5e84]">Calculating your first charge…</div>
