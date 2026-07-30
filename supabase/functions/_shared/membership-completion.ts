@@ -195,6 +195,16 @@ export async function completeMembershipFromSetupSession(
   }
 }
 
+// A membership must never store a consent version the parent did not see.
+function requireConsentVersion(payload: JsonObject): string {
+  const version = asNullableString(payload.recurring_consent_version)
+    || asNullableString(payload.membership_agreement_version);
+  if (!version) {
+    throw new Error("Missing recurring_consent_version on pending membership payload");
+  }
+  return version;
+}
+
 async function ensureMembershipRecord(options: {
   subscriptionId: string;
   customerId: string;
