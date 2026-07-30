@@ -27,6 +27,7 @@ import ClientsAdmin from "./pages/admin/ClientsAdmin";
 import MarketingAdmin from "./pages/admin/MarketingAdmin";
 import WaiversAdmin from "./pages/admin/WaiversAdmin";
 import PrivateLessonsAdmin from "./pages/admin/PrivateLessonsAdmin";
+import CardGapReport from "./pages/admin/CardGapReport";
 import BookingNew from "./pages/admin/BookingNew";
 import PrintDaySchedule from "./pages/admin/PrintDaySchedule";
 import CheckInAdmin from "./pages/admin/CheckInAdmin";
@@ -106,6 +107,7 @@ const App = () => (
 
               <Route path="private-lessons" element={<PrivateLessonsAdmin />} />
               <Route path="private-lessons/new" element={<BookingNew />} />
+              <Route path="card-gaps" element={<CardGapReport />} />
               <Route path="users" element={<UsersAdmin />} />
               <Route path="messages" element={<MessagesAdmin />} />
               <Route path="domain-health" element={<DomainHealthAdmin />} />

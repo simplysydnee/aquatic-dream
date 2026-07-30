@@ -46,6 +46,17 @@ async function invokeErrorBody(error: unknown): Promise<Record<string, unknown> 
   return null;
 }
 
+interface CardOnFileHint {
+  found: boolean;
+  brand?: string;
+  last4?: string;
+  exp_month?: number;
+  exp_year?: number;
+  source_booking_id?: string;
+  source_child_name?: string | null;
+  source_instructor_name?: string | null;
+}
+
 async function invokeErrorMessage(error: unknown, fallback: string): Promise<string> {
   const body = await invokeErrorBody(error);
   const msg = (body as { error?: unknown } | null)?.error;
@@ -1773,17 +1784,16 @@ function ReviewStep({
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [waiverOnFile, setWaiverOnFile] = useState<boolean | null>(null);
-  const [existingCardHint, setExistingCardHint] = useState<{
-    found: boolean;
-    brand?: string;
-    last4?: string;
-    exp_month?: number;
-    exp_year?: number;
-    source_booking_id?: string;
-    source_child_name?: string | null;
-    source_instructor_name?: string | null;
-  } | null>(null);
+  const [existingCardHint, setExistingCardHint] = useState<CardOnFileHint | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
+  // Three distinct lookup outcomes: "found", "none" (parent genuinely has no
+  // card), "error" (the lookup itself failed). A failure must never be shown
+  // or treated as "no card on file".
+  const [lookupStatus, setLookupStatus] = useState<"idle" | "found" | "none" | "error">("idle");
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  // Explicit admin decision required after a failed lookup.
+  const [failureChoice, setFailureChoice] = useState<"collect_at_desk" | null>(null);
+  const [lookupAttempt, setLookupAttempt] = useState(0);
   // Admin override: "reuse" (default when card found), "new" (collect fresh),
   // "none" (skip card / bill in person). Resets when email changes.
   const [cardChoice, setCardChoice] = useState<"reuse" | "new" | "none">("reuse");
@@ -1804,10 +1814,15 @@ function ReviewStep({
   }, [draft.client.swimmers, draft.client.parent_email, draft.client.parent_phone]);
 
   // Card on file lookup — validates against Stripe (attached + not expired).
+  // Distinguishes found / none / error so a failed lookup can never be
+  // mistaken for "this parent has no card".
   useEffect(() => {
     const email = draft.client.parent_email?.toLowerCase().trim();
     setExistingCardHint(null);
     setCardChoice("reuse");
+    setLookupError(null);
+    setFailureChoice(null);
+    setLookupStatus("idle");
     if (!email || !email.includes("@")) return;
     let cancelled = false;
     setLookupLoading(true);
@@ -1817,21 +1832,27 @@ function ReviewStep({
           body: { parent_email: email, environment: getStripeEnvironment() },
         });
         if (cancelled) return;
-        if (error || !data || (data as any).error) {
-          setExistingCardHint({ found: false });
+        if (error || !data || (data as { error?: string }).error) {
           const message = error
             ? await invokeErrorMessage(error, "Could not check for a card on file")
-            : (data as { error?: string } | null)?.error;
-          if (!cancelled && message) toast.error(message);
+            : (data as { error?: string } | null)?.error || "Could not check for a card on file";
+          if (cancelled) return;
+          setExistingCardHint(null);
+          setLookupStatus("error");
+          setLookupError(message);
+          toast.error(message);
         } else {
-          setExistingCardHint(data as any);
+          const result = data as CardOnFileHint;
+          setExistingCardHint(result);
+          setLookupStatus(result.found ? "found" : "none");
         }
       } finally {
         if (!cancelled) setLookupLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [draft.client.parent_email]);
+  }, [draft.client.parent_email, lookupAttempt]);
+
 
 
   const isGroup = draft.type === "group";
@@ -1969,8 +1990,20 @@ function ReviewStep({
     }
   }, [draft, occurrenceDates, onDone, existingCardHint, cardChoice]);
 
+  // A failed lookup blocks booking until the admin retries successfully or
+  // explicitly chooses to collect payment at the desk.
+  const lookupBlocked =
+    !isGroup &&
+    draft.payment.collectCardOnFile &&
+    lookupStatus === "error" &&
+    failureChoice !== "collect_at_desk";
+
   const handleBook = async () => {
     if (isGroup) { submitGroup(); return; }
+    if (lookupBlocked) {
+      toast.error("Card lookup failed. Retry the lookup or choose to collect at the desk.");
+      return;
+    }
     // No card requested.
     if (!draft.payment.collectCardOnFile || cardChoice === "none") {
       finalizePrivate(null, null, "none");
@@ -2179,22 +2212,63 @@ function ReviewStep({
               </button>
             </p>
           )}
-          {draft.payment.collectCardOnFile && existingCardHint && !existingCardHint.found && (
-            <p className="text-xs text-muted-foreground pl-10">No valid card on file — new card will be collected.</p>
+          {draft.payment.collectCardOnFile && lookupStatus === "none" && (
+            <p className="text-xs text-muted-foreground pl-10">No card on file for this parent — a new card will be collected.</p>
+          )}
+          {draft.payment.collectCardOnFile && lookupStatus === "error" && (
+            <div className="ml-10 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+              <p className="text-sm font-medium text-destructive">
+                Card lookup failed — we do not know if this parent has a card on file
+              </p>
+              <p className="text-xs text-destructive/90">
+                {lookupError || "The lookup could not be completed."} This is not the same as having no card. Retry
+                before booking so an existing card is not missed.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  disabled={lookupLoading}
+                  onClick={() => { setFailureChoice(null); setLookupAttempt((n) => n + 1); }}
+                >
+                  {lookupLoading && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                  Retry lookup
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={failureChoice === "collect_at_desk" ? "default" : "ghost"}
+                  className="h-7 text-xs"
+                  onClick={() => { setFailureChoice("collect_at_desk"); setCardChoice("none"); }}
+                >
+                  Collect at the desk instead
+                </Button>
+              </div>
+              {failureChoice === "collect_at_desk" && (
+                <p className="text-xs text-destructive/90">
+                  Booking will be created with no card. Payment must be collected in person.
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}
 
-      <Button onClick={handleBook} disabled={submitting} className="w-full" size="lg">
+      <Button onClick={handleBook} disabled={submitting || lookupBlocked} className="w-full" size="lg">
         {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
         {isGroup
           ? "Create enrollment"
+          : lookupBlocked
+          ? "Resolve card lookup to continue"
           : !draft.payment.collectCardOnFile || cardChoice === "none"
           ? "Create booking"
           : existingCardHint?.found && cardChoice === "reuse"
           ? "Create booking · reuse card on file"
           : "Continue to card on file"}
       </Button>
+
 
       <AlertDialog open={!!unavailablePrompt} onOpenChange={(o) => { if (!o) setUnavailablePrompt(null); }}>
         <AlertDialogContent>
