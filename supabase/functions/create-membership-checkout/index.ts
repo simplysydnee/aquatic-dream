@@ -48,11 +48,11 @@ serve(async (req) => {
       environment,
     } = body ?? {};
 
-    // PINNED to sandbox until go-live. See aquatic-dreams-GOLIVE-checklist.md.
-    // Ignores caller-provided `environment` on purpose so live checkout can't
-    // be triggered from /join accidentally while we're still testing.
-    void environment;
-    const ENV: StripeEnv = "sandbox";
+    // Go-live complete: honor the caller's environment (derived from the
+    // publishable-key prefix on the client). Anything unrecognized falls
+    // back to sandbox so a misconfigured build can never charge real money.
+    const ENV: StripeEnv = environment === "live" ? "live" : "sandbox";
+
 
     if (!["kid_group", "private", "adult_group"].includes(plan_key)) {
       return json({ error: "Invalid plan_key" }, 400);
