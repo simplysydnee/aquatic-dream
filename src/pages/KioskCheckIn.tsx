@@ -199,6 +199,32 @@ const KioskCheckIn = () => {
     const instrNameById = new Map<string, string>(
       ((instrRes.data as any[]) || []).map((i) => [i.id, i.name])
     );
+    // Membership rows: same swimmer-level waiver rule as group and private.
+    // A membership.waiver_id is proof on its own; when it is missing we fall
+    // back to the shared resolver instead of reporting the swimmer as missing.
+    const memWaiver = new Map<string, boolean>();
+    const needWaiverLookup = new Map<string, any>();
+    for (const o of (((memOccRes as any).data || []) as any[])) {
+      const m = o.memberships || {};
+      if (!m.id) continue;
+      if (m.waiver_id) memWaiver.set(m.id, true);
+      else if (!needWaiverLookup.has(m.id)) needWaiverLookup.set(m.id, m);
+    }
+    if (needWaiverLookup.size) {
+      const waiverResults = await Promise.all(
+        Array.from(needWaiverLookup.values()).map(async (m: any) => {
+          const status = await resolveSwimmerWaiver({
+            firstName: m.child_first_name || m.parent_first_name || "",
+            lastName: m.child_last_name || m.parent_last_name || "",
+            dob: m.child_dob || null,
+            parentEmail: m.parent_email || null,
+            parentPhone: m.parent_phone || null,
+          });
+          return [m.id as string, status.onFile] as const;
+        })
+      );
+      waiverResults.forEach(([id, ok]) => memWaiver.set(id, ok));
+    }
     const membershipGroups = new Map<string, Slot>();
     for (const o of ((memOccRes as any).data || []) as any[]) {
       const m = o.memberships || {};
