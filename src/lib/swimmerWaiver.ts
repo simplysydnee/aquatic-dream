@@ -52,6 +52,54 @@ export async function lookupActiveWaiver(
   return (row as ActiveWaiver) ?? null;
 }
 
+export interface SwimmerWaiverStatus {
+  /** True only when a waiver is confirmed on file. Never true for "unknown". */
+  onFile: boolean;
+  /** Waiver id when a visitor waiver row backs the match, else null. */
+  waiverId: string | null;
+  /** Full waiver row when available, so emergency contact can be reused. */
+  waiver: ActiveWaiver | null;
+}
+
+/**
+ * The single waiver resolver for every program. A waiver belongs to a swimmer,
+ * so this takes first name, last name and DOB only, with parent email/phone as
+ * optional tie-breakers for legacy records. There is deliberately no plan or
+ * program parameter: private, adult and group all resolve identically.
+ */
+export async function resolveSwimmerWaiver(args: {
+  firstName: string;
+  lastName: string;
+  dob: Date | string | null | undefined;
+  parentEmail?: string | null;
+  parentPhone?: string | null;
+}): Promise<SwimmerWaiverStatus> {
+  const first = (args.firstName || "").trim();
+  const last = (args.lastName || "").trim();
+  if (!first) return { onFile: false, waiverId: null, waiver: null };
+
+  // Primary: the visitor waiver row, which also carries emergency contact.
+  if (last && args.dob) {
+    const waiver = await lookupActiveWaiver(first, last, args.dob);
+    if (waiver) return { onFile: true, waiverId: waiver.waiver_id, waiver };
+  }
+
+  // Fallback: the family-wide rule, which also counts waivers signed inside an
+  // enrollment or a private lesson booking. No waiver id exists in that case.
+  const { data, error } = await supabase.rpc("swimmer_has_waiver_on_file", {
+    _first: first,
+    _last: last || null,
+    _dob: args.dob ? isoDob(args.dob) : null,
+    _parent_email: args.parentEmail || null,
+    _parent_phone: args.parentPhone || null,
+  });
+  if (error) {
+    console.warn("resolveSwimmerWaiver error", error);
+    return { onFile: false, waiverId: null, waiver: null };
+  }
+  return { onFile: !!data, waiverId: null, waiver: null };
+}
+
 /** Build a synthetic LegalAgreementData from a stored waiver so flows can skip the form. */
 export function legalDataFromWaiver(w: ActiveWaiver): LegalAgreementData {
   const ecName = `${w.emergency_contact_first_name || ""} ${w.emergency_contact_last_name || ""}`.trim();
