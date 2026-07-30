@@ -529,7 +529,7 @@ const SwimLessons = () => {
               <Users className="w-4 h-4 inline mr-1" /> Every class has a maximum of 3 students per instructor.
             </p>
             <p className="text-muted-foreground text-sm flex items-center justify-center gap-1">
-              <DollarSign className="w-4 h-4" /> $30/lesson (group) · $45 (semi-private) · $65 (private)
+              <DollarSign className="w-4 h-4" /> $30/lesson (group) · $65 (private)
             </p>
           </div>
         </div>
