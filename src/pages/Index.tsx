@@ -2,11 +2,47 @@ import { Link } from "react-router-dom";
 import SEO from "@/components/SEO";
 import StarfishCurriculumBadge from "@/components/StarfishCurriculumBadge";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
-import { Users, Award, MapPin, Star, ChevronRight, Waves, Heart } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Users, Award, MapPin, Star, ChevronRight, Waves } from "lucide-react";
 import iCanSwimLogo from "@/assets/i-can-swim-logo.jpg";
+import { SEASON_START_LABEL, isSeasonStarted } from "@/lib/season";
+
+type PlanKey = "private" | "kid_group" | "adult_group";
+
+// Source of truth is the membership_plans table; these are fallbacks only,
+// used if the query has not resolved yet or fails.
+const FALLBACK_PRICES: Record<PlanKey, number> = {
+  private: 20000,
+  kid_group: 14000,
+  adult_group: 14000,
+};
+
+const PROGRAMS: { key: PlanKey; name: string; blurb: string; when: string }[] = [
+  { key: "private", name: "Private Swim", blurb: "One-on-one · Ages 3+", when: "Tue–Thu evenings, Saturdays" },
+  { key: "kid_group", name: "Small Group", blurb: "Max 3 swimmers · 5 levels", when: "Monday afternoons" },
+  { key: "adult_group", name: "Adult Swim", blurb: "Never too late to learn", when: "Tuesday evenings" },
+];
+
+const usePlanPrices = () => {
+  const { data } = useQuery({
+    queryKey: ["membership-plan-prices"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("membership_plans")
+        .select("plan_key, monthly_price_cents")
+        .eq("active", true);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const row of data ?? []) map[row.plan_key] = row.monthly_price_cents;
+      return map;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  return (key: PlanKey) => Math.round((data?.[key] ?? FALLBACK_PRICES[key]) / 100);
+};
 
 const HeroSection = () => (
   <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-secondary">
@@ -46,45 +82,85 @@ const HeroSection = () => (
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="text-primary font-medium mb-4 tracking-wider uppercase text-sm"
+          className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary mb-6"
         >
-          Modesto's Swim Lesson Destination
+          Now enrolling · Starts {SEASON_START_LABEL}
         </motion.p>
         <h1 className="font-display text-5xl md:text-7xl lg:text-8xl font-bold text-secondary-foreground mb-6 leading-[0.9]">
-          Swim.<br />
-          <span className="text-primary">Dive.</span><br />
-          Dream.
+          Your spot.<br />
+          Every week.<br />
+          <span className="text-coral">All year.</span>
         </h1>
-        <p className="text-lg md:text-xl text-secondary-foreground/70 mb-10 max-w-xl leading-relaxed">
-          From your child's first splash to confident, independent swimming —
-          the only place in Modesto with max 3 students per instructor.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
-          <Button asChild size="lg" className="bg-coral hover:bg-coral/90 text-coral-foreground text-base px-8 py-6 rounded-xl shadow-lg">
-            <Link to="/swim-enrollment">Enroll in Swim Lessons</Link>
-          </Button>
-          <Button asChild size="lg" variant="secondary" className="text-base px-8 py-6 rounded-xl shadow-lg">
-            <Link to="/book-private-lesson">Book a Private Lesson</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg" className="border-primary text-primary hover:bg-primary/10 text-base px-8 py-6 rounded-xl">
-            <Link to="/swim-lessons">View Levels & Pricing <ChevronRight className="ml-1 w-4 h-4" /></Link>
-          </Button>
+        <div className="space-y-3 mb-8 max-w-xl">
+          <p className="text-lg md:text-xl text-secondary-foreground/70 leading-relaxed">
+            Introducing the Swimbership: one weekly lesson, the same time and the same coach, billed monthly.
+          </p>
+          <p className="text-lg md:text-xl text-secondary-foreground/70 leading-relaxed">
+            No more re-registering every session. No more losing your spot.
+          </p>
         </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+          <Button asChild size="lg" className="bg-coral hover:bg-coral/90 text-coral-foreground text-base px-10 py-6 rounded-xl shadow-lg">
+            <Link to="/join">Join</Link>
+          </Button>
+          <Link to="/swim-lessons" className="text-secondary-foreground/80 font-medium underline underline-offset-4 hover:text-primary">
+            See times &amp; pricing
+          </Link>
+        </div>
+        <p className="text-sm text-secondary-foreground/50 mt-6">
+          Max 3 swimmers per instructor · Spots are limited
+        </p>
       </motion.div>
     </div>
   </section>
 );
 
+const ProgramCards = () => {
+  const price = usePlanPrices();
+  return (
+    <section className="py-16 bg-card border-y">
+      <div className="container">
+        <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+          {PROGRAMS.map((p, i) => (
+            <motion.div
+              key={p.key}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1 }}
+            >
+              <Link to="/join" className="block h-full">
+                <Card className="h-full p-8 border-2 hover:border-primary/40 transition-all duration-300">
+                  <h2 className="font-display text-2xl font-bold text-foreground mb-1">{p.name}</h2>
+                  <p className="text-sm text-muted-foreground mb-6">{p.blurb}</p>
+                  <p className="font-display text-3xl font-bold text-foreground">
+                    ${price(p.key)}
+                    <span className="text-base font-semibold text-muted-foreground">/mo</span>
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">{p.when}</p>
+                  <span className="inline-flex items-center gap-1 text-primary font-semibold mt-6">
+                    Join <ChevronRight className="w-4 h-4" />
+                  </span>
+                </Card>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const StatsSection = () => {
   const stats = [
-    { icon: Users, value: "3 max", label: "Students per instructor", sub: "Industry-leading ratio" },
+    { icon: Users, value: "3 max", label: "Swimmers per instructor", sub: "Industry-leading ratio" },
     { icon: Award, value: "5", label: "Progressive levels", sub: "Starfish Aquatics system" },
-    { icon: Waves, value: "$30", label: "Group lessons", sub: "Semi-private & private too" },
+    { icon: Waves, value: "Weekly", label: "Same time, same coach", sub: "Your spot is held" },
     { icon: MapPin, value: "Modesto", label: "Local since day one", sub: "1212 Kansas Ave" },
   ];
 
   return (
-    <section className="py-16 bg-card border-y">
+    <section className="py-16">
       <div className="container">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
           {stats.map((stat, i) => (
@@ -109,40 +185,31 @@ const StatsSection = () => {
 };
 
 const SwimProgramPanel = () => (
-  <section className="py-20">
+  <section className="pb-20">
     <div className="container">
-      <div className="text-center mb-14">
-        <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">Our Swim Program</h2>
-        <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-          5 color-coded levels from water comfort to advanced strokes — every child gets the attention they deserve.
-        </p>
-      </div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
       >
-        <Card className="overflow-hidden border-2 hover:border-primary/40 transition-all duration-300">
+        <Card className="overflow-hidden border-2">
           <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-8 md:p-12">
             <Waves className="w-12 h-12 text-primary mb-6" />
-            <h3 className="font-display text-3xl font-bold text-foreground mb-4">Swim Lessons</h3>
+            <h2 className="font-display text-3xl font-bold text-foreground mb-4">How our swim program works</h2>
             <p className="text-muted-foreground mb-6 leading-relaxed max-w-2xl">
-              5 color-coded levels based on the Starfish Aquatics curriculum. Max 3 students per instructor.
-              Group, semi-private, and private lessons available for ages 3–12.
+              5 color-coded levels based on the Starfish Aquatics curriculum, with a maximum of 3 swimmers per
+              instructor. Kids and adults both have a weekly place in the water.
             </p>
             <ul className="space-y-2 mb-8 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Ages 3–12 · Preschool & School-Age tracks</li>
-              <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> $30 group · $45 semi-private · $65 private</li>
-              <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> $45 registration fee (swim bag, cap & goggles)</li>
-              <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Monday & Wednesday summer sessions</li>
+              <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Preschool and school-age tracks, plus adults</li>
+              <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> One lesson every week at the same time</li>
+              <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> The same coach week to week</li>
+              <li className="flex items-center gap-2"><Star className="w-4 h-4 text-coral" /> Billed monthly, cancel with notice</li>
             </ul>
             <StarfishCurriculumBadge variant="inline" className="mb-8 p-4 rounded-xl bg-background/60 border border-border" />
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl">
-                <Link to="/swim-enrollment">Enroll Now <ChevronRight className="ml-1 w-4 h-4" /></Link>
-              </Button>
               <Button asChild variant="outline" className="rounded-xl">
-                <Link to="/swim-lessons">View All Levels</Link>
+                <Link to="/swim-lessons">View all levels</Link>
               </Button>
             </div>
           </div>
@@ -152,63 +219,21 @@ const SwimProgramPanel = () => (
   </section>
 );
 
-const testimonials = [
-  {
-    name: "Sarah M.",
-    role: "Swim Parent",
-    text: "My daughter started in White at age 4 and is now a confident Yellow swimmer. The small class sizes make all the difference — her instructor knows her by name and exactly where she is in her progress.",
-  },
-  {
-    name: "The Nguyen Family",
-    role: "Multi-child Family",
-    text: "Both our kids swim here — our 4-year-old in preschool and our 8-year-old in intermediate. We love that they each get the right level of attention.",
-  },
-  {
-    name: "Lisa P.",
-    role: "Swim Parent",
-    text: "My son was terrified of water. The patience and expertise of the instructors here helped him overcome his fear. He's now loving his Red level classes!",
-  },
-  {
-    name: "Carlos R.",
-    role: "Swim Parent",
-    text: "The registration kit with the swim bag, cap and goggles was a great touch. My daughter felt like a real swimmer from day one.",
-  },
-];
-
-const TestimonialsSection = () => (
-  <section className="py-20 bg-card">
-    <div className="container">
-      <div className="text-center mb-12">
-        <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-3">What Our Families Say</h2>
-        <p className="text-muted-foreground">Real stories from real swim families.</p>
+const PrivateLessonsNote = () => {
+  if (isSeasonStarted()) return null;
+  return (
+    <section className="py-10 border-t">
+      <div className="container">
+        <p className="text-sm text-muted-foreground max-w-2xl">
+          Prefer a one-off lesson first? Private lessons are still bookable through August 16.{" "}
+          <Link to="/book-private-lesson" className="text-primary font-medium underline">
+            Book a private lesson
+          </Link>
+        </p>
       </div>
-      <Carousel opts={{ align: "start", loop: true }} className="max-w-5xl mx-auto">
-        <CarouselContent>
-          {testimonials.map((t, i) => (
-            <CarouselItem key={i} className="md:basis-1/2">
-              <Card className="h-full">
-                <CardContent className="p-8">
-                  <div className="flex gap-1 mb-4">
-                    {[...Array(5)].map((_, j) => (
-                      <Star key={j} className="w-4 h-4 fill-coral text-coral" />
-                    ))}
-                  </div>
-                  <p className="text-foreground/80 mb-6 leading-relaxed italic">"{t.text}"</p>
-                  <div>
-                    <p className="font-semibold text-foreground">{t.name}</p>
-                    <p className="text-xs text-muted-foreground">{t.role}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-        <CarouselPrevious className="-left-4 md:-left-12" />
-        <CarouselNext className="-right-4 md:-right-12" />
-      </Carousel>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
 
 const ICanSwimCallout = () => (
   <section className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 py-12">
@@ -235,15 +260,16 @@ const Index = () => {
   return (
     <main>
       <SEO
-        title="Aquatic Dreams Swim — Modesto Swim Lessons Ages 3–12"
-        description="Modesto's swim lesson destination. 5-level Starfish Aquatics curriculum for ages 3–12 with max 3 students per instructor. Group, semi-private & private lessons."
+        title="Aquatic Dreams Swim — Weekly Swim Lessons in Modesto"
+        description="Swimberships in Modesto: one weekly lesson at the same time with the same coach, billed monthly. Private, small group, and adult swim, max 3 swimmers per instructor."
         path="/"
       />
       <HeroSection />
+      <ProgramCards />
       <StatsSection />
       <SwimProgramPanel />
+      <PrivateLessonsNote />
       <ICanSwimCallout />
-      
     </main>
   );
 };
