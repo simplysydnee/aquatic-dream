@@ -392,45 +392,9 @@ const StandingSlotsAdmin = () => {
     });
   };
 
-  // Capacity dashboard groups: Small Group broken down by level, plus Private and Adult.
-  const dashboardGroups = useMemo(() => {
-    const activeSlots = slots.filter((s) => s.active);
-    type Group = { key: string; label: string; accent: string; enrolled: number; capacity: number; slotCount: number };
-    const groups: Group[] = [];
+  // Inactive slots are held in reserve and are not bookable.
+  const reserveCount = useMemo(() => slots.filter((s) => !s.active).length, [slots]);
 
-    for (const lv of SWIM_LEVELS) {
-      const bucket = activeSlots.filter((s) => s.plan_key === "kid_group" && s.swim_level === lv);
-      if (!bucket.length) continue;
-      const capacity = bucket.reduce((a, s) => a + s.capacity, 0);
-      const enrolled = bucket.reduce((a, s) => a + (enrolledCounts[s.id] || 0), 0);
-      const accent =
-        lv === "white" ? "bg-slate-400" :
-        lv === "red" ? "bg-rose-500" :
-        lv === "yellow" ? "bg-amber-400" :
-        lv === "blue" ? "bg-sky-500" :
-        "bg-emerald-500";
-      groups.push({ key: `kid_${lv}`, label: LEVEL_LABELS[lv], accent, capacity, enrolled, slotCount: bucket.length });
-    }
-
-    for (const pk of ["private", "adult_group"] as PlanKey[]) {
-      const bucket = activeSlots.filter((s) => s.plan_key === pk);
-      if (!bucket.length) continue;
-      const capacity = bucket.reduce((a, s) => a + s.capacity, 0);
-      const enrolled = bucket.reduce((a, s) => a + (enrolledCounts[s.id] || 0), 0);
-      const accent = pk === "private" ? "bg-primary" : "bg-secondary";
-      groups.push({ key: pk, label: PLAN_LABELS[pk], accent, capacity, enrolled, slotCount: bucket.length });
-    }
-    return groups;
-  }, [slots, enrolledCounts]);
-
-  const fillState = (enrolled: number, capacity: number) => {
-    if (capacity <= 0) return { label: "—", tone: "text-muted-foreground" };
-    const pct = enrolled / capacity;
-    if (enrolled >= capacity) return { label: "FULL", tone: "text-destructive" };
-    if (pct >= 0.8) return { label: "Nearly full", tone: "text-accent" };
-    if (pct >= 0.4) return { label: "Filling", tone: "text-primary" };
-    return { label: "Open", tone: "text-emerald-600" };
-  };
 
   const SortHead = ({ k, children }: { k: SortKey; children: React.ReactNode }) => (
     <button
