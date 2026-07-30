@@ -403,11 +403,6 @@ const SwimLessons = () => {
               <p className="text-sm text-secondary-foreground/70">per lesson</p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Semi-Private</p>
-              <p className="font-display text-5xl font-bold text-primary">$45</p>
-              <p className="text-sm text-secondary-foreground/70">per lesson</p>
-            </div>
-            <div className="text-center">
               <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Private</p>
               <p className="font-display text-5xl font-bold text-primary">$65</p>
               <p className="text-sm text-secondary-foreground/70">per lesson</p>

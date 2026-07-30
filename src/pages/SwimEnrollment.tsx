@@ -96,7 +96,7 @@ const SwimEnrollment = () => {
   const [priorLevel, setPriorLevel] = useState<SwimLevel | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
-  const [mode, setMode] = useState<"group" | "request">(isRequest ? "request" : "group");
+  
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [totalDue, setTotalDue] = useState(0);
   // Inputs needed to build the create-checkout payload (no DB row yet)
