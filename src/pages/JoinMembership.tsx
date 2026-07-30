@@ -1013,6 +1013,20 @@ export default function JoinMembership() {
                   Pick a slot — {plan.name}
                 </h2>
 
+                {holdLevelMismatch && (
+                  <div className="mb-4 rounded-lg border border-[#F58B76]/40 bg-[#F58B76]/10 p-3 text-sm text-[#1a3a8a]">
+                    <div className="font-semibold">Let's find a better fit</div>
+                    <p className="mt-1 text-[#2a5e84]">
+                      The class we were holding is not the right level for{" "}
+                      {holdSwimmerFirst || "your swimmer"}. Based on the skill check, the right group
+                      is <span className="font-semibold">{LEVEL_LABELS[holdLevelMismatch]}</span>.
+                      Here are the classes that take that group. Picking one releases the spot we
+                      were holding.
+                    </p>
+                  </div>
+                )}
+
+
                 {plan.plan_key === "kid_group" && (
                   <div className="mb-4 flex items-center gap-3 rounded-lg border border-[#2a5e84]/20 bg-[#2a5e84]/5 p-3">
                     <div className="flex-1 text-sm text-[#1a3a8a]">
