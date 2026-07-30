@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveSwimmerWaiver } from "@/lib/swimmerWaiver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -115,7 +116,7 @@ const CheckInAdmin = () => {
         .not("status", "in", "(cancelled,abandoned)") as any,
       (supabase
         .from("membership_occurrences") as any)
-        .select("id, occurrence_date, start_time, end_time, instructor_id, status, checked_in_at, checked_in_by, memberships!inner(id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, waiver_id, medical_notes, standing_slots(id, day_of_week, start_time, end_time, instructor_id, capacity))")
+        .select("id, occurrence_date, start_time, end_time, instructor_id, status, checked_in_at, checked_in_by, memberships!inner(id, plan_key, child_first_name, child_last_name, child_dob, parent_first_name, parent_last_name, parent_email, parent_phone, waiver_id, medical_notes, standing_slots(id, day_of_week, start_time, end_time, instructor_id, capacity))")
         .eq("occurrence_date", dateStr)
         .eq("status", "scheduled"),
       supabase.from("membership_plans").select("plan_key, name"),
@@ -225,6 +226,32 @@ const CheckInAdmin = () => {
     const instrNameById = new Map<string, string>(
       ((instrRes.data as any[]) || []).map((i) => [i.id, i.name])
     );
+    // Membership rows: same swimmer-level waiver rule as group and private.
+    // A membership.waiver_id is proof on its own; when it is missing we fall
+    // back to the shared resolver instead of reporting the swimmer as missing.
+    const memWaiver = new Map<string, boolean>();
+    const needWaiverLookup = new Map<string, any>();
+    for (const o of (((memOccRes as any).data || []) as any[])) {
+      const m = o.memberships || {};
+      if (!m.id) continue;
+      if (m.waiver_id) memWaiver.set(m.id, true);
+      else if (!needWaiverLookup.has(m.id)) needWaiverLookup.set(m.id, m);
+    }
+    if (needWaiverLookup.size) {
+      const waiverResults = await Promise.all(
+        Array.from(needWaiverLookup.values()).map(async (m: any) => {
+          const status = await resolveSwimmerWaiver({
+            firstName: m.child_first_name || m.parent_first_name || "",
+            lastName: m.child_last_name || m.parent_last_name || "",
+            dob: m.child_dob || null,
+            parentEmail: m.parent_email || null,
+            parentPhone: m.parent_phone || null,
+          });
+          return [m.id as string, status.onFile] as const;
+        })
+      );
+      waiverResults.forEach(([id, ok]) => memWaiver.set(id, ok));
+    }
     const membershipGroups = new Map<string, Slot>();
     for (const o of ((memOccRes as any).data || []) as any[]) {
       const m = o.memberships || {};
@@ -246,7 +273,7 @@ const CheckInAdmin = () => {
         parent_name: [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim(),
         parent_email: m.parent_email || "",
         parent_phone: m.parent_phone || null,
-        has_waiver: !!m.waiver_id,
+        has_waiver: memWaiver.get(m.id) ?? !!m.waiver_id,
         checked_in: !!o.checked_in_at,
         checked_in_at: o.checked_in_at ?? null,
         no_show: false,

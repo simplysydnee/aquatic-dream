@@ -14,7 +14,7 @@ import PrivateCardSetup from "./PrivateCardSetup";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { Slot, releaseHolds, fetchOpenSlots } from "@/lib/privateBooking";
 import { getPrivateLessonPrice, isPromoDate, PROMO_ACTIVE_FOR_TODAY, PROMO_LABEL, PRIVATE_PROMO_PRICE, PRIVATE_REGULAR_PRICE } from "@/lib/privateLessonPricing";
-import { lookupActiveWaiver, legalDataFromWaiver, backfillVisitorWaiver, ActiveWaiver } from "@/lib/swimmerWaiver";
+import { resolveSwimmerWaiver, legalDataFromWaiver, backfillVisitorWaiver, ActiveWaiver } from "@/lib/swimmerWaiver";
 
 import { z } from "zod";
 import { toast } from "@/hooks/use-toast";
@@ -157,8 +157,14 @@ export default function PrivateBookingFlow() {
       return;
     }
     if (form.childDob) {
-      const w = await lookupActiveWaiver(form.childFirstName, form.childLastName, form.childDob);
-      setActiveWaiver(w);
+      const { waiver } = await resolveSwimmerWaiver({
+        firstName: form.childFirstName,
+        lastName: form.childLastName,
+        dob: form.childDob,
+        parentEmail: form.parentEmail,
+        parentPhone: form.parentPhone,
+      });
+      setActiveWaiver(waiver);
     } else {
       setActiveWaiver(null);
     }

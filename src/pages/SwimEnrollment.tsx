@@ -16,7 +16,7 @@ import ReturningFamilyEntry, { type ReturningFamilyLookup, type ReturningSwimmer
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { SwimLevel, PRICING } from "@/components/swim-enrollment/types";
 import { WAIVER_VERSION, TOS_VERSION, PRIVACY_POLICY_VERSION } from "@/components/swim-enrollment/legal-content";
-import { lookupActiveWaiver, legalDataFromWaiver, backfillVisitorWaiver, type ActiveWaiver } from "@/lib/swimmerWaiver";
+import { resolveSwimmerWaiver, legalDataFromWaiver, backfillVisitorWaiver, type ActiveWaiver } from "@/lib/swimmerWaiver";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -266,7 +266,13 @@ const SwimEnrollment = () => {
     // If found, skip the legal step entirely and use the stored signature.
     if (data.childFirstName && data.childLastName && childDob) {
       try {
-        const existing = await lookupActiveWaiver(data.childFirstName, data.childLastName, childDob);
+        const { waiver: existing } = await resolveSwimmerWaiver({
+          firstName: data.childFirstName,
+          lastName: data.childLastName,
+          dob: childDob,
+          parentEmail: data.parentEmail,
+          parentPhone: data.parentPhone,
+        });
         if (existing) {
           toast({
             title: "Waiver already on file",

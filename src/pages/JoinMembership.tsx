@@ -26,7 +26,7 @@ import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/
 import ClosureScheduleNote from "@/components/ClosureScheduleNote";
 
 import {
-  lookupActiveWaiver,
+  resolveSwimmerWaiver,
   type ActiveWaiver,
 } from "@/lib/swimmerWaiver";
 import { submitVisitorWaiver } from "@/lib/visitorWaiver";
@@ -491,24 +491,31 @@ export default function JoinMembership() {
         parent_last: prev.child_last,
       }));
     }
-    // Waiver already matched on the hold: treat it as on file and skip step 4.
-    if (holdWaiverId) {
-      setWaiverId(holdWaiverId);
-      setStep(5);
-      return;
-    }
+    // One resolver for private, adult and group. A waiver id carried on a hold
+    // means "on file"; a null one means "not yet checked", so the check runs.
     setWaiverChecking(true);
     try {
-      const existing = await lookupActiveWaiver(form.child_first, form.child_last, childDob);
-      if (existing) {
-        setWaiverOnFile(existing);
-        setWaiverId(existing.waiver_id);
-        toast.success("Waiver already on file — skipping the legal step");
+      const status = await resolveSwimmerWaiver({
+        firstName: form.child_first,
+        lastName: form.child_last,
+        dob: childDob,
+        parentEmail: form.parent_email,
+        parentPhone: form.parent_phone,
+      });
+      if (status.waiver) setWaiverOnFile(status.waiver);
+      if (status.onFile || holdWaiverId) {
+        setWaiverId(status.waiverId ?? holdWaiverId);
+        if (status.onFile) toast.success("Waiver already on file — skipping the legal step");
         setStep(5);
         return;
       }
     } catch (e) {
       console.warn("waiver lookup failed", e);
+      if (holdWaiverId) {
+        setWaiverId(holdWaiverId);
+        setStep(5);
+        return;
+      }
     } finally {
       setWaiverChecking(false);
     }
