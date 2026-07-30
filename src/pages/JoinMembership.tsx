@@ -1420,7 +1420,7 @@ export default function JoinMembership() {
               <>
                 <button
                   type="button"
-                  onClick={() => setStep(waiverOnFile ? 3 : 4)}
+                  onClick={() => setStep(waiverOnFile || holdWaiverId ? 3 : 4)}
                   className="mb-4 flex items-center gap-1 text-sm text-[#2a5e84] hover:underline"
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
@@ -1536,7 +1536,7 @@ export default function JoinMembership() {
                   {form.has_medical === "yes" && (
                     <Row label="Medical" value={form.medical_notes} />
                   )}
-                  <Row label="Waiver" value={waiverOnFile ? "On file" : "Signed today"} />
+                  <Row label="Waiver" value={waiverOnFile || holdWaiverId ? "On file" : "Signed today"} />
                   <div className="space-y-2 border-t border-[#2a5e84]/20 pt-3">
                     {quoteLoading && !quote && (
                       <div className="text-sm text-[#2a5e84]">Calculating your first charge…</div>
