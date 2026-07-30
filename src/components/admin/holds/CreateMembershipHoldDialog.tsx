@@ -83,6 +83,9 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
     notes: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  // Waiver already on file for the matched swimmer, if we can find one.
+  const [waiverId, setWaiverId] = useState<string | null>(null);
+  const [waiverChecking, setWaiverChecking] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -91,6 +94,8 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
     setResults([]);
     setMatched(null);
     setForm({ swimmer_name: "", parent_name: "", parent_phone: "", parent_email: "", notes: "" });
+    setWaiverId(null);
+    setWaiverChecking(false);
   }, [open]);
 
   // Phone first, then name or email. Same sources the booking wizard searches.
@@ -220,6 +225,16 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
 
   const pick = (r: FamilyMatch) => {
     setMatched(r);
+    setWaiverId(null);
+    // Attach the family's active waiver when we can match one, so the parent's
+    // page can skip the legal step. No match simply means "not yet known".
+    if (r.child_dob) {
+      const { first, last } = splitName(r.swimmer_name);
+      setWaiverChecking(true);
+      void lookupActiveWaiver(first, last, r.child_dob)
+        .then((w) => setWaiverId(w?.waiver_id ?? null))
+        .finally(() => setWaiverChecking(false));
+    }
     setForm((prev) => ({
       ...prev,
       swimmer_name: r.swimmer_name,
@@ -255,6 +270,7 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
           parent_phone: form.parent_phone.trim(),
           parent_email: form.parent_email.trim() || null,
           swim_level: swimLevel,
+          existing_waiver_id: waiverId,
           notes: form.notes.trim() || null,
           hold_hours: HOLD_HOURS,
         },
@@ -395,7 +411,11 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              The parent completes the waiver, agreement, and card on their own device.
+              {waiverChecking
+                ? "Checking for a waiver on file…"
+                : waiverId
+                ? "Waiver already on file. The parent completes the agreement and card on their own device."
+                : "The parent completes the waiver, agreement, and card on their own device."}
             </p>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep(1)}>
@@ -421,6 +441,7 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
               {typeof slot.monthly_price_cents === "number" && (
                 <Row label="Monthly" value={`$${(slot.monthly_price_cents / 100).toFixed(0)}`} />
               )}
+              <Row label="Waiver" value={waiverId ? "On file" : "Parent signs on their device"} />
               <Row label="Hold expires" value={expiryLabel} />
             </div>
             <p className="text-xs text-muted-foreground">
