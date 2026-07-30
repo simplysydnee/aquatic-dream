@@ -160,6 +160,11 @@ export default function JoinMembership() {
   const [waiverId, setWaiverId] = useState<string | null>(null);
   const [waiverOnFile, setWaiverOnFile] = useState<ActiveWaiver | null>(null);
   const [waiverChecking, setWaiverChecking] = useState(false);
+  // Waiver id carried on the hold (front desk matched an existing family).
+  const [holdWaiverId, setHoldWaiverId] = useState<string | null>(null);
+  // Assessed level that the held Small Group class does not accept.
+  const [holdLevelMismatch, setHoldLevelMismatch] = useState<SwimLevel | null>(null);
+
   const [waiverSubmitting, setWaiverSubmitting] = useState(false);
 
   // Phone-booked hold state (/join?hold=<token>).
