@@ -24,6 +24,7 @@ import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
 import LegalAgreements, { type LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
 import ClosureScheduleNote from "@/components/ClosureScheduleNote";
+import { JOIN_OPEN } from "@/lib/joinGate";
 
 import {
   resolveSwimmerWaiver,
