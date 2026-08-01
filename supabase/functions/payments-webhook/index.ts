@@ -836,6 +836,17 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
 // recurring cycle to the 1st of the month after the first-lesson month.
 
 async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
-  const result = await completeMembershipFromSetupSession(session, env);
-  console.log("[membership setup] completed", result);
+  try {
+    const result = await completeMembershipFromSetupSession(session, env);
+    console.log("[membership setup] completed", result);
+  } catch (error) {
+    if (error instanceof MembershipCompletionInProgressError) {
+      // The return page is finishing the same pending row. Let it finish; a
+      // Stripe webhook retry will reconcile if it does not.
+      console.log("[membership setup] another caller is finalizing", error.pendingId);
+      return;
+    }
+    throw error;
+  }
 }
+
