@@ -791,16 +791,25 @@ const SwimEnrollmentsAdmin = () => {
                       </Button>
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+                    {!e.admin_reviewed_at && (
+                      <Badge variant="outline" className="text-[10px] bg-red-100 text-red-700 border-red-300">New</Badge>
+                    )}
                     <Badge variant="outline" className={`text-[10px] ${enrollmentStateColor(e.status)}`}>{e.status}</Badge>
                     <Badge variant="outline" className={`text-[10px] ${paymentStatusColor(e.payment_status)}`}>Reg: {formatPaymentStatus(e.payment_status)}</Badge>
                     <Badge variant="outline" className={`text-[10px] ${sessionFeeColor(e.session_fee_status)}`}>Session: {formatPaymentStatus(e.session_fee_status)}</Badge>
+                    {!e.admin_reviewed_at && (
+                      <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1" onClick={() => acknowledgeEnrollment(e.id)}>
+                        <CheckCircle className="w-3 h-3" /> Acknowledge
+                      </Button>
+                    )}
                     {e.session_fee_status === "due_day_1" && (
                       <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1" onClick={() => sendPaymentLink(e)}>
                         <Send className="w-3 h-3" /> Send link
                       </Button>
                     )}
                   </div>
+
                 </Card>
               );
             })}
