@@ -83,7 +83,7 @@ export function AdminSidebar() {
         { title: "Memberships", url: "/admin/memberships", icon: IdCard, badge: 0 },
         { title: "Holidays & Closures", url: "/admin/holidays", icon: CalendarClock, badge: 0 },
 
-        { title: "Private Lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: 0 },
+        { title: "Private Lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: newPrivateBookings },
         { title: "Reports", url: "/admin/reports", icon: BarChart3, badge: 0 },
         { title: "Card Gaps", url: "/admin/card-gaps", icon: AlertTriangle, badge: 0 },
       ],
