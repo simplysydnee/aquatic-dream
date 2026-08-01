@@ -1672,8 +1672,25 @@ export default function JoinMembership() {
                 </div>
                 {returnFinalizing ? (
                   <>
-                    <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">Finalizing enrollment…</h2>
-                    <p className="text-[#2a5e84]">Please keep this page open while we confirm your membership.</p>
+                    <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">
+                      {returnStillWorking ? "Payment received" : "Finalizing enrollment…"}
+                    </h2>
+                    <p className="text-[#2a5e84]">
+                      {returnStillWorking
+                        ? "Finishing your membership. Please keep this page open for a moment."
+                        : "Please keep this page open while we confirm your membership."}
+                    </p>
+                  </>
+                ) : returnStillWorking ? (
+                  <>
+                    <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">Payment received</h2>
+                    <p className="text-[#2a5e84]">
+                      Your payment went through and your spot is saved. We are finishing the last step
+                      and your welcome email with class details is on the way.
+                    </p>
+                    <p className="mt-2 text-sm text-[#2a5e84]/80">
+                      Nothing else is needed from you right now.
+                    </p>
                   </>
                 ) : returnError ? (
                   <>
@@ -1684,6 +1701,7 @@ export default function JoinMembership() {
                     <p className="mt-2 break-words text-sm text-[#2a5e84]/80">{returnError}</p>
                   </>
                 ) : (
+
                   <>
                     <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">You're enrolled!</h2>
                     <p className="text-[#2a5e84]">
