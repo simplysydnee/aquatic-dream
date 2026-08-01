@@ -7,6 +7,8 @@ import {
   MessageSquare,
   LogOut,
   CalendarDays,
+  CalendarPlus,
+
   ClipboardList,
   PanelLeftClose,
   PanelLeft,
