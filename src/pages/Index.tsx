@@ -132,7 +132,7 @@ const ProgramCards = () => {
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
             >
-              <Link to="/join" className="block h-full">
+              <Link to={JOIN_OPEN ? "/join" : "/swim-lessons"} className="block h-full">
                 <Card className="h-full p-8 border-2 hover:border-primary/40 transition-all duration-300">
                   <h2 className="font-display text-2xl font-bold text-foreground mb-1">{p.name}</h2>
                   <p className="text-sm text-muted-foreground mb-6">{p.blurb}</p>
@@ -142,7 +142,7 @@ const ProgramCards = () => {
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">{p.when}</p>
                   <span className="inline-flex items-center gap-1 text-primary font-semibold mt-6">
-                    Join <ChevronRight className="w-4 h-4" />
+                    {JOIN_OPEN ? "Join" : "See times"} <ChevronRight className="w-4 h-4" />
                   </span>
                 </Card>
               </Link>
