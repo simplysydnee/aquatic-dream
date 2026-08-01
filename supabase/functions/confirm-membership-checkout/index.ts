@@ -1,7 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { completeMembershipFromSetupSessionId } from "../_shared/membership-completion.ts";
+import {
+  completeMembershipFromSetupSessionId,
+  MembershipCompletionInProgressError,
+} from "../_shared/membership-completion.ts";
+
 
 type StripeEnv = "sandbox" | "live";
 
