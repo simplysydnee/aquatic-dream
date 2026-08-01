@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
-import { CalendarPlus, Clock, Loader2, User, Waves } from "lucide-react";
+import { CalendarPlus, Clock, Loader2, RefreshCw, User, Waves } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,9 @@ const RANGES = [
   { key: 14, label: "2 weeks" },
   { key: 28, label: "4 weeks" },
 ] as const;
+
+const slotKey = (s: Pick<OpenPrivateSlot, "instructor_id" | "slot_date" | "start_time">) =>
+  `${s.instructor_id}|${s.slot_date}|${s.start_time}`;
 
 const formatTime = (t: string) => {
   const [h, m] = t.split(":").map(Number);
@@ -27,6 +30,9 @@ export const FrontDeskBooking = () => {
   const [days, setDays] = useState<number>(28);
   const [prefill, setPrefill] = useState<OpenPrivateSlot | null>(null);
   const [bookOpen, setBookOpen] = useState(false);
+  // Slots booked in this session are hidden immediately so a second staff tap
+  // cannot double-book the same instructor/date/time before the refetch lands.
+  const [justBooked, setJustBooked] = useState<Set<string>>(new Set());
 
   const today = useMemo(() => new Date(), []);
   const startDateStr = format(today, "yyyy-MM-dd");
@@ -34,9 +40,27 @@ export const FrontDeskBooking = () => {
 
   const { slots, loading, refetch } = useOpenPrivateSlots(startDateStr, endDateStr);
 
+  // Keep the list fresh when staff come back to the tab or another device books.
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState === "visible") refetch();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [refetch]);
+
+  const visibleSlots = useMemo(
+    () => slots.filter((s) => !justBooked.has(slotKey(s))),
+    [slots, justBooked],
+  );
+
   const grouped = useMemo(() => {
     const map = new Map<string, OpenPrivateSlot[]>();
-    for (const s of slots) {
+    for (const s of visibleSlots) {
       const list = map.get(s.slot_date) || [];
       list.push(s);
       map.set(s.slot_date, list);
@@ -51,12 +75,21 @@ export const FrontDeskBooking = () => {
             : a.start_time.localeCompare(b.start_time),
         ),
       }));
-  }, [slots]);
+  }, [visibleSlots]);
 
   const openSlot = (slot: OpenPrivateSlot) => {
     setPrefill(slot);
     setBookOpen(true);
   };
+
+  const handleBooked = useCallback(() => {
+    if (prefill) {
+      const key = slotKey(prefill);
+      setJustBooked((prev) => new Set(prev).add(key));
+    }
+    refetch();
+  }, [prefill, refetch]);
+
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
