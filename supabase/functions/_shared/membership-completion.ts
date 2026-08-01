@@ -148,10 +148,40 @@ export async function completeMembershipFromSetupSession(
       subscriptionId: existingSubscriptionId,
       customerId,
       pendingId,
+      sessionId,
       payload,
       env,
       alreadyProcessed: true,
     });
+  }
+
+  // Atomic claim. Exactly one caller wins; the loser waits for the winner to
+  // publish the subscription id instead of creating a second subscription.
+  const claimer = `${Date.now()}-${crypto.randomUUID()}`;
+  const { data: claimRows, error: claimErr } = await supabase
+    .rpc("claim_pending_membership", { p_pending_id: pendingId, p_claimer: claimer });
+  if (claimErr) throw new Error(`Pending membership claim failed: ${claimErr.message}`);
+
+  const won = Array.isArray(claimRows) && claimRows.length > 0;
+  if (!won) {
+    const deadline = Date.now() + LOSER_WAIT_MS;
+    while (Date.now() < deadline) {
+      await sleep(LOSER_POLL_INTERVAL_MS);
+      const publishedId = await readPendingSubscriptionId(pendingId);
+      if (publishedId) {
+        return ensureMembershipRecord({
+          subscriptionId: publishedId,
+          customerId,
+          pendingId,
+          sessionId,
+          payload: { ...payload, stripe_subscription_id: publishedId },
+          env,
+          alreadyProcessed: true,
+        });
+      }
+    }
+    console.warn("[membership completion] loser timed out waiting for winner", pendingId);
+    throw new MembershipCompletionInProgressError(pendingId);
   }
 
   const stripe = createStripeClient(env);
@@ -177,6 +207,7 @@ export async function completeMembershipFromSetupSession(
     throw new Error(`Missing Stripe product id for first charge on pending membership ${pendingId}`);
   }
 
+  let subscriptionId: string | undefined;
   try {
     const subscription = asRecord(await stripe.subscriptions.create({
       customer: customerId,
@@ -198,31 +229,43 @@ export async function completeMembershipFromSetupSession(
             }],
           }
         : {}),
+    }, {
+      // Derived purely from the pending membership id. Nothing time-based and
+      // nothing random, so a stale reclaim of a slow winner replays the same
+      // key and Stripe returns the same subscription instead of a second one.
+      idempotencyKey: `membership-sub-${pendingId}`,
     }));
-
-    const subscriptionId = asString(subscription.id);
-    if (!subscriptionId) throw new Error("Stripe did not return a subscription id");
-
-    const { error: updateErr } = await supabase
-      .from("pending_memberships")
-      .update({ payload: { ...payload, stripe_subscription_id: subscriptionId } })
-      .eq("id", pendingId);
-    if (updateErr) {
-      throw new Error(`Pending membership update failed: ${updateErr.message}`);
-    }
-
-    return ensureMembershipRecord({
-      subscriptionId,
-      customerId,
-      pendingId,
-      payload: { ...payload, stripe_subscription_id: subscriptionId },
-      env,
-      alreadyProcessed: false,
-    });
+    subscriptionId = asString(subscription.id);
   } catch (error) {
     console.error("[membership completion] subscription create failed", stripeErrorDetails(error));
     throw new Error(`Stripe subscription create failed: ${errorMessage(error)}`);
   }
+  if (!subscriptionId) throw new Error("Stripe did not return a subscription id");
+
+  // Conditional write: never overwrite a subscription id that is already stored.
+  const { data: writeRows, error: writeErr } = await supabase
+    .rpc("set_pending_membership_subscription", { p_id: pendingId, p_sub: subscriptionId });
+  if (writeErr) throw new Error(`Pending membership update failed: ${writeErr.message}`);
+
+  const writeRow = asRecord(Array.isArray(writeRows) ? writeRows[0] : writeRows);
+  const storedSubscriptionId = asString(writeRow.stored_subscription_id) ?? subscriptionId;
+  if (writeRow.written !== true && storedSubscriptionId !== subscriptionId) {
+    console.warn(
+      "[membership completion] subscription id already stored; reconciling onto stored id",
+      { pendingId, stored: storedSubscriptionId, attempted: subscriptionId },
+    );
+  }
+
+  return ensureMembershipRecord({
+    subscriptionId: storedSubscriptionId,
+    customerId,
+    pendingId,
+    sessionId,
+    payload: { ...payload, stripe_subscription_id: storedSubscriptionId },
+    env,
+    alreadyProcessed: false,
+  });
+
 }
 
 // A membership must never store a consent version the parent did not see.
