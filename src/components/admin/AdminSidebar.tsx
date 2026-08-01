@@ -7,7 +7,6 @@ import {
   MessageSquare,
   LogOut,
   CalendarDays,
-  BookOpen,
   ClipboardList,
   PanelLeftClose,
   PanelLeft,
@@ -24,6 +23,7 @@ import {
   Globe,
   BotMessageSquare,
 } from "lucide-react";
+
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,7 @@ export function AdminSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const { signOut, user } = useAuth();
-  const { newLessonRequests, newContacts, newGroupEnrollments, newPrivateBookings } = useAdminBadgeCounts();
+  const { newContacts, newGroupEnrollments, newPrivateBookings } = useAdminBadgeCounts();
   const { pathname } = useLocation();
 
   const groups: NavGroup[] = [
@@ -70,10 +70,10 @@ export function AdminSidebar() {
       items: [
         { title: "Clients", url: "/admin/clients", icon: IdCard, badge: 0 },
         { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves, badge: newGroupEnrollments },
-        { title: "Lesson Requests", url: "/admin/lesson-requests", icon: BookOpen, badge: newLessonRequests },
         { title: "Contact Inquiries", url: "/admin/contacts", icon: MessageSquare, badge: newContacts },
         { title: "Waivers", url: "/admin/waivers", icon: FileSignature, badge: 0 },
       ],
+
     },
     {
       label: "Programs",
