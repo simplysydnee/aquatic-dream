@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Users, Award, MapPin, Star, ChevronRight, Waves } from "lucide-react";
 import iCanSwimLogo from "@/assets/i-can-swim-logo.jpg";
 import { SEASON_START_LABEL, isSeasonStarted } from "@/lib/season";
+import { JOIN_OPEN } from "@/lib/joinGate";
 
 type PlanKey = "private" | "kid_group" | "adult_group";
 
@@ -100,9 +101,11 @@ const HeroSection = () => (
           </p>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-          <Button asChild size="lg" className="bg-coral hover:bg-coral/90 text-coral-foreground text-base px-10 py-6 rounded-xl shadow-lg">
-            <Link to="/join">Join</Link>
-          </Button>
+          {JOIN_OPEN && (
+            <Button asChild size="lg" className="bg-coral hover:bg-coral/90 text-coral-foreground text-base px-10 py-6 rounded-xl shadow-lg">
+              <Link to="/join">Join</Link>
+            </Button>
+          )}
           <Link to="/swim-lessons" className="text-secondary-foreground/80 font-medium underline underline-offset-4 hover:text-primary">
             See times &amp; pricing
           </Link>
