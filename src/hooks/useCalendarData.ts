@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { DEAD_STATUS_FILTER, isRealLessonOccurrence } from "@/lib/lessonBookingStatus";
+import { composeOpenPrivateSlots, type OpenPrivateSlot } from "@/hooks/useOpenPrivateSlots";
+
+export type { OpenPrivateSlot };
+
 
 
 export interface CalendarSwimSession {
