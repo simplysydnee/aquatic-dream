@@ -902,10 +902,10 @@ export default function PrivateLessonsAdmin() {
                 <TableHeader><TableRow>
                   <TableHead>Parent</TableHead><TableHead>Swimmer</TableHead><TableHead>Lesson</TableHead>
                   <TableHead>Instructor</TableHead><TableHead>Lessons</TableHead><TableHead>Charged</TableHead>
-                  <TableHead>Card</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+                  <TableHead>Card</TableHead><TableHead>Status</TableHead><TableHead className="w-[90px]">Review</TableHead><TableHead></TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {rows.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">{emptyMsg}</TableCell></TableRow>}
+                  {rows.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">{emptyMsg}</TableCell></TableRow>}
                   {rows.map((b) => {
                     const occs = b.lesson_booking_occurrences || [];
                     const paid = occs.filter((o: any) => o.charge_status === "succeeded").length;
@@ -927,6 +927,18 @@ export default function PrivateLessonsAdmin() {
                         <TableCell>{b.stripe_payment_method_id ? "On file" : b.booking_source === "admin" ? "Manual" : "Pending"}</TableCell>
                         <TableCell className="capitalize">{b.status}</TableCell>
                         <TableCell>
+                          {!b.admin_reviewed_at ? (
+                            <div className="flex flex-col gap-1.5">
+                              <Badge variant="outline" className="text-[10px] self-start bg-red-100 text-red-700 border-red-300">New</Badge>
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1 self-start" onClick={() => acknowledgeBooking(b.id)}>
+                                <CheckCircle className="w-3 h-3" /> Acknowledge
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => setDetailBooking(b)}>
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
@@ -937,6 +949,7 @@ export default function PrivateLessonsAdmin() {
                 </TableBody>
               </Table>
             );
+
             return (
               <>
                 <Card>
