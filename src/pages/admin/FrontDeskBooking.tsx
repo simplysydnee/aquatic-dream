@@ -98,19 +98,33 @@ export const FrontDeskBooking = () => {
           <CalendarPlus className="h-8 w-8 text-primary" />
           Book a lesson
         </h1>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {RANGES.map((r) => (
             <Button
               key={r.key}
               size="lg"
               variant={days === r.key ? "default" : "outline"}
-              className="h-12 px-6 text-base"
+              className="h-14 min-w-[7rem] flex-1 sm:flex-none px-6 text-base"
               onClick={() => setDays(r.key)}
             >
               {r.label}
             </Button>
           ))}
+          <Button
+            size="lg"
+            variant="ghost"
+            className="h-14 px-5 text-base"
+            onClick={() => refetch()}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-5 w-5 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
+        <p className="text-sm text-muted-foreground">
+          Tap an open slot to book it. Families without a card on file can still be booked; the
+          wizard will say the card is collected at the desk.
+        </p>
       </div>
 
       {loading ? (
@@ -119,9 +133,19 @@ export const FrontDeskBooking = () => {
           <span className="text-lg">Loading open slots</span>
         </div>
       ) : grouped.length === 0 ? (
-        <Card className="p-10 text-center text-lg text-muted-foreground">
-          No open slots in this range.
+        <Card className="p-10 text-center space-y-3">
+          <p className="text-lg font-medium">
+            {days === 7 ? "No open slots this week." : `No open slots in the next ${days} days.`}
+          </p>
+          <p className="text-base text-muted-foreground">
+            Try a longer range, or add instructor availability in Standing Slots.
+          </p>
+          <Button size="lg" variant="outline" className="h-12 px-6" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Check again
+          </Button>
         </Card>
+
       ) : (
         <div className="space-y-8">
           {grouped.map((g) => (
