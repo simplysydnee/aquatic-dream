@@ -19,6 +19,36 @@ export interface MembershipCompletionResult {
   alreadyProcessed: boolean;
 }
 
+/**
+ * Thrown when another caller holds the claim on the same pending membership and
+ * has not written its subscription id yet. The caller turns this into a 202 so a
+ * parent who has just paid never sees an error.
+ */
+export class MembershipCompletionInProgressError extends Error {
+  constructor(public readonly pendingId: string) {
+    super("Membership completion already in progress");
+    this.name = "MembershipCompletionInProgressError";
+  }
+}
+
+/** How long a losing caller waits for the winner to write the subscription id. */
+const LOSER_WAIT_MS = 25_000;
+const LOSER_POLL_INTERVAL_MS = 1_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function readPendingSubscriptionId(pendingId: string): Promise<string | undefined> {
+  const { data } = await supabase
+    .from("pending_memberships")
+    .select("payload")
+    .eq("id", pendingId)
+    .maybeSingle();
+  return asString(asRecord(data?.payload).stripe_subscription_id);
+}
+
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 if (!supabaseUrl || !serviceRoleKey) {
