@@ -201,7 +201,7 @@ export const FrontDeskBooking = () => {
         } : undefined}
         initialType={prefill?.default_lesson_type === "semi_private" ? "semi_private" : "private"}
         lockedSlot
-        onBooked={refetch}
+        onBooked={handleBooked}
       />
     </div>
   );
