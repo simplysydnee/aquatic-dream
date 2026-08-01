@@ -1,7 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { completeMembershipFromSetupSessionId } from "../_shared/membership-completion.ts";
+import {
+  completeMembershipFromSetupSessionId,
+  MembershipCompletionInProgressError,
+} from "../_shared/membership-completion.ts";
+
 
 type StripeEnv = "sandbox" | "live";
 
@@ -40,10 +44,15 @@ serve(async (req) => {
 
     return json({ success: true, manageToken, ...result });
   } catch (error) {
+    if (error instanceof MembershipCompletionInProgressError) {
+      console.log("[confirm-membership-checkout] still finalizing", error.pendingId);
+      return json({ pending: true, reason: "in_progress" }, 202);
+    }
     const message = error instanceof Error ? error.message : String(error);
     console.error("[confirm-membership-checkout] failed", message);
     return json({ error: message }, 500);
   }
+
 });
 
 function json(body: unknown, status = 200) {

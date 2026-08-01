@@ -659,44 +659,83 @@ export default function JoinMembership() {
   const [returnFinalizing, setReturnFinalizing] = useState(false);
   const [returnError, setReturnError] = useState<string | null>(null);
   const [manageToken, setManageToken] = useState<string | null>(null);
+  const [returnStillWorking, setReturnStillWorking] = useState(false);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    if (p.get("membership") === "success") {
-      setReturned(true);
-      setStep(8);
-      const sessionId = p.get("session_id");
-      if (!sessionId) {
-        setReturnError("Missing checkout session. Please contact us so we can confirm your membership.");
+    if (p.get("membership") !== "success") return;
+    setReturned(true);
+    setStep(8);
+    const sessionId = p.get("session_id");
+    if (!sessionId) {
+      setReturnError("Missing checkout session. Please contact us so we can confirm your membership.");
+      return;
+    }
+
+    let cancelled = false;
+    setReturnFinalizing(true);
+
+    const finishHold = () => {
+      const returningHold = p.get("hold");
+      if (returningHold) {
+        void supabase.functions.invoke("get-membership-hold", {
+          body: { token: returningHold, action: "convert" },
+        });
+      }
+    };
+
+    // The webhook may still be finalizing the same checkout. A 202 means
+    // "payment received, still working" so we keep polling instead of
+    // showing an error to a parent who has already paid.
+    const POLL_INTERVAL_MS = 3000;
+    const MAX_WAIT_MS = 120_000;
+    const deadline = Date.now() + MAX_WAIT_MS;
+
+    const attempt = async (): Promise<void> => {
+      const { data, error } = await supabase.functions.invoke("confirm-membership-checkout", {
+        body: { sessionId },
+      });
+      if (cancelled) return;
+
+      if (!error && data?.pending) {
+        if (Date.now() < deadline) {
+          setReturnStillWorking(true);
+          window.setTimeout(() => void attempt(), POLL_INTERVAL_MS);
+          return;
+        }
+        // Terminal, reassuring state. Payment succeeded either way.
+        setReturnFinalizing(false);
+        setReturnStillWorking(true);
+        setReturnError(null);
+        finishHold();
         return;
       }
-      setReturnFinalizing(true);
-      supabase.functions
-        .invoke("confirm-membership-checkout", {
-          body: { sessionId, environment: getStripeEnvironment() },
-        })
-        .then(({ data, error }) => {
-          if (error || !data?.success) {
-            throw new Error(error?.message || data?.error || "Could not confirm membership");
-          }
-          setCharges({
-            firstChargeCents: data.firstChargeCents ?? 0,
-            monthlyCents: data.monthlyCents ?? 0,
-          });
-          setManageToken((data.manageToken as string | null) ?? null);
-          setReturnError(null);
-          const returningHold = p.get("hold");
-          if (returningHold) {
-            void supabase.functions.invoke("get-membership-hold", {
-              body: { token: returningHold, action: "convert" },
-            });
-          }
-        })
-        .catch((error) => {
-          setReturnError(error instanceof Error ? error.message : "Could not confirm membership");
-        })
-        .finally(() => setReturnFinalizing(false));
-    }
+
+      if (error || !data?.success) {
+        setReturnFinalizing(false);
+        setReturnStillWorking(false);
+        setReturnError(
+          (error?.message as string | undefined) || data?.error || "Could not confirm membership",
+        );
+        return;
+      }
+
+      setCharges({
+        firstChargeCents: data.firstChargeCents ?? 0,
+        monthlyCents: data.monthlyCents ?? 0,
+      });
+      setManageToken((data.manageToken as string | null) ?? null);
+      setReturnError(null);
+      setReturnStillWorking(false);
+      setReturnFinalizing(false);
+      finishHold();
+    };
+
+    void attempt();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
 
   // Phone-booked hold: /join?hold=<token> skips program and slot selection.
   useEffect(() => {
@@ -1633,8 +1672,25 @@ export default function JoinMembership() {
                 </div>
                 {returnFinalizing ? (
                   <>
-                    <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">Finalizing enrollment…</h2>
-                    <p className="text-[#2a5e84]">Please keep this page open while we confirm your membership.</p>
+                    <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">
+                      {returnStillWorking ? "Payment received" : "Finalizing enrollment…"}
+                    </h2>
+                    <p className="text-[#2a5e84]">
+                      {returnStillWorking
+                        ? "Finishing your membership. Please keep this page open for a moment."
+                        : "Please keep this page open while we confirm your membership."}
+                    </p>
+                  </>
+                ) : returnStillWorking ? (
+                  <>
+                    <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">Payment received</h2>
+                    <p className="text-[#2a5e84]">
+                      Your payment went through and your spot is saved. We are finishing the last step
+                      and your welcome email with class details is on the way.
+                    </p>
+                    <p className="mt-2 text-sm text-[#2a5e84]/80">
+                      Nothing else is needed from you right now.
+                    </p>
                   </>
                 ) : returnError ? (
                   <>
@@ -1645,6 +1701,7 @@ export default function JoinMembership() {
                     <p className="mt-2 break-words text-sm text-[#2a5e84]/80">{returnError}</p>
                   </>
                 ) : (
+
                   <>
                     <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">You're enrolled!</h2>
                     <p className="text-[#2a5e84]">

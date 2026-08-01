@@ -1,0 +1,1 @@
+DELETE FROM public.pending_memberships WHERE id = '00000000-0000-4000-8000-00000000dead';
