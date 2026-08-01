@@ -147,16 +147,6 @@ export interface MembershipLesson {
   emergency_contact_relationship: string | null;
 }
 
-export interface OpenPrivateSlot {
-  instructor_id: string;
-  instructor_name: string;
-  slot_date: string;
-  start_time: string;
-  end_time: string;
-  slot_minutes: number;
-  pool_area: string;
-  default_lesson_type: string;
-}
 
 export interface ICSSession {
   id: string;
