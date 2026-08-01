@@ -58,7 +58,9 @@ interface Enrollment {
   session_fee_status: string;
   session_fee_stripe_id?: string | null;
   session_fee_paid_at?: string | null;
+  admin_reviewed_at: string | null;
 }
+
 
 interface SessionInfo {
   id: string;
