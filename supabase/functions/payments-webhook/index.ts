@@ -3,7 +3,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { type StripeEnv, createStripeClient, verifyWebhook } from "../_shared/stripe.ts";
 import { sendEnrollmentConfirmation as sendConfirmationHelper } from "../_shared/send-enrollment-confirmation.ts";
 import { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } from "../_shared/textmagic.ts";
-import { completeMembershipFromSetupSession } from "../_shared/membership-completion.ts";
+import {
+  completeMembershipFromSetupSession,
+  MembershipCompletionInProgressError,
+} from "../_shared/membership-completion.ts";
+
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
