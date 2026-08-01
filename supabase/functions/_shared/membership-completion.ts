@@ -359,8 +359,33 @@ async function ensureMembershipRecord(options: {
     .single();
 
   if (insertErr || !membership?.id) {
+    // Unique index backstop: another caller inserted the row for this session or
+    // subscription first. Reconcile onto that row instead of failing the parent.
+    if (insertErr?.code === "23505") {
+      const { data: winner } = await supabase
+        .from("memberships")
+        .select("id")
+        .or(`stripe_subscription_id.eq.${options.subscriptionId},stripe_session_id.eq.${options.sessionId}`)
+        .limit(1)
+        .maybeSingle();
+      if (winner?.id) {
+        const occurrenceCountExisting = await ensureOccurrences(winner.id as string, options.payload);
+        await sendWelcomeIfNeeded(winner.id as string, options.payload).catch((e) =>
+          console.error("[membership completion] welcome send failed", errorMessage(e)),
+        );
+        return {
+          membershipId: winner.id as string,
+          subscriptionId: options.subscriptionId,
+          occurrenceCount: occurrenceCountExisting,
+          firstChargeCents: asNumber(options.payload.first_charge_cents),
+          monthlyCents: asNumber(options.payload.recurring_consent_amount_cents),
+          alreadyProcessed: true,
+        };
+      }
+    }
     throw new Error(`Membership insert failed: ${insertErr?.message || "no row returned"}`);
   }
+
 
   const occurrenceCount = await ensureOccurrences(membership.id as string, options.payload);
   console.log("[membership completion] membership created", membership.id, "pending", options.pendingId);
