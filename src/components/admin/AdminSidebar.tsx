@@ -7,7 +7,6 @@ import {
   MessageSquare,
   LogOut,
   CalendarDays,
-  BookOpen,
   ClipboardList,
   PanelLeftClose,
   PanelLeft,
@@ -24,6 +23,7 @@ import {
   Globe,
   BotMessageSquare,
 } from "lucide-react";
+
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
