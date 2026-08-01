@@ -874,6 +874,19 @@ const SwimEnrollmentsAdmin = () => {
                           </Select>
                         </TableCell>
                         <TableCell>
+                          {!e.admin_reviewed_at ? (
+                            <div className="flex flex-col gap-1.5">
+                              <Badge variant="outline" className="text-[10px] self-start bg-red-100 text-red-700 border-red-300">New</Badge>
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1 self-start" onClick={() => acknowledgeEnrollment(e.id)}>
+                                <CheckCircle className="w-3 h-3" /> Acknowledge
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+
+                        <TableCell>
                           {e.is_first_time && e.payment_status !== "not_required" ? (
                             <Select value={e.payment_status} onValueChange={(v) => v === "paid" ? openMarkPaid(e, "reg", "cash") : updatePaymentStatus(e, v)}>
                               <SelectTrigger className={`w-[120px] h-8 ${paymentStatusColor(e.payment_status)}`}>
