@@ -940,6 +940,7 @@ export type Database = {
           admin_reviewed_at: string | null
           booking_source: string
           cancellation_policy_hours: number
+          card_warning_sent_at: string | null
           child_age: number | null
           child_dob: string | null
           child_first_name: string | null
@@ -990,6 +991,7 @@ export type Database = {
           admin_reviewed_at?: string | null
           booking_source?: string
           cancellation_policy_hours?: number
+          card_warning_sent_at?: string | null
           child_age?: number | null
           child_dob?: string | null
           child_first_name?: string | null
@@ -1040,6 +1042,7 @@ export type Database = {
           admin_reviewed_at?: string | null
           booking_source?: string
           cancellation_policy_hours?: number
+          card_warning_sent_at?: string | null
           child_age?: number | null
           child_dob?: string | null
           child_first_name?: string | null
