@@ -282,10 +282,12 @@ async function ensureMembershipRecord(options: {
   subscriptionId: string;
   customerId: string;
   pendingId: string;
+  sessionId: string;
   payload: JsonObject;
   env: StripeEnv;
   alreadyProcessed: boolean;
 }): Promise<MembershipCompletionResult> {
+
   const { data: existing, error: existingErr } = await supabase
     .from("memberships")
     .select("id")
