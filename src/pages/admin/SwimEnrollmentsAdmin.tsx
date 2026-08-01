@@ -1091,6 +1091,19 @@ const SwimEnrollmentsAdmin = () => {
                           </Select>
                         </TableCell>
                         <TableCell>
+                          {!e.admin_reviewed_at ? (
+                            <div className="flex flex-col gap-1.5">
+                              <Badge variant="outline" className="text-[10px] self-start bg-red-100 text-red-700 border-red-300">New</Badge>
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1 self-start" onClick={() => acknowledgeEnrollment(e.id)}>
+                                <CheckCircle className="w-3 h-3" /> Acknowledge
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+
+                        <TableCell>
                           <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
                             {formatPaymentStatus(e.payment_status)}
                           </Badge>
