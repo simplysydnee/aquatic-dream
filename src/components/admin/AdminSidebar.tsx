@@ -1,29 +1,19 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
-  AlertTriangle,
-  Users,
   Waves,
-  MessageSquare,
   LogOut,
   CalendarDays,
   CalendarPlus,
-
   ClipboardList,
   PanelLeftClose,
   PanelLeft,
   UserCheck,
   Layers,
   CalendarClock,
-  BarChart3,
-  Mail,
   IdCard,
   ChevronDown,
-  Send,
-  FileSignature,
   CheckSquare,
-  Globe,
-  BotMessageSquare,
 } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
@@ -54,7 +44,7 @@ export function AdminSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const { signOut, user } = useAuth();
-  const { newContacts, newGroupEnrollments, newPrivateBookings } = useAdminBadgeCounts();
+  const { newGroupEnrollments, newPrivateBookings } = useAdminBadgeCounts();
   const { pathname } = useLocation();
 
   const groups: NavGroup[] = [
@@ -66,7 +56,6 @@ export function AdminSidebar() {
 
         { title: "Check-in", url: "/admin/checkin", icon: CheckSquare, badge: 0 },
         { title: "Class Roster", url: "/admin/roster", icon: ClipboardList, badge: 0 },
-        { title: "Messages", url: "/admin/messages", icon: Send, badge: 0 },
       ],
     },
     {
@@ -74,10 +63,7 @@ export function AdminSidebar() {
       items: [
         { title: "Clients", url: "/admin/clients", icon: IdCard, badge: 0 },
         { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves, badge: newGroupEnrollments },
-        { title: "Contact Inquiries", url: "/admin/contacts", icon: MessageSquare, badge: newContacts },
-        { title: "Waivers", url: "/admin/waivers", icon: FileSignature, badge: 0 },
       ],
-
     },
     {
       label: "Programs",
@@ -85,32 +71,13 @@ export function AdminSidebar() {
         { title: "Sessions", url: "/admin/sessions", icon: Layers, badge: 0 },
         { title: "Standing Slots", url: "/admin/standing-slots", icon: CalendarClock, badge: 0 },
         { title: "Memberships", url: "/admin/memberships", icon: IdCard, badge: 0 },
-        { title: "Holidays & Closures", url: "/admin/holidays", icon: CalendarClock, badge: 0 },
-
         { title: "Private Lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: newPrivateBookings },
-        { title: "Reports", url: "/admin/reports", icon: BarChart3, badge: 0 },
-        { title: "Card Gaps", url: "/admin/card-gaps", icon: AlertTriangle, badge: 0 },
       ],
     },
     {
       label: "Staff",
       items: [
         { title: "Instructors", url: "/admin/instructors", icon: UserCheck, badge: 0 },
-      ],
-    },
-    {
-      label: "Marketing",
-      items: [
-        { title: "Campaigns", url: "/admin/marketing", icon: Send, badge: 0 },
-      ],
-    },
-    {
-      label: "System",
-      items: [
-        { title: "Email Log", url: "/admin/emails", icon: Mail, badge: 0 },
-        { title: "Domain Health", url: "/admin/domain-health", icon: Globe, badge: 0 },
-        { title: "AI Assistant", url: "/admin/agent-connect", icon: BotMessageSquare, badge: 0 },
-        { title: "User Management", url: "/admin/users", icon: Users, badge: 0 },
       ],
     },
   ];
