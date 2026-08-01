@@ -110,6 +110,8 @@ const App = () => (
               <Route path="private-lessons" element={<PrivateLessonsAdmin />} />
               <Route path="private-lessons/new" element={<BookingNew />} />
               <Route path="card-gaps" element={<CardGapReport />} />
+              <Route path="book" element={<FrontDeskBooking />} />
+
               <Route path="users" element={<UsersAdmin />} />
               <Route path="messages" element={<MessagesAdmin />} />
               <Route path="domain-health" element={<DomainHealthAdmin />} />
