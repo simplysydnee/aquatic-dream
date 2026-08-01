@@ -52,7 +52,7 @@ export function AdminSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const { signOut, user } = useAuth();
-  const { newLessonRequests, newContacts } = useAdminBadgeCounts();
+  const { newLessonRequests, newContacts, newGroupEnrollments, newPrivateBookings } = useAdminBadgeCounts();
   const { pathname } = useLocation();
 
   const groups: NavGroup[] = [
