@@ -58,7 +58,9 @@ interface Enrollment {
   session_fee_status: string;
   session_fee_stripe_id?: string | null;
   session_fee_paid_at?: string | null;
+  admin_reviewed_at?: string | null;
 }
+
 
 interface SessionInfo {
   id: string;
@@ -262,6 +264,18 @@ const SwimEnrollmentsAdmin = () => {
     await supabase.from("swim_enrollments").update({ status }).eq("id", id);
     setEnrollments((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
   };
+
+  const acknowledgeEnrollment = async (id: string) => {
+    const reviewedAt = new Date().toISOString();
+    const { error } = await supabase.from("swim_enrollments").update({ admin_reviewed_at: reviewedAt }).eq("id", id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Enrollment acknowledged" });
+      setEnrollments((prev) => prev.map((e) => (e.id === id ? { ...e, admin_reviewed_at: reviewedAt } : e)));
+    }
+  };
+
 
   const deleteEnrollment = async (e: Enrollment) => {
     if (!window.confirm(`Permanently DELETE enrollment for ${e.child_name} (${e.parent_email})?\n\nThis cannot be undone and will NOT issue any refund. Use Cancel instead if a refund is needed.`)) return;
@@ -777,16 +791,25 @@ const SwimEnrollmentsAdmin = () => {
                       </Button>
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+                    {!e.admin_reviewed_at && (
+                      <Badge variant="outline" className="text-[10px] bg-red-100 text-red-700 border-red-300">New</Badge>
+                    )}
                     <Badge variant="outline" className={`text-[10px] ${enrollmentStateColor(e.status)}`}>{e.status}</Badge>
                     <Badge variant="outline" className={`text-[10px] ${paymentStatusColor(e.payment_status)}`}>Reg: {formatPaymentStatus(e.payment_status)}</Badge>
                     <Badge variant="outline" className={`text-[10px] ${sessionFeeColor(e.session_fee_status)}`}>Session: {formatPaymentStatus(e.session_fee_status)}</Badge>
+                    {!e.admin_reviewed_at && (
+                      <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1" onClick={() => acknowledgeEnrollment(e.id)}>
+                        <CheckCircle className="w-3 h-3" /> Acknowledge
+                      </Button>
+                    )}
                     {e.session_fee_status === "due_day_1" && (
                       <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1" onClick={() => sendPaymentLink(e)}>
                         <Send className="w-3 h-3" /> Send link
                       </Button>
                     )}
                   </div>
+
                 </Card>
               );
             })}
@@ -806,6 +829,7 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Parent</TableHead>
                     <TableHead>Session</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-[90px]">Review</TableHead>
                     <TableHead>Reg Fee</TableHead>
                     <TableHead>Session Fee</TableHead>
                     <TableHead>Method / Ref</TableHead>
@@ -813,6 +837,7 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead className="w-[100px]"></TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {filtered.map((e) => {
                     const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
@@ -848,6 +873,19 @@ const SwimEnrollmentsAdmin = () => {
                             </SelectContent>
                           </Select>
                         </TableCell>
+                        <TableCell>
+                          {!e.admin_reviewed_at ? (
+                            <div className="flex flex-col gap-1.5">
+                              <Badge variant="outline" className="text-[10px] self-start bg-red-100 text-red-700 border-red-300">New</Badge>
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1 self-start" onClick={() => acknowledgeEnrollment(e.id)}>
+                                <CheckCircle className="w-3 h-3" /> Acknowledge
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+
                         <TableCell>
                           {e.is_first_time && e.payment_status !== "not_required" ? (
                             <Select value={e.payment_status} onValueChange={(v) => v === "paid" ? openMarkPaid(e, "reg", "cash") : updatePaymentStatus(e, v)}>
@@ -931,11 +969,12 @@ const SwimEnrollmentsAdmin = () => {
                   })}
                   {filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                         No enrollments found
                       </TableCell>
                     </TableRow>
                   )}
+
                 </TableBody>
               </Table>
             </CardContent>
@@ -977,11 +1016,20 @@ const SwimEnrollmentsAdmin = () => {
                       <Eye className="w-4 h-4" />
                     </Button>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+                    {!e.admin_reviewed_at && (
+                      <Badge variant="outline" className="text-[10px] bg-red-100 text-red-700 border-red-300">New</Badge>
+                    )}
                     <Badge variant="outline" className={`text-[10px] ${enrollmentStateColor(e.status)}`}>{e.status}</Badge>
                     <Badge variant="outline" className={`text-[10px] ${paymentStatusColor(e.payment_status)}`}>Reg: {formatPaymentStatus(e.payment_status)}</Badge>
                     <Badge variant="outline" className={`text-[10px] ${sessionFeeColor(e.session_fee_status)}`}>Session: {formatPaymentStatus(e.session_fee_status)}</Badge>
+                    {!e.admin_reviewed_at && (
+                      <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1" onClick={() => acknowledgeEnrollment(e.id)}>
+                        <CheckCircle className="w-3 h-3" /> Acknowledge
+                      </Button>
+                    )}
                   </div>
+
                 </Card>
               );
             })}
@@ -1001,12 +1049,14 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Parent</TableHead>
                     <TableHead>Session</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-[90px]">Review</TableHead>
                     <TableHead>Reg Fee</TableHead>
                     <TableHead>Session Fee</TableHead>
                     <TableHead>Cancelled</TableHead>
                     <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {cancelledList.map((e) => {
                     const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
@@ -1041,6 +1091,19 @@ const SwimEnrollmentsAdmin = () => {
                           </Select>
                         </TableCell>
                         <TableCell>
+                          {!e.admin_reviewed_at ? (
+                            <div className="flex flex-col gap-1.5">
+                              <Badge variant="outline" className="text-[10px] self-start bg-red-100 text-red-700 border-red-300">New</Badge>
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1 self-start" onClick={() => acknowledgeEnrollment(e.id)}>
+                                <CheckCircle className="w-3 h-3" /> Acknowledge
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+
+                        <TableCell>
                           <Badge variant="outline" className={paymentStatusColor(e.payment_status)}>
                             {formatPaymentStatus(e.payment_status)}
                           </Badge>
@@ -1068,11 +1131,12 @@ const SwimEnrollmentsAdmin = () => {
                   })}
                   {cancelledList.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                         No cancelled enrollments
                       </TableCell>
                     </TableRow>
                   )}
+
                 </TableBody>
               </Table>
             </CardContent>

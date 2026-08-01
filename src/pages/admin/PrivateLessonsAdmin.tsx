@@ -16,7 +16,8 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2, ChevronDown, ChevronRight, Pencil, CalendarClock } from "lucide-react";
+import { Trash2, Plus, MoreHorizontal, CreditCard, XCircle, Loader2, ChevronDown, ChevronRight, Pencil, CalendarClock, CheckCircle } from "lucide-react";
+
 import { toast } from "@/hooks/use-toast";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { getPrivateLessonPrice, isPromoDate, PRIVATE_PROMO_PRICE, PRIVATE_REGULAR_PRICE, PROMO_LABEL } from "@/lib/privateLessonPricing";
@@ -127,20 +128,21 @@ export default function PrivateLessonsAdmin() {
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
       supabase.from("instructor_booking_blocks").select("*").order("created_at", { ascending: false }),
       supabase.from("lesson_bookings")
-        .select("*, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
+        .select("*, admin_reviewed_at, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
 
         .in("lesson_type", ["private", "semi_private"])
         .not("status", "in", DEAD_STATUS_FILTER)
         .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(200),
       supabase.from("lesson_bookings")
-        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, created_at, booking_source, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, created_at, start_time_override, instructor_override_id, instructor_override_name)")
+        .select("id, admin_reviewed_at, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, created_at, booking_source, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, created_at, start_time_override, instructor_override_id, instructor_override_name)")
         .in("lesson_type", ["private", "semi_private"])
         // Include pending_card so the slot grid marks the time as taken
         // while we wait for the parent to save their card.
         .not("status", "in", DEAD_STATUS_FILTER),
 
     ]);
+
     setInstructors((ins as any[]) || []);
     setBlocks((bks as any[]) || []);
     setBookings((bkg as any[]) || []);
@@ -151,7 +153,21 @@ export default function PrivateLessonsAdmin() {
       if (updated) setDetailBooking(updated);
     }
   };
+
+  const acknowledgeBooking = async (id: string) => {
+    const reviewedAt = new Date().toISOString();
+    const { error } = await supabase.from("lesson_bookings").update({ admin_reviewed_at: reviewedAt }).eq("id", id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Booking acknowledged" });
+      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, admin_reviewed_at: reviewedAt } : b)));
+      setAllPrivateBookings((prev) => prev.map((b) => (b.id === id ? { ...b, admin_reviewed_at: reviewedAt } : b)));
+    }
+  };
+
   useEffect(() => { load(); }, []);
+
 
   const addBlock = async () => {
     if (!draft.instructor_id) return;
@@ -886,10 +902,10 @@ export default function PrivateLessonsAdmin() {
                 <TableHeader><TableRow>
                   <TableHead>Parent</TableHead><TableHead>Swimmer</TableHead><TableHead>Lesson</TableHead>
                   <TableHead>Instructor</TableHead><TableHead>Lessons</TableHead><TableHead>Charged</TableHead>
-                  <TableHead>Card</TableHead><TableHead>Status</TableHead><TableHead></TableHead>
+                  <TableHead>Card</TableHead><TableHead>Status</TableHead><TableHead className="w-[90px]">Review</TableHead><TableHead></TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {rows.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">{emptyMsg}</TableCell></TableRow>}
+                  {rows.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">{emptyMsg}</TableCell></TableRow>}
                   {rows.map((b) => {
                     const occs = b.lesson_booking_occurrences || [];
                     const paid = occs.filter((o: any) => o.charge_status === "succeeded").length;
@@ -911,6 +927,18 @@ export default function PrivateLessonsAdmin() {
                         <TableCell>{b.stripe_payment_method_id ? "On file" : b.booking_source === "admin" ? "Manual" : "Pending"}</TableCell>
                         <TableCell className="capitalize">{b.status}</TableCell>
                         <TableCell>
+                          {!b.admin_reviewed_at ? (
+                            <div className="flex flex-col gap-1.5">
+                              <Badge variant="outline" className="text-[10px] self-start bg-red-100 text-red-700 border-red-300">New</Badge>
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-1 self-start" onClick={() => acknowledgeBooking(b.id)}>
+                                <CheckCircle className="w-3 h-3" /> Acknowledge
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => setDetailBooking(b)}>
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
@@ -921,6 +949,7 @@ export default function PrivateLessonsAdmin() {
                 </TableBody>
               </Table>
             );
+
             return (
               <>
                 <Card>
