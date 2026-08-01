@@ -153,7 +153,21 @@ export default function PrivateLessonsAdmin() {
       if (updated) setDetailBooking(updated);
     }
   };
+
+  const acknowledgeBooking = async (id: string) => {
+    const reviewedAt = new Date().toISOString();
+    const { error } = await supabase.from("lesson_bookings").update({ admin_reviewed_at: reviewedAt }).eq("id", id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Booking acknowledged" });
+      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, admin_reviewed_at: reviewedAt } : b)));
+      setAllPrivateBookings((prev) => prev.map((b) => (b.id === id ? { ...b, admin_reviewed_at: reviewedAt } : b)));
+    }
+  };
+
   useEffect(() => { load(); }, []);
+
 
   const addBlock = async () => {
     if (!draft.instructor_id) return;
