@@ -156,11 +156,12 @@ export const FrontDeskBooking = () => {
               <div className="grid gap-3 sm:grid-cols-2">
                 {g.list.map((s) => (
                   <button
-                    key={`${s.instructor_id}|${s.slot_date}|${s.start_time}`}
+                    key={slotKey(s)}
                     type="button"
                     onClick={() => openSlot(s)}
-                    className="text-left rounded-xl border bg-card p-5 min-h-[112px] transition hover:border-primary hover:bg-muted/50 active:scale-[0.99]"
+                    className="text-left rounded-xl border bg-card p-5 min-h-[124px] touch-manipulation transition hover:border-primary hover:bg-muted/50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
+
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-2xl font-bold">{formatTime(s.start_time)}</span>
                       <span className="text-sm text-muted-foreground flex items-center gap-1">
