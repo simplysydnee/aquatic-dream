@@ -4,6 +4,7 @@ import PrivateBookingFlow from "@/components/private-lessons/PrivateBookingFlow"
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { Button } from "@/components/ui/button";
 import { isSeasonStarted, SEASON_START_LABEL } from "@/lib/season";
+import { JOIN_OPEN } from "@/lib/joinGate";
 import {
   PROMO_ACTIVE_FOR_TODAY,
   PROMO_LABEL,
@@ -35,9 +36,15 @@ const PrivateLessonsRetired = () => (
           Already have lessons on the calendar? Nothing changes. Your existing links for
           cancelling, rescheduling, and payment still work.
         </p>
-        <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
-          <Link to="/join">Join</Link>
-        </Button>
+        {JOIN_OPEN ? (
+          <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
+            <Link to="/join">Join</Link>
+          </Button>
+        ) : (
+          <p className="text-muted-foreground">
+            Enrollment opens soon. Give us a call and we will save you a spot.
+          </p>
+        )}
       </div>
     </section>
   </main>

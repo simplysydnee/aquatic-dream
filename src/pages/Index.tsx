@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Users, Award, MapPin, Star, ChevronRight, Waves } from "lucide-react";
 import iCanSwimLogo from "@/assets/i-can-swim-logo.jpg";
 import { SEASON_START_LABEL, isSeasonStarted } from "@/lib/season";
+import { JOIN_OPEN } from "@/lib/joinGate";
 
 type PlanKey = "private" | "kid_group" | "adult_group";
 
@@ -100,9 +101,11 @@ const HeroSection = () => (
           </p>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-          <Button asChild size="lg" className="bg-coral hover:bg-coral/90 text-coral-foreground text-base px-10 py-6 rounded-xl shadow-lg">
-            <Link to="/join">Join</Link>
-          </Button>
+          {JOIN_OPEN && (
+            <Button asChild size="lg" className="bg-coral hover:bg-coral/90 text-coral-foreground text-base px-10 py-6 rounded-xl shadow-lg">
+              <Link to="/join">Join</Link>
+            </Button>
+          )}
           <Link to="/swim-lessons" className="text-secondary-foreground/80 font-medium underline underline-offset-4 hover:text-primary">
             See times &amp; pricing
           </Link>
@@ -129,7 +132,7 @@ const ProgramCards = () => {
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
             >
-              <Link to="/join" className="block h-full">
+              <Link to={JOIN_OPEN ? "/join" : "/swim-lessons"} className="block h-full">
                 <Card className="h-full p-8 border-2 hover:border-primary/40 transition-all duration-300">
                   <h2 className="font-display text-2xl font-bold text-foreground mb-1">{p.name}</h2>
                   <p className="text-sm text-muted-foreground mb-6">{p.blurb}</p>
@@ -139,7 +142,7 @@ const ProgramCards = () => {
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">{p.when}</p>
                   <span className="inline-flex items-center gap-1 text-primary font-semibold mt-6">
-                    Join <ChevronRight className="w-4 h-4" />
+                    {JOIN_OPEN ? "Join" : "See times"} <ChevronRight className="w-4 h-4" />
                   </span>
                 </Card>
               </Link>

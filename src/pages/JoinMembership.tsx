@@ -24,6 +24,7 @@ import SwimAssessment from "@/components/swim-enrollment/SwimAssessment";
 import LegalAgreements, { type LegalAgreementData } from "@/components/swim-enrollment/LegalAgreements";
 import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
 import ClosureScheduleNote from "@/components/ClosureScheduleNote";
+import { JOIN_OPEN } from "@/lib/joinGate";
 
 import {
   resolveSwimmerWaiver,
@@ -130,6 +131,23 @@ const HOLD_PROBLEMS: Record<
 
 
 export default function JoinMembership() {
+  if (!JOIN_OPEN) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F7F3EE] px-4">
+        <Card className="max-w-md p-8 text-center">
+          <h1 className="text-2xl font-bold text-[#1a3a8a]">Enrollment opens soon</h1>
+          <p className="mt-3 text-[#2a5e84]">
+            We are getting the next round of Swimberships ready. Check back shortly or give us a
+            call and we will save you a spot.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+  return <JoinMembershipForm />;
+}
+
+function JoinMembershipForm() {
   const [step, setStep] = useState<Step>(1);
   const [showAssessment, setShowAssessment] = useState(false);
   const [loading, setLoading] = useState(true);
