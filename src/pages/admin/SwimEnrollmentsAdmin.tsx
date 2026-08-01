@@ -265,6 +265,18 @@ const SwimEnrollmentsAdmin = () => {
     setEnrollments((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
   };
 
+  const acknowledgeEnrollment = async (id: string) => {
+    const reviewedAt = new Date().toISOString();
+    const { error } = await supabase.from("swim_enrollments").update({ admin_reviewed_at: reviewedAt }).eq("id", id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Enrollment acknowledged" });
+      setEnrollments((prev) => prev.map((e) => (e.id === id ? { ...e, admin_reviewed_at: reviewedAt } : e)));
+    }
+  };
+
+
   const deleteEnrollment = async (e: Enrollment) => {
     if (!window.confirm(`Permanently DELETE enrollment for ${e.child_name} (${e.parent_email})?\n\nThis cannot be undone and will NOT issue any refund. Use Cancel instead if a refund is needed.`)) return;
     const { error } = await supabase.from("swim_enrollments").delete().eq("id", e.id);
