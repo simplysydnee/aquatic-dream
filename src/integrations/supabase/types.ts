@@ -937,6 +937,7 @@ export type Database = {
       }
       lesson_bookings: {
         Row: {
+          admin_reviewed_at: string | null
           booking_source: string
           cancellation_policy_hours: number
           child_age: number | null
@@ -986,6 +987,7 @@ export type Database = {
           waiver_token: string | null
         }
         Insert: {
+          admin_reviewed_at?: string | null
           booking_source?: string
           cancellation_policy_hours?: number
           child_age?: number | null
@@ -1035,6 +1037,7 @@ export type Database = {
           waiver_token?: string | null
         }
         Update: {
+          admin_reviewed_at?: string | null
           booking_source?: string
           cancellation_policy_hours?: number
           child_age?: number | null
@@ -2535,6 +2538,7 @@ export type Database = {
       }
       swim_enrollments: {
         Row: {
+          admin_reviewed_at: string | null
           child_age: number
           child_dob: string | null
           child_first_name: string | null
@@ -2583,6 +2587,7 @@ export type Database = {
           waiver_token: string | null
         }
         Insert: {
+          admin_reviewed_at?: string | null
           child_age: number
           child_dob?: string | null
           child_first_name?: string | null
@@ -2631,6 +2636,7 @@ export type Database = {
           waiver_token?: string | null
         }
         Update: {
+          admin_reviewed_at?: string | null
           child_age?: number
           child_dob?: string | null
           child_first_name?: string | null
