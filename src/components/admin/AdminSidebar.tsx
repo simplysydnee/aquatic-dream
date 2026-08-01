@@ -52,7 +52,7 @@ export function AdminSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const { signOut, user } = useAuth();
-  const { newLessonRequests, newContacts } = useAdminBadgeCounts();
+  const { newLessonRequests, newContacts, newGroupEnrollments, newPrivateBookings } = useAdminBadgeCounts();
   const { pathname } = useLocation();
 
   const groups: NavGroup[] = [
@@ -69,7 +69,7 @@ export function AdminSidebar() {
       label: "Clients & Inquiries",
       items: [
         { title: "Clients", url: "/admin/clients", icon: IdCard, badge: 0 },
-        { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves, badge: 0 },
+        { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves, badge: newGroupEnrollments },
         { title: "Lesson Requests", url: "/admin/lesson-requests", icon: BookOpen, badge: newLessonRequests },
         { title: "Contact Inquiries", url: "/admin/contacts", icon: MessageSquare, badge: newContacts },
         { title: "Waivers", url: "/admin/waivers", icon: FileSignature, badge: 0 },
@@ -83,7 +83,7 @@ export function AdminSidebar() {
         { title: "Memberships", url: "/admin/memberships", icon: IdCard, badge: 0 },
         { title: "Holidays & Closures", url: "/admin/holidays", icon: CalendarClock, badge: 0 },
 
-        { title: "Private Lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: 0 },
+        { title: "Private Lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: newPrivateBookings },
         { title: "Reports", url: "/admin/reports", icon: BarChart3, badge: 0 },
         { title: "Card Gaps", url: "/admin/card-gaps", icon: AlertTriangle, badge: 0 },
       ],
