@@ -7,6 +7,8 @@ import {
   MessageSquare,
   LogOut,
   CalendarDays,
+  CalendarPlus,
+
   ClipboardList,
   PanelLeftClose,
   PanelLeft,
@@ -59,7 +61,9 @@ export function AdminSidebar() {
     {
       label: "Operations",
       items: [
+        { title: "Book a Lesson", url: "/admin/book", icon: CalendarPlus, badge: 0 },
         { title: "Calendar", url: "/admin", icon: CalendarDays, badge: 0 },
+
         { title: "Check-in", url: "/admin/checkin", icon: CheckSquare, badge: 0 },
         { title: "Class Roster", url: "/admin/roster", icon: ClipboardList, badge: 0 },
         { title: "Messages", url: "/admin/messages", icon: Send, badge: 0 },

@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { DEAD_STATUS_FILTER, isRealLessonOccurrence } from "@/lib/lessonBookingStatus";
+import { composeOpenPrivateSlots, type OpenPrivateSlot } from "@/hooks/useOpenPrivateSlots";
+
+export type { OpenPrivateSlot };
+
 
 
 export interface CalendarSwimSession {
@@ -143,16 +147,6 @@ export interface MembershipLesson {
   emergency_contact_relationship: string | null;
 }
 
-export interface OpenPrivateSlot {
-  instructor_id: string;
-  instructor_name: string;
-  slot_date: string;
-  start_time: string;
-  end_time: string;
-  slot_minutes: number;
-  pool_area: string;
-  default_lesson_type: string;
-}
 
 export interface ICSSession {
   id: string;
@@ -433,77 +427,14 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
       taken.add(`${p.instructor_id}|${p.occurrence_date}|${p.start_time}`);
     }
 
-    const allBlocks = (blocksRes.data as any[]) || [];
-    const blocks = allBlocks.filter((b) => !b.is_blackout);
-    const blackouts = allBlocks.filter((b) => b.is_blackout);
-    const open: OpenPrivateSlot[] = [];
-    const fromD = new Date(rangeStart + "T00:00:00");
-    const toD = new Date(rangeEnd + "T00:00:00");
-    const addMin = (t: string, m: number): string => {
-      const [h, mm] = t.split(":").map(Number);
-      const total = h * 60 + mm + m;
-      return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-    };
-    const toMin = (t: string) => {
-      const [h, mm] = t.split(":").map(Number);
-      return h * 60 + (mm || 0);
-    };
-    const blockApplies = (blk: any, ds: string, dow: number): boolean => {
-      if (blk.kind === "weekly" && blk.day_of_week !== dow) return false;
-      if (blk.start_date && ds < blk.start_date) return false;
-      if (blk.end_date && ds > blk.end_date) return false;
-      if (blk.kind === "date_range" && blk.day_of_week !== null && blk.day_of_week !== dow) return false;
-      return true;
-    };
-    for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + 1)) {
-      const ds = format(d, "yyyy-MM-dd");
-      const dow = d.getDay();
-      const blackoutsToday = blackouts
-        .filter((b) => blockApplies(b, ds, dow))
-        .map((b) => ({
-          instructor_id: b.instructor_id,
-          start: toMin((b.start_time as string).slice(0, 5)),
-          end: toMin((b.end_time as string).slice(0, 5)),
-        }));
-      for (const blk of blocks) {
-        if (!blockApplies(blk, ds, dow)) continue;
-        let t = (blk.start_time as string).slice(0, 5);
-        const end = (blk.end_time as string).slice(0, 5);
-        const bs = blk.break_start_time ? (blk.break_start_time as string).slice(0, 5) : null;
-        const be = blk.break_end_time ? (blk.break_end_time as string).slice(0, 5) : null;
-        while (addMin(t, blk.slot_minutes) <= end) {
-          const se = addMin(t, blk.slot_minutes);
-          if (bs && be && t < be && se > bs) { t = be; continue; }
-          const sMin = toMin(t);
-          const eMin = toMin(se);
-          const blackedOut = blackoutsToday.some(
-            (bo) => bo.instructor_id === blk.instructor_id && sMin < bo.end && eMin > bo.start,
-          );
-          const key = `${blk.instructor_id}|${ds}|${t}`;
-          if (!taken.has(key) && !blackedOut) {
-            open.push({
-              instructor_id: blk.instructor_id,
-              instructor_name: instructorMap.get(blk.instructor_id) || "Instructor",
-              slot_date: ds,
-              start_time: t,
-              end_time: se,
-              slot_minutes: blk.slot_minutes,
-              pool_area: blk.pool_area || "shallow",
-              default_lesson_type: blk.default_lesson_type || "private",
-            });
-          }
-          t = se;
-        }
-      }
-    }
-    // Dedupe overlapping blocks
-    const seen = new Set<string>();
-    setOpenPrivateSlots(open.filter((s) => {
-      const k = `${s.instructor_id}|${s.slot_date}|${s.start_time}`;
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
+    setOpenPrivateSlots(composeOpenPrivateSlots({
+      rangeStart,
+      rangeEnd,
+      blocks: ((blocksRes.data as any[]) || []) as Record<string, unknown>[],
+      instructorNames: instructorMap,
+      takenKeys: taken,
     }));
+
 
     // Show the calendar immediately — ICS data loads in the background
     setLoading(false);
