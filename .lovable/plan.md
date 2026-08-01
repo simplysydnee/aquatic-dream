@@ -1,52 +1,42 @@
-## Phase 3 — make duplicate memberships impossible
+## Status: 5.2 and 5.3 were not run
 
-Verified before planning:
-- `public.memberships` has **no** `stripe_session_id` column yet.
-- 6 membership rows: 3 keepers (subscription ids set) and 3 duplicates (subscription id already nulled, incident details in `notes`).
-- Each duplicate pair traces to a **single** `pending_memberships` row whose payload holds the *later* subscription id — direct evidence of the unconditional overwrite.
+Plainly stated: **the completion path is unproven end to end.** What landed was 5.1 only — concurrent `claim_pending_membership` calls and concurrent subscription-id writes at the SQL level. There was no pre-flip gate report, no environment flip, no sandbox checkout, no parallel `confirm-membership-checkout` invocation, and no flip-back read-back. 5.1 proves the two SQL functions behave; it does not prove `completeMembershipFromSetupSessionId` calls them correctly on the real path.
 
-### Step 1 — Loser behavior (approved)
+## Step 5.0 — Confirm the current value and the gate
 
-- **Wait window:** loser polls the pending row for `payload.stripe_subscription_id` every 1s for up to **25s**.
-- **If the id appears:** skips subscription creation, runs the idempotent `ensureMembershipRecord`, returns the same membership id, occurrence count and amounts as the winner.
-- **If not within 25s:** returns HTTP **202** `{ pending: true, reason: "in_progress" }`. Never a 500.
-- **Parent on `/join`:** the return page treats `pending: true` as the finalizing state — spinner plus "Payment received. Finishing your membership…" — and re-calls `confirm-membership-checkout` every 3s for up to 2 minutes. On `success: true` it renders the normal confirmation with the manage link. After 2 minutes it shows a reassuring terminal message (payment received, membership being finalized, welcome email on its way, contact number). No error, no blank screen. Genuine failures (invalid session, declined SetupIntent) still surface as errors.
+1. **You read `PAYMENTS_ENV` from the dashboard and tell me the value.** No probe function is deployed. The secrets tool lists names only, so I cannot read it myself.
+   - Only if the dashboard masks it and you say so: deploy a minimal `admin-env-probe` that returns `{ payments_env }` and nothing else. Its deletion is then verified in 5.3 by listing deployed functions and confirming the name is absent.
+2. Re-confirm and report that the public Join button is OFF and `/join` cannot start a real enrollment, by reading `src/pages/JoinMembership.tsx` and the flag that gates it. Reported before any flip.
+3. Record the pre-flip value verbatim so the flip-back target is the observed value, not an assumption. If it is anything other than `live` or `sandbox`, that is raised as an incident and no test proceeds.
 
-### Step 2 — Atomic claim
+## Step 5.2 — End-to-end concurrent completion in sandbox
 
-Migration adds `claimed_at timestamptz` and `claimed_by text` to `pending_memberships`, plus `public.claim_pending_membership(p_pending_id uuid, p_claimer text)` — a single conditional `UPDATE … WHERE id = p_pending_id AND (claimed_at IS NULL OR claimed_at < now() - interval '90 seconds')` returning the row on win, no rows on loss. One statement, no read-then-write gap.
+1. Flip `PAYMENTS_ENV` to `sandbox`.
+2. **Create a new, inactive standing slot dedicated to this test** — not one of the 94 production slots. Report its id on creation. It is deleted in cleanup and its deletion confirmed by re-query.
+3. Insert a synthetic `pending_memberships` row against that test slot, with a clearly marked test parent email.
+4. Create a sandbox setup-mode Checkout Session against that pending row, drive it in a headless browser, and complete it with `4242 4242 4242 4242`.
+5. Invoke `confirm-membership-checkout` **twice in parallel** on that one session id.
+6. Report each of the following as an observed count, not an expectation:
+   - `memberships` rows for that session id — must be exactly 1
+   - subscriptions on that Stripe customer — must be exactly 1
+   - `membership_occurrences` for that membership — must be exactly 8
+   - welcome sends logged — must be exactly 1
+   - the loser's HTTP status and body — either the identical success payload or a clean `202 { pending: true }`, never a 500
+7. Clean up: cancel the test subscription, delete the test customer, membership, occurrences, pending row, **and the test standing slot**. Report each deletion as verified.
 
-### Step 3 — Conditional payload write + idempotency key
+If any part of 5.2 cannot execute (sandbox Stripe key missing, headless checkout blocked), that is reported as "the completion path is unproven end to end" with the specific blocker named. 5.1 is not offered as a substitute.
 
-- **Idempotency key confirmed pure:** the literal expression is `"membership-sub-" + pendingId` and nothing else — no timestamp, no random value, no attempt counter, no claim id. A stale reclaim of a slow-but-alive winner therefore sends the identical key and Stripe returns the *same* subscription. Re-read and confirmed after implementation.
-- Payload write becomes conditional: `public.set_pending_membership_subscription(p_id uuid, p_sub text)` writes only `WHERE payload->>'stripe_subscription_id' IS NULL`. On 0 rows updated, the code reads back the stored id, logs a loud warning with both ids, and reconciles onto the stored one. The unconditional overwrite is removed.
+## Step 5.3 — Blocking flip-back
 
-### Step 4 — Backfill, verify, then index
+1. Set `PAYMENTS_ENV` back to `live`.
+2. Verify the read-back shows exactly `live`. If the probe was never deployed, verification is by you reading the dashboard again and confirming; I report that the set operation completed and wait for your confirmation before declaring Phase 3 done.
+3. If the probe was deployed under 5.0, delete it and confirm its absence from the deployed function list.
+4. Until `live` is confirmed: Phase 3 is not complete, the Join button stays off, and no Phase 4 work starts. A mismatch is raised as an incident, not retried silently.
 
-1. Add nullable `memberships.stripe_session_id text`.
-2. Backfill all 6 rows from the audited pairing (each pair's pending row supplies the session id for both keeper and duplicate; duplicates identified by the cancelled subscription id in `notes`).
-3. **Verify before any index:** report `count(*) where stripe_session_id is not null` — must be exactly **6**. If not, stop and report; no index is created, since a null slips past a partial index and silently loses protection.
-4. Null the session id on the 3 duplicates, re-report the count — expected **3** non-null, all distinct.
-5. Only then create both partial unique indexes, on `stripe_session_id` and `stripe_subscription_id`, each `WHERE … IS NOT NULL`, with pre-check duplicate counts reported.
+## Not in scope
 
-### Step 5 — Prove it (sandbox flip, gated both ends)
+Phase 4 capacity work, environment lockdown, and parent emails all stay untouched.
 
-**5.0 — Pre-flip safety gate.** Confirm and report that the Join button is OFF and `/join` cannot start a real enrollment *before* `PAYMENTS_ENV` is changed. The public join path stays closed for the entire sandbox window, so no parent can save a test card against a real slot. Current `PAYMENTS_ENV` value is read and recorded first, then flipped to `sandbox`.
+## Technical notes
 
-**5.1 — DB-level:** two concurrent `claim_pending_membership` calls on one test pending row; exactly one returns a row. Necessary but *not* sufficient — it proves the function, not that the completion path calls it correctly.
-
-**5.2 — End-to-end (the test that matters):** create a sandbox setup-mode checkout session, complete it with test card `4242 4242 4242 4242`, then invoke `confirm-membership-checkout` twice in parallel on the same session id. Confirm exactly 1 `memberships` row, exactly 1 subscription on that Stripe customer, one set of 8 occurrences, one welcome send, and that the loser returned either the identical result or a clean 202. Clean up the test subscription, customer, membership, occurrences and pending row.
-If 5.2 cannot run cleanly, that is reported plainly as "the completion path is unproven end to end" — 5.1 is never offered as a substitute.
-
-**5.3 — Blocking flip-back.** `PAYMENTS_ENV` is set back to `live`, then **read back and verified to equal exactly `live`**, and that verification output is reported to you. Setting it does not count as done; only the read-back does. Until that read-back shows `live`:
-- Phase 3 is not reported complete,
-- the Join button stays off,
-- no further work proceeds.
-
-If the read-back shows anything other than `live`, that is raised immediately as an incident rather than retried silently.
-
-### Not in this phase
-Capacity re-check and trigger (Phase 4); environment lockdown (Phase 5). Join stays off throughout. No parent emails.
-
-### Technical notes
-Touched: `supabase/functions/_shared/membership-completion.ts`, `supabase/functions/confirm-membership-checkout/index.ts`, `src/pages/JoinMembership.tsx` (return-page polling only), and two migrations. `payments-webhook` is unchanged apart from inheriting the shared completion helper.
+No new permanent files. Test scripting runs under `/tmp/browser/`. No changes to `membership-completion.ts`, `confirm-membership-checkout`, `payments-webhook`, or `JoinMembership.tsx` — 5.2 tests the code as it stands, and any fix it surfaces is reported before being made.
