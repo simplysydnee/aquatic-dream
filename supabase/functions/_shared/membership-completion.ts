@@ -342,6 +342,8 @@ async function ensureMembershipRecord(options: {
       start_date: startDate,
       stripe_customer_id: options.customerId,
       stripe_subscription_id: options.subscriptionId,
+      stripe_session_id: options.sessionId,
+
       current_period_start: periodStart ? new Date(periodStart * 1000).toISOString() : null,
       current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
       recurring_consent_at: new Date().toISOString(),
