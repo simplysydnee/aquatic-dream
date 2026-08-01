@@ -1,0 +1,1 @@
+ALTER TABLE public.lesson_bookings ADD COLUMN IF NOT EXISTS card_warning_sent_at timestamptz;
