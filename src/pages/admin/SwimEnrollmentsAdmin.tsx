@@ -829,6 +829,7 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Parent</TableHead>
                     <TableHead>Session</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-[90px]">Review</TableHead>
                     <TableHead>Reg Fee</TableHead>
                     <TableHead>Session Fee</TableHead>
                     <TableHead>Method / Ref</TableHead>
@@ -836,6 +837,7 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead className="w-[100px]"></TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {filtered.map((e) => {
                     const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
