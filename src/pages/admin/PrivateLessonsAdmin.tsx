@@ -127,20 +127,21 @@ export default function PrivateLessonsAdmin() {
       supabase.from("instructors").select("id, name").eq("is_active", true).order("name"),
       supabase.from("instructor_booking_blocks").select("*").order("created_at", { ascending: false }),
       supabase.from("lesson_bookings")
-        .select("*, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
+        .select("*, admin_reviewed_at, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, charge_error, start_time_override, end_time_override, instructor_override_id, instructor_override_name)")
 
         .in("lesson_type", ["private", "semi_private"])
         .not("status", "in", DEAD_STATUS_FILTER)
         .neq("status", "pending_card")
         .order("created_at", { ascending: false }).limit(200),
       supabase.from("lesson_bookings")
-        .select("id, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, created_at, booking_source, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, created_at, start_time_override, instructor_override_id, instructor_override_name)")
+        .select("id, admin_reviewed_at, instructor_id, instructor_name, start_time, parent_name, child_name, status, lesson_type, created_at, booking_source, lesson_booking_occurrences(id, occurrence_date, status, charge_status, payment_status, created_at, start_time_override, instructor_override_id, instructor_override_name)")
         .in("lesson_type", ["private", "semi_private"])
         // Include pending_card so the slot grid marks the time as taken
         // while we wait for the parent to save their card.
         .not("status", "in", DEAD_STATUS_FILTER),
 
     ]);
+
     setInstructors((ins as any[]) || []);
     setBlocks((bks as any[]) || []);
     setBookings((bkg as any[]) || []);
