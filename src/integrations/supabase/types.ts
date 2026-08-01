@@ -1858,18 +1858,24 @@ export type Database = {
       }
       pending_memberships: {
         Row: {
+          claimed_at: string | null
+          claimed_by: string | null
           created_at: string
           id: string
           payload: Json
           stripe_session_id: string | null
         }
         Insert: {
+          claimed_at?: string | null
+          claimed_by?: string | null
           created_at?: string
           id?: string
           payload: Json
           stripe_session_id?: string | null
         }
         Update: {
+          claimed_at?: string | null
+          claimed_by?: string | null
           created_at?: string
           id?: string
           payload?: Json
@@ -3273,6 +3279,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claim_pending_membership: {
+        Args: { p_claimer: string; p_pending_id: string }
+        Returns: {
+          id: string
+          payload: Json
+          stripe_session_id: string
+        }[]
+      }
       clock_in: {
         Args: { _notes?: string; _shift_id?: string }
         Returns: {
@@ -3587,6 +3601,13 @@ export type Database = {
         }[]
       }
       release_slot_holds: { Args: { p_session_token: string }; Returns: number }
+      set_pending_membership_subscription: {
+        Args: { p_id: string; p_sub: string }
+        Returns: {
+          stored_subscription_id: string
+          written: boolean
+        }[]
+      }
       soundex: { Args: { "": string }; Returns: string }
       swimmer_has_active_waiver: {
         Args: { _dob: string; _first: string; _last: string }
