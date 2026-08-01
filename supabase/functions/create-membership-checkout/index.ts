@@ -45,13 +45,19 @@ serve(async (req) => {
       sms_consent_text,
       sms_consent_version,
       returnUrl,
-      environment,
     } = body ?? {};
 
-    // Go-live complete: honor the caller's environment (derived from the
-    // publishable-key prefix on the client). Anything unrecognized falls
-    // back to sandbox so a misconfigured build can never charge real money.
-    const ENV: StripeEnv = environment === "live" ? "live" : "sandbox";
+    // SECURITY: the Stripe environment is server-controlled only. Any
+    // client-supplied `environment` value in the request body is ignored.
+    // There is no default: a missing or unrecognized PAYMENTS_ENV is a
+    // configuration error and the request is rejected.
+    const configuredEnv = Deno.env.get("PAYMENTS_ENV");
+    if (configuredEnv !== "live" && configuredEnv !== "sandbox") {
+      console.error("[create-membership-checkout] PAYMENTS_ENV missing or invalid");
+      return json({ error: "Payments are not configured. Contact the school." }, 500);
+    }
+    const ENV: StripeEnv = configuredEnv;
+
 
 
     if (!["kid_group", "private", "adult_group"].includes(plan_key)) {
