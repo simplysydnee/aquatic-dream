@@ -1049,12 +1049,14 @@ const SwimEnrollmentsAdmin = () => {
                     <TableHead>Parent</TableHead>
                     <TableHead>Session</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-[90px]">Review</TableHead>
                     <TableHead>Reg Fee</TableHead>
                     <TableHead>Session Fee</TableHead>
                     <TableHead>Cancelled</TableHead>
                     <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {cancelledList.map((e) => {
                     const levelInfo = LEVEL_DISPLAY[e.swim_level as SwimLevel];
