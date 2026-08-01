@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
-import { CalendarPlus, Clock, Loader2, User, Waves } from "lucide-react";
+import { CalendarPlus, Clock, Loader2, RefreshCw, User, Waves } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,9 @@ const RANGES = [
   { key: 14, label: "2 weeks" },
   { key: 28, label: "4 weeks" },
 ] as const;
+
+const slotKey = (s: Pick<OpenPrivateSlot, "instructor_id" | "slot_date" | "start_time">) =>
+  `${s.instructor_id}|${s.slot_date}|${s.start_time}`;
 
 const formatTime = (t: string) => {
   const [h, m] = t.split(":").map(Number);
@@ -27,6 +30,9 @@ export const FrontDeskBooking = () => {
   const [days, setDays] = useState<number>(28);
   const [prefill, setPrefill] = useState<OpenPrivateSlot | null>(null);
   const [bookOpen, setBookOpen] = useState(false);
+  // Slots booked in this session are hidden immediately so a second staff tap
+  // cannot double-book the same instructor/date/time before the refetch lands.
+  const [justBooked, setJustBooked] = useState<Set<string>>(new Set());
 
   const today = useMemo(() => new Date(), []);
   const startDateStr = format(today, "yyyy-MM-dd");
@@ -34,9 +40,27 @@ export const FrontDeskBooking = () => {
 
   const { slots, loading, refetch } = useOpenPrivateSlots(startDateStr, endDateStr);
 
+  // Keep the list fresh when staff come back to the tab or another device books.
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState === "visible") refetch();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [refetch]);
+
+  const visibleSlots = useMemo(
+    () => slots.filter((s) => !justBooked.has(slotKey(s))),
+    [slots, justBooked],
+  );
+
   const grouped = useMemo(() => {
     const map = new Map<string, OpenPrivateSlot[]>();
-    for (const s of slots) {
+    for (const s of visibleSlots) {
       const list = map.get(s.slot_date) || [];
       list.push(s);
       map.set(s.slot_date, list);
@@ -51,12 +75,21 @@ export const FrontDeskBooking = () => {
             : a.start_time.localeCompare(b.start_time),
         ),
       }));
-  }, [slots]);
+  }, [visibleSlots]);
 
   const openSlot = (slot: OpenPrivateSlot) => {
     setPrefill(slot);
     setBookOpen(true);
   };
+
+  const handleBooked = useCallback(() => {
+    if (prefill) {
+      const key = slotKey(prefill);
+      setJustBooked((prev) => new Set(prev).add(key));
+    }
+    refetch();
+  }, [prefill, refetch]);
+
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
@@ -65,19 +98,33 @@ export const FrontDeskBooking = () => {
           <CalendarPlus className="h-8 w-8 text-primary" />
           Book a lesson
         </h1>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {RANGES.map((r) => (
             <Button
               key={r.key}
               size="lg"
               variant={days === r.key ? "default" : "outline"}
-              className="h-12 px-6 text-base"
+              className="h-14 min-w-[7rem] flex-1 sm:flex-none px-6 text-base"
               onClick={() => setDays(r.key)}
             >
               {r.label}
             </Button>
           ))}
+          <Button
+            size="lg"
+            variant="ghost"
+            className="h-14 px-5 text-base"
+            onClick={() => refetch()}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-5 w-5 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
+        <p className="text-sm text-muted-foreground">
+          Tap an open slot to book it. Families without a card on file can still be booked; the
+          wizard will say the card is collected at the desk.
+        </p>
       </div>
 
       {loading ? (
@@ -86,9 +133,19 @@ export const FrontDeskBooking = () => {
           <span className="text-lg">Loading open slots</span>
         </div>
       ) : grouped.length === 0 ? (
-        <Card className="p-10 text-center text-lg text-muted-foreground">
-          No open slots in this range.
+        <Card className="p-10 text-center space-y-3">
+          <p className="text-lg font-medium">
+            {days === 7 ? "No open slots this week." : `No open slots in the next ${days} days.`}
+          </p>
+          <p className="text-base text-muted-foreground">
+            Try a longer range, or add instructor availability in Standing Slots.
+          </p>
+          <Button size="lg" variant="outline" className="h-12 px-6" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Check again
+          </Button>
         </Card>
+
       ) : (
         <div className="space-y-8">
           {grouped.map((g) => (
@@ -99,11 +156,12 @@ export const FrontDeskBooking = () => {
               <div className="grid gap-3 sm:grid-cols-2">
                 {g.list.map((s) => (
                   <button
-                    key={`${s.instructor_id}|${s.slot_date}|${s.start_time}`}
+                    key={slotKey(s)}
                     type="button"
                     onClick={() => openSlot(s)}
-                    className="text-left rounded-xl border bg-card p-5 min-h-[112px] transition hover:border-primary hover:bg-muted/50 active:scale-[0.99]"
+                    className="text-left rounded-xl border bg-card p-5 min-h-[124px] touch-manipulation transition hover:border-primary hover:bg-muted/50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
+
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-2xl font-bold">{formatTime(s.start_time)}</span>
                       <span className="text-sm text-muted-foreground flex items-center gap-1">
@@ -143,7 +201,7 @@ export const FrontDeskBooking = () => {
         } : undefined}
         initialType={prefill?.default_lesson_type === "semi_private" ? "semi_private" : "private"}
         lockedSlot
-        onBooked={refetch}
+        onBooked={handleBooked}
       />
     </div>
   );
