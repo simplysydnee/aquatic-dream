@@ -70,10 +70,10 @@ export function AdminSidebar() {
       items: [
         { title: "Clients", url: "/admin/clients", icon: IdCard, badge: 0 },
         { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves, badge: newGroupEnrollments },
-        { title: "Lesson Requests", url: "/admin/lesson-requests", icon: BookOpen, badge: newLessonRequests },
         { title: "Contact Inquiries", url: "/admin/contacts", icon: MessageSquare, badge: newContacts },
         { title: "Waivers", url: "/admin/waivers", icon: FileSignature, badge: 0 },
       ],
+
     },
     {
       label: "Programs",
