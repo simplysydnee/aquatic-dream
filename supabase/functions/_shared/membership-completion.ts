@@ -491,6 +491,16 @@ async function ensureMembershipRecord(options: {
     // and the insert. Surface a clean reseat outcome, not a stack trace.
     if (isSlotFullDbError(insertErr)) {
       const slotId = asString(options.payload.standing_slot_id) || "";
+      // The subscription exists but there is no seat behind it, so cancel it
+      // now. It is still inside its trial, so nothing has been charged.
+      let cancelled = false;
+      try {
+        const stripeCancel = createStripeClient(options.env);
+        await stripeCancel.subscriptions.cancel(options.subscriptionId, { prorate: false });
+        cancelled = true;
+      } catch (e) {
+        console.error("[membership completion] slot-full subscription cancel failed", errorMessage(e));
+      }
       await alertAdminSlotFull({
         standingSlotId: slotId,
         pendingId: options.pendingId,
@@ -498,9 +508,12 @@ async function ensureMembershipRecord(options: {
         parentPhone: asNullableString(options.payload.parent_phone),
         childName: asNullableString(options.payload.child_first_name),
         cardSaved: true,
+        subscriptionId: options.subscriptionId,
+        subscriptionCancelled: cancelled,
       });
       throw new MembershipSlotFullError(slotId, options.pendingId, true);
     }
+
     throw new Error(`Membership insert failed: ${insertErr?.message || "no row returned"}`);
 
   }
