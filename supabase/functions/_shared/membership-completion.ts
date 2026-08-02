@@ -103,11 +103,11 @@ export async function alertAdminSlotFull(details: {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify({
-      templateName: "internal-generic-alert",
+      templateName: "admin-freeform",
       recipientEmail: "info@aquaticdreamsswim.com",
       idempotencyKey: `slot-full-${details.pendingId}`,
       purpose: "transactional",
-      templateData: { subject: "Slot filled during checkout", body: text },
+      templateData: { subject: "Slot filled during checkout", parentName: "team", body: text },
     }),
   }).catch((e) => console.error("[membership completion] slot-full email failed", errorMessage(e)));
 
