@@ -487,7 +487,22 @@ async function ensureMembershipRecord(options: {
         };
       }
     }
+    // Capacity trigger backstop: the slot filled between the pre-flight check
+    // and the insert. Surface a clean reseat outcome, not a stack trace.
+    if (isSlotFullDbError(insertErr)) {
+      const slotId = asString(options.payload.standing_slot_id) || "";
+      await alertAdminSlotFull({
+        standingSlotId: slotId,
+        pendingId: options.pendingId,
+        parentEmail: asNullableString(options.payload.parent_email),
+        parentPhone: asNullableString(options.payload.parent_phone),
+        childName: asNullableString(options.payload.child_first_name),
+        cardSaved: true,
+      });
+      throw new MembershipSlotFullError(slotId, options.pendingId, true);
+    }
     throw new Error(`Membership insert failed: ${insertErr?.message || "no row returned"}`);
+
   }
 
 
