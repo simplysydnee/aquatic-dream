@@ -826,7 +826,9 @@ async function handleMembershipCheckoutCompleted(session: any, env: StripeEnv) {
       });
       cursor = new Date(cursor.getTime() + 7 * 86400000);
     }
-    const { error: occErr } = await supabase.from("membership_occurrences").insert(rows);
+    const { error: occErr } = await supabase
+      .from("membership_occurrences")
+      .upsert(rows, { onConflict: "membership_id,occurrence_date", ignoreDuplicates: true });
     if (occErr) console.error("[membership webhook] occurrence insert failed", occErr);
   }
 

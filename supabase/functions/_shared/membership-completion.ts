@@ -465,7 +465,9 @@ async function ensureOccurrences(membershipId: string, payload: JsonObject): Pro
   });
 
 
-  const { error: insertErr } = await supabase.from("membership_occurrences").insert(rows);
+  const { error: insertErr } = await supabase
+    .from("membership_occurrences")
+    .upsert(rows, { onConflict: "membership_id,occurrence_date", ignoreDuplicates: true });
   if (insertErr) throw new Error(`Membership occurrence insert failed: ${insertErr.message}`);
   return rows.length;
 }
