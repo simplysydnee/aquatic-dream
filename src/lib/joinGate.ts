@@ -1,6 +1,6 @@
 /**
- * TEMPORARY — Phase 3 step 5.2 sandbox verification gate.
+ * Public enrollment gate.
  * While false, /join is closed to the public and all public entry points are hidden.
- * Remove this file and its usages at the end of step 5.3.
+ * Opened after Phase 4 capacity enforcement was proven end to end in sandbox.
  */
-export const JOIN_OPEN = false;
+export const JOIN_OPEN = true;
