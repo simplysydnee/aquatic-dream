@@ -291,7 +291,23 @@ export async function completeMembershipFromSetupSession(
     throw new Error(`Missing Stripe product id for first charge on pending membership ${pendingId}`);
   }
 
+  // Last check before any money moves: never create a subscription for a spot
+  // that filled while the parent was on the checkout page.
+  const preflightSlotId = asString(payload.standing_slot_id);
+  if (preflightSlotId && await slotIsFull(preflightSlotId)) {
+    await alertAdminSlotFull({
+      standingSlotId: preflightSlotId,
+      pendingId,
+      parentEmail: asNullableString(payload.parent_email),
+      parentPhone: asNullableString(payload.parent_phone),
+      childName: asNullableString(payload.child_first_name),
+      cardSaved: true,
+    });
+    throw new MembershipSlotFullError(preflightSlotId, pendingId, true);
+  }
+
   let subscriptionId: string | undefined;
+
   try {
     const subscription = asRecord(await stripe.subscriptions.create({
       customer: customerId,
