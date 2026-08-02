@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   completeMembershipFromSetupSessionId,
   MembershipCompletionInProgressError,
+  MembershipSlotFullError,
 } from "../_shared/membership-completion.ts";
 
 
@@ -44,6 +45,15 @@ serve(async (req) => {
 
     return json({ success: true, manageToken, ...result });
   } catch (error) {
+    if (error instanceof MembershipSlotFullError) {
+      console.error("[confirm-membership-checkout] slot filled", error.standingSlotId, error.pendingId);
+      return json({
+        slotFull: true,
+        cardSaved: error.cardSaved,
+        error:
+          "This class time filled up while you were checking out. Your card is on file and you have not been charged a monthly rate. Our team will call you right away to pick a new time.",
+      }, 409);
+    }
     if (error instanceof MembershipCompletionInProgressError) {
       console.log("[confirm-membership-checkout] still finalizing", error.pendingId);
       return json({ pending: true, reason: "in_progress" }, 202);

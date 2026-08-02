@@ -130,6 +130,18 @@ const HOLD_PROBLEMS: Record<
 };
 
 
+/** Reads a 409 slot-filled body off a Supabase functions error, if present. */
+const readSlotFullMessage = async (error: unknown): Promise<string | null> => {
+  const ctx = (error as { context?: { json?: () => Promise<unknown> } } | null)?.context;
+  if (!ctx?.json) return null;
+  try {
+    const body = (await ctx.json()) as { slotFull?: boolean; error?: string };
+    return body?.slotFull ? (body.error || "This class time filled up while you were checking out.") : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function JoinMembership() {
   if (!JOIN_OPEN) {
     return (
@@ -678,6 +690,7 @@ function JoinMembershipForm() {
   const [returnError, setReturnError] = useState<string | null>(null);
   const [manageToken, setManageToken] = useState<string | null>(null);
   const [returnStillWorking, setReturnStillWorking] = useState(false);
+  const [returnSlotFull, setReturnSlotFull] = useState<string | null>(null);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get("membership") !== "success") return;
@@ -724,6 +737,19 @@ function JoinMembershipForm() {
         setReturnFinalizing(false);
         setReturnStillWorking(true);
         setReturnError(null);
+        finishHold();
+        return;
+      }
+
+      // A 409 means the class time filled while the parent was checking out.
+      const slotFullMessage = data?.slotFull
+        ? (data.error as string)
+        : await readSlotFullMessage(error);
+      if (slotFullMessage) {
+        setReturnFinalizing(false);
+        setReturnStillWorking(false);
+        setReturnError(null);
+        setReturnSlotFull(slotFullMessage);
         finishHold();
         return;
       }
@@ -1708,6 +1734,14 @@ function JoinMembershipForm() {
                     </p>
                     <p className="mt-2 text-sm text-[#2a5e84]/80">
                       Nothing else is needed from you right now.
+                    </p>
+                  </>
+                ) : returnSlotFull ? (
+                  <>
+                    <h2 className="mb-2 text-2xl font-semibold text-[#1a3a8a]">This class time just filled</h2>
+                    <p className="text-[#2a5e84]">{returnSlotFull}</p>
+                    <p className="mt-2 text-sm text-[#2a5e84]/80">
+                      Questions right now? Call us at (209) 577-3483.
                     </p>
                   </>
                 ) : returnError ? (

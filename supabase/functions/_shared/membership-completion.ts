@@ -31,6 +31,90 @@ export class MembershipCompletionInProgressError extends Error {
   }
 }
 
+/**
+ * Thrown when the standing slot filled before the membership could be written.
+ * The card may already be saved, so callers surface a clean reseat message
+ * instead of a stack trace and an admin alert goes out.
+ */
+export class MembershipSlotFullError extends Error {
+  constructor(
+    public readonly standingSlotId: string,
+    public readonly pendingId: string,
+    public readonly cardSaved: boolean,
+  ) {
+    super("This class time filled before the enrollment could be completed");
+    this.name = "MembershipSlotFullError";
+  }
+}
+
+const OCCUPYING_STATUSES = ["active", "pending_cancel", "paused"];
+
+/** True when the slot has no room left for one more membership. */
+async function slotIsFull(standingSlotId: string): Promise<boolean> {
+  const { data: slot, error: slotErr } = await supabase
+    .from("standing_slots")
+    .select("capacity")
+    .eq("id", standingSlotId)
+    .maybeSingle();
+  if (slotErr) throw new Error(`Standing slot lookup failed: ${slotErr.message}`);
+  const capacity = slot?.capacity == null ? null : Number(slot.capacity);
+  if (capacity == null || !Number.isFinite(capacity)) return false;
+
+  const { count, error: countErr } = await supabase
+    .from("memberships")
+    .select("id", { count: "exact", head: true })
+    .eq("standing_slot_id", standingSlotId)
+    .in("status", OCCUPYING_STATUSES);
+  if (countErr) throw new Error(`Membership capacity count failed: ${countErr.message}`);
+  return (count ?? 0) + 1 > capacity;
+}
+
+function isSlotFullDbError(error: { message?: string } | null | undefined): boolean {
+  return typeof error?.message === "string" && error.message.includes("MEMBERSHIP_SLOT_FULL");
+}
+
+/** Email + SMS to the office so the family gets reseated by a human. */
+export async function alertAdminSlotFull(details: {
+  standingSlotId: string;
+  pendingId: string;
+  parentEmail?: string | null;
+  parentPhone?: string | null;
+  childName?: string | null;
+  cardSaved: boolean;
+}): Promise<void> {
+  const url = Deno.env.get("SUPABASE_URL")!;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const who = details.childName || details.parentEmail || "a family";
+  const text =
+    `Slot filled during checkout: ${who} could not be enrolled in standing slot ${details.standingSlotId}. ` +
+    `Card ${details.cardSaved ? "was saved" : "was not charged"}. Contact ${details.parentEmail || "the parent"}` +
+    `${details.parentPhone ? ` / ${details.parentPhone}` : ""} to reseat. Pending ${details.pendingId}.`;
+
+  const adminPhone = Deno.env.get("ADMIN_ALERT_PHONE") || Deno.env.get("ADMIN_PHONE") || "";
+  if (adminPhone) {
+    await fetch(`${url}/functions/v1/send-sms-message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ to: adminPhone, message: text }),
+    }).catch((e) => console.error("[membership completion] slot-full SMS failed", errorMessage(e)));
+  }
+
+  await fetch(`${url}/functions/v1/send-transactional-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      templateName: "admin-freeform",
+      recipientEmail: "info@aquaticdreamsswim.com",
+      idempotencyKey: `slot-full-${details.pendingId}`,
+      purpose: "transactional",
+      templateData: { subject: "Slot filled during checkout", parentName: "team", body: text },
+    }),
+  }).catch((e) => console.error("[membership completion] slot-full email failed", errorMessage(e)));
+
+  console.error("[membership completion] slot full", text);
+}
+
+
 /** How long a losing caller waits for the winner to write the subscription id. */
 const LOSER_WAIT_MS = 25_000;
 const LOSER_POLL_INTERVAL_MS = 1_000;
@@ -207,7 +291,23 @@ export async function completeMembershipFromSetupSession(
     throw new Error(`Missing Stripe product id for first charge on pending membership ${pendingId}`);
   }
 
+  // Last check before any money moves: never create a subscription for a spot
+  // that filled while the parent was on the checkout page.
+  const preflightSlotId = asString(payload.standing_slot_id);
+  if (preflightSlotId && await slotIsFull(preflightSlotId)) {
+    await alertAdminSlotFull({
+      standingSlotId: preflightSlotId,
+      pendingId,
+      parentEmail: asNullableString(payload.parent_email),
+      parentPhone: asNullableString(payload.parent_phone),
+      childName: asNullableString(payload.child_first_name),
+      cardSaved: true,
+    });
+    throw new MembershipSlotFullError(preflightSlotId, pendingId, true);
+  }
+
   let subscriptionId: string | undefined;
+
   try {
     const subscription = asRecord(await stripe.subscriptions.create({
       customer: customerId,
@@ -387,7 +487,22 @@ async function ensureMembershipRecord(options: {
         };
       }
     }
+    // Capacity trigger backstop: the slot filled between the pre-flight check
+    // and the insert. Surface a clean reseat outcome, not a stack trace.
+    if (isSlotFullDbError(insertErr)) {
+      const slotId = asString(options.payload.standing_slot_id) || "";
+      await alertAdminSlotFull({
+        standingSlotId: slotId,
+        pendingId: options.pendingId,
+        parentEmail: asNullableString(options.payload.parent_email),
+        parentPhone: asNullableString(options.payload.parent_phone),
+        childName: asNullableString(options.payload.child_first_name),
+        cardSaved: true,
+      });
+      throw new MembershipSlotFullError(slotId, options.pendingId, true);
+    }
     throw new Error(`Membership insert failed: ${insertErr?.message || "no row returned"}`);
+
   }
 
 
