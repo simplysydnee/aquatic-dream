@@ -81,14 +81,20 @@ export async function alertAdminSlotFull(details: {
   parentPhone?: string | null;
   childName?: string | null;
   cardSaved: boolean;
+  subscriptionId?: string | null;
+  subscriptionCancelled?: boolean;
 }): Promise<void> {
   const url = Deno.env.get("SUPABASE_URL")!;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const who = details.childName || details.parentEmail || "a family";
+  const subNote = details.subscriptionId
+    ? ` Subscription ${details.subscriptionId} ${details.subscriptionCancelled ? "was cancelled before any charge" : "COULD NOT BE CANCELLED - cancel it by hand"}.`
+    : "";
   const text =
     `Slot filled during checkout: ${who} could not be enrolled in standing slot ${details.standingSlotId}. ` +
-    `Card ${details.cardSaved ? "was saved" : "was not charged"}. Contact ${details.parentEmail || "the parent"}` +
+    `Card ${details.cardSaved ? "was saved" : "was not charged"}.${subNote} Contact ${details.parentEmail || "the parent"}` +
     `${details.parentPhone ? ` / ${details.parentPhone}` : ""} to reseat. Pending ${details.pendingId}.`;
+
 
   const adminPhone = Deno.env.get("ADMIN_ALERT_PHONE") || Deno.env.get("ADMIN_PHONE") || "";
   if (adminPhone) {
