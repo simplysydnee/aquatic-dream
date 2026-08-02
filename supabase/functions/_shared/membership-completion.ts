@@ -432,15 +432,12 @@ async function resolveStartDate(payload: JsonObject): Promise<string> {
 }
 
 async function ensureOccurrences(membershipId: string, payload: JsonObject): Promise<number> {
-  const { count, error: countErr } = await supabase
-    .from("membership_occurrences")
-    .select("id", { count: "exact", head: true })
-    .eq("membership_id", membershipId);
-  if (countErr) throw new Error(`Membership occurrence lookup failed: ${countErr.message}`);
-  if ((count ?? 0) > 0) return count ?? 0;
-
+  // No count-then-insert: two concurrent completions both read zero and both
+  // inserted. The unique index on (membership_id, occurrence_date) plus an
+  // ignore-duplicates upsert makes this idempotent under concurrency.
   const standingSlotId = asString(payload.standing_slot_id);
   if (!standingSlotId) throw new Error("Missing standing slot for membership occurrences");
+
 
   const { data: slot, error: slotErr } = await supabase
     .from("standing_slots")
@@ -465,7 +462,9 @@ async function ensureOccurrences(membershipId: string, payload: JsonObject): Pro
   });
 
 
-  const { error: insertErr } = await supabase.from("membership_occurrences").insert(rows);
+  const { error: insertErr } = await supabase
+    .from("membership_occurrences")
+    .upsert(rows, { onConflict: "membership_id,occurrence_date", ignoreDuplicates: true });
   if (insertErr) throw new Error(`Membership occurrence insert failed: ${insertErr.message}`);
   return rows.length;
 }

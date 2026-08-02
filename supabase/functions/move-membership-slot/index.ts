@@ -130,7 +130,9 @@ Deno.serve(async (req) => {
     });
 
     if (rows.length > 0) {
-      const { error: insErr } = await supabase.from("membership_occurrences").insert(rows);
+      const { error: insErr } = await supabase
+        .from("membership_occurrences")
+        .upsert(rows, { onConflict: "membership_id,occurrence_date", ignoreDuplicates: true });
       if (insErr) return json({ error: `Slot updated but rescheduling failed: ${insErr.message}` }, 500);
     }
 
