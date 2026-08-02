@@ -6,6 +6,7 @@ import { sendAndLogBookingConfirmation, formatPTTime, formatPTDate } from "../_s
 import {
   completeMembershipFromSetupSession,
   MembershipCompletionInProgressError,
+  MembershipSlotFullError,
 } from "../_shared/membership-completion.ts";
 
 
@@ -850,6 +851,12 @@ async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
       // The return page is finishing the same pending row. Let it finish; a
       // Stripe webhook retry will reconcile if it does not.
       console.log("[membership setup] another caller is finalizing", error.pendingId);
+      return;
+    }
+    if (error instanceof MembershipSlotFullError) {
+      // Card is saved but the slot is gone. Admin alert already fired; do not
+      // retry the webhook — a human reseats this family.
+      console.error("[membership setup] slot filled", error.standingSlotId, error.pendingId);
       return;
     }
     throw error;
