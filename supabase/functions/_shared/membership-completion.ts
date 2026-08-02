@@ -81,14 +81,20 @@ export async function alertAdminSlotFull(details: {
   parentPhone?: string | null;
   childName?: string | null;
   cardSaved: boolean;
+  subscriptionId?: string | null;
+  subscriptionCancelled?: boolean;
 }): Promise<void> {
   const url = Deno.env.get("SUPABASE_URL")!;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const who = details.childName || details.parentEmail || "a family";
+  const subNote = details.subscriptionId
+    ? ` Subscription ${details.subscriptionId} ${details.subscriptionCancelled ? "was cancelled before any charge" : "COULD NOT BE CANCELLED - cancel it by hand"}.`
+    : "";
   const text =
     `Slot filled during checkout: ${who} could not be enrolled in standing slot ${details.standingSlotId}. ` +
-    `Card ${details.cardSaved ? "was saved" : "was not charged"}. Contact ${details.parentEmail || "the parent"}` +
+    `Card ${details.cardSaved ? "was saved" : "was not charged"}.${subNote} Contact ${details.parentEmail || "the parent"}` +
     `${details.parentPhone ? ` / ${details.parentPhone}` : ""} to reseat. Pending ${details.pendingId}.`;
+
 
   const adminPhone = Deno.env.get("ADMIN_ALERT_PHONE") || Deno.env.get("ADMIN_PHONE") || "";
   if (adminPhone) {
@@ -491,6 +497,16 @@ async function ensureMembershipRecord(options: {
     // and the insert. Surface a clean reseat outcome, not a stack trace.
     if (isSlotFullDbError(insertErr)) {
       const slotId = asString(options.payload.standing_slot_id) || "";
+      // The subscription exists but there is no seat behind it, so cancel it
+      // now. It is still inside its trial, so nothing has been charged.
+      let cancelled = false;
+      try {
+        const stripeCancel = createStripeClient(options.env);
+        await stripeCancel.subscriptions.cancel(options.subscriptionId, { prorate: false });
+        cancelled = true;
+      } catch (e) {
+        console.error("[membership completion] slot-full subscription cancel failed", errorMessage(e));
+      }
       await alertAdminSlotFull({
         standingSlotId: slotId,
         pendingId: options.pendingId,
@@ -498,9 +514,12 @@ async function ensureMembershipRecord(options: {
         parentPhone: asNullableString(options.payload.parent_phone),
         childName: asNullableString(options.payload.child_first_name),
         cardSaved: true,
+        subscriptionId: options.subscriptionId,
+        subscriptionCancelled: cancelled,
       });
       throw new MembershipSlotFullError(slotId, options.pendingId, true);
     }
+
     throw new Error(`Membership insert failed: ${insertErr?.message || "no row returned"}`);
 
   }
