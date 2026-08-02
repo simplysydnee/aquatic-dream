@@ -130,6 +130,18 @@ const HOLD_PROBLEMS: Record<
 };
 
 
+/** Reads a 409 slot-filled body off a Supabase functions error, if present. */
+const readSlotFullMessage = async (error: unknown): Promise<string | null> => {
+  const ctx = (error as { context?: { json?: () => Promise<unknown> } } | null)?.context;
+  if (!ctx?.json) return null;
+  try {
+    const body = (await ctx.json()) as { slotFull?: boolean; error?: string };
+    return body?.slotFull ? (body.error || "This class time filled up while you were checking out.") : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function JoinMembership() {
   if (!JOIN_OPEN) {
     return (
