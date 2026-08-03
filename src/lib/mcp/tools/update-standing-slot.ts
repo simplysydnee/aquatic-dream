@@ -28,8 +28,12 @@ export default defineTool({
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: async (input, ctx) => {
     if (!ctx.isAuthenticated()) return notAuthed();
-    const { id, confirm, ...rest } = input;
-    const updates = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+    const { id, confirm, is_active, ...rest } = input;
+    const updates: Record<string, unknown> = Object.fromEntries(
+      Object.entries(rest).filter(([, v]) => v !== undefined),
+    );
+    // The database column is `active`; the tool input uses `is_active`.
+    if (is_active !== undefined) updates.active = is_active;
     if (Object.keys(updates).length === 0) return errResult("No fields provided to update");
     if (!confirm) {
       return refuseUnconfirmed(`Would update standing slot ${id}.`, { id, updates });
