@@ -1092,8 +1092,11 @@ var update_standing_slot_default = defineTool17({
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: async (input, ctx) => {
     if (!ctx.isAuthenticated()) return notAuthed();
-    const { id, confirm, ...rest } = input;
-    const updates = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== void 0));
+    const { id, confirm, is_active, ...rest } = input;
+    const updates = Object.fromEntries(
+      Object.entries(rest).filter(([, v]) => v !== void 0)
+    );
+    if (is_active !== void 0) updates.active = is_active;
     if (Object.keys(updates).length === 0) return errResult("No fields provided to update");
     if (!confirm) {
       return refuseUnconfirmed(`Would update standing slot ${id}.`, { id, updates });
