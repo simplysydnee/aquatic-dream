@@ -8,7 +8,7 @@ import {
   MembershipCompletionInProgressError,
   MembershipSlotFullError,
   MembershipCardDeclinedError,
-} from "../_shared/membership-completion.ts";")
+} from "../_shared/membership-completion.ts";
 
 
 const supabase = createClient(
@@ -867,6 +867,12 @@ async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
       // Card is saved but the slot is gone. Admin alert already fired; do not
       // retry the webhook — a human reseats this family.
       console.error("[membership setup] slot filled", error.standingSlotId, error.pendingId);
+      return;
+    }
+    if (error instanceof MembershipCardDeclinedError) {
+      // Hard decline. Returning 200 stops Stripe redelivery so the same
+      // invoice is never re-attempted in a tight loop.
+      console.error("[membership setup] card declined", error.declineCode, error.pendingId);
       return;
     }
     throw error;
