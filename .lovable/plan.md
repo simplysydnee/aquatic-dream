@@ -34,6 +34,12 @@ Under 18 in Adult Swim: same panel shape, reversed copy, with buttons for Privat
 
 Switching only changes `plan`, clears `slot`, clears `swimLevel` when leaving Small Group, and moves to step 2. Everything already typed stays in the existing `form` state and `childDob`: names, email, phone, first-time answer, medical answers, notes, plus `waiverId` / `waiverOnFile` and the consent checkboxes. Nothing is reset, so nothing is retyped. Going into Small Group from Adult Swim still needs a level, so that one route opens the assessment with the DOB prefilled; the assessment itself is not modified.
 
+## Phone holds get released, not orphaned
+
+If the swimmer arrived on `/join?hold=<token>` and the DOB disqualifies them from the held program, switching must free the slot. The block panel says so plainly, for example: "We are releasing the held Tuesday 4:15 Private Swim spot, since the program is changing."
+
+On the switch the page calls the existing `release-membership-hold` edge function with the token, then clears `holdToken`, `holdState`, `holdHeldUntil`, `holdWaiverId` and the `?hold=` query param, exactly the same teardown `chooseSlot` already performs when a held parent picks a different slot. The hold flips to `cancelled` and the slot returns to circulation immediately. Data already carried over from the hold (name, phone, email, waiver id resolved for that swimmer) stays in form state. No new edge function and no schema change.
+
 ## Adult Swim full
 
 The switch lands on the normal Adult Swim slot picker, which already renders full slots as "Class full" with a "Join waitlist" button and the existing waitlist capture dialog. If Adult Swim has no slots at all, the panel shows the waitlist capture directly rather than an empty list, so there is no dead end.
