@@ -50,39 +50,53 @@ export function AdminSidebar() {
 
   const groups: NavGroup[] = [
     {
-      label: "Operations",
+      label: "Today",
       items: [
-        { title: "Book a Lesson", url: "/admin/book", icon: CalendarPlus, badge: 0 },
         { title: "Calendar", url: "/admin", icon: CalendarDays, badge: 0 },
-
         { title: "Check-in", url: "/admin/checkin", icon: CheckSquare, badge: 0 },
-        { title: "Class Roster", url: "/admin/roster", icon: ClipboardList, badge: 0 },
+        { title: "Messages", url: "/admin/messages", icon: MessageSquare, badge: 0 },
       ],
     },
     {
-      label: "Clients & Inquiries",
+      label: "Memberships",
+      items: [
+        { title: "Memberships", url: "/admin/memberships", icon: IdCard, badge: 0 },
+        { title: "Class times", url: "/admin/standing-slots", icon: CalendarClock, badge: 0 },
+        { title: "Holidays", url: "/admin/holidays", icon: CalendarOff, badge: 0 },
+      ],
+    },
+    {
+      label: "Clients",
       items: [
         { title: "Clients", url: "/admin/clients", icon: IdCard, badge: 0 },
-        { title: "Swim Enrollments", url: "/admin/enrollments", icon: Waves, badge: newGroupEnrollments },
+        { title: "Waivers", url: "/admin/waivers", icon: FileText, badge: 0 },
+        { title: "Card gaps", url: "/admin/card-gaps", icon: CreditCard, badge: 0 },
       ],
     },
     {
-      label: "Programs",
+      label: "Legacy (retires Aug 8)",
       items: [
+        { title: "Enrollments", url: "/admin/enrollments", icon: Waves, badge: newGroupEnrollments },
         { title: "Sessions", url: "/admin/sessions", icon: Layers, badge: 0 },
-        { title: "Standing Slots", url: "/admin/standing-slots", icon: CalendarClock, badge: 0 },
-        { title: "Memberships", url: "/admin/memberships", icon: IdCard, badge: 0 },
-        { title: "Private Lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: newPrivateBookings },
-        { title: "Payment Reconciliation", url: "/admin/payment-reconciliation", icon: Scale, badge: 0 },
+        { title: "Private lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: newPrivateBookings },
+        { title: "Book a lesson", url: "/admin/book", icon: CalendarPlus, badge: 0 },
+        { title: "Class roster", url: "/admin/roster", icon: ClipboardList, badge: 0 },
+        { title: "Lesson requests", url: "/admin/lesson-requests", icon: Inbox, badge: 0 },
       ],
     },
     {
-      label: "Staff",
+      label: "Setup",
       items: [
         { title: "Instructors", url: "/admin/instructors", icon: UserCheck, badge: 0 },
+        { title: "Users", url: "/admin/users", icon: Users, badge: 0 },
+        { title: "Reports", url: "/admin/reports", icon: BarChart3, badge: 0 },
+        { title: "Payment reconciliation", url: "/admin/payment-reconciliation", icon: Scale, badge: 0 },
+        { title: "Emails", url: "/admin/emails", icon: Mail, badge: 0 },
+        { title: "Marketing", url: "/admin/marketing", icon: Megaphone, badge: 0 },
       ],
     },
   ];
+
 
   const isItemActive = (url: string) =>
     url === "/admin" ? pathname === "/admin" : pathname === url || pathname.startsWith(url + "/");
