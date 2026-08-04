@@ -7,7 +7,8 @@ import {
   completeMembershipFromSetupSession,
   MembershipCompletionInProgressError,
   MembershipSlotFullError,
-} from "../_shared/membership-completion.ts";
+  MembershipCardDeclinedError,
+} from "../_shared/membership-completion.ts";")
 
 
 const supabase = createClient(

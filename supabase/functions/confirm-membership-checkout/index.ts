@@ -5,6 +5,7 @@ import {
   completeMembershipFromSetupSessionId,
   MembershipCompletionInProgressError,
   MembershipSlotFullError,
+  MembershipCardDeclinedError,
 } from "../_shared/membership-completion.ts";
 
 
@@ -53,6 +54,17 @@ serve(async (req) => {
         error:
           "This class time filled up while you were checking out. Your card is on file and you have not been charged a monthly rate. Our team will call you right away to pick a new time.",
       }, 409);
+    }
+    if (error instanceof MembershipCardDeclinedError) {
+      // Terminal: never retried by the client poll or by Stripe redelivery.
+      console.error("[confirm-membership-checkout] card declined", error.declineCode, error.pendingId);
+      return json({
+        declined: true,
+        declineCode: error.declineCode,
+        error:
+          "Your bank declined the card. No membership was created and you have not been charged. " +
+          "Please call us at the front desk so we can take a different card.",
+      }, 402);
     }
     if (error instanceof MembershipCompletionInProgressError) {
       console.log("[confirm-membership-checkout] still finalizing", error.pendingId);
