@@ -443,6 +443,12 @@ function JoinMembershipForm() {
     setSwimLevel(level);
     setChildDob(dob);
     setShowAssessment(false);
+    // 18 and over cannot be in Small Group. Stay on step 1, where the age gate
+    // panel renders in place of the program picker.
+    if (programAgeMismatch("kid_group", dob)) {
+      setStep(1);
+      return;
+    }
     if (holdToken && plan?.plan_key === "kid_group" && slot) {
       const accepted = acceptedLevelsOf(slot);
       if (accepted.length > 0 && !accepted.includes(level)) {
