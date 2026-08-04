@@ -47,6 +47,35 @@ export class MembershipSlotFullError extends Error {
   }
 }
 
+/**
+ * Thrown when Stripe hard-declines the first charge. Terminal on purpose: a
+ * declined card will decline again, and rapid re-attempts on the same invoice
+ * trip card_velocity_exceeded and put the merchant account at risk. Callers
+ * must NOT retry.
+ */
+export class MembershipCardDeclinedError extends Error {
+  constructor(
+    public readonly pendingId: string,
+    public readonly declineCode: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "MembershipCardDeclinedError";
+  }
+}
+
+const HARD_DECLINE_CODES = new Set([
+  "card_declined",
+  "card_velocity_exceeded",
+  "insufficient_funds",
+  "expired_card",
+  "incorrect_cvc",
+  "lost_card",
+  "stolen_card",
+  "pickup_card",
+]);
+
+
 const OCCUPYING_STATUSES = ["active", "pending_cancel", "paused"];
 
 /** True when the slot has no room left for one more membership. */
