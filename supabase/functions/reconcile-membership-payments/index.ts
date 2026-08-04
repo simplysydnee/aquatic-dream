@@ -145,8 +145,11 @@ serve(async (req) => {
         continue;
       }
 
-      // (c) money reversed in Stripe while the membership still looks paid
-      if (membership && (c.refunded || (c.amount_refunded ?? 0) > 0)) {
+      // (c) money reversed in Stripe while the membership still looks paid.
+      // A refund on an already-cancelled membership is expected, not drift.
+      const stillBilling =
+        membership && ["active", "pending_cancel", "paused"].includes(membership.status);
+      if (stillBilling && (c.refunded || (c.amount_refunded ?? 0) > 0)) {
         contradictions.push({
           kind: "refunded_but_active",
           stripeId: c.id,
@@ -159,7 +162,7 @@ serve(async (req) => {
           detail: `Charge refunded in Stripe while membership status is "${membership.status}".`,
         });
       }
-      if (membership && (c.disputed === true)) {
+      if (membership && c.disputed === true) {
         contradictions.push({
           kind: "disputed_charge",
           stripeId: c.id,
