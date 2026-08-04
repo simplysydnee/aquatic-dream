@@ -14,6 +14,7 @@ import {
   IdCard,
   ChevronDown,
   CheckSquare,
+  Scale,
 } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
@@ -72,6 +73,7 @@ export function AdminSidebar() {
         { title: "Standing Slots", url: "/admin/standing-slots", icon: CalendarClock, badge: 0 },
         { title: "Memberships", url: "/admin/memberships", icon: IdCard, badge: 0 },
         { title: "Private Lessons", url: "/admin/private-lessons", icon: CalendarClock, badge: newPrivateBookings },
+        { title: "Payment Reconciliation", url: "/admin/payment-reconciliation", icon: Scale, badge: 0 },
       ],
     },
     {

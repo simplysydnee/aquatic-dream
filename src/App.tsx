@@ -39,6 +39,8 @@ import AgentConnectionInstructions from "./pages/admin/AgentConnectionInstructio
 import StandingSlotsAdmin from "./pages/admin/StandingSlotsAdmin";
 import HolidaysAdmin from "./pages/admin/HolidaysAdmin";
 import MembershipsAdmin from "./pages/admin/MembershipsAdmin";
+import PaymentReconciliation from "./pages/admin/PaymentReconciliation";
+
 
 
 import Waivers from "./pages/Waivers";
@@ -106,6 +108,8 @@ const App = () => (
               <Route path="standing-slots" element={<StandingSlotsAdmin />} />
               <Route path="memberships" element={<MembershipsAdmin />} />
               <Route path="holidays" element={<HolidaysAdmin />} />
+              <Route path="payment-reconciliation" element={<PaymentReconciliation />} />
+
 
               <Route path="private-lessons" element={<PrivateLessonsAdmin />} />
               <Route path="private-lessons/new" element={<BookingNew />} />

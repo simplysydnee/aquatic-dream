@@ -792,10 +792,13 @@ function JoinMembershipForm() {
 
     // The webhook may still be finalizing the same checkout. A 202 means
     // "payment received, still working" so we keep polling instead of
-    // showing an error to a parent who has already paid.
-    const POLL_INTERVAL_MS = 3000;
+    // showing an error to a parent who has already paid. Exponential backoff
+    // with a cap keeps us from hammering Stripe on the same invoice.
+    const FIRST_INTERVAL_MS = 2000;
+    const MAX_INTERVAL_MS = 30_000;
     const MAX_WAIT_MS = 120_000;
     const deadline = Date.now() + MAX_WAIT_MS;
+    let nextInterval = FIRST_INTERVAL_MS;
 
     const attempt = async (): Promise<void> => {
       const { data, error } = await supabase.functions.invoke("confirm-membership-checkout", {
@@ -806,9 +809,12 @@ function JoinMembershipForm() {
       if (!error && data?.pending) {
         if (Date.now() < deadline) {
           setReturnStillWorking(true);
-          window.setTimeout(() => void attempt(), POLL_INTERVAL_MS);
+          const delay = nextInterval;
+          nextInterval = Math.min(nextInterval * 2, MAX_INTERVAL_MS);
+          window.setTimeout(() => void attempt(), delay);
           return;
         }
+
         // Terminal, reassuring state. Payment succeeded either way.
         setReturnFinalizing(false);
         setReturnStillWorking(true);

@@ -47,6 +47,35 @@ export class MembershipSlotFullError extends Error {
   }
 }
 
+/**
+ * Thrown when Stripe hard-declines the first charge. Terminal on purpose: a
+ * declined card will decline again, and rapid re-attempts on the same invoice
+ * trip card_velocity_exceeded and put the merchant account at risk. Callers
+ * must NOT retry.
+ */
+export class MembershipCardDeclinedError extends Error {
+  constructor(
+    public readonly pendingId: string,
+    public readonly declineCode: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "MembershipCardDeclinedError";
+  }
+}
+
+const HARD_DECLINE_CODES = new Set([
+  "card_declined",
+  "card_velocity_exceeded",
+  "insufficient_funds",
+  "expired_card",
+  "incorrect_cvc",
+  "lost_card",
+  "stolen_card",
+  "pickup_card",
+]);
+
+
 const OCCUPYING_STATUSES = ["active", "pending_cancel", "paused"];
 
 /** True when the slot has no room left for one more membership. */
@@ -343,9 +372,30 @@ export async function completeMembershipFromSetupSession(
     }));
     subscriptionId = asString(subscription.id);
   } catch (error) {
-    console.error("[membership completion] subscription create failed", stripeErrorDetails(error));
+    const details = stripeErrorDetails(error);
+    console.error("[membership completion] subscription create failed", details);
+    const code = String(
+      (asRecord(error).decline_code as string | undefined) ?? details.code ?? "",
+    );
+    if (HARD_DECLINE_CODES.has(code)) {
+      // Terminal. Record the decline on the pending row and stop: no client
+      // poll and no webhook redelivery may re-attempt this invoice.
+      await supabase
+        .from("pending_memberships")
+        .update({
+          payload: {
+            ...payload,
+            last_decline_code: code,
+            last_decline_message: errorMessage(error),
+            last_decline_at: new Date().toISOString(),
+          },
+        })
+        .eq("id", pendingId);
+      throw new MembershipCardDeclinedError(pendingId, code, errorMessage(error));
+    }
     throw new Error(`Stripe subscription create failed: ${errorMessage(error)}`);
   }
+
   if (!subscriptionId) throw new Error("Stripe did not return a subscription id");
 
   // Conditional write: never overwrite a subscription id that is already stored.
