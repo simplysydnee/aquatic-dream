@@ -365,6 +365,8 @@ function JoinMembershipForm() {
 
   // Membership waitlist — only ever populated by an explicit tap, never automatically.
   const [waitlistSlot, setWaitlistSlot] = useState<Slot | null>(null);
+  // Set when there is no open slot at all, so the family waits on the program itself.
+  const [waitlistAnyTime, setWaitlistAnyTime] = useState(false);
 
   const [waitlistSaved, setWaitlistSaved] = useState(false);
   const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
@@ -376,8 +378,10 @@ function JoinMembershipForm() {
     notes: "",
   });
 
+  const waitlistOpen = !!waitlistSlot || waitlistAnyTime;
+
   const submitWaitlist = async () => {
-    if (!waitlistSlot || !plan) return;
+    if (!waitlistOpen || !plan) return;
     if (
       !waitlistForm.swimmer_name.trim() ||
       !waitlistForm.parent_name.trim() ||
@@ -390,10 +394,10 @@ function JoinMembershipForm() {
     setWaitlistSubmitting(true);
     const { error } = await supabase.from("membership_waitlist").insert({
       plan_key: plan.plan_key,
-      standing_slot_id: waitlistSlot.id,
+      standing_slot_id: waitlistSlot?.id ?? null,
       swim_level: plan.plan_key === "kid_group" ? swimLevel : null,
-      preferred_day: waitlistSlot.day_of_week,
-      preferred_time: waitlistSlot.start_time,
+      preferred_day: waitlistSlot?.day_of_week ?? null,
+      preferred_time: waitlistSlot?.start_time ?? null,
       swimmer_name: waitlistForm.swimmer_name.trim(),
       parent_name: waitlistForm.parent_name.trim(),
       parent_email: waitlistForm.parent_email.trim(),
@@ -411,9 +415,11 @@ function JoinMembershipForm() {
 
   const closeWaitlist = () => {
     setWaitlistSlot(null);
+    setWaitlistAnyTime(false);
     setWaitlistSaved(false);
     setWaitlistForm({ swimmer_name: "", parent_name: "", parent_email: "", parent_phone: "", notes: "" });
   };
+
 
 
   const selectPlan = (p: Plan) => {
