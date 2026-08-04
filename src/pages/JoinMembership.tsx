@@ -1100,7 +1100,17 @@ function JoinMembershipForm() {
           </div>
         ) : (
           <Card className="p-6">
-            {step === 1 && !showAssessment && (
+            {step === 1 && !showAssessment && ageMismatch && (
+              <AgeGatePanel
+                kind={ageMismatch}
+                holdReleaseNotice={holdReleaseNotice}
+                switching={switchingProgram}
+                onSwitch={switchProgram}
+                onBackToPrograms={holdToken ? undefined : backToPrograms}
+              />
+            )}
+
+            {step === 1 && !showAssessment && !ageMismatch && (
               <>
                 <h2 className="mb-4 text-xl font-semibold text-[#1a3a8a]">Pick a program</h2>
                 {plans.length === 0 ? (
@@ -1118,6 +1128,9 @@ function JoinMembershipForm() {
                       >
                         <div>
                           <div className="font-semibold text-[#1a3a8a]">{p.name}</div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-[#F58B76]">
+                            {PROGRAM_AGE_LABELS[p.plan_key]}
+                          </div>
                           <div className="text-sm text-[#2a5e84]">
                             {p.plan_key === "kid_group"
                               ? "Kids group class · group sizes no more than 3 · we'll match your swimmer to the right level"
