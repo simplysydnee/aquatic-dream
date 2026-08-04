@@ -1252,11 +1252,25 @@ function JoinMembershipForm() {
                     </Button>
                   </div>
                 ) : planSlots.length === 0 ? (
-                  <p className="py-8 text-center text-[#2a5e84]">
-                    {plan.plan_key === "kid_group" && swimLevel
-                      ? `No open ${LEVEL_LABELS[swimLevel]} slots right now. Try a different level or check back soon.`
-                      : "No open spots right now — check back soon"}
-                  </p>
+                  <div className="py-8 text-center text-[#2a5e84]">
+                    <p className="mb-4">
+                      {plan.plan_key === "kid_group" && swimLevel
+                        ? `No open ${LEVEL_LABELS[swimLevel]} slots right now. Try a different level or check back soon.`
+                        : "No open spots right now — check back soon"}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setWaitlistSaved(false);
+                        setWaitlistSlot(null);
+                        setWaitlistAnyTime(true);
+                      }}
+                      className="h-11 border-[#F58B76] text-[#1a3a8a] hover:bg-[#F58B76]/10"
+                    >
+                      Join the waitlist
+                    </Button>
+                  </div>
                 ) : (
                   <>
                     {showFilterBar && (
