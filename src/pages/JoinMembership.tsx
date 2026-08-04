@@ -544,7 +544,7 @@ function JoinMembershipForm() {
 
   const isAdult = plan?.plan_key === "adult_group";
 
-  const canContinueStep3 = isAdult
+  const canContinueStep3 = !ageMismatch && (isAdult
     ? !!(
         form.child_first.trim() &&
         form.child_last.trim() &&
