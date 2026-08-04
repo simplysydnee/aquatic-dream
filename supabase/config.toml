@@ -76,6 +76,8 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = true
   [functions.admin-charge-private-lesson-occurrence]
     verify_jwt = true
+  [functions.send-lesson-charge-receipt]
+    verify_jwt = true
   [functions.admin-setup-card-for-booking]
     verify_jwt = true
   [functions.receive-inbound-sms]
