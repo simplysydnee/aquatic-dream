@@ -1270,6 +1270,17 @@ function JoinMembershipForm() {
                       onClick={() => {
                         setWaitlistSaved(false);
                         setWaitlistSlot(null);
+                        setWaitlistForm((f) => ({
+                          ...f,
+                          swimmer_name:
+                            f.swimmer_name ||
+                            `${form.child_first} ${form.child_last}`.trim(),
+                          parent_name:
+                            f.parent_name ||
+                            `${form.parent_first} ${form.parent_last}`.trim(),
+                          parent_email: f.parent_email || form.parent_email,
+                          parent_phone: f.parent_phone || form.parent_phone,
+                        }));
                         setWaitlistAnyTime(true);
                       }}
                       className="h-11 border-[#F58B76] text-[#1a3a8a] hover:bg-[#F58B76]/10"
