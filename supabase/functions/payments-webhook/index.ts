@@ -872,3 +872,92 @@ async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
   }
 }
 
+
+/**
+ * Append-only ledger for money movement that happens outside our checkout
+ * path: refunds and disputes issued in the Stripe dashboard, plus recurring
+ * invoice outcomes. This NEVER mutates memberships — the reconciliation
+ * report surfaces the drift and a human resolves it.
+ */
+async function recordMembershipPaymentEvent(
+  event: { id?: string; type: string; created?: number; data: { object: any } },
+  env: StripeEnv,
+) {
+  const obj = event.data?.object ?? {};
+  const eventId = event.id;
+  if (!eventId) {
+    console.error("[payment event] missing event id", event.type);
+    return;
+  }
+
+  const isDispute = event.type.startsWith("charge.dispute");
+  const isInvoice = event.type.startsWith("invoice.");
+
+  const subscriptionId: string | null =
+    (typeof obj.subscription === "string" ? obj.subscription : obj.subscription?.id) ??
+    obj.parent?.subscription_details?.subscription ??
+    null;
+  const customerId: string | null =
+    typeof obj.customer === "string" ? obj.customer : obj.customer?.id ?? null;
+  const invoiceId: string | null = isInvoice
+    ? obj.id ?? null
+    : typeof obj.invoice === "string"
+      ? obj.invoice
+      : obj.invoice?.id ?? null;
+
+  let membershipId: string | null = null;
+  if (subscriptionId) {
+    const { data } = await supabase
+      .from("memberships")
+      .select("id")
+      .eq("stripe_subscription_id", subscriptionId)
+      .maybeSingle();
+    membershipId = (data?.id as string | undefined) ?? null;
+  }
+  if (!membershipId && customerId) {
+    const { data } = await supabase
+      .from("memberships")
+      .select("id")
+      .eq("stripe_customer_id", customerId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    membershipId = (data?.id as string | undefined) ?? null;
+  }
+
+  const amountCents: number | null = isDispute
+    ? obj.amount ?? null
+    : isInvoice
+      ? obj.amount_paid ?? obj.amount_due ?? null
+      : obj.amount_refunded ?? obj.amount ?? null;
+
+  const { error } = await supabase.from("membership_payment_events").insert({
+    stripe_event_id: eventId,
+    event_type: event.type,
+    membership_id: membershipId,
+    stripe_subscription_id: subscriptionId,
+    stripe_customer_id: customerId,
+    stripe_object_id: obj.id ?? null,
+    stripe_invoice_id: invoiceId,
+    amount_cents: amountCents,
+    currency: obj.currency ?? null,
+    status: obj.status ?? null,
+    environment: env,
+    parent_email: obj.customer_email ?? obj.billing_details?.email ?? null,
+    raw: {
+      reason: obj.reason ?? null,
+      refunded: obj.refunded ?? null,
+      payment_intent: typeof obj.payment_intent === "string" ? obj.payment_intent : null,
+      charge: typeof obj.charge === "string" ? obj.charge : null,
+      hosted_invoice_url: obj.hosted_invoice_url ?? null,
+    },
+    occurred_at: event.created ? new Date(event.created * 1000).toISOString() : new Date().toISOString(),
+  });
+
+  // Duplicate delivery of the same Stripe event is expected and fine.
+  if (error && !`${error.message}`.includes("duplicate key")) {
+    console.error("[payment event] insert failed", event.type, error.message);
+    return;
+  }
+  console.log("[payment event] recorded", event.type, eventId, membershipId ?? "unmatched");
+}
