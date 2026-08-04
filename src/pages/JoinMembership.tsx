@@ -1923,10 +1923,15 @@ function JoinMembershipForm() {
               <DialogHeader>
                 <DialogTitle className="text-[#1a3a8a]">Join the waitlist</DialogTitle>
               </DialogHeader>
-              {waitlistSlot && (
+              {waitlistSlot ? (
                 <p className="text-sm text-[#2a5e84]">
                   {plan?.name} · {DAYS[waitlistSlot.day_of_week]}{" "}
                   {fmtTime(waitlistSlot.start_time)}–{fmtTime(waitlistSlot.end_time)}
+                  {plan?.plan_key === "kid_group" && swimLevel ? ` · ${LEVEL_LABELS[swimLevel]}` : ""}
+                </p>
+              ) : (
+                <p className="text-sm text-[#2a5e84]">
+                  {plan?.name} · any available time
                   {plan?.plan_key === "kid_group" && swimLevel ? ` · ${LEVEL_LABELS[swimLevel]}` : ""}
                 </p>
               )}
