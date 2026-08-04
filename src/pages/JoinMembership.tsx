@@ -25,6 +25,8 @@ import LegalAgreements, { type LegalAgreementData } from "@/components/swim-enro
 import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
 import ClosureScheduleNote from "@/components/ClosureScheduleNote";
 import { JOIN_OPEN } from "@/lib/joinGate";
+import AgeGatePanel from "@/components/swim-enrollment/AgeGatePanel";
+import { programAgeMismatch, PROGRAM_AGE_LABELS } from "@/lib/programEligibility";
 
 import {
   resolveSwimmerWaiver,
@@ -363,6 +365,8 @@ function JoinMembershipForm() {
 
   // Membership waitlist — only ever populated by an explicit tap, never automatically.
   const [waitlistSlot, setWaitlistSlot] = useState<Slot | null>(null);
+  // Set when there is no open slot at all, so the family waits on the program itself.
+  const [waitlistAnyTime, setWaitlistAnyTime] = useState(false);
 
   const [waitlistSaved, setWaitlistSaved] = useState(false);
   const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
@@ -374,8 +378,10 @@ function JoinMembershipForm() {
     notes: "",
   });
 
+  const waitlistOpen = !!waitlistSlot || waitlistAnyTime;
+
   const submitWaitlist = async () => {
-    if (!waitlistSlot || !plan) return;
+    if (!waitlistOpen || !plan) return;
     if (
       !waitlistForm.swimmer_name.trim() ||
       !waitlistForm.parent_name.trim() ||
@@ -388,10 +394,10 @@ function JoinMembershipForm() {
     setWaitlistSubmitting(true);
     const { error } = await supabase.from("membership_waitlist").insert({
       plan_key: plan.plan_key,
-      standing_slot_id: waitlistSlot.id,
+      standing_slot_id: waitlistSlot?.id ?? null,
       swim_level: plan.plan_key === "kid_group" ? swimLevel : null,
-      preferred_day: waitlistSlot.day_of_week,
-      preferred_time: waitlistSlot.start_time,
+      preferred_day: waitlistSlot?.day_of_week ?? null,
+      preferred_time: waitlistSlot?.start_time ?? null,
       swimmer_name: waitlistForm.swimmer_name.trim(),
       parent_name: waitlistForm.parent_name.trim(),
       parent_email: waitlistForm.parent_email.trim(),
@@ -409,9 +415,11 @@ function JoinMembershipForm() {
 
   const closeWaitlist = () => {
     setWaitlistSlot(null);
+    setWaitlistAnyTime(false);
     setWaitlistSaved(false);
     setWaitlistForm({ swimmer_name: "", parent_name: "", parent_email: "", parent_phone: "", notes: "" });
   };
+
 
 
   const selectPlan = (p: Plan) => {
@@ -441,6 +449,12 @@ function JoinMembershipForm() {
     setSwimLevel(level);
     setChildDob(dob);
     setShowAssessment(false);
+    // 18 and over cannot be in Small Group. Stay on step 1, where the age gate
+    // panel renders in place of the program picker.
+    if (programAgeMismatch("kid_group", dob)) {
+      setStep(1);
+      return;
+    }
     if (holdToken && plan?.plan_key === "kid_group" && slot) {
       const accepted = acceptedLevelsOf(slot);
       if (accepted.length > 0 && !accepted.includes(level)) {
@@ -476,11 +490,73 @@ function JoinMembershipForm() {
     setStep(3);
   };
 
+  // ---- Age gate (public /join only) ----------------------------------------
+  const ageMismatch = programAgeMismatch(plan?.plan_key, childDob);
+  const [switchingProgram, setSwitchingProgram] = useState(false);
 
+  const holdReleaseNotice =
+    holdToken && slot && plan
+      ? `We are releasing the ${plan.name} spot held for ${DAYS[slot.day_of_week]} at ${fmtTime(
+          slot.start_time,
+        )}, since the program is changing. It goes back to other families right away.`
+      : null;
+
+  /** Switch programs from the age gate, carrying every entered field along. */
+  const switchProgram = async (target: PlanKey) => {
+    const next = plans.find((p) => p.plan_key === target);
+    if (!next) {
+      toast.error("That program is not available right now. Please call us and we will help.");
+      return;
+    }
+    setSwitchingProgram(true);
+    // A phone hold on the wrong program must be freed, never orphaned.
+    if (holdToken) {
+      const token = holdToken;
+      const { error } = await supabase.functions.invoke("release-membership-hold", {
+        body: { token },
+      });
+      if (error) {
+        setSwitchingProgram(false);
+        toast.error("Could not release the held spot. Please call us and we will help.");
+        return;
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete("hold");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      setHoldToken(null);
+      setHoldState("none");
+      setHoldHeldUntil(null);
+      setHoldWaiverId(null);
+      setHoldLevelMismatch(null);
+      toast.success("Held spot released");
+    }
+    setSwitchingProgram(false);
+
+    setPlan(next);
+    setSlot(null);
+    setSwimLevel(null);
+    resetFilters();
+    if (target === "kid_group") {
+      setShowAssessment(true);
+      setStep(1);
+    } else {
+      setShowAssessment(false);
+      setStep(2);
+    }
+  };
+
+  const backToPrograms = () => {
+    setPlan(null);
+    setSlot(null);
+    setSwimLevel(null);
+    setShowAssessment(false);
+    resetFilters();
+    setStep(1);
+  };
 
   const isAdult = plan?.plan_key === "adult_group";
 
-  const canContinueStep3 = isAdult
+  const canContinueStep3 = !ageMismatch && (isAdult
     ? !!(
         form.child_first.trim() &&
         form.child_last.trim() &&
@@ -502,7 +578,7 @@ function JoinMembershipForm() {
         form.is_first_time !== "" &&
         form.has_medical !== "" &&
         (form.has_medical !== "yes" || form.medical_notes.trim().length > 0)
-      );
+      ));
 
   const canContinueStep5 = authRecurring && smsConsent && agreementAccepted;
 
@@ -1030,7 +1106,17 @@ function JoinMembershipForm() {
           </div>
         ) : (
           <Card className="p-6">
-            {step === 1 && !showAssessment && (
+            {step === 1 && !showAssessment && ageMismatch && (
+              <AgeGatePanel
+                kind={ageMismatch}
+                holdReleaseNotice={holdReleaseNotice}
+                switching={switchingProgram}
+                onSwitch={switchProgram}
+                onBackToPrograms={holdToken ? undefined : backToPrograms}
+              />
+            )}
+
+            {step === 1 && !showAssessment && !ageMismatch && (
               <>
                 <h2 className="mb-4 text-xl font-semibold text-[#1a3a8a]">Pick a program</h2>
                 {plans.length === 0 ? (
@@ -1048,6 +1134,9 @@ function JoinMembershipForm() {
                       >
                         <div>
                           <div className="font-semibold text-[#1a3a8a]">{p.name}</div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-[#F58B76]">
+                            {PROGRAM_AGE_LABELS[p.plan_key]}
+                          </div>
                           <div className="text-sm text-[#2a5e84]">
                             {p.plan_key === "kid_group"
                               ? "Kids group class · group sizes no more than 3 · we'll match your swimmer to the right level"
@@ -1169,11 +1258,36 @@ function JoinMembershipForm() {
                     </Button>
                   </div>
                 ) : planSlots.length === 0 ? (
-                  <p className="py-8 text-center text-[#2a5e84]">
-                    {plan.plan_key === "kid_group" && swimLevel
-                      ? `No open ${LEVEL_LABELS[swimLevel]} slots right now. Try a different level or check back soon.`
-                      : "No open spots right now — check back soon"}
-                  </p>
+                  <div className="py-8 text-center text-[#2a5e84]">
+                    <p className="mb-4">
+                      {plan.plan_key === "kid_group" && swimLevel
+                        ? `No open ${LEVEL_LABELS[swimLevel]} slots right now. Try a different level or check back soon.`
+                        : "No open spots right now — check back soon"}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setWaitlistSaved(false);
+                        setWaitlistSlot(null);
+                        setWaitlistForm((f) => ({
+                          ...f,
+                          swimmer_name:
+                            f.swimmer_name ||
+                            `${form.child_first} ${form.child_last}`.trim(),
+                          parent_name:
+                            f.parent_name ||
+                            `${form.parent_first} ${form.parent_last}`.trim(),
+                          parent_email: f.parent_email || form.parent_email,
+                          parent_phone: f.parent_phone || form.parent_phone,
+                        }));
+                        setWaitlistAnyTime(true);
+                      }}
+                      className="h-11 border-[#F58B76] text-[#1a3a8a] hover:bg-[#F58B76]/10"
+                    >
+                      Join the waitlist
+                    </Button>
+                  </div>
                 ) : (
                   <>
                     {showFilterBar && (
@@ -1311,7 +1425,17 @@ function JoinMembershipForm() {
               </>
             )}
 
-            {step === 3 && plan && (
+            {step === 3 && plan && ageMismatch && (
+              <AgeGatePanel
+                kind={ageMismatch}
+                holdReleaseNotice={holdReleaseNotice}
+                switching={switchingProgram}
+                onSwitch={switchProgram}
+                onBackToPrograms={holdToken ? undefined : backToPrograms}
+              />
+            )}
+
+            {step === 3 && plan && !ageMismatch && (
               <>
                 {!holdToken && (
                   <button
@@ -1787,7 +1911,7 @@ function JoinMembershipForm() {
         )}
       </div>
 
-      <Dialog open={!!waitlistSlot} onOpenChange={(o) => { if (!o) closeWaitlist(); }}>
+      <Dialog open={waitlistOpen} onOpenChange={(o) => { if (!o) closeWaitlist(); }}>
         <DialogContent className="max-w-md">
           {waitlistSaved ? (
             <>
@@ -1810,10 +1934,15 @@ function JoinMembershipForm() {
               <DialogHeader>
                 <DialogTitle className="text-[#1a3a8a]">Join the waitlist</DialogTitle>
               </DialogHeader>
-              {waitlistSlot && (
+              {waitlistSlot ? (
                 <p className="text-sm text-[#2a5e84]">
                   {plan?.name} · {DAYS[waitlistSlot.day_of_week]}{" "}
                   {fmtTime(waitlistSlot.start_time)}–{fmtTime(waitlistSlot.end_time)}
+                  {plan?.plan_key === "kid_group" && swimLevel ? ` · ${LEVEL_LABELS[swimLevel]}` : ""}
+                </p>
+              ) : (
+                <p className="text-sm text-[#2a5e84]">
+                  {plan?.name} · any available time
                   {plan?.plan_key === "kid_group" && swimLevel ? ` · ${LEVEL_LABELS[swimLevel]}` : ""}
                 </p>
               )}
