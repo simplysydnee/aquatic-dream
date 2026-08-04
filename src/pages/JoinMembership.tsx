@@ -25,6 +25,8 @@ import LegalAgreements, { type LegalAgreementData } from "@/components/swim-enro
 import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
 import ClosureScheduleNote from "@/components/ClosureScheduleNote";
 import { JOIN_OPEN } from "@/lib/joinGate";
+import AgeGatePanel from "@/components/swim-enrollment/AgeGatePanel";
+import { programAgeMismatch, PROGRAM_AGE_LABELS } from "@/lib/programEligibility";
 
 import {
   resolveSwimmerWaiver,
