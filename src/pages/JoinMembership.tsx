@@ -1900,7 +1900,7 @@ function JoinMembershipForm() {
         )}
       </div>
 
-      <Dialog open={!!waitlistSlot} onOpenChange={(o) => { if (!o) closeWaitlist(); }}>
+      <Dialog open={waitlistOpen} onOpenChange={(o) => { if (!o) closeWaitlist(); }}>
         <DialogContent className="max-w-md">
           {waitlistSaved ? (
             <>
