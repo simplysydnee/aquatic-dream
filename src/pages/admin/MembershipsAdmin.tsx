@@ -305,11 +305,20 @@ const MembershipsAdmin = () => {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Memberships</h1>
-          <p className="text-sm text-muted-foreground">Search a family, review their slot, and manage their membership.</p>
+          <p className="text-sm text-muted-foreground">
+            Families enrolled in a weekly spot. Search, move, or cancel.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Enrolling someone new?{" "}
+            <Link to="/admin/standing-slots" className="text-primary underline underline-offset-2">
+              Hold a time on Class times.
+            </Link>
+          </p>
         </div>
         <Button variant="outline" asChild>
           <Link to="/admin/standing-slots">Hold a spot over the phone</Link>
         </Button>
+
       </div>
 
       <MembershipHoldsPanel />

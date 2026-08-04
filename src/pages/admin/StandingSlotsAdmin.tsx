@@ -410,10 +410,11 @@ const StandingSlotsAdmin = () => {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-display font-semibold text-foreground">Standing Slots</h1>
+          <h1 className="text-2xl font-display font-semibold text-foreground">Class times</h1>
           <p className="text-sm text-muted-foreground">
-            Permanent weekly class slots that memberships enroll into.
+            The weekly schedule families enroll into. Tap an open time to hold it for a family.
           </p>
+
         </div>
         <Button onClick={startAdd} disabled={adding}>
           <Plus className="h-4 w-4 mr-1.5" />

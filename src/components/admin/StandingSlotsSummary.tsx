@@ -179,6 +179,10 @@ export function StandingSlotsSummary({ slots, occupancy, instructorNames, loadin
         <h2 className="text-sm font-semibold text-foreground">What is open</h2>
         <span className="text-xs text-muted-foreground">Live capacity, tap a program for times</span>
       </div>
+      <p className="text-xs text-muted-foreground -mt-2">
+        Tap an open time to hold it for a family and text them the signup link.
+      </p>
+
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading openings…</p>
@@ -253,7 +257,8 @@ export function StandingSlotsSummary({ slots, occupancy, instructorNames, loadin
                         type="button"
                         onClick={() => onChipClick(c.openSlots)}
                         title="Hold this spot over the phone"
-                        className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/20"
+                        className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-all hover:border-primary hover:bg-primary/20 hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-95 cursor-pointer"
+
                       >
                         {timeLabel(c.start)} · {c.count}
                       </button>
