@@ -566,7 +566,7 @@ function JoinMembershipForm() {
         form.is_first_time !== "" &&
         form.has_medical !== "" &&
         (form.has_medical !== "yes" || form.medical_notes.trim().length > 0)
-      );
+      ));
 
   const canContinueStep5 = authRecurring && smsConsent && agreementAccepted;
 
