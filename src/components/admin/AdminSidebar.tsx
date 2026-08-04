@@ -15,6 +15,15 @@ import {
   ChevronDown,
   CheckSquare,
   Scale,
+  MessageSquare,
+  CalendarOff,
+  FileText,
+  CreditCard,
+  Inbox,
+  Users,
+  BarChart3,
+  Mail,
+  Megaphone,
 } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
