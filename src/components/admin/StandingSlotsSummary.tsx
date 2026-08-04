@@ -179,6 +179,10 @@ export function StandingSlotsSummary({ slots, occupancy, instructorNames, loadin
         <h2 className="text-sm font-semibold text-foreground">What is open</h2>
         <span className="text-xs text-muted-foreground">Live capacity, tap a program for times</span>
       </div>
+      <p className="text-xs text-muted-foreground -mt-2">
+        Tap an open time to hold it for a family and text them the signup link.
+      </p>
+
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading openings…</p>
