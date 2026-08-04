@@ -22,9 +22,9 @@ const FALLBACK_PRICES: Record<PlanKey, number> = {
 };
 
 const PROGRAMS: { key: PlanKey; name: string; blurb: string; when: string }[] = [
-  { key: "private", name: "Private Swim", blurb: "One-on-one · Ages 3+", when: "Tue–Thu evenings, Saturdays" },
-  { key: "kid_group", name: "Small Group", blurb: "Max 3 swimmers · 5 levels", when: "Monday afternoons" },
-  { key: "adult_group", name: "Adult Swim", blurb: "Never too late to learn", when: "Tuesday evenings" },
+  { key: "private", name: "Private Swim", blurb: "One-on-one · Ages 3 to 17", when: "Tue–Thu evenings, Saturdays" },
+  { key: "kid_group", name: "Small Group", blurb: "Max 3 swimmers · 5 levels · Ages 3 to 17", when: "Monday afternoons" },
+  { key: "adult_group", name: "Adult Swim", blurb: "Never too late to learn · 18 and over", when: "Tuesday evenings" },
 ];
 
 const usePlanPrices = () => {
