@@ -1,42 +1,58 @@
-## Status: 5.2 and 5.3 were not run
+# Age gating on /join
 
-Plainly stated: **the completion path is unproven end to end.** What landed was 5.1 only — concurrent `claim_pending_membership` calls and concurrent subscription-id writes at the SQL level. There was no pre-flip gate report, no environment flip, no sandbox checkout, no parallel `confirm-membership-checkout` invocation, and no flip-back read-back. 5.1 proves the two SQL functions behave; it does not prove `completeMembershipFromSetupSessionId` calls them correctly on the real path.
+## Where DOB is captured today (answer first)
 
-## Step 5.0 — Confirm the current value and the gate
+Read of `src/pages/JoinMembership.tsx` (steps: 1 program, 2 slot, 3 info, 4 waiver, 5 consent, 6 review, 7 checkout, 8 success):
 
-1. **You read `PAYMENTS_ENV` from the dashboard and tell me the value.** No probe function is deployed. The secrets tool lists names only, so I cannot read it myself.
-   - Only if the dashboard masks it and you say so: deploy a minimal `admin-env-probe` that returns `{ payments_env }` and nothing else. Its deletion is then verified in 5.3 by listing deployed functions and confirming the name is absent.
-2. Re-confirm and report that the public Join button is OFF and `/join` cannot start a real enrollment, by reading `src/pages/JoinMembership.tsx` and the flag that gates it. Reported before any flip.
-3. Record the pre-flip value verbatim so the flip-back target is the observed value, not an assumption. If it is anything other than `live` or `sandbox`, that is raised as an incident and no test proceeds.
+- Program is always chosen first, at step 1.
+- Small Group: the Find Your Spot assessment runs immediately after the program tile is tapped, still inside step 1, and `handleAssessmentComplete(level, age, dob)` sets `childDob` before the slot picker. So for Small Group a usable DOB exists before step 2.
+- Private Swim and Adult Swim: no assessment. DOB is first typed at step 3, in the swimmer/your-info form (`childDob`, date input), after the program and the slot are already chosen.
+- Phone holds (`/join?hold=...`) jump straight to step 3 with the program and slot fixed, so DOB there is also step 3.
 
-## Step 5.2 — End-to-end concurrent completion in sandbox
+Net: DOB always arrives after program selection, and for two of three programs after slot selection too. The gate therefore has to fire on DOB entry/change and be able to send the swimmer back to a different program, which is what the switch flow below does.
 
-1. Flip `PAYMENTS_ENV` to `sandbox`.
-2. **Create a new, inactive standing slot dedicated to this test** — not one of the 94 production slots. Report its id on creation. It is deleted in cleanup and its deletion confirmed by re-query.
-3. Insert a synthetic `pending_memberships` row against that test slot, with a clearly marked test parent email.
-4. Create a sandbox setup-mode Checkout Session against that pending row, drive it in a headless browser, and complete it with `4242 4242 4242 4242`.
-5. Invoke `confirm-membership-checkout` **twice in parallel** on that one session id.
-6. Report each of the following as an observed count, not an expectation:
-   - `memberships` rows for that session id — must be exactly 1
-   - subscriptions on that Stripe customer — must be exactly 1
-   - `membership_occurrences` for that membership — must be exactly 8
-   - welcome sends logged — must be exactly 1
-   - the loser's HTTP status and body — either the identical success payload or a clean `202 { pending: true }`, never a 500
-7. Clean up: cancel the test subscription, delete the test customer, membership, occurrences, pending row, **and the test standing slot**. Report each deletion as verified.
+## The rule
 
-If any part of 5.2 cannot execute (sandbox Stripe key missing, headless checkout blocked), that is reported as "the completion path is unproven end to end" with the specific blocker named. 5.1 is not offered as a substitute.
+`ageOn(dob, today) >= 18` -> Adult Swim only. Under 18 -> Private Swim or Small Group only. Age computed as of today, client side, no stored age.
 
-## Step 5.3 — Blocking flip-back
+## What fires where
 
-1. Set `PAYMENTS_ENV` back to `live`.
-2. Verify the read-back shows exactly `live`. If the probe was never deployed, verification is by you reading the dashboard again and confirming; I report that the set operation completed and wait for your confirmation before declaring Phase 3 done.
-3. If the probe was deployed under 5.0, delete it and confirm its absence from the deployed function list.
-4. Until `live` is confirmed: Phase 3 is not complete, the Join button stays off, and no Phase 4 work starts. A mismatch is raised as an incident, not retried silently.
+1. Small Group assessment completion: if the DOB from the assessment makes the swimmer 18+, show the block panel instead of advancing to the slot picker.
+2. Step 3 DOB field (all programs, including hold arrivals): on change, evaluate. On mismatch the step-3 form is replaced by the block panel and Continue is disabled, so there is no way to proceed in the wrong program.
 
-## Not in scope
+## The block panel
 
-Phase 4 capacity work, environment lockdown, and parent emails all stay untouched.
+Adult in a kids program:
+
+> Swimmers 18 and over enroll in Adult Swim. It is $140 a month instead of $200, runs Tuesday evenings at 7:15, and is a small group of two adults.
+
+Primary button "Switch to Adult Swim". Secondary link back to the program picker.
+
+Under 18 in Adult Swim: same panel shape, reversed copy, with buttons for Private Swim and Small Group.
+
+## Carrying the data across the switch
+
+Switching only changes `plan`, clears `slot`, clears `swimLevel` when leaving Small Group, and moves to step 2. Everything already typed stays in the existing `form` state and `childDob`: names, email, phone, first-time answer, medical answers, notes, plus `waiverId` / `waiverOnFile` and the consent checkboxes. Nothing is reset, so nothing is retyped. Going into Small Group from Adult Swim still needs a level, so that one route opens the assessment with the DOB prefilled; the assessment itself is not modified.
+
+## Adult Swim full
+
+The switch lands on the normal Adult Swim slot picker, which already renders full slots as "Class full" with a "Join waitlist" button and the existing waitlist capture dialog. If Adult Swim has no slots at all, the panel shows the waitlist capture directly rather than an empty list, so there is no dead end.
+
+## Copy
+
+- Join picker subtitles: Private Swim "One-on-one coaching · Ages 3 to 17", Small Group "... · Ages 3 to 17", Adult Swim "Adult group class · 2 adults max · 18 and over".
+- `src/pages/Index.tsx` program cards: private blurb changes from "One-on-one · Ages 3+" to "One-on-one · Ages 3 to 17"; Small Group gains "Ages 3 to 17"; Adult Swim gains "18 and over".
+
+## Out of scope, untouched
+
+Admin booking, phone-hold creation, and front-desk flows keep full program choice. No pricing, proration, consent, checkout, or assessment logic changes. No schema change, no age column, no writes to any existing membership.
 
 ## Technical notes
 
-No new permanent files. Test scripting runs under `/tmp/browser/`. No changes to `membership-completion.ts`, `confirm-membership-checkout`, `payments-webhook`, or `JoinMembership.tsx` — 5.2 tests the code as it stands, and any fix it surfaces is reported before being made.
+- New small helper for age-from-DOB and program eligibility, kept alongside the join page (e.g. `src/lib/programEligibility.ts`), exported named.
+- New presentational component for the block panel under `src/components/swim-enrollment/`.
+- Purely frontend and presentational; no edge function or SQL work.
+
+## Verification
+
+Manual pass on /join covering: 18-year-old DOB blocks Private Swim and offers Adult Swim; switch preserves every entered field; 17-year-old proceeds in Private Swim unchanged; 15-year-old in Adult Swim is redirected to the kids programs; Adult Swim full shows the waitlist; admin booking can still place an adult in a private lesson; the existing adult private membership row is untouched.
