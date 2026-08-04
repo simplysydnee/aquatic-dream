@@ -1394,7 +1394,17 @@ function JoinMembershipForm() {
               </>
             )}
 
-            {step === 3 && plan && (
+            {step === 3 && plan && ageMismatch && (
+              <AgeGatePanel
+                kind={ageMismatch}
+                holdReleaseNotice={holdReleaseNotice}
+                switching={switchingProgram}
+                onSwitch={switchProgram}
+                onBackToPrograms={holdToken ? undefined : backToPrograms}
+              />
+            )}
+
+            {step === 3 && plan && !ageMismatch && (
               <>
                 {!holdToken && (
                   <button
