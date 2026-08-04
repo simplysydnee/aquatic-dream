@@ -478,7 +478,69 @@ function JoinMembershipForm() {
     setStep(3);
   };
 
+  // ---- Age gate (public /join only) ----------------------------------------
+  const ageMismatch = programAgeMismatch(plan?.plan_key, childDob);
+  const [switchingProgram, setSwitchingProgram] = useState(false);
 
+  const holdReleaseNotice =
+    holdToken && slot && plan
+      ? `We are releasing the ${plan.name} spot held for ${DAYS[slot.day_of_week]} at ${fmtTime(
+          slot.start_time,
+        )}, since the program is changing. It goes back to other families right away.`
+      : null;
+
+  /** Switch programs from the age gate, carrying every entered field along. */
+  const switchProgram = async (target: PlanKey) => {
+    const next = plans.find((p) => p.plan_key === target);
+    if (!next) {
+      toast.error("That program is not available right now. Please call us and we will help.");
+      return;
+    }
+    setSwitchingProgram(true);
+    // A phone hold on the wrong program must be freed, never orphaned.
+    if (holdToken) {
+      const token = holdToken;
+      const { error } = await supabase.functions.invoke("release-membership-hold", {
+        body: { token },
+      });
+      if (error) {
+        setSwitchingProgram(false);
+        toast.error("Could not release the held spot. Please call us and we will help.");
+        return;
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete("hold");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      setHoldToken(null);
+      setHoldState("none");
+      setHoldHeldUntil(null);
+      setHoldWaiverId(null);
+      setHoldLevelMismatch(null);
+      toast.success("Held spot released");
+    }
+    setSwitchingProgram(false);
+
+    setPlan(next);
+    setSlot(null);
+    setSwimLevel(null);
+    resetFilters();
+    if (target === "kid_group") {
+      setShowAssessment(true);
+      setStep(1);
+    } else {
+      setShowAssessment(false);
+      setStep(2);
+    }
+  };
+
+  const backToPrograms = () => {
+    setPlan(null);
+    setSlot(null);
+    setSwimLevel(null);
+    setShowAssessment(false);
+    resetFilters();
+    setStep(1);
+  };
 
   const isAdult = plan?.plan_key === "adult_group";
 
