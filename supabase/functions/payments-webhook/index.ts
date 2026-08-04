@@ -89,9 +89,18 @@ serve(async (req) => {
         }
         break;
       }
+      case "charge.refunded":
+      case "charge.dispute.created":
+      case "charge.dispute.closed":
+      case "invoice.paid":
+      case "invoice.payment_failed": {
+        await recordMembershipPaymentEvent(event as any, env);
+        break;
+      }
       default:
         console.log("Unhandled event:", event.type);
     }
+
 
     return new Response(JSON.stringify({ received: true }), {
       status: 200,
