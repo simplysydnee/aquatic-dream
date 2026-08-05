@@ -60,13 +60,32 @@ Do not auto-cancel, and I would not even auto-flag it as a cancellation request.
 - A **banner** above the table when any membership in the list has `last_payment_status = 'failed'` or a Stripe subscription status of `past_due` / `unpaid` / `canceled` while the membership is still active. It names the count and filters the table on click.
 - **Detail view**: last payment date, amount, invoice id, and, on failure, the decline reason mapped to plain language (for example `insufficient_funds` becomes "The card did not have enough funds"), plus the raw Stripe reason underneath.
 
-## 4. No auto-cancel
+## 4. Backfill from the existing ledger
+
+After the migration, backfill the new columns from `membership_payment_events`: for each membership, take the most recent `invoice.paid` / `invoice.payment_failed` row and write `last_invoice_id`, `last_payment_status`, `last_payment_at`, `last_payment_amount_cents`, and on a failure the reason. `payment_failure_count` is set to the number of consecutive failure rows since the last success.
+
+One thing to set expectations on: `membership_payment_events` is currently **empty** (zero rows, confirmed by query). The handlers that write it went in recently and no recurring invoice has run yet. So the backfill will report 0 rows and every existing membership will show "Awaiting first charge", which is accurate. The backfill still ships so it is correct if any events land between now and the migration, and the count will be reported after it runs.
+
+## 5. No parent-facing notification on failure
+
+Confirmed as a design constraint and enforced in the implementation: none of the new handlers call `send-transactional-email`, the SMS path, or enqueue anything. A decline writes database fields and renders in admin only. I will re-verify by grepping the changed handlers for email/SMS call sites before shipping.
+
+### Stripe dunning status
+
+I cannot read the Stripe account's dunning setting from here — it lives in Billing settings on the Stripe account, not in anything the app stores or the API surfaces through the keys we hold. Retry schedule and "send email when payment fails" are dashboard toggles.
+
+So this is a question for you rather than something I can report. My recommendation: leave Stripe dunning emails **on** and treat Stripe as authoritative for the parent-facing message. Stripe's email carries the hosted invoice link that lets the parent actually fix the card, which we would otherwise have to build. The admin banner is then not a duplicate notification, it is the internal signal that a parent has been asked to update their card and has not yet done so. If you would rather own the wording, we turn Stripe's off and add a parent email later as its own piece of work, but that should not go in this change.
+
+Either way, the answer does not block the rest of the work. I will note it in the banner copy once you confirm which way it goes.
+
+## 6. No auto-cancel
 
 Nothing in these handlers writes `memberships.status`, deletes or alters `membership_occurrences`, or touches check-in or calendar queries. A failure sets display fields only.
 
 ## Out of scope
 
 Pricing, proration, checkout, occurrence generation, check-in, and calendar are untouched.
+
 
 ## Verification
 
