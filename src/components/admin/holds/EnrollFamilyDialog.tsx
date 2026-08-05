@@ -560,6 +560,15 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
               <span className="font-medium">{assignRow.name || "this swimmer"}</span>
             </div>
 
+            {takenNotice && (
+              <div
+                role="status"
+                className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {takenNotice}
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2">
               {PLAN_ORDER.filter((p) => slots.some((s) => s.plan_key === p)).map((p) => (
                 <Button
@@ -569,12 +578,14 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
                   onClick={() => {
                     setPlanChoice(p);
                     setCoachChoice(null);
+                    setTakenNotice(null);
                   }}
                 >
                   {PLAN_LABELS[p]}
                 </Button>
               ))}
             </div>
+
 
             {planChoice && coachChoice && (
               <div className="space-y-2 rounded-md border bg-muted/30 p-3">
