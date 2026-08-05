@@ -83,6 +83,26 @@ interface RosterRow {
   assignment: Assignment | null;
 }
 
+/** Reads the status and message out of a failed edge function call. */
+const readFunctionError = async (
+  error: unknown,
+  data: { error?: string } | null,
+): Promise<{ status: number | null; message: string }> => {
+  const fallback = data?.error || (error as { message?: string } | null)?.message || "Could not hold that time";
+  const context = (error as { context?: Response } | null)?.context;
+  if (context && typeof context.status === "number") {
+    let message = fallback;
+    try {
+      const body = await context.clone().json();
+      if (body?.error) message = String(body.error);
+    } catch {
+      // non-JSON body, keep the fallback
+    }
+    return { status: context.status, message };
+  }
+  return { status: null, message: fallback };
+};
+
 export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
   const [step, setStep] = useState<"search" | "roster" | "assign" | "review">("search");
   const [query, setQuery] = useState("");
@@ -91,7 +111,9 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
   const [assigningKey, setAssigningKey] = useState<string | null>(null);
   const [planChoice, setPlanChoice] = useState<OpeningPlanKey | null>(null);
   const [busy, setBusy] = useState(false);
+  const [takenNotice, setTakenNotice] = useState<string | null>(null);
   const [sendResults, setSendResults] = useState<{ label: string; ok: boolean; detail: string }[]>([]);
+
 
   const { families, searching } = useFamilySearch(query, { groupByFamily: true });
   const { slots, occupancy, instructorNames, plans, refresh } = useSlotOpenings();
