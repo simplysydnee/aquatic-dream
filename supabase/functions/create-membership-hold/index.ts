@@ -137,7 +137,20 @@ Deno.serve(async (req) => {
     const link = `${SITE_URL}/join?hold=${hold.token}`;
     const message =
       `Aquatic Dreams: we're holding a ${program} spot for ${firstName}, ${when}. ` +
-      `Finish enrollment within 48 hrs: ${link}`;
+      `Finish enrollment within ${formatHoldWindow(holdMinutes)}: ${link}`;
+
+    if (!sendSms) {
+      return json({
+        success: true,
+        hold_id: hold.id,
+        token: hold.token,
+        held_until: hold.held_until,
+        link,
+        sms_sent: false,
+        sms_skipped: true,
+        sms_error: null,
+      });
+    }
 
     const smsResult = await sendAndLogBookingConfirmation(supabaseAdmin, {
       phoneRaw: parentPhone,
@@ -160,6 +173,7 @@ Deno.serve(async (req) => {
       held_until: hold.held_until,
       link,
       sms_sent: smsResult.ok,
+      sms_skipped: false,
       sms_error: smsResult.ok ? null : smsResult.error ?? null,
     });
   } catch (e) {
