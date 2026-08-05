@@ -330,7 +330,17 @@ const MembershipsAdmin = () => {
 
       </div>
 
-      <MembershipHoldsPanel />
+      <EnrollFamilyDialog
+        open={enrollFamilyOpen}
+        onOpenChange={setEnrollFamilyOpen}
+        onSent={() => {
+          setHoldsRefresh((v) => v + 1);
+          void fetchData();
+        }}
+      />
+
+      <MembershipHoldsPanel refreshKey={holdsRefresh} />
+
 
 
 
