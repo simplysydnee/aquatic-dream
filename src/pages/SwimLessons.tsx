@@ -4,137 +4,63 @@ import StarfishCurriculumBadge from "@/components/StarfishCurriculumBadge";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Users, Star, ChevronRight, DollarSign, Calendar, Clock, ShoppingBag, Loader2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Users, Clock, Loader2, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import LevelBadge from "@/components/LevelBadge";
 import type { SwimLevel } from "@/components/swim-enrollment/types";
+import { MEMBERSHIP_AGREEMENT_TEXT } from "@/components/swim-enrollment/membership-agreement";
 
-/* ───────── curriculum data ───────── */
+/* ───────── types ───────── */
 
-const preschoolCurriculum = [
-  {
-    group: "Little Fins",
-    level: "Preschool 1",
-    color: "White",
-    diveStatus: "Beginner",
-    gradient: "from-gray-50 to-gray-100/60",
-    borderColor: "border-gray-300",
-    accentColor: "text-gray-600",
-    badgeBg: "bg-white",
-    badgeRing: "ring-gray-300",
-    letter: "BM",
-    skills: [
-      "Water comfort & safety introduction",
-      "Guided submersion practice",
-      "Supported floating",
-      "Water entry & exit",
-    ],
-  },
-  {
-    group: "Reef Explorers",
-    level: "Preschool 2",
-    color: "Red",
-    diveStatus: "Foundations",
-    gradient: "from-red-50 to-red-100/60",
-    borderColor: "border-red-200",
-    accentColor: "text-red-600",
-    badgeBg: "bg-red-50",
-    badgeRing: "ring-red-300",
-    letter: "RE",
-    skills: [
-      "Submersion for 5+ seconds",
-      "Beginning independent floating",
-      "Front & back float introduction",
-      "Basic water safety skills",
-    ],
-  },
-];
+type PlanKey = "private" | "kid_group" | "adult_group";
 
-const schoolAgeCurriculum = [
-  {
-    group: "Sea Scouts",
-    level: "School Age 1",
-    color: "Yellow",
-    diveStatus: "Beginner",
-    gradient: "from-yellow-50 to-yellow-100/60",
-    borderColor: "border-yellow-200",
-    accentColor: "text-yellow-600",
-    badgeBg: "bg-yellow-50",
-    badgeRing: "ring-yellow-300",
-    letter: "SS",
-    skills: [
-      "Beginner water comfort & submersion",
-      "Independent floating introduction",
-      "Basic kick drills",
-      "Water safety fundamentals",
-    ],
-  },
-  {
-    group: "Deep Sea Divers",
-    level: "School Age 2",
-    color: "Blue",
-    diveStatus: "Intermediate",
-    gradient: "from-sky-50 to-sky-100/60",
-    borderColor: "border-sky-200",
-    accentColor: "text-sky-600",
-    badgeBg: "bg-sky-50",
-    badgeRing: "ring-sky-300",
-    letter: "DD",
-    skills: [
-      "Independent front & back float",
-      "Introduction to kicking drills",
-      "Treading water introduction",
-      "Basic stroke mechanics",
-    ],
-  },
-  {
-    group: "Ocean Masters",
-    level: "School Age 3",
-    color: "Green",
-    diveStatus: "Advanced",
-    gradient: "from-green-50 to-green-100/60",
-    borderColor: "border-green-200",
-    accentColor: "text-green-600",
-    badgeBg: "bg-green-50",
-    badgeRing: "ring-green-300",
-    letter: "OM",
-    skills: [
-      "Treading water 10+ seconds",
-      "Side-roll-side kick drill",
-      "Multiple stroke development",
-      "Endurance & swim completion",
-    ],
-  },
-];
-
-/* ───────── helpers ───────── */
-
-interface SessionPeriod {
+interface OpenSlot {
   id: string;
-  name: string;
-  start_date: string;
-  end_date: string;
-}
-
-interface SwimSession {
-  id: string;
-  swim_level: string;
-  age_group: string | null;
+  plan_key: PlanKey;
+  plan_name: string;
+  monthly_price_cents: number | null;
+  instructor_name: string | null;
+  day_of_week: number;
   start_time: string;
   end_time: string;
-  max_students: number;
-  session_name: string | null;
-  session_period_id: string | null;
-  registration_status: string;
+  swim_level: string | null;
+  accepted_levels: string[] | null;
+  spots_left: number;
+  is_full: boolean;
 }
 
-interface EnrollmentCount {
-  session_id: string;
-  count: number;
-}
+/* ───────── static copy ─────────
+   Prices, days and times are read live from standing_slots and
+   membership_plans through the get-open-slots function. Only the
+   descriptive one-liners below are hardcoded. */
 
-const levelOrder: Record<string, number> = { white: 0, red: 1, yellow: 2, blue: 3, green: 4 };
+const PROGRAM_ORDER: PlanKey[] = ["private", "kid_group", "adult_group"];
+
+const PROGRAM_COPY: Record<PlanKey, { name: string; blurb: string }> = {
+  private: { name: "Private Swim", blurb: "One-on-one · Ages 3 to 17" },
+  kid_group: { name: "Small Group", blurb: "Max 3 swimmers · Ages 3 to 17" },
+  adult_group: { name: "Adult Swim", blurb: "2 adults max · 18 and over" },
+};
+
+const LEVELS: { level: SwimLevel; group: string; line: string }[] = [
+  { level: "white", group: "Little Fins", line: "Water comfort, guided submersion, supported floating" },
+  { level: "red", group: "Reef Explorers", line: "Longer submersion and beginning independent floating" },
+  { level: "yellow", group: "Sea Scouts", line: "Independent floating and first kick drills" },
+  { level: "blue", group: "Deep Sea Divers", line: "Treading water and basic stroke mechanics" },
+  { level: "green", group: "Ocean Masters", line: "Multiple strokes, endurance, swim completion" },
+];
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/* ───────── helpers ───────── */
 
 function formatTime(t: string) {
   const [h, m] = t.split(":");
@@ -144,92 +70,139 @@ function formatTime(t: string) {
   return `${h12}:${m} ${ampm}`;
 }
 
-function formatDate(d: string) {
-  const date = new Date(d + "T00:00:00");
-  return date.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+function formatDollars(cents: number | null | undefined) {
+  if (cents == null) return null;
+  return `$${Math.round(cents / 100)}`;
 }
 
-const groupColors: Record<string, { bg: string; text: string; dot: string }> = {
-  white: { bg: "bg-gray-100", text: "text-gray-700", dot: "bg-gray-400" },
-  red: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-400" },
-  yellow: { bg: "bg-yellow-50", text: "text-yellow-700", dot: "bg-yellow-400" },
-  blue: { bg: "bg-sky-50", text: "text-sky-700", dot: "bg-sky-400" },
-  green: { bg: "bg-green-50", text: "text-green-700", dot: "bg-green-400" },
-};
-
-/* ───────── curriculum card ───────── */
-
-function CurriculumCard({ item, index }: { item: typeof preschoolCurriculum[0]; index: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay: index * 0.1 }}
-    >
-      <Card className={`h-full border ${item.borderColor} bg-gradient-to-br ${item.gradient} hover:shadow-xl transition-all duration-300 overflow-hidden`}>
-        <CardContent className="p-0">
-          <div className="flex flex-col items-center pt-8 pb-4 px-6">
-            <div className="mb-4 drop-shadow-md">
-              <LevelBadge level={item.color.toLowerCase() as SwimLevel} size={112} />
-            </div>
-            <h3 className="font-display text-2xl font-bold text-foreground">{item.group}</h3>
-            <div className="flex items-center gap-2 mt-1 mb-0.5">
-              <span className={`text-sm font-semibold ${item.accentColor}`}>{item.level}</span>
-              <span className="text-muted-foreground/40">•</span>
-              <span className="text-xs text-muted-foreground font-medium">{item.color} Level</span>
-            </div>
-            <span className={`text-[11px] font-semibold uppercase tracking-wider ${item.accentColor}`}>
-              🤿 {item.diveStatus}
-            </span>
-          </div>
-          <div className="px-6 pb-6">
-            <div className="border-t border-foreground/10 pt-4">
-              <ul className="space-y-2.5">
-                {item.skills.map((skill) => (
-                  <li key={skill} className="flex items-start gap-2.5 text-sm text-foreground/80">
-                    <Star className={`w-4 h-4 mt-0.5 shrink-0 fill-current ${item.accentColor}`} />
-                    {skill}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
+/** Collapses a program's slots into "Tue, Wed, Thu 4:00-7:00 PM · Saturday 10:00 AM-1:00 PM". */
+function summarizeWhen(slots: OpenSlot[]) {
+  const byDay = new Map<number, { start: string; end: string }>();
+  for (const s of slots) {
+    const cur = byDay.get(s.day_of_week);
+    if (!cur) {
+      byDay.set(s.day_of_week, { start: s.start_time, end: s.end_time });
+    } else {
+      if (s.start_time < cur.start) cur.start = s.start_time;
+      if (s.end_time > cur.end) cur.end = s.end_time;
+    }
+  }
+  // Group consecutive-listed days that share the same window.
+  const entries = Array.from(byDay.entries()).sort((a, b) => a[0] - b[0]);
+  const groups: { days: number[]; start: string; end: string }[] = [];
+  for (const [day, win] of entries) {
+    const last = groups[groups.length - 1];
+    if (last && last.start === win.start && last.end === win.end) {
+      last.days.push(day);
+    } else {
+      groups.push({ days: [day], start: win.start, end: win.end });
+    }
+  }
+  return groups
+    .map((g) => {
+      const days =
+        g.days.length === 1
+          ? DAY_NAMES[g.days[0]]
+          : g.days.map((d) => DAY_NAMES[d].slice(0, 3)).join(", ");
+      return `${days} ${formatTime(g.start)}–${formatTime(g.end)}`;
+    })
+    .join(" · ");
 }
 
-/* ───────── schedule section ───────── */
+/* ───────── data ───────── */
 
-function ScheduleSection() {
-  const [periods, setPeriods] = useState<SessionPeriod[]>([]);
-  const [sessions, setSessions] = useState<SwimSession[]>([]);
-  const [counts, setCounts] = useState<EnrollmentCount[]>([]);
+function useOpenSlots() {
+  const [slots, setSlots] = useState<OpenSlot[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
-      const today = new Date().toISOString().slice(0, 10);
-      const [periodsRes, sessionsRes] = await Promise.all([
-        (supabase as any).from("session_periods_public").select("id, name, start_date, end_date").eq("is_active", true).gte("end_date", today).order("start_date"),
-        supabase.from("swim_sessions").select("id, swim_level, age_group, start_time, end_time, max_students, session_name, session_period_id, registration_status").eq("is_active", true).eq("registration_status", "open").order("start_time"),
-      ]);
-      if (periodsRes.data) setPeriods(periodsRes.data);
-      if (sessionsRes.data) setSessions(sessionsRes.data);
-      const sessionIds = (sessionsRes.data || []).map((s) => s.id);
-      if (sessionIds.length) {
-        const { data: countsData } = await supabase.rpc("get_session_enrollment_counts", { _session_ids: sessionIds } as any);
-        if (countsData) {
-          setCounts((countsData as any[]).map((r: any) => ({ session_id: r.session_id, count: r.enrolled_count })));
-        }
-      }
+      const { data } = await supabase.functions.invoke("get-open-slots", { body: {} });
+      if (cancelled) return;
+      const rows = ((data as { slots?: OpenSlot[] } | null)?.slots ?? []).filter((s) =>
+        PROGRAM_ORDER.includes(s.plan_key),
+      );
+      setSlots(rows);
       setLoading(false);
     }
-    load();
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  return { slots, loading };
+}
+
+/* ───────── program cards ───────── */
+
+function ProgramCards({ slots, loading }: { slots: OpenSlot[]; loading: boolean }) {
+  return (
+    <section className="py-16 bg-card border-y">
+      <div className="container">
+        <div className="text-center mb-10">
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-2">
+            When each program runs
+          </h2>
+          <p className="text-muted-foreground">
+            One weekly lesson, the same time and the same coach, billed monthly.
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+            {PROGRAM_ORDER.map((key, i) => {
+              const programSlots = slots.filter((s) => s.plan_key === key);
+              const price = formatDollars(programSlots[0]?.monthly_price_cents);
+              const when = summarizeWhen(programSlots);
+              return (
+                <motion.div
+                  key={key}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08 }}
+                >
+                  <Link to="/join" className="block h-full">
+                    <Card className="h-full p-7 border-2 hover:border-primary/40 transition-all duration-300">
+                      <div className="flex items-baseline justify-between gap-3 mb-1">
+                        <h3 className="font-display text-2xl font-bold text-foreground">
+                          {PROGRAM_COPY[key].name}
+                        </h3>
+                        {price && (
+                          <span className="font-display text-2xl font-bold text-primary whitespace-nowrap">
+                            {price}
+                            <span className="text-sm font-medium text-muted-foreground">/mo</span>
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">{PROGRAM_COPY[key].blurb}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {when || "Times announced soon"}
+                      </p>
+                      <span className="mt-5 inline-flex items-center text-sm font-semibold text-coral">
+                        Join <ChevronRight className="w-4 h-4 ml-1" />
+                      </span>
+                    </Card>
+                  </Link>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ───────── schedule ───────── */
+
+function OpenTimes({ slots, loading }: { slots: OpenSlot[]; loading: boolean }) {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -238,143 +211,102 @@ function ScheduleSection() {
     );
   }
 
-  if (periods.length === 0) {
-    return <p className="text-center text-muted-foreground">Schedule coming soon — check back later!</p>;
-  }
-
-  const getCount = (id: string) => counts.find((c) => c.session_id === id)?.count ?? 0;
-
-  // Group sessions by time slot within a period, then by age group
-  function renderPeriod(period: SessionPeriod) {
-    const periodSessions = sessions.filter((s) => s.session_period_id === period.id);
-    const preschool = periodSessions
-      .filter((s) => s.age_group === "preschool-3-5")
-      .sort((a, b) => a.start_time.localeCompare(b.start_time) || (levelOrder[a.swim_level] ?? 99) - (levelOrder[b.swim_level] ?? 99));
-    const schoolAge = periodSessions
-      .filter((s) => s.age_group === "school-age-6-12")
-      .sort((a, b) => a.start_time.localeCompare(b.start_time) || (levelOrder[a.swim_level] ?? 99) - (levelOrder[b.swim_level] ?? 99));
-
-    // Group by unique start_time
-    function groupByTime(list: SwimSession[]) {
-      const grouped = new Map<string, SwimSession[]>();
-      list.forEach((s) => {
-        const key = s.start_time;
-        if (!grouped.has(key)) grouped.set(key, []);
-        grouped.get(key)!.push(s);
-      });
-      return Array.from(grouped);
-    }
-
-    const preschoolTimes = groupByTime(preschool);
-    const schoolAgeTimes = groupByTime(schoolAge);
-
-    if (preschoolTimes.length === 0 && schoolAgeTimes.length === 0) return null;
-
-    return (
-      <Card key={period.id} className="p-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Calendar className="w-5 h-5 text-primary" />
-          <h3 className="font-display text-xl font-bold text-foreground">{period.name}</h3>
-        </div>
-        <p className="text-sm text-muted-foreground mb-5">
-          {formatDate(period.start_date)} – {formatDate(period.end_date)} · Mon & Wed · 30 min lessons
-        </p>
-
-        {preschoolTimes.length > 0 && (
-          <>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              🐠 Preschool (Ages 3–5)
-            </h4>
-            <div className="space-y-2 mb-5">
-              {preschoolTimes.map(([time, slots]) => (
-                <TimeSlotRow key={time} time={time} slots={slots} getCount={getCount} />
-              ))}
-            </div>
-          </>
-        )}
-
-        {schoolAgeTimes.length > 0 && (
-          <>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              🏊 School-Age (Ages 6–12)
-            </h4>
-            <div className="space-y-2">
-              {schoolAgeTimes.map(([time, slots]) => (
-                <TimeSlotRow key={time} time={time} slots={slots} getCount={getCount} />
-              ))}
-            </div>
-          </>
-        )}
-      </Card>
-    );
-  }
-
   return (
-    <div className="grid gap-8 md:grid-cols-2 max-w-5xl mx-auto">
-      {periods.map(renderPeriod)}
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
+      {PROGRAM_ORDER.map((key) => {
+        const open = slots.filter((s) => s.plan_key === key && !s.is_full);
+        const days = Array.from(new Set(open.map((s) => s.day_of_week))).sort((a, b) => a - b);
+        return (
+          <Card key={key} className="p-6">
+            <h3 className="font-display text-xl font-bold text-foreground mb-4">
+              {PROGRAM_COPY[key].name}
+            </h3>
+            {open.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Every {PROGRAM_COPY[key].name} time is currently full. Join to get on the waitlist.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {days.map((day) => {
+                  // Several instructors can hold the same time; merge into one
+                  // chip per time (and per level for Small Group) with total spots.
+                  const merged = new Map<string, { time: string; level: string | null; spots: number }>();
+                  open
+                    .filter((s) => s.day_of_week === day)
+                    .forEach((s) => {
+                      const key = `${s.start_time}|${s.swim_level ?? ""}`;
+                      const cur = merged.get(key);
+                      if (cur) cur.spots += s.spots_left;
+                      else merged.set(key, { time: s.start_time, level: s.swim_level, spots: s.spots_left });
+                    });
+                  const chips = Array.from(merged.values()).sort(
+                    (a, b) => a.time.localeCompare(b.time) || (a.level ?? "").localeCompare(b.level ?? ""),
+                  );
+                  return (
+                    <div key={day}>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                        {DAY_NAMES[day]}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {chips.map((c) => (
+                          <span
+                            key={`${c.time}-${c.level ?? ""}`}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground"
+                          >
+                            <Clock className="w-3 h-3 text-muted-foreground" />
+                            {formatTime(c.time)}
+                            {c.level && (
+                              <span className="opacity-70">
+                                · {LEVELS.find((l) => l.level === c.level)?.group ?? c.level}
+                              </span>
+                            )}
+                            <span className="opacity-70">
+                              · {c.spots} {c.spots === 1 ? "spot" : "spots"}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+              </div>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
 }
 
-function TimeSlotRow({ time, slots, getCount }: { time: string; slots: SwimSession[]; getCount: (id: string) => number }) {
-  return (
-    <div className="flex items-start gap-3 py-2.5 px-3 rounded-lg bg-muted/50">
-      <div className="flex items-center gap-1.5 min-w-[80px] pt-0.5">
-        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-sm font-semibold text-foreground">{formatTime(time)}</span>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {slots.map((s) => {
-          const enrolled = getCount(s.id);
-          const spotsLeft = s.max_students - enrolled;
-          const full = spotsLeft <= 0;
-          const colors = groupColors[s.swim_level] ?? groupColors.blue;
-          return (
-            <span
-              key={s.id}
-              className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
-                full ? "bg-muted text-muted-foreground line-through" : `${colors.bg} ${colors.text}`
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${full ? "bg-muted-foreground/40" : colors.dot}`} />
-              {s.session_name || s.swim_level}
-              {!full && (
-                <span className="text-[10px] opacity-70">· {spotsLeft} {spotsLeft === 1 ? "spot" : "spots"}</span>
-              )}
-              {full && <span className="text-[10px]">Full</span>}
-            </span>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ───────── main page ───────── */
+/* ───────── page ───────── */
 
 const SwimLessons = () => {
+  const { slots, loading } = useOpenSlots();
+
   return (
     <main>
       <SEO
-        title="Swim Lesson Levels & Pricing — Aquatic Dreams Swim Modesto"
-        description="Explore our 5 color-coded swim levels for ages 3–12 with pricing, weekly schedule, and the Starfish Aquatics curriculum. Max 3 students per instructor."
+        title="Swim Memberships: Times & Monthly Pricing — Aquatic Dreams"
+        description="Weekly swim lessons for kids and adults in Modesto on a flat monthly membership. See private, small group, and adult swim times, pricing, and open spots."
         path="/swim-lessons"
       />
+
       {/* Hero */}
       <section className="bg-gradient-to-br from-primary/10 to-background py-20">
         <div className="container">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl">
-            <p className="text-primary font-medium tracking-wider uppercase text-sm mb-3">Swim Lessons</p>
+            <p className="text-primary font-medium tracking-wider uppercase text-sm mb-3">Times & pricing</p>
             <h1 className="font-display text-4xl md:text-6xl font-bold text-foreground mb-6">
-              Where Every Swimmer<br />
-              <span className="text-primary">Thrives</span>
+              Your weekly spot,<br />
+              <span className="text-primary">billed monthly</span>
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed mb-8 max-w-xl">
-              Five progressive groups based on the Starfish Aquatics system,
-              maximum 3 students per instructor — because every child deserves to be seen in the water.
+              One lesson a week at the same time with the same coach, for kids and adults. A flat monthly
+              rate, no re-registering, and a maximum of 3 swimmers per instructor.
             </p>
             <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
-              <Link to="/swim-enrollment">Find Your Level & Enroll</Link>
+              <Link to="/join">Join</Link>
             </Button>
             <div className="mt-10 max-w-xl">
               <StarfishCurriculumBadge variant="stacked" className="md:items-start md:text-left" />
@@ -383,153 +315,104 @@ const SwimLessons = () => {
         </div>
       </section>
 
-      {/* Key stats */}
-      <section className="bg-secondary text-secondary-foreground py-12">
-        <div className="container">
-          <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
-            <div className="text-center">
-              <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Max Class Size</p>
-              <p className="font-display text-5xl font-bold text-primary">3</p>
-              <p className="text-sm text-secondary-foreground/70">students per instructor</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Lesson Duration</p>
-              <p className="font-display text-5xl font-bold text-primary">30</p>
-              <p className="text-sm text-secondary-foreground/70">minutes per lesson</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Group Lesson</p>
-              <p className="font-display text-5xl font-bold text-primary">$30</p>
-              <p className="text-sm text-secondary-foreground/70">per lesson</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-secondary-foreground/60 uppercase tracking-wider mb-1">Private</p>
-              <p className="font-display text-5xl font-bold text-primary">$65</p>
-              <p className="text-sm text-secondary-foreground/70">per lesson</p>
-            </div>
-          </div>
-          <div className="text-center mt-8 space-y-2">
-            <p className="text-secondary-foreground/60 text-sm max-w-md mx-auto">
-              Smaller classes mean more attention, faster progress, and a safer learning environment for every child.
-            </p>
-            <p className="text-secondary-foreground/70 text-sm flex items-center justify-center gap-1">
-              <ShoppingBag className="w-4 h-4" />
-              $45 registration fee — includes swim bag, swim cap & goggles
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* Programs */}
+      <ProgramCards slots={slots} loading={loading} />
 
-      {/* Refund Policy */}
-      <section className="py-12 bg-background">
-        <div className="container max-w-4xl">
-          <div className="rounded-xl border border-border bg-card p-6 md:p-8">
-            <h3 className="font-display text-2xl font-bold text-foreground mb-4">
-              Pricing & Refund Policy
-            </h3>
-            <ul className="space-y-3 text-sm md:text-base text-muted-foreground leading-relaxed">
-              <li>
-                <strong className="text-foreground">Registration fee ($45):</strong> One-time and{" "}
-                <strong>non-refundable</strong>. Includes swim bag, cap, and goggles.
-              </li>
-              <li>
-                <strong className="text-foreground">New swimmers:</strong> $240 session fee is due on the{" "}
-                <strong>first day of lessons</strong> (cash, check, or secure payment link).
-              </li>
-              <li>
-                <strong className="text-foreground">Returning swimmers:</strong> $240 session fee is paid at the time of enrollment.
-              </li>
-              <li>
-                <strong className="text-foreground">Session fee refunds:</strong> Non-refundable once paid, except in documented circumstances (illness with doctor's note, injury, relocation). Email{" "}
-                <a href="mailto:info@aquaticdreamsswim.com" className="text-primary underline">
-                  info@aquaticdreamsswim.com
-                </a>{" "}
-                <strong>before the second lesson</strong>; reviewed case-by-case and prorated when approved.
-              </li>
-              <li>
-                <strong className="text-foreground">Missed lessons / no-shows:</strong> Not refunded, credited, or rescheduled as makeups.
-              </li>
-              <li>
-                <strong className="text-foreground">Cancellations by Aquatic Dreams</strong> (weather, facility, instructor): We reschedule the lesson or issue a session credit.
-              </li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* Preschool Curriculum */}
-      <section className="py-20">
-        <div className="container">
-          <div className="text-center mb-14">
-            <p className="text-sm font-semibold uppercase tracking-wider text-primary mb-2">Ages 3–5</p>
-            <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">Preschool Program</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              White & Red levels — building water comfort and safety foundations for our youngest swimmers.
-            </p>
-          </div>
-          <div className="grid gap-8 md:grid-cols-2 max-w-3xl mx-auto">
-            {preschoolCurriculum.map((item, i) => (
-              <CurriculumCard key={item.group} item={item} index={i} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* School-Age Curriculum */}
-      <section className="py-20 bg-muted/30">
-        <div className="container">
-          <div className="text-center mb-14">
-            <p className="text-sm font-semibold uppercase tracking-wider text-primary mb-2">Ages 6–12</p>
-            <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">School-Age Program</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              Yellow → Blue → Green levels — progressing from beginner fundamentals through intermediate skills to advanced swimming.
-            </p>
-          </div>
-          <div className="grid gap-8 md:grid-cols-3 max-w-5xl mx-auto">
-            {schoolAgeCurriculum.map((item, i) => (
-              <CurriculumCard key={item.group} item={item} index={i} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Private lessons CTA */}
-      <section className="bg-secondary text-secondary-foreground py-16">
-        <div className="container text-center">
-          <h2 className="font-display text-3xl font-bold mb-4">Private Lessons</h2>
-          <p className="text-secondary-foreground/70 max-w-xl mx-auto mb-6">
-            Want one on one attention? Book a private lesson online at $65 per lesson
-            and pick your instructor, day, and time.
-          </p>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl">
-              <Link to="/book-private-lesson">Book a Private Lesson <ChevronRight className="ml-1 w-4 h-4" /></Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-
-      {/* Schedule */}
+      {/* Open times */}
       <section className="py-20">
         <div className="container">
           <div className="text-center mb-12">
-            <h2 className="font-display text-3xl font-bold text-foreground mb-3">Class Schedule</h2>
-            <p className="text-muted-foreground">Monday & Wednesday · 30 minute lessons · Max 3 students per class</p>
-            <p className="text-xs text-muted-foreground mt-1">Preschool and school-age times are staggered to ease parking</p>
-            <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base mt-6">
-              <Link to="/swim-enrollment">Enroll Now</Link>
-            </Button>
+            <h2 className="font-display text-3xl font-bold text-foreground mb-3">Open times</h2>
+            <p className="text-muted-foreground">
+              Live availability. Spots are held as families join.
+            </p>
           </div>
 
-          <ScheduleSection />
+          <OpenTimes slots={slots} loading={loading} />
 
-          <div className="text-center mt-8">
-            <p className="text-muted-foreground text-sm mb-2">
-              <Users className="w-4 h-4 inline mr-1" /> Every class has a maximum of 3 students per instructor.
+          <div className="text-center mt-10">
+            <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
+              <Link to="/join">Join</Link>
+            </Button>
+            <p className="text-muted-foreground text-sm mt-4 flex items-center justify-center gap-1">
+              <Users className="w-4 h-4" /> Maximum of 3 swimmers per instructor.
             </p>
-            <p className="text-muted-foreground text-sm flex items-center justify-center gap-1">
-              <DollarSign className="w-4 h-4" /> $30/lesson (group) · $65 (private)
+          </div>
+        </div>
+      </section>
+
+      {/* Levels */}
+      <section className="py-16 bg-muted/30">
+        <div className="container max-w-5xl">
+          <div className="text-center mb-10">
+            <h2 className="font-display text-3xl font-bold text-foreground mb-3">Our levels</h2>
+            <p className="text-muted-foreground">
+              Not sure which level? The signup will ask a few questions and recommend one.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {LEVELS.map((l) => (
+              <div key={l.level} className="flex items-center gap-3 rounded-xl border bg-card p-4">
+                <LevelBadge level={l.level} size={48} className="shrink-0" />
+                <div>
+                  <p className="font-semibold text-foreground leading-tight">{l.group}</p>
+                  <p className="text-sm text-muted-foreground leading-snug">{l.line}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Billing summary */}
+      <section className="py-16">
+        <div className="container max-w-4xl">
+          <div className="rounded-xl border border-border bg-card p-6 md:p-8">
+            <h2 className="font-display text-2xl font-bold text-foreground mb-4">
+              Billing, closures, and cancellation
+            </h2>
+            <ul className="space-y-3 text-sm md:text-base text-muted-foreground leading-relaxed">
+              <li>
+                <strong className="text-foreground">Flat monthly rate.</strong> Your membership renews
+                automatically on the 1st of each month. Some months have 4 lessons and some have 5; the
+                rate does not change.
+              </li>
+              <li>
+                <strong className="text-foreground">Cancel anytime with 30 days notice.</strong> You are
+                charged for one more monthly cycle and stay enrolled through the end of that final paid
+                month. Final months are charged in full and no partial refunds are issued.
+              </li>
+              <li>
+                <strong className="text-foreground">Missed lessons.</strong> Lessons your swimmer misses
+                are not refunded, credited, or made up.
+              </li>
+              <li>
+                <strong className="text-foreground">Planned holiday closures.</strong> No class and no
+                credit. Holiday weeks are already accounted for in the monthly rate.
+              </li>
+              <li>
+                <strong className="text-foreground">Unexpected closures on our end.</strong> We issue an
+                account credit for that lesson, applied to your next invoice. We do not schedule makeups.
+              </li>
+            </ul>
+            <p className="text-sm text-muted-foreground mt-6">
+              This is a summary. Where it and the membership agreement disagree, the agreement wins.{" "}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button type="button" className="text-primary underline underline-offset-4">
+                    Read the full membership agreement
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Membership agreement</DialogTitle>
+                  </DialogHeader>
+                  <p className="whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed">
+                    {MEMBERSHIP_AGREEMENT_TEXT}
+                  </p>
+                </DialogContent>
+              </Dialog>
+              .
             </p>
           </div>
         </div>
