@@ -3,6 +3,12 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient } from "../_shared/stripe.ts";
 import { computeMembershipQuote } from "../_shared/membership-pricing.ts";
+import { resolveParentStripeCustomer, verifySavedCard } from "../_shared/stripe-customer.ts";
+import {
+  completeMembershipWithSavedCard,
+  MembershipSlotFullError,
+  MembershipCardDeclinedError,
+} from "../_shared/membership-completion.ts";
 
 type StripeEnv = "sandbox" | "live";
 
@@ -45,6 +51,7 @@ serve(async (req) => {
       sms_consent_text,
       sms_consent_version,
       returnUrl,
+      reuse_token,
     } = body ?? {};
 
     // SECURITY: the Stripe environment is server-controlled only. Any
@@ -192,24 +199,110 @@ serve(async (req) => {
       console.error("[create-membership-checkout] pending insert failed", pendErr);
       return json({ error: "Could not stage enrollment" }, 500);
     }
+    let pendingId = pending.id as string;
 
-    let customer: any;
+
+
+    // One Stripe customer per parent email. The resolver is shared so every
+    // membership for a family lands on the same customer record and the card
+    // they saved last time is the card we can offer next time.
+    let customerId: string;
     try {
-      const existing = await stripe.customers.list({ email: parent_email, limit: 1 });
-      customer = existing?.data?.[0];
-      if (!customer) {
-        customer = await stripe.customers.create({
-          email: parent_email,
-          name: payload.parent_name || undefined,
-          phone: payload.parent_phone || undefined,
-        });
-      }
+      const resolved = await resolveParentStripeCustomer(stripe, {
+        email: payload.parent_email,
+        name: payload.parent_name || null,
+        phone: payload.parent_phone || null,
+      });
+      customerId = resolved.customerId;
     } catch (e: any) {
       console.error("[create-membership-checkout] customer resolve failed", {
         type: e?.type, code: e?.code, message: e?.message, raw: e?.raw?.message,
       });
       return json({ error: `Stripe customer setup failed: ${e?.message || "unknown"}`, stripe_type: e?.type, stripe_code: e?.code }, 500);
     }
+
+    // Saved-card path. The reuse token was minted by
+    // lookup-parent-card-on-file-public, which already proved this browser
+    // knows the family's email AND parent name, so no Checkout session is
+    // needed: we complete the membership on the card already on file.
+    if (typeof reuse_token === "string" && reuse_token.length >= 32) {
+      const { data: tok } = await supabaseAdmin
+        .from("card_reuse_tokens")
+        .select("token, parent_email, stripe_customer_id, stripe_payment_method_id, expires_at, consumed_at")
+        .eq("token", reuse_token)
+        .maybeSingle();
+
+      const tokenOk =
+        tok &&
+        !(tok as any).consumed_at &&
+        new Date((tok as any).expires_at).getTime() > Date.now() &&
+        ((tok as any).parent_email || "").toLowerCase() === payload.parent_email;
+
+      if (tokenOk) {
+        const card = await verifySavedCard(
+          stripe,
+          (tok as any).stripe_customer_id,
+          (tok as any).stripe_payment_method_id,
+        );
+        if (card) {
+          try {
+            const result = await completeMembershipWithSavedCard({
+              pendingId,
+              customerId: (tok as any).stripe_customer_id,
+              paymentMethodId: card.paymentMethodId,
+              env: ENV,
+            });
+            await supabaseAdmin
+              .from("card_reuse_tokens")
+              .update({ consumed_at: new Date().toISOString() })
+              .eq("token", (tok as any).token);
+
+            const { data: mem } = await supabaseAdmin
+              .from("memberships")
+              .select("manage_token")
+              .eq("id", result.membershipId)
+              .maybeSingle();
+
+            return json({
+              savedCardUsed: true,
+              membershipId: result.membershipId,
+              manageToken: (mem?.manage_token as string | null) ?? null,
+              firstChargeCents: result.firstChargeCents,
+              monthlyCents: result.monthlyCents,
+              card: { brand: card.brand, last4: card.last4 },
+            });
+          } catch (e: any) {
+            if (e instanceof MembershipSlotFullError) {
+              return json({
+                slotFull: true,
+                error:
+                  "This class time filled up while you were checking out. You have not been charged. Our team will call you right away to pick a new time.",
+              }, 409);
+            }
+            if (e instanceof MembershipCardDeclinedError) {
+              return json({
+                declined: true,
+                error:
+                  "Your bank declined the card we had on file. Please enter a different card below.",
+              }, 402);
+            }
+            // Anything else: fall through to normal Checkout so the parent
+            // can still enroll by entering a card.
+            console.error("[create-membership-checkout] saved-card completion failed", e?.message || e);
+            // The pending row above may already be claimed by the failed
+            // attempt, so stage a fresh one for the Checkout fallback.
+            const { data: retryPending } = await supabaseAdmin
+              .from("pending_memberships")
+              .insert({ payload })
+              .select("id")
+              .single();
+            if (retryPending?.id) pendingId = retryPending.id as string;
+          }
+        }
+      }
+    }
+
+
 
     // SETUP-mode embedded Checkout: collects and saves the card only; no
     // charge here. Keep this session creation deliberately minimal: all
@@ -221,7 +314,7 @@ serve(async (req) => {
       session = await stripe.checkout.sessions.create({
         mode: "setup",
         ui_mode: "embedded_page",
-        customer: customer.id,
+        customer: customerId,
         currency: "usd",
         return_url:
           returnUrl || `${origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
@@ -263,7 +356,7 @@ serve(async (req) => {
     await supabaseAdmin
       .from("pending_memberships")
       .update({ stripe_session_id: session.id })
-      .eq("id", pending.id);
+      .eq("id", pendingId);
 
     return json({
       clientSecret: session.client_secret,

@@ -13,7 +13,9 @@ const corsHeaders = {
 };
 
 const BodySchema = z.object({
-  environment: z.enum(["sandbox", "live"]),
+  // Accepted for backwards compatibility but ignored: the Stripe environment
+  // is server-controlled via PAYMENTS_ENV only.
+  environment: z.enum(["sandbox", "live"]).optional(),
   parent_email: z.string().email().max(200),
   parent_first_name: z.string().min(1).max(80),
   parent_last_name: z.string().min(1).max(80),
@@ -45,7 +47,13 @@ Deno.serve(async (req) => {
   try {
     const parsed = BodySchema.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) return j({ found: false }, 200);
-    const { environment, parent_email, parent_first_name, parent_last_name } = parsed.data;
+    const { parent_email, parent_first_name, parent_last_name } = parsed.data;
+
+    const configuredEnv = Deno.env.get("PAYMENTS_ENV");
+    if (configuredEnv !== "live" && configuredEnv !== "sandbox") {
+      console.error("[lookup-parent-card-on-file-public] PAYMENTS_ENV missing or invalid");
+      return j({ found: false }, 200);
+    }
 
     const email = norm(parent_email);
     const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0]?.trim() || "unknown";
@@ -68,16 +76,28 @@ Deno.serve(async (req) => {
       .neq("status", "cancelled")
       .limit(20);
 
+    // Memberships count too: a family whose only history is a Swimbership
+    // still has a Stripe customer with a saved card.
+    const { data: memberMatches } = await supabase
+      .from("memberships")
+      .select("id, parent_first_name, parent_last_name")
+      .ilike("parent_email", email)
+      .neq("status", "cancelled")
+      .limit(20);
+
     const fn = norm(parent_first_name);
     const ln = norm(parent_last_name);
-    const nameMatched = ((matches as any[]) || []).some((r) => {
+    const memberNameMatched = ((memberMatches as any[]) || []).some((r) =>
+      norm(r.parent_first_name || "") === fn && norm(r.parent_last_name || "") === ln
+    );
+    const nameMatched = memberNameMatched || ((matches as any[]) || []).some((r) => {
       const f = norm(r.parent_first_name || (r.parent_name || "").split(" ")[0] || "");
       const l = norm(r.parent_last_name || (r.parent_name || "").split(" ").slice(1).join(" ") || "");
       return f === fn && l === ln;
     });
     if (!nameMatched) return j({ found: false }, 200);
 
-    const stripe = createStripeClient(environment as StripeEnv);
+    const stripe = createStripeClient(configuredEnv as StripeEnv);
     const result = await findReusableCardForEmail(supabase, stripe, email);
     if (!result.found) return j({ found: false }, 200);
 

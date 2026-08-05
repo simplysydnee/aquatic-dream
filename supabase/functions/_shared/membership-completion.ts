@@ -259,8 +259,66 @@ export async function completeMembershipFromSetupSession(
     throw new Error(`Pending membership not found for checkout session ${sessionId}`);
   }
 
-  const pendingId = pendingBySession.id as string;
-  const payload = asRecord(pendingBySession.payload);
+  return finishMembership({
+    pendingId: pendingBySession.id as string,
+    payload: asRecord(pendingBySession.payload),
+    customerId,
+    sessionId,
+    env,
+    resolvePaymentMethod: async (stripe) => {
+      const setupIntent = asRecord(await stripe.setupIntents.retrieve(setupIntentId));
+      if (setupIntent.status !== "succeeded") {
+        throw new Error(
+          `SetupIntent ${setupIntentId} status is ${String(setupIntent.status || "unknown")}`,
+        );
+      }
+      const pm = asString(setupIntent.payment_method);
+      if (!pm) throw new Error(`No payment_method on SetupIntent ${setupIntentId}`);
+      return pm;
+    },
+  });
+}
+
+/**
+ * Saved-card path: the family already has one Stripe customer for their email
+ * with a usable card on file, so there is no Checkout session at all. Every
+ * downstream guarantee (atomic claim, capacity pre-flight, idempotent
+ * subscription create, occurrence upsert) is shared with the Checkout path.
+ */
+export async function completeMembershipWithSavedCard(options: {
+  pendingId: string;
+  customerId: string;
+  paymentMethodId: string;
+  env: StripeEnv;
+}): Promise<MembershipCompletionResult> {
+  const { data: pending, error } = await supabase
+    .from("pending_memberships")
+    .select("id, payload")
+    .eq("id", options.pendingId)
+    .maybeSingle();
+  if (error) throw new Error(`Pending membership lookup failed: ${error.message}`);
+  if (!pending?.id) throw new Error(`Pending membership ${options.pendingId} not found`);
+
+  return finishMembership({
+    pendingId: pending.id as string,
+    payload: asRecord(pending.payload),
+    customerId: options.customerId,
+    sessionId: null,
+    env: options.env,
+    resolvePaymentMethod: async () => options.paymentMethodId,
+  });
+}
+
+async function finishMembership(options: {
+  pendingId: string;
+  payload: JsonObject;
+  customerId: string;
+  sessionId: string | null;
+  env: StripeEnv;
+  resolvePaymentMethod: (stripe: ReturnType<typeof createStripeClient>) => Promise<string>;
+}): Promise<MembershipCompletionResult> {
+  const { pendingId, payload, customerId, sessionId, env } = options;
+
   const existingSubscriptionId = asString(payload.stripe_subscription_id);
   if (existingSubscriptionId) {
     return ensureMembershipRecord({
@@ -304,17 +362,12 @@ export async function completeMembershipFromSetupSession(
   }
 
   const stripe = createStripeClient(env);
-  const setupIntent = asRecord(await stripe.setupIntents.retrieve(setupIntentId));
-  if (setupIntent.status !== "succeeded") {
-    throw new Error(`SetupIntent ${setupIntentId} status is ${String(setupIntent.status || "unknown")}`);
-  }
-
-  const paymentMethodId = asString(setupIntent.payment_method);
-  if (!paymentMethodId) throw new Error(`No payment_method on SetupIntent ${setupIntentId}`);
+  const paymentMethodId = await options.resolvePaymentMethod(stripe);
 
   await stripe.customers.update(customerId, {
     invoice_settings: { default_payment_method: paymentMethodId },
   });
+
 
   const stripePriceId = asString(payload.stripe_price_id);
   const stripeProductId = asString(payload.stripe_product_id);
@@ -438,7 +491,7 @@ async function ensureMembershipRecord(options: {
   subscriptionId: string;
   customerId: string;
   pendingId: string;
-  sessionId: string;
+  sessionId: string | null;
   payload: JsonObject;
   env: StripeEnv;
   alreadyProcessed: boolean;
@@ -525,7 +578,12 @@ async function ensureMembershipRecord(options: {
       const { data: winner } = await supabase
         .from("memberships")
         .select("id")
-        .or(`stripe_subscription_id.eq.${options.subscriptionId},stripe_session_id.eq.${options.sessionId}`)
+        .or(
+          options.sessionId
+            ? `stripe_subscription_id.eq.${options.subscriptionId},stripe_session_id.eq.${options.sessionId}`
+            : `stripe_subscription_id.eq.${options.subscriptionId}`,
+        )
+
         .limit(1)
         .maybeSingle();
       if (winner?.id) {

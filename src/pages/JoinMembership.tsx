@@ -749,37 +749,42 @@ function JoinMembershipForm() {
   }, [plan, slot]);
 
 
+  const buildCheckoutBody = useCallback(() => {
+    if (!plan || !slot) throw new Error("Missing plan or slot");
+    return {
+      plan_key: plan.plan_key,
+      standing_slot_id: slot.id,
+      child_first_name: form.child_first,
+      child_last_name: form.child_last,
+      child_dob: childDob,
+      swim_level: plan.plan_key === "kid_group" ? swimLevel : null,
+      parent_first_name: form.parent_first,
+      parent_last_name: form.parent_last,
+      parent_name: `${form.parent_first} ${form.parent_last}`.trim(),
+      parent_email: form.parent_email,
+      parent_phone: form.parent_phone,
+      is_first_time: form.is_first_time === "yes",
+      has_medical: form.has_medical === "yes",
+      medical_notes: form.medical_notes,
+      notes: form.notes,
+      waiver_id: waiverId,
+      recurring_consent: authRecurring,
+      sms_consent: smsConsent,
+      sms_consent_text: smsConsent ? SMS_CONSENT_DISCLOSURE : null,
+      sms_consent_version: smsConsent ? SMS_CONSENT_VERSION : null,
+      recurring_consent_version: MEMBERSHIP_AGREEMENT_VERSION,
+      membership_agreement_version: MEMBERSHIP_AGREEMENT_VERSION,
+      membership_agreement_text: MEMBERSHIP_AGREEMENT_TEXT,
+      membership_agreement_accepted: agreementAccepted,
+      returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}${holdToken ? `&hold=${encodeURIComponent(holdToken)}` : ""}`,
+      environment: getStripeEnvironment(),
+    };
+  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId, agreementAccepted, holdToken]);
+
   const fetchClientSecret = useCallback(async (): Promise<string> => {
     if (!plan || !slot) throw new Error("Missing plan or slot");
     const { data, error } = await supabase.functions.invoke("create-membership-checkout", {
-      body: {
-        plan_key: plan.plan_key,
-        standing_slot_id: slot.id,
-        child_first_name: form.child_first,
-        child_last_name: form.child_last,
-        child_dob: childDob,
-        swim_level: plan.plan_key === "kid_group" ? swimLevel : null,
-        parent_first_name: form.parent_first,
-        parent_last_name: form.parent_last,
-        parent_name: `${form.parent_first} ${form.parent_last}`.trim(),
-        parent_email: form.parent_email,
-        parent_phone: form.parent_phone,
-        is_first_time: form.is_first_time === "yes",
-        has_medical: form.has_medical === "yes",
-        medical_notes: form.medical_notes,
-        notes: form.notes,
-        waiver_id: waiverId,
-        recurring_consent: authRecurring,
-        sms_consent: smsConsent,
-        sms_consent_text: smsConsent ? SMS_CONSENT_DISCLOSURE : null,
-        sms_consent_version: smsConsent ? SMS_CONSENT_VERSION : null,
-        recurring_consent_version: MEMBERSHIP_AGREEMENT_VERSION,
-        membership_agreement_version: MEMBERSHIP_AGREEMENT_VERSION,
-        membership_agreement_text: MEMBERSHIP_AGREEMENT_TEXT,
-        membership_agreement_accepted: agreementAccepted,
-        returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}${holdToken ? `&hold=${encodeURIComponent(holdToken)}` : ""}`,
-        environment: getStripeEnvironment(),
-      },
+      body: buildCheckoutBody(),
     });
     if (error || !data?.clientSecret) {
       const msg = String(error?.message || data?.error || "Failed to start checkout");
@@ -791,7 +796,75 @@ function JoinMembershipForm() {
       monthlyCents: data.monthlyCents ?? plan.monthly_price_cents,
     });
     return data.clientSecret;
-  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId, holdToken]);
+  }, [plan, slot, buildCheckoutBody]);
+
+  // ---- Saved card on file (one Stripe customer per parent email) ----
+  type SavedCardOffer = { brand: string; last4: string; reuse_token: string };
+  const [savedCard, setSavedCard] = useState<SavedCardOffer | null>(null);
+  const [savedCardChecked, setSavedCardChecked] = useState(false);
+  const [useNewCard, setUseNewCard] = useState(false);
+  const [savedCardSubmitting, setSavedCardSubmitting] = useState(false);
+  const [savedCardError, setSavedCardError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (step !== 7 || savedCardChecked) return;
+    if (!form.parent_email || !form.parent_first || !form.parent_last) return;
+    let cancelled = false;
+    setSavedCardChecked(true);
+    void supabase.functions
+      .invoke("lookup-parent-card-on-file-public", {
+        body: {
+          parent_email: form.parent_email,
+          parent_first_name: form.parent_first,
+          parent_last_name: form.parent_last,
+        },
+      })
+      .then(({ data }) => {
+        if (cancelled || !data?.found) return;
+        setSavedCard({ brand: data.brand, last4: data.last4, reuse_token: data.reuse_token });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [step, savedCardChecked, form.parent_email, form.parent_first, form.parent_last]);
+
+  const paySavedCard = useCallback(async () => {
+    if (!savedCard || !plan) return;
+    setSavedCardSubmitting(true);
+    setSavedCardError(null);
+    const { data, error } = await supabase.functions.invoke("create-membership-checkout", {
+      body: { ...buildCheckoutBody(), reuse_token: savedCard.reuse_token },
+    });
+    setSavedCardSubmitting(false);
+
+    if (data?.savedCardUsed) {
+      setCharges({
+        firstChargeCents: data.firstChargeCents ?? 0,
+        monthlyCents: data.monthlyCents ?? plan.monthly_price_cents,
+      });
+      setManageToken((data.manageToken as string | null) ?? null);
+      setReturned(true);
+      setReturnFinalizing(false);
+      setReturnError(null);
+      setStep(8);
+      if (holdToken) {
+        void supabase.functions.invoke("get-membership-hold", {
+          body: { token: holdToken, action: "convert" },
+        });
+      }
+      return;
+    }
+
+    // Every failure lands the parent on normal card entry, never a dead end.
+    const message = String(
+      data?.error || error?.message || "We could not use your card on file. Please enter a card.",
+    );
+    setSavedCard(null);
+    setUseNewCard(true);
+    setSavedCardError(message);
+  }, [savedCard, plan, buildCheckoutBody, holdToken]);
+
 
   const [returned, setReturned] = useState(false);
   const [returnFinalizing, setReturnFinalizing] = useState(false);
@@ -2003,14 +2076,55 @@ function JoinMembershipForm() {
                   <strong>{fmtPrice(plan.monthly_price_cents)}</strong> on the 1st of every month
                   until you cancel.
                 </p>
-                <div className="overflow-hidden rounded-lg border border-[#2a5e84]/20">
-                  <EmbeddedCheckoutProvider
-                    stripe={getStripe()}
-                    options={{ fetchClientSecret }}
-                  >
-                    <EmbeddedCheckout />
-                  </EmbeddedCheckoutProvider>
-                </div>
+                {savedCardError && (
+                  <div className="mb-4 rounded-lg border border-[#F58B76] bg-[#F58B76]/10 px-4 py-3 text-sm text-[#1a3a8a]">
+                    {savedCardError}
+                  </div>
+                )}
+
+                {savedCard && !useNewCard ? (
+                  <div className="rounded-lg border border-[#2a5e84]/20 p-4">
+                    <p className="text-sm font-medium text-[#1a3a8a]">
+                      Use your card on file
+                    </p>
+                    <p className="mt-1 text-sm text-[#2a5e84]">
+                      {savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1)} ending in{" "}
+                      {savedCard.last4}
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => void paySavedCard()}
+                      disabled={savedCardSubmitting}
+                      className="mt-4 w-full bg-[#F58B76] py-6 text-base hover:bg-[#F58B76]/90"
+                    >
+                      {savedCardSubmitting
+                        ? "Confirming..."
+                        : quote
+                          ? `Pay ${fmtPrice(quote.firstChargeCents)} and enroll`
+                          : "Pay and enroll"}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUseNewCard(true);
+                        setSavedCardError(null);
+                      }}
+                      className="mt-3 w-full text-sm text-[#2a5e84] hover:underline"
+                    >
+                      Use a different card
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-lg border border-[#2a5e84]/20">
+                    <EmbeddedCheckoutProvider
+                      stripe={getStripe()}
+                      options={{ fetchClientSecret }}
+                    >
+                      <EmbeddedCheckout />
+                    </EmbeddedCheckoutProvider>
+                  </div>
+                )}
+
               </>
             )}
 
