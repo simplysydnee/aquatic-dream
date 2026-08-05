@@ -433,6 +433,17 @@ const MembershipsAdmin = () => {
               ))}
             </SelectContent>
           </Select>
+          <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+            <SelectTrigger className="w-[12rem]"><SelectValue placeholder="Payment" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any payment state</SelectItem>
+              <SelectItem value="problem">Payment problems</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="awaiting">Awaiting first charge</SelectItem>
+            </SelectContent>
+          </Select>
+
           <label className="flex items-center gap-2 text-sm">
             <Switch checked={includeInactive} onCheckedChange={setIncludeInactive} />
             Include cancelled and paused
