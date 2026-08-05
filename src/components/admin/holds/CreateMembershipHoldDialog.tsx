@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { formatPhone } from "@/lib/phone";
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
 import { resolveSwimmerWaiver } from "@/lib/swimmerWaiver";
+import { useFamilySearch, type FamilyMatch } from "@/hooks/useFamilySearch";
 
 export interface HoldSlotTarget {
   id: string;
@@ -53,21 +54,13 @@ const splitName = (full?: string | null) => {
   return { first: parts[0] || "", last: parts.slice(1).join(" ") };
 };
 
-type FamilyMatch = {
-  parent_name: string;
-  parent_email: string | null;
-  parent_phone: string | null;
-  swimmer_name: string;
-  child_dob: string | null;
-  source: "membership" | "booking" | "enrollment" | "request";
-};
-
 const SOURCE_LABELS: Record<FamilyMatch["source"], string> = {
   membership: "Membership",
   booking: "Private lesson",
   enrollment: "Session enrollment",
   request: "Lesson request",
 };
+
 
 export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
