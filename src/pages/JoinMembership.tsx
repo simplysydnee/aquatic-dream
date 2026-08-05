@@ -81,7 +81,36 @@ const fmtPrice = (cents: number) => `$${(cents / 100).toFixed(0)}`;
 // 1 program, 2 slot, 3 info, 4 waiver (auto-skip if on file), 5 consent, 6 review, 7 checkout, 8 success
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-type HoldState = "none" | "loading" | "ok" | "expired" | "converted" | "cancelled" | "not_found";
+type HoldState =
+  | "none"
+  | "loading"
+  | "ok"
+  | "expired"
+  | "converted"
+  | "cancelled"
+  | "not_found"
+  | "batch_done";
+
+/** One swimmer inside a batched (group_token) invite link. */
+type GroupHoldEntry = {
+  id: string;
+  swimmerName: string;
+  status: "held" | "converted" | "expired" | "cancelled" | string;
+  planKey: PlanKey;
+  planName: string | null;
+  monthlyPriceCents: number | null;
+  swimLevel: SwimLevel | null;
+  existingWaiverId: string | null;
+  heldUntil: string | null;
+  slot: {
+    id: string;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    instructor_name: string | null;
+  } | null;
+};
+type BatchState = "all_converted" | "all_expired" | "mixed_terminal" | null;
 
 /** Reads the hold token straight off the URL so first paint can be gated. */
 const holdTokenFromUrl = (): string | null => {
@@ -212,6 +241,9 @@ function JoinMembershipForm() {
   );
   const [holdHeldUntil, setHoldHeldUntil] = useState<string | null>(null);
   const [holdSwimmerFirst, setHoldSwimmerFirst] = useState<string>("");
+  // Batched invite link (/join?hold=<group_token>): every swimmer in the batch.
+  const [groupHolds, setGroupHolds] = useState<GroupHoldEntry[]>([]);
+  const [batchState, setBatchState] = useState<BatchState>(null);
   const [releasingHold, setReleasingHold] = useState(false);
   const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
   const holdActive = holdState === "ok" && !!holdToken;
@@ -885,7 +917,18 @@ function JoinMembershipForm() {
         parentEmail: string | null;
         existingWaiverId: string | null;
         heldUntil: string | null;
+        groupHolds?: GroupHoldEntry[];
+        batchState?: BatchState;
       };
+      const entries = h.groupHolds ?? [];
+      setGroupHolds(entries);
+      setBatchState(h.batchState ?? null);
+      // Every swimmer in the batch is finished one way or another: show the
+      // batch outcome instead of falling back to one arbitrary swimmer.
+      if (entries.length > 0 && h.batchState) {
+        setHoldState("batch_done");
+        return;
+      }
       if (h.status !== "held") {
         setHoldState(
           h.status === "converted"
@@ -983,6 +1026,78 @@ function JoinMembershipForm() {
     );
   }
 
+  // Every swimmer in a batched link is finished: name who enrolled and who ran out.
+  if (holdState === "batch_done") {
+    const converted = groupHolds.filter((g) => g.status === "converted");
+    const lapsed = groupHolds.filter((g) => g.status !== "converted");
+    const title =
+      batchState === "all_converted"
+        ? `All ${groupHolds.length} swimmer${groupHolds.length === 1 ? " is" : "s are"} enrolled`
+        : batchState === "all_expired"
+        ? "These holds have expired"
+        : "Part of this group is enrolled";
+    return holdShell(
+      <Card className="p-6">
+        <h2 className="mb-2 text-xl font-semibold text-[#1a3a8a]">{title}</h2>
+        {converted.length > 0 && (
+          <ul className="mb-4 space-y-2">
+            {converted.map((g) => (
+              <li
+                key={g.id}
+                className="flex items-start gap-2 rounded-lg border border-[#2a5e84]/20 bg-white p-3 text-sm"
+              >
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#2a5e84]" />
+                <span className="text-[#1a3a8a]">
+                  <span className="font-semibold">{g.swimmerName}</span>
+                  {" — "}
+                  {g.planName || "Membership"}
+                  {g.slot
+                    ? `, ${DAYS[g.slot.day_of_week]} at ${fmtTime(g.slot.start_time)}`
+                    : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {lapsed.length > 0 && (
+          <>
+            <p className="mb-2 text-sm text-[#2a5e84]">
+              {batchState === "all_expired"
+                ? "We held these times for a limited window and it has passed, so they are open to everyone again. You can enroll now and pick any time that works."
+                : "These swimmers ran out of time on their hold, so those spots went back to other families. You can pick a new time for them now."}
+            </p>
+            <ul className="mb-6 space-y-2">
+              {lapsed.map((g) => (
+                <li
+                  key={g.id}
+                  className="rounded-lg border border-[#2a5e84]/20 bg-[#2a5e84]/5 p-3 text-sm text-[#2a5e84]"
+                >
+                  <span className="font-semibold text-[#1a3a8a]">{g.swimmerName}</span>
+                  {" — hold expired"}
+                  {g.slot ? ` (${DAYS[g.slot.day_of_week]} at ${fmtTime(g.slot.start_time)})` : ""}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {lapsed.length > 0 ? (
+          <Button
+            type="button"
+            onClick={startNormalEnrollment}
+            className="bg-[#F58B76] text-white hover:bg-[#F58B76]/90"
+          >
+            Pick a new time
+          </Button>
+        ) : (
+          <p className="text-sm text-[#2a5e84]">
+            Nothing left to do here. If you need to make a change or add another swimmer, give us a
+            call at (209) 577-3483.
+          </p>
+        )}
+      </Card>,
+    );
+  }
+
   if (
     holdState === "expired" ||
     holdState === "converted" ||
@@ -1012,6 +1127,70 @@ function JoinMembershipForm() {
           <h1 className="text-3xl font-bold text-[#1a3a8a]">Join Aquatic Dreams</h1>
           <p className="mt-2 text-[#2a5e84]">Monthly swim membership. Cancel anytime.</p>
         </div>
+
+        {holdActive && groupHolds.length > 1 && step < 8 && (
+          <div className="mb-6 rounded-lg border border-[#2a5e84]/20 bg-white p-4">
+            {(() => {
+              const held = groupHolds.filter((g) => g.status === "held");
+              const totalCents = held.reduce((sum, g) => sum + (g.monthlyPriceCents ?? 0), 0);
+              return (
+                <>
+                  <div className="font-semibold text-[#1a3a8a]">
+                    You're enrolling {held.length} swimmer{held.length === 1 ? "" : "s"}
+                  </div>
+                  <p className="mt-1 text-sm text-[#2a5e84]">
+                    Each has its own monthly membership, so you'll confirm each separately. Total{" "}
+                    {fmtPrice(totalCents)} a month.
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {groupHolds.map((g) => {
+                      const done = g.status === "converted";
+                      const lapsed = g.status !== "converted" && g.status !== "held";
+                      const current = g.status === "held" && g.id === held[0]?.id;
+                      return (
+                        <li
+                          key={g.id}
+                          className={`rounded-lg border p-3 text-sm ${
+                            done
+                              ? "border-[#2a5e84]/15 bg-[#2a5e84]/5 text-[#2a5e84]/60"
+                              : lapsed
+                              ? "border-[#F58B76]/40 bg-[#F58B76]/5 text-[#2a5e84]"
+                              : current
+                              ? "border-[#F58B76] bg-[#F58B76]/10 text-[#1a3a8a]"
+                              : "border-[#2a5e84]/20 text-[#2a5e84]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-[#1a3a8a]">{g.swimmerName}</span>
+                            <span className="text-xs font-semibold uppercase tracking-wide">
+                              {done
+                                ? "Enrolled"
+                                : lapsed
+                                ? "Hold expired"
+                                : current
+                                ? "Confirming now"
+                                : "Up next"}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs">
+                            {g.planName || "Membership"}
+                            {g.slot
+                              ? ` · ${DAYS[g.slot.day_of_week]} at ${fmtTime(g.slot.start_time)}`
+                              : ""}
+                            {g.slot?.instructor_name ? ` · Coach ${g.slot.instructor_name}` : ""}
+                            {g.monthlyPriceCents != null && !done && !lapsed
+                              ? ` · ${fmtPrice(g.monthlyPriceCents)}/mo`
+                              : ""}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              );
+            })()}
+          </div>
+        )}
 
         {holdActive && slot && plan && step < 8 && (
           <div className="mb-6 rounded-lg border border-[#2a5e84]/20 bg-white p-4 text-sm text-[#2a5e84]">

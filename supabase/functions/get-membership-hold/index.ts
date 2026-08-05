@@ -36,7 +36,20 @@ Deno.serve(async (req) => {
 
     // The batch invite link carries a group_token shared by every hold in the
     // family batch. Resolve it to the first hold still awaiting completion.
-    let groupHolds: { id: string; swimmer_name: string; status: string }[] = [];
+    type GroupEntry = {
+      id: string;
+      swimmerName: string;
+      status: string;
+      planKey: string;
+      planName: string | null;
+      monthlyPriceCents: number | null;
+      swimLevel: string | null;
+      existingWaiverId: string | null;
+      heldUntil: string | null;
+      slot: Record<string, unknown> | null;
+    };
+    let groupHolds: GroupEntry[] = [];
+    let batchState: "all_converted" | "all_expired" | "mixed_terminal" | null = null;
     if (!hold) {
       const { data: group } = await supabase
         .from("membership_holds")
@@ -44,15 +57,79 @@ Deno.serve(async (req) => {
         .eq("group_token", token)
         .order("created_at", { ascending: true });
       if (group && group.length > 0) {
-        groupHolds = group.map((g) => ({
-          id: g.id,
-          swimmer_name: g.swimmer_name,
-          status: g.status,
-        }));
-        hold = group.find((g) => g.status === "held") ?? group[0];
+        const slotIds = [...new Set(group.map((g) => g.standing_slot_id).filter(Boolean))];
+        const planKeys = [...new Set(group.map((g) => g.plan_key).filter(Boolean))];
+        const { data: slotRows } = await supabase
+          .from("standing_slots")
+          .select(
+            "id, plan_key, day_of_week, start_time, end_time, swim_level, accepted_levels, instructor_id, active",
+          )
+          .in("id", slotIds.length > 0 ? slotIds : ["00000000-0000-0000-0000-000000000000"]);
+        const instructorIds = [
+          ...new Set((slotRows ?? []).map((s) => s.instructor_id).filter(Boolean)),
+        ];
+        const { data: instRows } = instructorIds.length
+          ? await supabase.from("instructors").select("id, name").in("id", instructorIds)
+          : { data: [] as { id: string; name: string }[] };
+        const { data: planRows } = await supabase
+          .from("membership_plans")
+          .select("plan_key, name, monthly_price_cents")
+          .in("plan_key", planKeys.length > 0 ? planKeys : ["__none__"]);
+
+        const slotById = new Map((slotRows ?? []).map((s) => [s.id, s]));
+        const instById = new Map((instRows ?? []).map((i) => [i.id, i.name]));
+        const planByKey = new Map((planRows ?? []).map((p) => [p.plan_key, p]));
+
+        groupHolds = group.map((g) => {
+          const s = slotById.get(g.standing_slot_id);
+          const p = planByKey.get(g.plan_key);
+          return {
+            id: g.id,
+            swimmerName: g.swimmer_name,
+            // Every entry gets the same expiry recomputation the single hold gets.
+            status: recomputeStatus(g.status, g.held_until),
+            planKey: g.plan_key,
+            planName: p?.name ?? null,
+            monthlyPriceCents: p?.monthly_price_cents ?? null,
+            swimLevel: g.swim_level,
+            existingWaiverId: g.existing_waiver_id,
+            heldUntil: g.held_until,
+            slot: s
+              ? {
+                  id: s.id,
+                  plan_key: s.plan_key,
+                  day_of_week: s.day_of_week,
+                  start_time: s.start_time,
+                  end_time: s.end_time,
+                  swim_level: s.swim_level,
+                  accepted_levels: s.accepted_levels,
+                  instructor_name: s.instructor_id ? instById.get(s.instructor_id) ?? null : null,
+                  active: s.active,
+                }
+              : null,
+          };
+        });
+
+        const stillHeld = groupHolds.filter((g) => g.status === "held");
+        if (stillHeld.length === 0) {
+          const converted = groupHolds.filter((g) => g.status === "converted").length;
+          const expiredish = groupHolds.length - converted;
+          batchState =
+            converted === groupHolds.length
+              ? "all_converted"
+              : expiredish === groupHolds.length
+              ? "all_expired"
+              : "mixed_terminal";
+        }
+        hold =
+          group.find((g) => g.id === stillHeld[0]?.id) ??
+          group.find((g) => g.status === "held") ??
+          group[0];
       }
     }
     if (!hold) return json({ error: "Not found" }, 404);
+
+
 
     if (action === "convert") {
       if (hold.status === "converted") return json({ success: true, alreadyConverted: true });
@@ -101,6 +178,7 @@ Deno.serve(async (req) => {
         existingWaiverId: hold.existing_waiver_id,
         heldUntil: hold.held_until,
         groupHolds,
+        batchState,
       },
       plan: plan ?? null,
       slot: slot
@@ -122,6 +200,13 @@ Deno.serve(async (req) => {
     return json({ error: "Something went wrong" }, 500);
   }
 });
+
+/** A held hold past its held_until reads as expired, everything else as-is. */
+function recomputeStatus(status: string, heldUntil: string | null): string {
+  if (status !== "held") return status;
+  const t = heldUntil ? new Date(heldUntil).getTime() : 0;
+  return t <= Date.now() ? "expired" : "held";
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
