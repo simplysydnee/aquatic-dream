@@ -27,6 +27,8 @@ import { Loader2, Search, AlertTriangle, FileWarning, Stethoscope } from "lucide
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
 import { Link } from "react-router-dom";
 import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPanel";
+import { EnrollFamilyDialog } from "@/components/admin/holds/EnrollFamilyDialog";
+
 
 
 type PlanKey = "kid_group" | "private" | "adult_group";
