@@ -505,6 +505,25 @@ const MembershipsAdmin = () => {
                       <Badge variant={m.status === "active" ? "default" : "secondary"}>{m.status.replace("_", " ")}</Badge>
                     </td>
                     <td className="px-3 py-2">
+                      <span
+                        className={
+                          paymentBucket(m) === "failed"
+                            ? "font-medium text-destructive"
+                            : paymentBucket(m) === "paid"
+                              ? ""
+                              : "text-muted-foreground"
+                        }
+                      >
+                        {paymentLabel(m)}
+                      </span>
+                      {m.stripe_subscription_status &&
+                        ["past_due", "unpaid", "canceled"].includes(m.stripe_subscription_status) && (
+                          <div className="text-xs text-destructive">
+                            Stripe: {m.stripe_subscription_status.replace("_", " ")}
+                          </div>
+                        )}
+                    </td>
+
                       {m.current_period_end
                         ? new Date(m.current_period_end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : "--"}
