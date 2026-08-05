@@ -1128,6 +1128,70 @@ function JoinMembershipForm() {
           <p className="mt-2 text-[#2a5e84]">Monthly swim membership. Cancel anytime.</p>
         </div>
 
+        {holdActive && groupHolds.length > 1 && step < 8 && (
+          <div className="mb-6 rounded-lg border border-[#2a5e84]/20 bg-white p-4">
+            {(() => {
+              const held = groupHolds.filter((g) => g.status === "held");
+              const totalCents = held.reduce((sum, g) => sum + (g.monthlyPriceCents ?? 0), 0);
+              return (
+                <>
+                  <div className="font-semibold text-[#1a3a8a]">
+                    You're enrolling {held.length} swimmer{held.length === 1 ? "" : "s"}
+                  </div>
+                  <p className="mt-1 text-sm text-[#2a5e84]">
+                    Each has its own monthly membership, so you'll confirm each separately. Total{" "}
+                    {fmtPrice(totalCents)} a month.
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {groupHolds.map((g) => {
+                      const done = g.status === "converted";
+                      const lapsed = g.status !== "converted" && g.status !== "held";
+                      const current = g.status === "held" && g.id === held[0]?.id;
+                      return (
+                        <li
+                          key={g.id}
+                          className={`rounded-lg border p-3 text-sm ${
+                            done
+                              ? "border-[#2a5e84]/15 bg-[#2a5e84]/5 text-[#2a5e84]/60"
+                              : lapsed
+                              ? "border-[#F58B76]/40 bg-[#F58B76]/5 text-[#2a5e84]"
+                              : current
+                              ? "border-[#F58B76] bg-[#F58B76]/10 text-[#1a3a8a]"
+                              : "border-[#2a5e84]/20 text-[#2a5e84]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-[#1a3a8a]">{g.swimmerName}</span>
+                            <span className="text-xs font-semibold uppercase tracking-wide">
+                              {done
+                                ? "Enrolled"
+                                : lapsed
+                                ? "Hold expired"
+                                : current
+                                ? "Confirming now"
+                                : "Up next"}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs">
+                            {g.planName || "Membership"}
+                            {g.slot
+                              ? ` · ${DAYS[g.slot.day_of_week]} at ${fmtTime(g.slot.start_time)}`
+                              : ""}
+                            {g.slot?.instructor_name ? ` · Coach ${g.slot.instructor_name}` : ""}
+                            {g.monthlyPriceCents != null && !done && !lapsed
+                              ? ` · ${fmtPrice(g.monthlyPriceCents)}/mo`
+                              : ""}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
         {holdActive && slot && plan && step < 8 && (
           <div className="mb-6 rounded-lg border border-[#2a5e84]/20 bg-white p-4 text-sm text-[#2a5e84]">
             <div className="font-semibold text-[#1a3a8a]">Your spot is reserved</div>
