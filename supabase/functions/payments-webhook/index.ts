@@ -899,13 +899,14 @@ async function handleMembershipSetupCompleted(session: any, env: StripeEnv) {
 async function recordMembershipPaymentEvent(
   event: { id?: string; type: string; created?: number; data: { object: any } },
   env: StripeEnv,
-) {
+): Promise<string | null> {
   const obj = event.data?.object ?? {};
   const eventId = event.id;
   if (!eventId) {
     console.error("[payment event] missing event id", event.type);
-    return;
+    return null;
   }
+
 
   const isDispute = event.type.startsWith("charge.dispute");
   const isInvoice = event.type.startsWith("invoice.");
