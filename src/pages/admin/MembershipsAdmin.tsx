@@ -367,6 +367,31 @@ const MembershipsAdmin = () => {
 
       <MembershipHoldsPanel refreshKey={holdsRefresh} />
 
+      {paymentProblems.length > 0 && (
+        <Card className="border-destructive/40 bg-destructive/5 p-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+            <span className="text-destructive">
+              {paymentProblems.length === 1
+                ? "1 membership has a payment problem."
+                : `${paymentProblems.length} memberships have a payment problem.`}{" "}
+              The swimmer stays enrolled. Stripe retries on its own schedule.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setPaymentFilter("problem");
+                setIncludeInactive(true);
+              }}
+            >
+              Show them
+            </Button>
+          </div>
+        </Card>
+      )}
+
+
 
 
 
