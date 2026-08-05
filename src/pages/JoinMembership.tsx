@@ -1026,6 +1026,78 @@ function JoinMembershipForm() {
     );
   }
 
+  // Every swimmer in a batched link is finished: name who enrolled and who ran out.
+  if (holdState === "batch_done") {
+    const converted = groupHolds.filter((g) => g.status === "converted");
+    const lapsed = groupHolds.filter((g) => g.status !== "converted");
+    const title =
+      batchState === "all_converted"
+        ? `All ${groupHolds.length} swimmer${groupHolds.length === 1 ? " is" : "s are"} enrolled`
+        : batchState === "all_expired"
+        ? "These holds have expired"
+        : "Part of this group is enrolled";
+    return holdShell(
+      <Card className="p-6">
+        <h2 className="mb-2 text-xl font-semibold text-[#1a3a8a]">{title}</h2>
+        {converted.length > 0 && (
+          <ul className="mb-4 space-y-2">
+            {converted.map((g) => (
+              <li
+                key={g.id}
+                className="flex items-start gap-2 rounded-lg border border-[#2a5e84]/20 bg-white p-3 text-sm"
+              >
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#2a5e84]" />
+                <span className="text-[#1a3a8a]">
+                  <span className="font-semibold">{g.swimmerName}</span>
+                  {" — "}
+                  {g.planName || "Membership"}
+                  {g.slot
+                    ? `, ${DAYS[g.slot.day_of_week]} at ${fmtTime(g.slot.start_time)}`
+                    : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {lapsed.length > 0 && (
+          <>
+            <p className="mb-2 text-sm text-[#2a5e84]">
+              {batchState === "all_expired"
+                ? "We held these times for a limited window and it has passed, so they are open to everyone again. You can enroll now and pick any time that works."
+                : "These swimmers ran out of time on their hold, so those spots went back to other families. You can pick a new time for them now."}
+            </p>
+            <ul className="mb-6 space-y-2">
+              {lapsed.map((g) => (
+                <li
+                  key={g.id}
+                  className="rounded-lg border border-[#2a5e84]/20 bg-[#2a5e84]/5 p-3 text-sm text-[#2a5e84]"
+                >
+                  <span className="font-semibold text-[#1a3a8a]">{g.swimmerName}</span>
+                  {" — hold expired"}
+                  {g.slot ? ` (${DAYS[g.slot.day_of_week]} at ${fmtTime(g.slot.start_time)})` : ""}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {lapsed.length > 0 ? (
+          <Button
+            type="button"
+            onClick={startNormalEnrollment}
+            className="bg-[#F58B76] text-white hover:bg-[#F58B76]/90"
+          >
+            Pick a new time
+          </Button>
+        ) : (
+          <p className="text-sm text-[#2a5e84]">
+            Nothing left to do here. If you need to make a change or add another swimmer, give us a
+            call at (209) 577-3483.
+          </p>
+        )}
+      </Card>,
+    );
+  }
+
   if (
     holdState === "expired" ||
     holdState === "converted" ||
