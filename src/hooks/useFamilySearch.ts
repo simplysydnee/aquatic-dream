@@ -208,8 +208,12 @@ export function useFamilySearch(query: string, options: UseFamilySearchOptions =
           parentName = String(row.parent_name || "").trim();
           swimmerName = String(row.child_name || "").trim();
         } else {
-          parentName = `${row.parent_first_name || ""} ${row.parent_last_name || ""}`.trim();
-          swimmerName = `${row.child_first_name || ""} ${row.child_last_name || ""}`.trim();
+          parentName =
+            `${row.parent_first_name || ""} ${row.parent_last_name || ""}`.trim() ||
+            String(row.parent_name || "").trim();
+          swimmerName =
+            `${row.child_first_name || ""} ${row.child_last_name || ""}`.trim() ||
+            String(row.child_name || "").trim();
         }
         if (!swimmerName) return;
         const email = String(row.parent_email || "").toLowerCase().trim() || null;
