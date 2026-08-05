@@ -10,6 +10,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
@@ -129,6 +139,7 @@ const StandingSlotsAdmin = () => {
   const [occupancyCounts, setOccupancyCounts] = useState<Record<string, number>>({});
   const [holdTarget, setHoldTarget] = useState<HoldSlotTarget | null>(null);
   const [holdsRefresh, setHoldsRefresh] = useState(0);
+  const [deactivateTarget, setDeactivateTarget] = useState<{ slot: Slot; enrolled: number } | null>(null);
 
   const [expandedSlots, setExpandedSlots] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -232,7 +243,8 @@ const StandingSlotsAdmin = () => {
     if (filterPlan !== "all") list = list.filter((s) => s.plan_key === filterPlan);
     if (filterInstructor !== "all") list = list.filter((s) => s.instructor_id === filterInstructor);
     if (filterDay !== "all") list = list.filter((s) => s.day_of_week === parseInt(filterDay, 10));
-    if (filterActive === "active") list = list.filter((s) => s.active);
+    // A slot with people in it is never hidden, whatever the status filter says.
+    if (filterActive === "active") list = list.filter((s) => s.active || (enrolledCounts[s.id] || 0) > 0);
     else if (filterActive === "inactive") list = list.filter((s) => !s.active);
 
     list.sort((a, b) => {
@@ -367,20 +379,22 @@ const StandingSlotsAdmin = () => {
     await loadAll();
   };
 
-  const toggleActive = async (s: Slot, next: boolean) => {
-    const enrolled = enrolledCounts[s.id] || 0;
-    if (!next && enrolled > 0) {
-      toast({
-        title: "Deactivated",
-        description: `${enrolled} active membership(s) still reference this slot. Slot is hidden but not deleted.`,
-      });
-    }
+  const writeActive = async (s: Slot, next: boolean) => {
     const { error } = await supabase.from("standing_slots").update({ active: next }).eq("id", s.id);
     if (error) {
       toast({ title: "Toggle failed", description: error.message, variant: "destructive" });
       return;
     }
     await loadAll();
+  };
+
+  const toggleActive = async (s: Slot, next: boolean) => {
+    const enrolled = enrolledCounts[s.id] || 0;
+    if (!next && enrolled > 0) {
+      setDeactivateTarget({ slot: s, enrolled });
+      return;
+    }
+    await writeActive(s, next);
   };
 
   const toggleExpand = (id: string) => {
@@ -508,7 +522,7 @@ const StandingSlotsAdmin = () => {
           <Select value={filterActive} onValueChange={setFilterActive}>
             <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="active">Active only</SelectItem>
+              <SelectItem value="active">Active + occupied</SelectItem>
               <SelectItem value="inactive">Inactive only</SelectItem>
               <SelectItem value="all">All</SelectItem>
             </SelectContent>
@@ -783,7 +797,10 @@ const StandingSlotsAdmin = () => {
               const roster = rosterBySlot[s.id] || [];
               return (
                 <FragmentRow key={s.id}>
-                <tr className={cn("border-t hover:bg-muted/30", !s.active && "opacity-60")}>
+                <tr className={cn(
+                  "border-t hover:bg-muted/30",
+                  !s.active && (enrolled > 0 ? "bg-destructive/5" : "opacity-60"),
+                )}>
                   <td className="px-2 py-2">
                     <button
                       type="button"
@@ -812,7 +829,14 @@ const StandingSlotsAdmin = () => {
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{s.location || "—"}</td>
                   <td className="px-3 py-2">
-                    <Switch checked={s.active} onCheckedChange={(v) => toggleActive(s, v)} />
+                    <div className="flex items-center gap-2">
+                      <Switch checked={s.active} onCheckedChange={(v) => toggleActive(s, v)} />
+                      {!s.active && enrolled > 0 && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                          Inactive · {enrolled} enrolled
+                        </Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-right">
                     <Button size="sm" variant="ghost" className="h-8" onClick={() => startEdit(s)}>
@@ -882,7 +906,41 @@ const StandingSlotsAdmin = () => {
       </Card>
       <p className="text-xs text-muted-foreground">
         Deactivating a slot with active memberships hides it from booking but keeps the row so existing members are not orphaned.
+        Occupied slots stay visible here under every status filter.
       </p>
+
+      <AlertDialog
+        open={!!deactivateTarget}
+        onOpenChange={(open) => { if (!open) setDeactivateTarget(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate a class with swimmers in it?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deactivateTarget && (
+                <>
+                  {DAYS[deactivateTarget.slot.day_of_week]} {timeLabel(deactivateTarget.slot.start_time)} ·{" "}
+                  {PLAN_LABELS[deactivateTarget.slot.plan_key]} has {deactivateTarget.enrolled} enrolled{" "}
+                  {deactivateTarget.enrolled === 1 ? "membership" : "memberships"}. Deactivating removes it from booking.
+                  Existing families keep their spot and the class stays visible here.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep active</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const target = deactivateTarget;
+                setDeactivateTarget(null);
+                if (target) await writeActive(target.slot, false);
+              }}
+            >
+              Deactivate anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

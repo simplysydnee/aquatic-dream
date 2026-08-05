@@ -2550,6 +2550,8 @@ export type Database = {
           plan_key: Database["public"]["Enums"]["membership_plan_key"]
           start_time: string
           swim_level: string | null
+          updated_at: string
+          updated_by: string | null
         }
         Insert: {
           accepted_levels?: string[] | null
@@ -2564,6 +2566,8 @@ export type Database = {
           plan_key: Database["public"]["Enums"]["membership_plan_key"]
           start_time: string
           swim_level?: string | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           accepted_levels?: string[] | null
@@ -2578,6 +2582,8 @@ export type Database = {
           plan_key?: Database["public"]["Enums"]["membership_plan_key"]
           start_time?: string
           swim_level?: string | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
