@@ -94,10 +94,20 @@ serve(async (req) => {
       case "charge.dispute.created":
       case "charge.dispute.closed":
       case "invoice.paid":
+      case "invoice.payment_succeeded":
       case "invoice.payment_failed": {
-        await recordMembershipPaymentEvent(event as any, env);
+        const membershipId = await recordMembershipPaymentEvent(event as any, env);
+        if (event.type.startsWith("invoice.")) {
+          await applyInvoiceOutcomeToMembership(event as any, membershipId);
+        }
         break;
       }
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted": {
+        await recordSubscriptionStatus(event as any);
+        break;
+      }
+
       default:
         console.log("Unhandled event:", event.type);
     }
