@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
     const spotsLeft = (slot.capacity ?? 0) - (memberCount ?? 0) - (holdCount ?? 0);
     if (spotsLeft <= 0) return json({ error: "That slot is already full" }, 409);
 
-    const heldUntil = new Date(Date.now() + holdHours * 60 * 60 * 1000).toISOString();
+    const heldUntil = new Date(Date.now() + holdMinutes * 60 * 1000).toISOString();
     const token = makeToken();
 
     const { data: hold, error: insErr } = await supabaseAdmin
