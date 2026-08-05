@@ -27,6 +27,8 @@ import { Loader2, Search, AlertTriangle, FileWarning, Stethoscope } from "lucide
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
 import { Link } from "react-router-dom";
 import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPanel";
+import { EnrollFamilyDialog } from "@/components/admin/holds/EnrollFamilyDialog";
+
 
 
 type PlanKey = "kid_group" | "private" | "adult_group";
@@ -122,6 +124,9 @@ const MembershipsAdmin = () => {
   const [includeInactive, setIncludeInactive] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [enrollFamilyOpen, setEnrollFamilyOpen] = useState(false);
+  const [holdsRefresh, setHoldsRefresh] = useState(0);
+
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [occLoading, setOccLoading] = useState(false);
 
@@ -315,13 +320,27 @@ const MembershipsAdmin = () => {
             </Link>
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link to="/admin/standing-slots">Hold a spot over the phone</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setEnrollFamilyOpen(true)}>Enroll a family</Button>
+          <Button variant="outline" asChild>
+            <Link to="/admin/standing-slots">Hold a spot over the phone</Link>
+          </Button>
+        </div>
+
 
       </div>
 
-      <MembershipHoldsPanel />
+      <EnrollFamilyDialog
+        open={enrollFamilyOpen}
+        onOpenChange={setEnrollFamilyOpen}
+        onSent={() => {
+          setHoldsRefresh((v) => v + 1);
+          void fetchData();
+        }}
+      />
+
+      <MembershipHoldsPanel refreshKey={holdsRefresh} />
+
 
 
 
