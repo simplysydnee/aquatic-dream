@@ -49,10 +49,16 @@ Deno.serve(async (req) => {
     const swimLevel = body?.swim_level ? String(body.swim_level) : null;
     const notes = String(body?.notes || "").trim() || null;
     const existingWaiverId = body?.existing_waiver_id ? String(body.existing_waiver_id) : null;
+    const sendSms = body?.send_sms === undefined ? true : Boolean(body.send_sms);
+    // hold_minutes wins when present so short drafts (20 min) are expressible;
+    // hold_hours still accepts fractions, floored at 15 minutes.
+    const minutesValue = Number(body?.hold_minutes);
     const hoursValue = Number(body?.hold_hours);
-    const holdHours = Number.isFinite(hoursValue) && hoursValue > 0 && hoursValue <= 168
-      ? hoursValue
-      : 48;
+    const holdMinutes = Number.isFinite(minutesValue) && minutesValue >= 5 && minutesValue <= 10080
+      ? Math.round(minutesValue)
+      : Number.isFinite(hoursValue) && hoursValue >= 0.25 && hoursValue <= 168
+      ? Math.round(hoursValue * 60)
+      : 48 * 60;
 
     if (!standingSlotId) return json({ error: "standing_slot_id required" }, 400);
     if (!swimmerName) return json({ error: "Swimmer name required" }, 400);
