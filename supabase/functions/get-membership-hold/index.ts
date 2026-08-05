@@ -178,6 +178,7 @@ Deno.serve(async (req) => {
         existingWaiverId: hold.existing_waiver_id,
         heldUntil: hold.held_until,
         groupHolds,
+        batchState,
       },
       plan: plan ?? null,
       slot: slot
@@ -199,6 +200,13 @@ Deno.serve(async (req) => {
     return json({ error: "Something went wrong" }, 500);
   }
 });
+
+/** A held hold past its held_until reads as expired, everything else as-is. */
+function recomputeStatus(status: string, heldUntil: string | null): string {
+  if (status !== "held") return status;
+  const t = heldUntil ? new Date(heldUntil).getTime() : 0;
+  return t <= Date.now() ? "expired" : "held";
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
