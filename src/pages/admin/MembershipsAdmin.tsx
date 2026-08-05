@@ -59,7 +59,7 @@ interface Slot {
   accepted_levels: string[] | null;
 }
 
-interface Membership {
+interface Membership extends MembershipPaymentState {
   id: string;
   plan_key: PlanKey;
   standing_slot_id: string | null;
@@ -80,6 +80,7 @@ interface Membership {
   swim_level: SwimLevel | null;
   manage_token: string | null;
 }
+
 
 interface Occurrence {
   id: string;
