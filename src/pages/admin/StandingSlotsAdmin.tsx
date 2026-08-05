@@ -816,7 +816,14 @@ const StandingSlotsAdmin = () => {
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{s.location || "—"}</td>
                   <td className="px-3 py-2">
-                    <Switch checked={s.active} onCheckedChange={(v) => toggleActive(s, v)} />
+                    <div className="flex items-center gap-2">
+                      <Switch checked={s.active} onCheckedChange={(v) => toggleActive(s, v)} />
+                      {!s.active && enrolled > 0 && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                          Inactive · {enrolled} enrolled
+                        </Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-right">
                     <Button size="sm" variant="ghost" className="h-8" onClick={() => startEdit(s)}>
