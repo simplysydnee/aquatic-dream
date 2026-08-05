@@ -787,7 +787,10 @@ const StandingSlotsAdmin = () => {
               const roster = rosterBySlot[s.id] || [];
               return (
                 <FragmentRow key={s.id}>
-                <tr className={cn("border-t hover:bg-muted/30", !s.active && "opacity-60")}>
+                <tr className={cn(
+                  "border-t hover:bg-muted/30",
+                  !s.active && (enrolled > 0 ? "bg-destructive/5" : "opacity-60"),
+                )}>
                   <td className="px-2 py-2">
                     <button
                       type="button"
