@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Users, Clock, Loader2, ChevronRight } from "lucide-react";
+import { Users, Loader2, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import LevelBadge from "@/components/LevelBadge";
 import type { SwimLevel } from "@/components/swim-enrollment/types";
@@ -69,6 +69,40 @@ function formatTime(t: string) {
   const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
   return `${h12}:${m} ${ampm}`;
 }
+
+function meridiem(t: string) {
+  return parseInt(t.split(":")[0], 10) >= 12 ? "PM" : "AM";
+}
+
+function bareTime(t: string) {
+  return formatTime(t).replace(/ (AM|PM)$/, "");
+}
+
+/** "4:00 – 7:00 PM" (suffix collapsed when both ends share a meridiem). */
+function formatRange(start: string, end: string) {
+  return meridiem(start) === meridiem(end)
+    ? `${bareTime(start)} – ${formatTime(end)}`
+    : `${formatTime(start)} – ${formatTime(end)}`;
+}
+
+/** "4:00, 5:00, 6:00 PM" (trailing suffix only when all share a meridiem). */
+function formatTimeList(times: string[]) {
+  if (times.length === 0) return "";
+  const all = meridiem(times[0]);
+  if (times.every((t) => meridiem(t) === all)) {
+    return `${times.map(bareTime).join(", ")} ${all}`;
+  }
+  return times.map(formatTime).join(", ");
+}
+
+/** Level rows for Small Group: Divers and Masters share a line. */
+const LEVEL_ROWS: { label: string; levels: string[] }[] = [
+  { label: "Little Fins", levels: ["white"] },
+  { label: "Reef Explorers", levels: ["red"] },
+  { label: "Sea Scouts", levels: ["yellow"] },
+  { label: "Divers + Masters", levels: ["blue", "green"] },
+];
+
 
 function formatDollars(cents: number | null | undefined) {
   if (cents == null) return null;
@@ -202,75 +236,105 @@ function ProgramCards({ slots, loading }: { slots: OpenSlot[]; loading: boolean 
 
 /* ───────── schedule ───────── */
 
+function FullNotice({ name }: { name: string }) {
+  return (
+    <p className="text-sm text-muted-foreground">
+      {name} is currently full.{" "}
+      <Link to="/join" className="text-primary underline underline-offset-4">
+        Join the waitlist
+      </Link>
+      .
+    </p>
+  );
+}
+
 function OpenTimes({ slots, loading }: { slots: OpenSlot[]; loading: boolean }) {
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
+      <div className="flex justify-center py-10">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto items-start">
       {PROGRAM_ORDER.map((key) => {
         const open = slots.filter((s) => s.plan_key === key && !s.is_full);
         const days = Array.from(new Set(open.map((s) => s.day_of_week))).sort((a, b) => a - b);
+        const isGroup = key === "kid_group";
+
         return (
-          <Card key={key} className="p-6">
-            <h3 className="font-display text-xl font-bold text-foreground mb-4">
+          <Card key={key} className="p-5">
+            <h3 className="font-display text-lg font-bold text-foreground mb-3">
               {PROGRAM_COPY[key].name}
+              {isGroup && days.length === 1 && (
+                <span className="font-sans text-sm font-medium text-muted-foreground">
+                  {" "}
+                  ({DAY_NAMES[days[0]]})
+                </span>
+              )}
             </h3>
+
             {open.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Every {PROGRAM_COPY[key].name} time is currently full. Join to get on the waitlist.
-              </p>
-            ) : (
-              <div className="space-y-4">
+              <FullNotice name={PROGRAM_COPY[key].name} />
+            ) : isGroup ? (
+              <div className="space-y-3">
                 {days.map((day) => {
-                  // Several instructors can hold the same time; merge into one
-                  // chip per time (and per level for Small Group) with total spots.
-                  const merged = new Map<string, { time: string; level: string | null; spots: number }>();
-                  open
-                    .filter((s) => s.day_of_week === day)
-                    .forEach((s) => {
-                      const key = `${s.start_time}|${s.swim_level ?? ""}`;
-                      const cur = merged.get(key);
-                      if (cur) cur.spots += s.spots_left;
-                      else merged.set(key, { time: s.start_time, level: s.swim_level, spots: s.spots_left });
-                    });
-                  const chips = Array.from(merged.values()).sort(
-                    (a, b) => a.time.localeCompare(b.time) || (a.level ?? "").localeCompare(b.level ?? ""),
-                  );
+                  const daySlots = open.filter((s) => s.day_of_week === day);
                   return (
                     <div key={day}>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                        {DAY_NAMES[day]}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {chips.map((c) => (
-                          <span
-                            key={`${c.time}-${c.level ?? ""}`}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground"
-                          >
-                            <Clock className="w-3 h-3 text-muted-foreground" />
-                            {formatTime(c.time)}
-                            {c.level && (
-                              <span className="opacity-70">
-                                · {LEVELS.find((l) => l.level === c.level)?.group ?? c.level}
-                              </span>
-                            )}
-                            <span className="opacity-70">
-                              · {c.spots} {c.spots === 1 ? "spot" : "spots"}
-                            </span>
-                          </span>
-                        ))}
-                      </div>
+                      {days.length > 1 && (
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                          {DAY_NAMES[day]}
+                        </p>
+                      )}
+                      <dl className="space-y-1">
+                        {LEVEL_ROWS.map((row) => {
+                          const times = Array.from(
+                            new Set(
+                              daySlots
+                                .filter((s) => s.swim_level && row.levels.includes(s.swim_level))
+                                .map((s) => s.start_time),
+                            ),
+                          ).sort();
+                          if (times.length === 0) return null;
+                          return (
+                            <div key={row.label} className="flex justify-between gap-3 text-sm">
+                              <dt className="text-muted-foreground">{row.label}</dt>
+                              <dd className="font-medium text-foreground text-right">
+                                {formatTimeList(times)}
+                              </dd>
+                            </div>
+                          );
+                        })}
+                      </dl>
                     </div>
                   );
                 })}
-
               </div>
+            ) : (
+              <dl className="space-y-1">
+                {days.map((day) => {
+                  const daySlots = open.filter((s) => s.day_of_week === day);
+                  const start = daySlots.reduce(
+                    (min, s) => (s.start_time < min ? s.start_time : min),
+                    daySlots[0].start_time,
+                  );
+                  const end = daySlots.reduce(
+                    (max, s) => (s.end_time > max ? s.end_time : max),
+                    daySlots[0].end_time,
+                  );
+                  return (
+                    <div key={day} className="flex justify-between gap-3 text-sm">
+                      <dt className="text-muted-foreground">{DAY_NAMES[day]}</dt>
+                      <dd className="font-medium text-foreground text-right">
+                        {formatRange(start, end)}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
             )}
           </Card>
         );
@@ -278,6 +342,7 @@ function OpenTimes({ slots, loading }: { slots: OpenSlot[]; loading: boolean }) 
     </div>
   );
 }
+
 
 /* ───────── page ───────── */
 
@@ -319,18 +384,17 @@ const SwimLessons = () => {
       <ProgramCards slots={slots} loading={loading} />
 
       {/* Open times */}
-      <section className="py-20">
+      <section className="py-12">
         <div className="container">
-          <div className="text-center mb-12">
-            <h2 className="font-display text-3xl font-bold text-foreground mb-3">Open times</h2>
-            <p className="text-muted-foreground">
-              Live availability. Spots are held as families join.
-            </p>
+          <div className="text-center mb-6">
+            <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-1">Open times</h2>
+            <p className="text-sm text-muted-foreground">Live availability.</p>
           </div>
 
           <OpenTimes slots={slots} loading={loading} />
 
-          <div className="text-center mt-10">
+          <div className="text-center mt-8">
+
             <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
               <Link to="/join">Join</Link>
             </Button>
