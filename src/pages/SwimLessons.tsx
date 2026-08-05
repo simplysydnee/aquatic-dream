@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Users, Clock, Loader2, ChevronRight } from "lucide-react";
+import { Users, Loader2, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import LevelBadge from "@/components/LevelBadge";
 import type { SwimLevel } from "@/components/swim-enrollment/types";
