@@ -578,7 +578,12 @@ async function ensureMembershipRecord(options: {
       const { data: winner } = await supabase
         .from("memberships")
         .select("id")
-        .or(`stripe_subscription_id.eq.${options.subscriptionId},stripe_session_id.eq.${options.sessionId}`)
+        .or(
+          options.sessionId
+            ? `stripe_subscription_id.eq.${options.subscriptionId},stripe_session_id.eq.${options.sessionId}`
+            : `stripe_subscription_id.eq.${options.subscriptionId}`,
+        )
+
         .limit(1)
         .maybeSingle();
       if (winner?.id) {
