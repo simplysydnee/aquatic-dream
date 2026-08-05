@@ -491,7 +491,7 @@ async function ensureMembershipRecord(options: {
   subscriptionId: string;
   customerId: string;
   pendingId: string;
-  sessionId: string;
+  sessionId: string | null;
   payload: JsonObject;
   env: StripeEnv;
   alreadyProcessed: boolean;
