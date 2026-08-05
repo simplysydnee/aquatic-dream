@@ -81,7 +81,36 @@ const fmtPrice = (cents: number) => `$${(cents / 100).toFixed(0)}`;
 // 1 program, 2 slot, 3 info, 4 waiver (auto-skip if on file), 5 consent, 6 review, 7 checkout, 8 success
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-type HoldState = "none" | "loading" | "ok" | "expired" | "converted" | "cancelled" | "not_found";
+type HoldState =
+  | "none"
+  | "loading"
+  | "ok"
+  | "expired"
+  | "converted"
+  | "cancelled"
+  | "not_found"
+  | "batch_done";
+
+/** One swimmer inside a batched (group_token) invite link. */
+type GroupHoldEntry = {
+  id: string;
+  swimmerName: string;
+  status: "held" | "converted" | "expired" | "cancelled" | string;
+  planKey: PlanKey;
+  planName: string | null;
+  monthlyPriceCents: number | null;
+  swimLevel: SwimLevel | null;
+  existingWaiverId: string | null;
+  heldUntil: string | null;
+  slot: {
+    id: string;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    instructor_name: string | null;
+  } | null;
+};
+type BatchState = "all_converted" | "all_expired" | "mixed_terminal" | null;
 
 /** Reads the hold token straight off the URL so first paint can be gated. */
 const holdTokenFromUrl = (): string | null => {
@@ -212,6 +241,9 @@ function JoinMembershipForm() {
   );
   const [holdHeldUntil, setHoldHeldUntil] = useState<string | null>(null);
   const [holdSwimmerFirst, setHoldSwimmerFirst] = useState<string>("");
+  // Batched invite link (/join?hold=<group_token>): every swimmer in the batch.
+  const [groupHolds, setGroupHolds] = useState<GroupHoldEntry[]>([]);
+  const [batchState, setBatchState] = useState<BatchState>(null);
   const [releasingHold, setReleasingHold] = useState(false);
   const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
   const holdActive = holdState === "ok" && !!holdToken;
@@ -885,7 +917,18 @@ function JoinMembershipForm() {
         parentEmail: string | null;
         existingWaiverId: string | null;
         heldUntil: string | null;
+        groupHolds?: GroupHoldEntry[];
+        batchState?: BatchState;
       };
+      const entries = h.groupHolds ?? [];
+      setGroupHolds(entries);
+      setBatchState(h.batchState ?? null);
+      // Every swimmer in the batch is finished one way or another: show the
+      // batch outcome instead of falling back to one arbitrary swimmer.
+      if (entries.length > 0 && h.batchState) {
+        setHoldState("batch_done");
+        return;
+      }
       if (h.status !== "held") {
         setHoldState(
           h.status === "converted"
