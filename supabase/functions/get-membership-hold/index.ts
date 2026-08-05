@@ -25,12 +25,34 @@ Deno.serve(async (req) => {
     }
     if (!token) return json({ error: "Missing token" }, 400);
 
-    const { data: hold, error } = await supabase
+    const HOLD_FIELDS =
+      "id, status, plan_key, standing_slot_id, swim_level, swimmer_name, parent_name, parent_phone, parent_email, existing_waiver_id, held_until, converted_at";
+
+    let { data: hold } = await supabase
       .from("membership_holds")
-      .select("id, status, plan_key, standing_slot_id, swim_level, swimmer_name, parent_name, parent_phone, parent_email, existing_waiver_id, held_until, converted_at")
+      .select(HOLD_FIELDS)
       .eq("token", token)
       .maybeSingle();
-    if (error || !hold) return json({ error: "Not found" }, 404);
+
+    // The batch invite link carries a group_token shared by every hold in the
+    // family batch. Resolve it to the first hold still awaiting completion.
+    let groupHolds: { id: string; swimmer_name: string; status: string }[] = [];
+    if (!hold) {
+      const { data: group } = await supabase
+        .from("membership_holds")
+        .select(HOLD_FIELDS)
+        .eq("group_token", token)
+        .order("created_at", { ascending: true });
+      if (group && group.length > 0) {
+        groupHolds = group.map((g) => ({
+          id: g.id,
+          swimmer_name: g.swimmer_name,
+          status: g.status,
+        }));
+        hold = group.find((g) => g.status === "held") ?? group[0];
+      }
+    }
+    if (!hold) return json({ error: "Not found" }, 404);
 
     if (action === "convert") {
       if (hold.status === "converted") return json({ success: true, alreadyConverted: true });
@@ -78,6 +100,7 @@ Deno.serve(async (req) => {
         parentEmail: hold.parent_email,
         existingWaiverId: hold.existing_waiver_id,
         heldUntil: hold.held_until,
+        groupHolds,
       },
       plan: plan ?? null,
       slot: slot
