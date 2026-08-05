@@ -1,6 +1,8 @@
 /**
  * Family-first enrollment (Enroll a family).
- * Off until Phase 4 ships: a batch invite today produces a hold link that only
- * renders the first swimmer, so the rest of the family is invisible to the parent.
+ * On: Phase 4 (batch rendering on /join) and Phase 5 (saved-card reuse) are both
+ * shipped, so a group link renders every swimmer and swimmers 2+ reuse the card
+ * saved on the parent's single Stripe customer.
  */
-export const FAMILY_ENROLL_ENABLED = false;
+export const FAMILY_ENROLL_ENABLED = true;
+
