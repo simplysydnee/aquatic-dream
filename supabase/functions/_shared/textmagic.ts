@@ -144,3 +144,13 @@ export async function sendAndLogBookingConfirmation(
   });
   return result;
 }
+
+// 20 -> "20 min", 60 -> "1 hr", 90 -> "1.5 hrs", 2880 -> "48 hrs"
+export function formatHoldWindow(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes <= 0) return "48 hrs";
+  if (minutes < 60) return `${Math.round(minutes)} min`;
+  const hours = minutes / 60;
+  const rounded = Math.round(hours * 2) / 2;
+  if (rounded === 1) return "1 hr";
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} hrs`;
+}

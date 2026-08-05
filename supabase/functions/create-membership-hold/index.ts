@@ -3,7 +3,7 @@
 // created here — the existing /join checkout path still does all of that.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { formatPTTime, sendAndLogBookingConfirmation } from "../_shared/textmagic.ts";
+import { formatHoldWindow, formatPTTime, sendAndLogBookingConfirmation } from "../_shared/textmagic.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
