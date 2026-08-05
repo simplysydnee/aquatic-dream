@@ -28,6 +28,8 @@ import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
 import { Link } from "react-router-dom";
 import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPanel";
 import { EnrollFamilyDialog } from "@/components/admin/holds/EnrollFamilyDialog";
+import { FAMILY_ENROLL_ENABLED } from "@/lib/familyEnrollGate";
+
 
 
 
