@@ -236,75 +236,105 @@ function ProgramCards({ slots, loading }: { slots: OpenSlot[]; loading: boolean 
 
 /* ───────── schedule ───────── */
 
+function FullNotice({ name }: { name: string }) {
+  return (
+    <p className="text-sm text-muted-foreground">
+      {name} is currently full.{" "}
+      <Link to="/join" className="text-primary underline underline-offset-4">
+        Join the waitlist
+      </Link>
+      .
+    </p>
+  );
+}
+
 function OpenTimes({ slots, loading }: { slots: OpenSlot[]; loading: boolean }) {
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
+      <div className="flex justify-center py-10">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto items-start">
       {PROGRAM_ORDER.map((key) => {
         const open = slots.filter((s) => s.plan_key === key && !s.is_full);
         const days = Array.from(new Set(open.map((s) => s.day_of_week))).sort((a, b) => a - b);
+        const isGroup = key === "kid_group";
+
         return (
-          <Card key={key} className="p-6">
-            <h3 className="font-display text-xl font-bold text-foreground mb-4">
+          <Card key={key} className="p-5">
+            <h3 className="font-display text-lg font-bold text-foreground mb-3">
               {PROGRAM_COPY[key].name}
+              {isGroup && days.length === 1 && (
+                <span className="font-sans text-sm font-medium text-muted-foreground">
+                  {" "}
+                  ({DAY_NAMES[days[0]]})
+                </span>
+              )}
             </h3>
+
             {open.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Every {PROGRAM_COPY[key].name} time is currently full. Join to get on the waitlist.
-              </p>
-            ) : (
-              <div className="space-y-4">
+              <FullNotice name={PROGRAM_COPY[key].name} />
+            ) : isGroup ? (
+              <div className="space-y-3">
                 {days.map((day) => {
-                  // Several instructors can hold the same time; merge into one
-                  // chip per time (and per level for Small Group) with total spots.
-                  const merged = new Map<string, { time: string; level: string | null; spots: number }>();
-                  open
-                    .filter((s) => s.day_of_week === day)
-                    .forEach((s) => {
-                      const key = `${s.start_time}|${s.swim_level ?? ""}`;
-                      const cur = merged.get(key);
-                      if (cur) cur.spots += s.spots_left;
-                      else merged.set(key, { time: s.start_time, level: s.swim_level, spots: s.spots_left });
-                    });
-                  const chips = Array.from(merged.values()).sort(
-                    (a, b) => a.time.localeCompare(b.time) || (a.level ?? "").localeCompare(b.level ?? ""),
-                  );
+                  const daySlots = open.filter((s) => s.day_of_week === day);
                   return (
                     <div key={day}>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                        {DAY_NAMES[day]}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {chips.map((c) => (
-                          <span
-                            key={`${c.time}-${c.level ?? ""}`}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground"
-                          >
-                            <Clock className="w-3 h-3 text-muted-foreground" />
-                            {formatTime(c.time)}
-                            {c.level && (
-                              <span className="opacity-70">
-                                · {LEVELS.find((l) => l.level === c.level)?.group ?? c.level}
-                              </span>
-                            )}
-                            <span className="opacity-70">
-                              · {c.spots} {c.spots === 1 ? "spot" : "spots"}
-                            </span>
-                          </span>
-                        ))}
-                      </div>
+                      {days.length > 1 && (
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                          {DAY_NAMES[day]}
+                        </p>
+                      )}
+                      <dl className="space-y-1">
+                        {LEVEL_ROWS.map((row) => {
+                          const times = Array.from(
+                            new Set(
+                              daySlots
+                                .filter((s) => s.swim_level && row.levels.includes(s.swim_level))
+                                .map((s) => s.start_time),
+                            ),
+                          ).sort();
+                          if (times.length === 0) return null;
+                          return (
+                            <div key={row.label} className="flex justify-between gap-3 text-sm">
+                              <dt className="text-muted-foreground">{row.label}</dt>
+                              <dd className="font-medium text-foreground text-right">
+                                {formatTimeList(times)}
+                              </dd>
+                            </div>
+                          );
+                        })}
+                      </dl>
                     </div>
                   );
                 })}
-
               </div>
+            ) : (
+              <dl className="space-y-1">
+                {days.map((day) => {
+                  const daySlots = open.filter((s) => s.day_of_week === day);
+                  const start = daySlots.reduce(
+                    (min, s) => (s.start_time < min ? s.start_time : min),
+                    daySlots[0].start_time,
+                  );
+                  const end = daySlots.reduce(
+                    (max, s) => (s.end_time > max ? s.end_time : max),
+                    daySlots[0].end_time,
+                  );
+                  return (
+                    <div key={day} className="flex justify-between gap-3 text-sm">
+                      <dt className="text-muted-foreground">{DAY_NAMES[day]}</dt>
+                      <dd className="font-medium text-foreground text-right">
+                        {formatRange(start, end)}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
             )}
           </Card>
         );
@@ -312,6 +342,7 @@ function OpenTimes({ slots, loading }: { slots: OpenSlot[]; loading: boolean }) 
     </div>
   );
 }
+
 
 /* ───────── page ───────── */
 
