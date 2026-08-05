@@ -134,6 +134,8 @@ const MembershipsAdmin = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dayFilter, setDayFilter] = useState<string>("all");
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [enrollFamilyOpen, setEnrollFamilyOpen] = useState(false);
