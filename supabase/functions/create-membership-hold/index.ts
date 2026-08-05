@@ -3,7 +3,7 @@
 // created here — the existing /join checkout path still does all of that.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { formatPTTime, sendAndLogBookingConfirmation } from "../_shared/textmagic.ts";
+import { formatHoldWindow, formatPTTime, sendAndLogBookingConfirmation } from "../_shared/textmagic.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -49,10 +49,16 @@ Deno.serve(async (req) => {
     const swimLevel = body?.swim_level ? String(body.swim_level) : null;
     const notes = String(body?.notes || "").trim() || null;
     const existingWaiverId = body?.existing_waiver_id ? String(body.existing_waiver_id) : null;
+    const sendSms = body?.send_sms === undefined ? true : Boolean(body.send_sms);
+    // hold_minutes wins when present so short drafts (20 min) are expressible;
+    // hold_hours still accepts fractions, floored at 15 minutes.
+    const minutesValue = Number(body?.hold_minutes);
     const hoursValue = Number(body?.hold_hours);
-    const holdHours = Number.isFinite(hoursValue) && hoursValue > 0 && hoursValue <= 168
-      ? hoursValue
-      : 48;
+    const holdMinutes = Number.isFinite(minutesValue) && minutesValue >= 5 && minutesValue <= 10080
+      ? Math.round(minutesValue)
+      : Number.isFinite(hoursValue) && hoursValue >= 0.25 && hoursValue <= 168
+      ? Math.round(hoursValue * 60)
+      : 48 * 60;
 
     if (!standingSlotId) return json({ error: "standing_slot_id required" }, 400);
     if (!swimmerName) return json({ error: "Swimmer name required" }, 400);
@@ -99,7 +105,7 @@ Deno.serve(async (req) => {
     const spotsLeft = (slot.capacity ?? 0) - (memberCount ?? 0) - (holdCount ?? 0);
     if (spotsLeft <= 0) return json({ error: "That slot is already full" }, 409);
 
-    const heldUntil = new Date(Date.now() + holdHours * 60 * 60 * 1000).toISOString();
+    const heldUntil = new Date(Date.now() + holdMinutes * 60 * 1000).toISOString();
     const token = makeToken();
 
     const { data: hold, error: insErr } = await supabaseAdmin
@@ -131,7 +137,20 @@ Deno.serve(async (req) => {
     const link = `${SITE_URL}/join?hold=${hold.token}`;
     const message =
       `Aquatic Dreams: we're holding a ${program} spot for ${firstName}, ${when}. ` +
-      `Finish enrollment within 48 hrs: ${link}`;
+      `Finish enrollment within ${formatHoldWindow(holdMinutes)}: ${link}`;
+
+    if (!sendSms) {
+      return json({
+        success: true,
+        hold_id: hold.id,
+        token: hold.token,
+        held_until: hold.held_until,
+        link,
+        sms_sent: false,
+        sms_skipped: true,
+        sms_error: null,
+      });
+    }
 
     const smsResult = await sendAndLogBookingConfirmation(supabaseAdmin, {
       phoneRaw: parentPhone,
@@ -154,6 +173,7 @@ Deno.serve(async (req) => {
       held_until: hold.held_until,
       link,
       sms_sent: smsResult.ok,
+      sms_skipped: false,
       sms_error: smsResult.ok ? null : smsResult.error ?? null,
     });
   } catch (e) {
