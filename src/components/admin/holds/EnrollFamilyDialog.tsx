@@ -255,6 +255,7 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
       return;
     }
     setBusy(true);
+    setTakenNotice(null);
     try {
       const { data, error } = await supabase.functions.invoke("create-membership-hold", {
         body: {
@@ -269,7 +270,22 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
           hold_minutes: DRAFT_HOLD_MINUTES,
         },
       });
-      if (error || data?.error) throw new Error(data?.error || error?.message || "Could not hold that time");
+
+      if (error || data?.error) {
+        const detail = await readFunctionError(error, data);
+        if (detail.status === 409 || detail.status === 404) {
+          // Someone on /join (or another desk tab) took it while this list was on screen.
+          setCoachChoice(null);
+          await refresh();
+          const label = `${DAYS[slot.day_of_week]} ${fmtTime(slot.start_time)}`;
+          const message = `${label} was just taken. Times below are refreshed, pick another.`;
+          setTakenNotice(message);
+          toast.error(message);
+          return;
+        }
+        throw new Error(detail.message);
+      }
+
       const assignment: Assignment = {
         holdId: data.hold_id,
         slotId: slot.id,
@@ -291,6 +307,7 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
       setBusy(false);
     }
   };
+
 
   const unassign = async (row: RosterRow) => {
     if (!row.assignment) return;
