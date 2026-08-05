@@ -896,7 +896,41 @@ const StandingSlotsAdmin = () => {
       </Card>
       <p className="text-xs text-muted-foreground">
         Deactivating a slot with active memberships hides it from booking but keeps the row so existing members are not orphaned.
+        Occupied slots stay visible here under every status filter.
       </p>
+
+      <AlertDialog
+        open={!!deactivateTarget}
+        onOpenChange={(open) => { if (!open) setDeactivateTarget(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate a class with swimmers in it?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deactivateTarget && (
+                <>
+                  {DAYS[deactivateTarget.slot.day_of_week]} {timeLabel(deactivateTarget.slot.start_time)} ·{" "}
+                  {PLAN_LABELS[deactivateTarget.slot.plan_key]} has {deactivateTarget.enrolled} enrolled{" "}
+                  {deactivateTarget.enrolled === 1 ? "membership" : "memberships"}. Deactivating removes it from booking.
+                  Existing families keep their spot and the class stays visible here.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep active</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const target = deactivateTarget;
+                setDeactivateTarget(null);
+                if (target) await writeActive(target.slot, false);
+              }}
+            >
+              Deactivate anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
