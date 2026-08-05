@@ -70,6 +70,40 @@ function formatTime(t: string) {
   return `${h12}:${m} ${ampm}`;
 }
 
+function meridiem(t: string) {
+  return parseInt(t.split(":")[0], 10) >= 12 ? "PM" : "AM";
+}
+
+function bareTime(t: string) {
+  return formatTime(t).replace(/ (AM|PM)$/, "");
+}
+
+/** "4:00 – 7:00 PM" (suffix collapsed when both ends share a meridiem). */
+function formatRange(start: string, end: string) {
+  return meridiem(start) === meridiem(end)
+    ? `${bareTime(start)} – ${formatTime(end)}`
+    : `${formatTime(start)} – ${formatTime(end)}`;
+}
+
+/** "4:00, 5:00, 6:00 PM" (trailing suffix only when all share a meridiem). */
+function formatTimeList(times: string[]) {
+  if (times.length === 0) return "";
+  const all = meridiem(times[0]);
+  if (times.every((t) => meridiem(t) === all)) {
+    return `${times.map(bareTime).join(", ")} ${all}`;
+  }
+  return times.map(formatTime).join(", ");
+}
+
+/** Level rows for Small Group: Divers and Masters share a line. */
+const LEVEL_ROWS: { label: string; levels: string[] }[] = [
+  { label: "Little Fins", levels: ["white"] },
+  { label: "Reef Explorers", levels: ["red"] },
+  { label: "Sea Scouts", levels: ["yellow"] },
+  { label: "Divers + Masters", levels: ["blue", "green"] },
+];
+
+
 function formatDollars(cents: number | null | undefined) {
   if (cents == null) return null;
   return `$${Math.round(cents / 100)}`;
