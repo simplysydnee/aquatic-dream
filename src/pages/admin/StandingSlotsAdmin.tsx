@@ -367,20 +367,22 @@ const StandingSlotsAdmin = () => {
     await loadAll();
   };
 
-  const toggleActive = async (s: Slot, next: boolean) => {
-    const enrolled = enrolledCounts[s.id] || 0;
-    if (!next && enrolled > 0) {
-      toast({
-        title: "Deactivated",
-        description: `${enrolled} active membership(s) still reference this slot. Slot is hidden but not deleted.`,
-      });
-    }
+  const writeActive = async (s: Slot, next: boolean) => {
     const { error } = await supabase.from("standing_slots").update({ active: next }).eq("id", s.id);
     if (error) {
       toast({ title: "Toggle failed", description: error.message, variant: "destructive" });
       return;
     }
     await loadAll();
+  };
+
+  const toggleActive = async (s: Slot, next: boolean) => {
+    const enrolled = enrolledCounts[s.id] || 0;
+    if (!next && enrolled > 0) {
+      setDeactivateTarget({ slot: s, enrolled });
+      return;
+    }
+    await writeActive(s, next);
   };
 
   const toggleExpand = (id: string) => {
