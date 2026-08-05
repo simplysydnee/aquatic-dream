@@ -134,6 +134,30 @@ const fmtHeldUntil = (iso: string | null): string | null => {
   });
 };
 
+/**
+ * After one swimmer in a batched invite finishes checkout, look up who is
+ * still held on the same group token so the success screen can hand the
+ * parent straight to the next swimmer instead of the original SMS.
+ */
+const fetchNextHeldSwimmer = async (
+  token: string,
+): Promise<{ name: string; remaining: number } | null> => {
+  try {
+    const { data } = await supabase.functions.invoke("get-membership-hold", {
+      body: { token },
+    });
+    const entries = ((data as { groupHolds?: GroupHoldEntry[] } | null)?.groupHolds ??
+      []) as GroupHoldEntry[];
+    const held = entries.filter((e) => e.status === "held");
+    if (held.length === 0) return null;
+    return { name: held[0].swimmerName || "your next swimmer", remaining: held.length };
+  } catch {
+    return null;
+  }
+};
+
+
+
 const HOLD_PROBLEMS: Record<
   "expired" | "converted" | "cancelled" | "not_found",
   { title: string; body: string }
