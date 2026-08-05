@@ -523,6 +523,7 @@ const MembershipsAdmin = () => {
                           </div>
                         )}
                     </td>
+                    <td className="px-3 py-2">
 
                       {m.current_period_end
                         ? new Date(m.current_period_end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
