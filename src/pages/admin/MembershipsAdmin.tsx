@@ -226,6 +226,8 @@ const MembershipsAdmin = () => {
         const slot = m.standing_slot_id ? slotById.get(m.standing_slot_id) : null;
         if (!slot || String(slot.day_of_week) !== dayFilter) return false;
       }
+      if (paymentFilter === "problem" && !hasPaymentProblem(m)) return false;
+      if (paymentFilter !== "all" && paymentFilter !== "problem" && paymentBucket(m) !== paymentFilter) return false;
       if (!q) return true;
       const hay = [
         swimmerName(m),
@@ -238,7 +240,12 @@ const MembershipsAdmin = () => {
         .toLowerCase();
       return hay.includes(q) || hay.includes(q.replace(/\D/g, ""));
     });
-  }, [memberships, search, planFilter, statusFilter, dayFilter, includeInactive, slotById]);
+  }, [memberships, search, planFilter, statusFilter, dayFilter, paymentFilter, includeInactive, slotById]);
+
+  // Payment problems are surfaced across the whole book, not just the current
+  // filter, so a filtered view can never hide a declined card.
+  const paymentProblems = useMemo(() => memberships.filter(hasPaymentProblem), [memberships]);
+
 
   const targetSlots = useMemo(() => {
     if (!selected) return [] as (Slot & { enrolled: number })[];
