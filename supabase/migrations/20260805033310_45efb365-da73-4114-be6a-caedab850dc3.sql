@@ -1,0 +1,2 @@
+ALTER TABLE public.membership_holds ADD COLUMN IF NOT EXISTS group_token text;
+CREATE INDEX IF NOT EXISTS membership_holds_group_token_idx ON public.membership_holds (group_token) WHERE group_token IS NOT NULL;

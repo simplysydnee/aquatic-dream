@@ -1411,6 +1411,7 @@ export type Database = {
           created_by: string | null
           existing_waiver_id: string | null
           expired_at: string | null
+          group_token: string | null
           held_until: string
           id: string
           notes: string | null
@@ -1432,6 +1433,7 @@ export type Database = {
           created_by?: string | null
           existing_waiver_id?: string | null
           expired_at?: string | null
+          group_token?: string | null
           held_until: string
           id?: string
           notes?: string | null
@@ -1453,6 +1455,7 @@ export type Database = {
           created_by?: string | null
           existing_waiver_id?: string | null
           expired_at?: string | null
+          group_token?: string | null
           held_until?: string
           id?: string
           notes?: string | null
