@@ -13,6 +13,8 @@ import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
 import { resolveSwimmerWaiver } from "@/lib/swimmerWaiver";
 import { useFamilySearch, type FamilyGroup } from "@/hooks/useFamilySearch";
 import { useSlotOpenings, type OpeningPlanKey, type OpeningSlot } from "@/hooks/useSlotOpenings";
+import { computeOpenTimes } from "@/lib/openTimes";
+
 
 interface Props {
   open: boolean;
