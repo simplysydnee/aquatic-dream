@@ -315,9 +315,13 @@ const MembershipsAdmin = () => {
             </Link>
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link to="/admin/standing-slots">Hold a spot over the phone</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setEnrollFamilyOpen(true)}>Enroll a family</Button>
+          <Button variant="outline" asChild>
+            <Link to="/admin/standing-slots">Hold a spot over the phone</Link>
+          </Button>
+        </div>
+
 
       </div>
 
