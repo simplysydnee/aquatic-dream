@@ -928,6 +928,9 @@ function JoinMembershipForm() {
   const [manageToken, setManageToken] = useState<string | null>(null);
   const [returnStillWorking, setReturnStillWorking] = useState(false);
   const [returnSlotFull, setReturnSlotFull] = useState<string | null>(null);
+  // Next swimmer still held on the same batched invite link.
+  const [nextSwimmer, setNextSwimmer] = useState<{ name: string; remaining: number } | null>(null);
+  const [nextSwimmerToken, setNextSwimmerToken] = useState<string | null>(null);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get("membership") !== "success") return;
@@ -944,12 +947,18 @@ function JoinMembershipForm() {
 
     const finishHold = () => {
       const returningHold = p.get("hold");
-      if (returningHold) {
-        void supabase.functions.invoke("get-membership-hold", {
+      if (!returningHold) return;
+      void (async () => {
+        await supabase.functions.invoke("get-membership-hold", {
           body: { token: returningHold, action: "convert" },
         });
-      }
+        const next = await fetchNextHeldSwimmer(returningHold);
+        if (cancelled || !next) return;
+        setNextSwimmerToken(returningHold);
+        setNextSwimmer(next);
+      })();
     };
+
 
     // The webhook may still be finalizing the same checkout. A 202 means
     // "payment received, still working" so we keep polling instead of
