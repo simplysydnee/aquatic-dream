@@ -905,10 +905,18 @@ function JoinMembershipForm() {
       setReturnError(null);
       setStep(8);
       if (holdToken) {
-        void supabase.functions.invoke("get-membership-hold", {
-          body: { token: holdToken, action: "convert" },
-        });
+        const token = holdToken;
+        void (async () => {
+          await supabase.functions.invoke("get-membership-hold", {
+            body: { token, action: "convert" },
+          });
+          const next = await fetchNextHeldSwimmer(token);
+          if (!next) return;
+          setNextSwimmerToken(token);
+          setNextSwimmer(next);
+        })();
       }
+
       return;
     }
 
