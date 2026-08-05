@@ -48,7 +48,7 @@ const normalizePhone = (input?: string | null): string => {
   return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
 };
 
-const groupMatches = (matches: FamilyMatch[]): FamilyGroup[] => {
+export const groupFamilyMatches = (matches: FamilyMatch[]): FamilyGroup[] => {
   const groups = new Map<string, FamilyGroup>();
 
   for (const m of matches) {
