@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     const { data: holds, error: holdsErr } = await supabaseAdmin
       .from("membership_holds")
       .select(
-        "id, token, status, swimmer_name, parent_phone, sms_sent_at, standing_slots:standing_slot_id (plan_key, day_of_week, start_time)",
+        "id, token, group_token, status, swimmer_name, parent_phone, sms_sent_at, standing_slots:standing_slot_id (plan_key, day_of_week, start_time)",
       )
       .in("id", holdIds)
       .order("created_at", { ascending: true });
@@ -128,7 +128,21 @@ Deno.serve(async (req) => {
       ? `${parts[0]} and ${parts[1]}`
       : `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
 
-    const link = `${SITE_URL}/join?hold=${sendable[0].token}`;
+    // One group_token covers the whole batch so every swimmer is reachable
+    // from a single link. Reuse an existing one rather than minting a second.
+    const existingGroupToken = holds.find((h) => h.group_token)?.group_token as string | undefined;
+    const groupToken = existingGroupToken ?? crypto.randomUUID().replace(/-/g, "");
+
+    const { error: groupErr } = await supabaseAdmin
+      .from("membership_holds")
+      .update({ group_token: groupToken })
+      .in("id", holdIds);
+    if (groupErr) {
+      console.error("[send-membership-hold-invites] group_token write failed", groupErr);
+      return json({ error: "Could not group the holds" }, 500);
+    }
+
+    const link = `${SITE_URL}/join?hold=${groupToken}`;
     const message =
       `Aquatic Dreams: we're holding ${parts.length === 1 ? "a spot" : "spots"} for ${list}. ` +
       `Finish enrollment within ${EXTEND_HOURS} hrs: ${link}`;
@@ -171,6 +185,7 @@ Deno.serve(async (req) => {
       success: true,
       sent: true,
       message,
+      group_token: groupToken,
       results: [
         ...sendable.map((h) => ({
           hold_id: h.id,
