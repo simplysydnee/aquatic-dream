@@ -29,6 +29,15 @@ import { Link } from "react-router-dom";
 import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPanel";
 import { EnrollFamilyDialog } from "@/components/admin/holds/EnrollFamilyDialog";
 import { FAMILY_ENROLL_ENABLED } from "@/lib/familyEnrollGate";
+import {
+  type MembershipPaymentState,
+  hasPaymentProblem,
+  paymentAmountLabel,
+  paymentBucket,
+  paymentLabel,
+  plainDeclineReason,
+} from "@/lib/membershipPayment";
+
 
 
 
@@ -59,7 +68,7 @@ interface Slot {
   accepted_levels: string[] | null;
 }
 
-interface Membership {
+interface Membership extends MembershipPaymentState {
   id: string;
   plan_key: PlanKey;
   standing_slot_id: string | null;
@@ -80,6 +89,7 @@ interface Membership {
   swim_level: SwimLevel | null;
   manage_token: string | null;
 }
+
 
 interface Occurrence {
   id: string;
@@ -124,6 +134,8 @@ const MembershipsAdmin = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dayFilter, setDayFilter] = useState<string>("all");
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [enrollFamilyOpen, setEnrollFamilyOpen] = useState(false);
@@ -151,7 +163,7 @@ const MembershipsAdmin = () => {
       supabase
         .from("memberships")
         .select(
-          "id, plan_key, standing_slot_id, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status, start_date, current_period_end, cancel_effective_date, recurring_consent_amount_cents, medical_notes, notes, waiver_id, swim_level, manage_token",
+          "id, plan_key, standing_slot_id, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status, start_date, current_period_end, cancel_effective_date, recurring_consent_amount_cents, medical_notes, notes, waiver_id, swim_level, manage_token, last_invoice_id, last_payment_status, last_payment_at, last_payment_amount_cents, payment_failure_count, payment_failure_reason, stripe_subscription_status",
         )
         .order("created_at", { ascending: false }),
       supabase
@@ -214,6 +226,8 @@ const MembershipsAdmin = () => {
         const slot = m.standing_slot_id ? slotById.get(m.standing_slot_id) : null;
         if (!slot || String(slot.day_of_week) !== dayFilter) return false;
       }
+      if (paymentFilter === "problem" && !hasPaymentProblem(m)) return false;
+      if (paymentFilter !== "all" && paymentFilter !== "problem" && paymentBucket(m) !== paymentFilter) return false;
       if (!q) return true;
       const hay = [
         swimmerName(m),
@@ -226,7 +240,12 @@ const MembershipsAdmin = () => {
         .toLowerCase();
       return hay.includes(q) || hay.includes(q.replace(/\D/g, ""));
     });
-  }, [memberships, search, planFilter, statusFilter, dayFilter, includeInactive, slotById]);
+  }, [memberships, search, planFilter, statusFilter, dayFilter, paymentFilter, includeInactive, slotById]);
+
+  // Payment problems are surfaced across the whole book, not just the current
+  // filter, so a filtered view can never hide a declined card.
+  const paymentProblems = useMemo(() => memberships.filter(hasPaymentProblem), [memberships]);
+
 
   const targetSlots = useMemo(() => {
     if (!selected) return [] as (Slot & { enrolled: number })[];
@@ -348,6 +367,31 @@ const MembershipsAdmin = () => {
 
       <MembershipHoldsPanel refreshKey={holdsRefresh} />
 
+      {paymentProblems.length > 0 && (
+        <Card className="border-destructive/40 bg-destructive/5 p-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+            <span className="text-destructive">
+              {paymentProblems.length === 1
+                ? "1 membership has a payment problem."
+                : `${paymentProblems.length} memberships have a payment problem.`}{" "}
+              The swimmer stays enrolled. Stripe retries on its own schedule.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setPaymentFilter("problem");
+                setIncludeInactive(true);
+              }}
+            >
+              Show them
+            </Button>
+          </div>
+        </Card>
+      )}
+
+
 
 
 
@@ -389,6 +433,17 @@ const MembershipsAdmin = () => {
               ))}
             </SelectContent>
           </Select>
+          <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+            <SelectTrigger className="w-[12rem]"><SelectValue placeholder="Payment" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any payment state</SelectItem>
+              <SelectItem value="problem">Payment problems</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="awaiting">Awaiting first charge</SelectItem>
+            </SelectContent>
+          </Select>
+
           <label className="flex items-center gap-2 text-sm">
             <Switch checked={includeInactive} onCheckedChange={setIncludeInactive} />
             Include cancelled and paused
@@ -413,7 +468,9 @@ const MembershipsAdmin = () => {
                 <th className="px-3 py-2 font-medium">Instructor</th>
                 <th className="px-3 py-2 font-medium">Level</th>
                 <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Payment</th>
                 <th className="px-3 py-2 font-medium">Next charge</th>
+
                 <th className="px-3 py-2 font-medium">Flags</th>
               </tr>
             </thead>
@@ -448,6 +505,26 @@ const MembershipsAdmin = () => {
                       <Badge variant={m.status === "active" ? "default" : "secondary"}>{m.status.replace("_", " ")}</Badge>
                     </td>
                     <td className="px-3 py-2">
+                      <span
+                        className={
+                          paymentBucket(m) === "failed"
+                            ? "font-medium text-destructive"
+                            : paymentBucket(m) === "paid"
+                              ? ""
+                              : "text-muted-foreground"
+                        }
+                      >
+                        {paymentLabel(m)}
+                      </span>
+                      {m.stripe_subscription_status &&
+                        ["past_due", "unpaid", "canceled"].includes(m.stripe_subscription_status) && (
+                          <div className="text-xs text-destructive">
+                            Stripe: {m.stripe_subscription_status.replace("_", " ")}
+                          </div>
+                        )}
+                    </td>
+                    <td className="px-3 py-2">
+
                       {m.current_period_end
                         ? new Date(m.current_period_end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : "--"}
@@ -510,6 +587,55 @@ const MembershipsAdmin = () => {
                     <Detail label="Cancels on" value={dateLabel(selected.cancel_effective_date)} />
                   )}
                 </div>
+
+                <div
+                  className={`space-y-1 rounded border p-3 ${
+                    paymentBucket(selected) === "failed" ? "border-destructive/40 bg-destructive/5" : ""
+                  }`}
+                >
+                  <div className="font-medium">Last payment</div>
+                  {paymentBucket(selected) === "awaiting" ? (
+                    <div className="text-muted-foreground">No charge has run yet.</div>
+                  ) : (
+                    <>
+                      <div>
+                        {paymentLabel(selected)} · {paymentAmountLabel(selected.last_payment_amount_cents)}
+                      </div>
+                      {selected.last_payment_at && (
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(selected.last_payment_at).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      )}
+                      {selected.last_invoice_id && (
+                        <div className="text-xs text-muted-foreground">Invoice {selected.last_invoice_id}</div>
+                      )}
+                      {paymentBucket(selected) === "failed" && (
+                        <div className="pt-1 text-destructive">
+                          <div>{plainDeclineReason(selected.payment_failure_reason)}</div>
+                          {selected.payment_failure_reason && (
+                            <div className="text-xs opacity-80">Stripe said: {selected.payment_failure_reason}</div>
+                          )}
+                          <div className="text-xs opacity-80">
+                            Failed charges in a row: {selected.payment_failure_count ?? 1}. The swimmer stays enrolled.
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {selected.stripe_subscription_status && (
+                    <div className="text-xs text-muted-foreground">
+                      Stripe subscription status: {selected.stripe_subscription_status.replace("_", " ")}
+                    </div>
+                  )}
+                </div>
+
+
 
                 {!selected.waiver_id && (
                   <div className="flex items-center gap-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive">

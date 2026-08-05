@@ -1739,6 +1739,10 @@ export type Database = {
           has_medical: boolean | null
           id: string
           is_first_time: boolean | null
+          last_invoice_id: string | null
+          last_payment_amount_cents: number | null
+          last_payment_at: string | null
+          last_payment_status: string | null
           manage_token: string
           medical_notes: string | null
           membership_agreement_accepted_at: string | null
@@ -1749,6 +1753,8 @@ export type Database = {
           parent_first_name: string | null
           parent_last_name: string | null
           parent_phone: string | null
+          payment_failure_count: number
+          payment_failure_reason: string | null
           plan_key: Database["public"]["Enums"]["membership_plan_key"]
           recurring_consent_amount_cents: number | null
           recurring_consent_at: string | null
@@ -1763,6 +1769,7 @@ export type Database = {
           stripe_customer_id: string | null
           stripe_session_id: string | null
           stripe_subscription_id: string | null
+          stripe_subscription_status: string | null
           swim_level: string | null
           waiver_id: string | null
           welcome_sent_at: string | null
@@ -1779,6 +1786,10 @@ export type Database = {
           has_medical?: boolean | null
           id?: string
           is_first_time?: boolean | null
+          last_invoice_id?: string | null
+          last_payment_amount_cents?: number | null
+          last_payment_at?: string | null
+          last_payment_status?: string | null
           manage_token?: string
           medical_notes?: string | null
           membership_agreement_accepted_at?: string | null
@@ -1789,6 +1800,8 @@ export type Database = {
           parent_first_name?: string | null
           parent_last_name?: string | null
           parent_phone?: string | null
+          payment_failure_count?: number
+          payment_failure_reason?: string | null
           plan_key: Database["public"]["Enums"]["membership_plan_key"]
           recurring_consent_amount_cents?: number | null
           recurring_consent_at?: string | null
@@ -1803,6 +1816,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_session_id?: string | null
           stripe_subscription_id?: string | null
+          stripe_subscription_status?: string | null
           swim_level?: string | null
           waiver_id?: string | null
           welcome_sent_at?: string | null
@@ -1819,6 +1833,10 @@ export type Database = {
           has_medical?: boolean | null
           id?: string
           is_first_time?: boolean | null
+          last_invoice_id?: string | null
+          last_payment_amount_cents?: number | null
+          last_payment_at?: string | null
+          last_payment_status?: string | null
           manage_token?: string
           medical_notes?: string | null
           membership_agreement_accepted_at?: string | null
@@ -1829,6 +1847,8 @@ export type Database = {
           parent_first_name?: string | null
           parent_last_name?: string | null
           parent_phone?: string | null
+          payment_failure_count?: number
+          payment_failure_reason?: string | null
           plan_key?: Database["public"]["Enums"]["membership_plan_key"]
           recurring_consent_amount_cents?: number | null
           recurring_consent_at?: string | null
@@ -1843,6 +1863,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_session_id?: string | null
           stripe_subscription_id?: string | null
+          stripe_subscription_status?: string | null
           swim_level?: string | null
           waiver_id?: string | null
           welcome_sent_at?: string | null
