@@ -192,6 +192,9 @@ serve(async (req) => {
       console.error("[create-membership-checkout] pending insert failed", pendErr);
       return json({ error: "Could not stage enrollment" }, 500);
     }
+    let pendingId = pending.id as string;
+
+
 
     // One Stripe customer per parent email. The resolver is shared so every
     // membership for a family lands on the same customer record and the card
