@@ -384,18 +384,17 @@ const SwimLessons = () => {
       <ProgramCards slots={slots} loading={loading} />
 
       {/* Open times */}
-      <section className="py-20">
+      <section className="py-12">
         <div className="container">
-          <div className="text-center mb-12">
-            <h2 className="font-display text-3xl font-bold text-foreground mb-3">Open times</h2>
-            <p className="text-muted-foreground">
-              Live availability. Spots are held as families join.
-            </p>
+          <div className="text-center mb-6">
+            <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-1">Open times</h2>
+            <p className="text-sm text-muted-foreground">Live availability.</p>
           </div>
 
           <OpenTimes slots={slots} loading={loading} />
 
-          <div className="text-center mt-10">
+          <div className="text-center mt-8">
+
             <Button asChild className="bg-coral hover:bg-coral/90 text-coral-foreground rounded-xl px-8 py-6 text-base">
               <Link to="/join">Join</Link>
             </Button>
