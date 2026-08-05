@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { formatPhone } from "@/lib/phone";
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
 import { resolveSwimmerWaiver } from "@/lib/swimmerWaiver";
+import { useFamilySearch, type FamilyMatch } from "@/hooks/useFamilySearch";
 
 export interface HoldSlotTarget {
   id: string;
@@ -53,15 +54,6 @@ const splitName = (full?: string | null) => {
   return { first: parts[0] || "", last: parts.slice(1).join(" ") };
 };
 
-type FamilyMatch = {
-  parent_name: string;
-  parent_email: string | null;
-  parent_phone: string | null;
-  swimmer_name: string;
-  child_dob: string | null;
-  source: "membership" | "booking" | "enrollment" | "request";
-};
-
 const SOURCE_LABELS: Record<FamilyMatch["source"], string> = {
   membership: "Membership",
   booking: "Private lesson",
@@ -69,11 +61,10 @@ const SOURCE_LABELS: Record<FamilyMatch["source"], string> = {
   request: "Lesson request",
 };
 
+
 export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<FamilyMatch[]>([]);
-  const [searching, setSearching] = useState(false);
   const [matched, setMatched] = useState<FamilyMatch | null>(null);
   const [form, setForm] = useState({
     swimmer_name: "",
@@ -91,137 +82,16 @@ export function CreateMembershipHoldDialog({ slot, open, onOpenChange, onCreated
     if (!open) return;
     setStep(1);
     setQuery("");
-    setResults([]);
     setMatched(null);
     setForm({ swimmer_name: "", parent_name: "", parent_phone: "", parent_email: "", notes: "" });
     setWaiverId(null);
     setWaiverChecking(false);
   }, [open]);
 
+
   // Phone first, then name or email. Same sources the booking wizard searches.
-  useEffect(() => {
-    const q = query.trim();
-    if (q.length < 2) {
-      setResults([]);
-      return;
-    }
-    let cancelled = false;
-    setSearching(true);
-    const digits = q.replace(/\D/g, "");
-    const like = `%${q}%`;
-    const phoneLike = digits.length >= 3 ? `%${digits}%` : null;
+  const { results, searching } = useFamilySearch(query);
 
-    (async () => {
-      const [mem, bk, en, rq] = await Promise.all([
-        supabase
-          .from("memberships")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,created_at")
-          .or(
-            [
-              `parent_email.ilike.${like}`,
-              `parent_first_name.ilike.${like}`,
-              `parent_last_name.ilike.${like}`,
-              `child_first_name.ilike.${like}`,
-              `child_last_name.ilike.${like}`,
-              `parent_phone.ilike.${like}`,
-              ...(phoneLike ? [`parent_phone.ilike.${phoneLike}`] : []),
-            ].join(","),
-          )
-          .order("created_at", { ascending: false })
-          .limit(20),
-        supabase
-          .from("lesson_bookings")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
-          .or(
-            [
-              `parent_email.ilike.${like}`,
-              `parent_first_name.ilike.${like}`,
-              `parent_last_name.ilike.${like}`,
-              `child_first_name.ilike.${like}`,
-              `child_last_name.ilike.${like}`,
-              `parent_phone.ilike.${like}`,
-              ...(phoneLike ? [`parent_phone.ilike.${phoneLike}`] : []),
-            ].join(","),
-          )
-          .order("updated_at", { ascending: false })
-          .limit(20),
-        supabase
-          .from("swim_enrollments")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
-          .or(
-            [
-              `parent_email.ilike.${like}`,
-              `parent_first_name.ilike.${like}`,
-              `parent_last_name.ilike.${like}`,
-              `child_first_name.ilike.${like}`,
-              `child_last_name.ilike.${like}`,
-              `parent_phone.ilike.${like}`,
-              ...(phoneLike ? [`parent_phone.ilike.${phoneLike}`] : []),
-            ].join(","),
-          )
-          .order("updated_at", { ascending: false })
-          .limit(20),
-        supabase
-          .from("lesson_requests")
-          .select("parent_name,parent_email,parent_phone,child_name,created_at")
-          .or(
-            [
-              `parent_email.ilike.${like}`,
-              `parent_name.ilike.${like}`,
-              `child_name.ilike.${like}`,
-              `parent_phone.ilike.${like}`,
-              ...(phoneLike ? [`parent_phone.ilike.${phoneLike}`] : []),
-            ].join(","),
-          )
-          .order("created_at", { ascending: false })
-          .limit(20),
-      ]);
-      if (cancelled) return;
-
-      const map = new Map<string, FamilyMatch>();
-      const add = (row: Record<string, unknown>, source: FamilyMatch["source"]) => {
-        let parentName = "";
-        let swimmerName = "";
-        if (source === "request") {
-          parentName = String(row.parent_name || "").trim();
-          swimmerName = String(row.child_name || "").trim();
-        } else {
-          parentName = `${row.parent_first_name || ""} ${row.parent_last_name || ""}`.trim();
-          swimmerName = `${row.child_first_name || ""} ${row.child_last_name || ""}`.trim();
-        }
-        if (!swimmerName) return;
-        const email = String(row.parent_email || "").toLowerCase().trim() || null;
-        const phone = (row.parent_phone as string | null) || null;
-        const key = `${email || phone || parentName}|${swimmerName.toLowerCase()}`;
-        if (map.has(key)) return;
-        map.set(key, {
-          parent_name: parentName,
-          parent_email: email,
-          parent_phone: phone,
-          swimmer_name: swimmerName,
-          child_dob: (row.child_dob as string | null) || null,
-          source,
-        });
-      };
-      (mem.data || []).forEach((row) => add(row, "membership"));
-      (bk.data || []).forEach((row) => add(row, "booking"));
-      (en.data || []).forEach((row) => add(row, "enrollment"));
-      (rq.data || []).forEach((row) => add(row, "request"));
-
-      // Phone matches rank first so a caller ID lookup lands at the top.
-      const list = Array.from(map.values()).sort((a, b) => {
-        const aPhone = phoneLike && (a.parent_phone || "").replace(/\D/g, "").includes(digits) ? 0 : 1;
-        const bPhone = phoneLike && (b.parent_phone || "").replace(/\D/g, "").includes(digits) ? 0 : 1;
-        return aPhone - bPhone;
-      });
-      setResults(list.slice(0, 12));
-      setSearching(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [query]);
 
   const pick = (r: FamilyMatch) => {
     setMatched(r);
