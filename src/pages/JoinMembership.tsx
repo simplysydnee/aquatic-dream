@@ -2275,7 +2275,31 @@ function JoinMembershipForm() {
                     />
                   </>
                 )}
+
+                {!returnFinalizing && nextSwimmer && nextSwimmerToken && (
+                  <div className="mx-auto mt-8 max-w-md rounded-lg border border-[#F58B76]/40 bg-[#F58B76]/10 p-4 text-left">
+                    <p className="text-sm font-medium text-[#1a3a8a]">
+                      {nextSwimmer.remaining === 1
+                        ? "One more swimmer to enroll"
+                        : `${nextSwimmer.remaining} more swimmers to enroll`}
+                    </p>
+                    <p className="mt-1 text-sm text-[#2a5e84]">
+                      Their spot is still held. Your card on file will be offered, so there is
+                      nothing to re-enter.
+                    </p>
+                    <Button
+                      type="button"
+                      className="mt-3 w-full bg-[#F58B76] hover:bg-[#F58B76]/90"
+                      onClick={() => {
+                        window.location.href = `/join?hold=${encodeURIComponent(nextSwimmerToken)}`;
+                      }}
+                    >
+                      Continue to {nextSwimmer.name}
+                    </Button>
+                  </div>
+                )}
               </div>
+
             )}
 
 
