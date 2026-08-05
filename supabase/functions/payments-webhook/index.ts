@@ -975,7 +975,102 @@ async function recordMembershipPaymentEvent(
   // Duplicate delivery of the same Stripe event is expected and fine.
   if (error && !`${error.message}`.includes("duplicate key")) {
     console.error("[payment event] insert failed", event.type, error.message);
-    return;
+    return membershipId;
   }
   console.log("[payment event] recorded", event.type, eventId, membershipId ?? "unmatched");
+  return membershipId;
 }
+
+/** Plain-language decline reason pulled off a failed invoice. */
+function declineReason(invoice: any): string | null {
+  const err = invoice?.last_finalization_error ?? invoice?.payment_intent?.last_payment_error ?? null;
+  return (
+    err?.message ??
+    invoice?.last_payment_error?.message ??
+    (typeof err?.decline_code === "string" ? err.decline_code : null) ??
+    (typeof err?.code === "string" ? err.code : null) ??
+    null
+  );
+}
+
+/**
+ * Record the outcome of a recurring invoice on the membership itself so admin
+ * can see it. This writes display fields ONLY: it never touches membership
+ * status, occurrences, or anything the deck reads, and it never notifies the
+ * family. Stripe owns parent-facing dunning.
+ */
+async function applyInvoiceOutcomeToMembership(
+  event: { type: string; created?: number; data: { object: any } },
+  membershipId: string | null,
+) {
+  if (!membershipId) return;
+  const invoice = event.data?.object ?? {};
+  const invoiceId: string | null = invoice.id ?? null;
+  const at = event.created ? new Date(event.created * 1000).toISOString() : new Date().toISOString();
+  const failed = event.type === "invoice.payment_failed";
+
+  if (!failed) {
+    const { error } = await supabase
+      .from("memberships")
+      .update({
+        last_invoice_id: invoiceId,
+        last_payment_status: "paid",
+        last_payment_at: at,
+        last_payment_amount_cents: invoice.amount_paid ?? invoice.amount_due ?? null,
+        payment_failure_count: 0,
+        payment_failure_reason: null,
+      })
+      .eq("id", membershipId);
+    if (error) console.error("[payment state] paid update failed", membershipId, error.message);
+    else console.log("[payment state] paid", membershipId, invoiceId);
+    return;
+  }
+
+  // Only bump the failure count when this is a different invoice than the one
+  // already recorded, so a Stripe redelivery of the same failure is a no-op.
+  const { data: current } = await supabase
+    .from("memberships")
+    .select("last_invoice_id, last_payment_status, payment_failure_count")
+    .eq("id", membershipId)
+    .maybeSingle();
+
+  const sameInvoiceAlreadyFailed =
+    current?.last_payment_status === "failed" && current?.last_invoice_id === invoiceId;
+  const nextCount = sameInvoiceAlreadyFailed
+    ? (current?.payment_failure_count as number | null) ?? 1
+    : ((current?.payment_failure_count as number | null) ?? 0) + 1;
+
+  const { error } = await supabase
+    .from("memberships")
+    .update({
+      last_invoice_id: invoiceId,
+      last_payment_status: "failed",
+      last_payment_at: at,
+      last_payment_amount_cents: invoice.amount_due ?? null,
+      payment_failure_count: nextCount,
+      payment_failure_reason: declineReason(invoice),
+    })
+    .eq("id", membershipId);
+  if (error) console.error("[payment state] failed update failed", membershipId, error.message);
+  else console.log("[payment state] failed", membershipId, invoiceId, nextCount);
+}
+
+/**
+ * Record the subscription status Stripe last reported. Deliberately does NOT
+ * change membership status: a deleted subscription can mean a parent cancelled,
+ * an internal cleanup, or exhausted dunning, and only a human can tell which.
+ */
+async function recordSubscriptionStatus(event: { type: string; data: { object: any } }) {
+  const sub = event.data?.object ?? {};
+  const subscriptionId: string | null = sub.id ?? null;
+  if (!subscriptionId) return;
+  const status: string = event.type === "customer.subscription.deleted" ? "canceled" : sub.status ?? "unknown";
+
+  const { error } = await supabase
+    .from("memberships")
+    .update({ stripe_subscription_status: status })
+    .eq("stripe_subscription_id", subscriptionId);
+  if (error) console.error("[subscription status] update failed", subscriptionId, error.message);
+  else console.log("[subscription status]", subscriptionId, status);
+}
+
