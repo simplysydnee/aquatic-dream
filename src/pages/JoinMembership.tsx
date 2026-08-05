@@ -174,7 +174,29 @@ const readSlotFullMessage = async (error: unknown): Promise<string | null> => {
 };
 
 export default function JoinMembership() {
-  if (!JOIN_OPEN) {
+  // Structural sandbox gate: /join reads the server's payments environment
+  // and closes itself whenever it is not live, regardless of JOIN_OPEN. The
+  // gate reads the same variable the risk comes from, so flipping the
+  // backend to sandbox cannot leave public enrollment reachable.
+  const [paymentsLive, setPaymentsLive] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void supabase.functions
+      .invoke("get-payments-env")
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setPaymentsLive(!error && data?.live === true);
+      })
+      .catch(() => {
+        if (!cancelled) setPaymentsLive(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!JOIN_OPEN || paymentsLive === false) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F7F3EE] px-4">
         <Card className="max-w-md p-8 text-center">
@@ -187,8 +209,18 @@ export default function JoinMembership() {
       </div>
     );
   }
+
+  if (paymentsLive === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F7F3EE] px-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#2a5e84]" />
+      </div>
+    );
+  }
+
   return <JoinMembershipForm />;
 }
+
 
 function JoinMembershipForm() {
   const [step, setStep] = useState<Step>(1);

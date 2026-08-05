@@ -65,6 +65,43 @@ serve(async (req) => {
     }
     const ENV: StripeEnv = configuredEnv;
 
+    // SECURITY: in sandbox, only a verified admin may create a membership.
+    // This is deliberately NOT a client-supplied flag (that was the hole
+    // closed on Aug 1). The caller must present a real Supabase JWT whose
+    // user passes the server-side has_role(uid,'admin') check, so a public
+    // /join request can never produce a test-mode membership.
+    if (ENV === "sandbox") {
+      const authHeader = req.headers.get("Authorization") ?? "";
+      const token = authHeader.toLowerCase().startsWith("bearer ")
+        ? authHeader.slice(7).trim()
+        : "";
+      let isAdmin = false;
+      if (token) {
+        const { data: userData } = await supabaseAdmin.auth.getUser(token);
+        const uid = userData?.user?.id;
+        if (uid) {
+          const { data: hasRole } = await supabaseAdmin.rpc("has_role", {
+            _user_id: uid,
+            _role: "admin",
+          });
+          isAdmin = hasRole === true;
+        }
+      }
+      if (!isAdmin) {
+        console.warn("[create-membership-checkout] sandbox request rejected: not an admin");
+        return json(
+          {
+            error:
+              "Enrollment is temporarily closed while we finish maintenance. Please give us a call and we will save your spot.",
+            sandboxBlocked: true,
+          },
+          403,
+        );
+      }
+    }
+
+
+
 
 
     if (!["kid_group", "private", "adult_group"].includes(plan_key)) {
