@@ -68,9 +68,21 @@ Deno.serve(async (req) => {
       .neq("status", "cancelled")
       .limit(20);
 
+    // Memberships count too: a family whose only history is a Swimbership
+    // still has a Stripe customer with a saved card.
+    const { data: memberMatches } = await supabase
+      .from("memberships")
+      .select("id, parent_first_name, parent_last_name")
+      .ilike("parent_email", email)
+      .neq("status", "cancelled")
+      .limit(20);
+
     const fn = norm(parent_first_name);
     const ln = norm(parent_last_name);
-    const nameMatched = ((matches as any[]) || []).some((r) => {
+    const memberNameMatched = ((memberMatches as any[]) || []).some((r) =>
+      norm(r.parent_first_name || "") === fn && norm(r.parent_last_name || "") === ln
+    );
+    const nameMatched = memberNameMatched || ((matches as any[]) || []).some((r) => {
       const f = norm(r.parent_first_name || (r.parent_name || "").split(" ")[0] || "");
       const l = norm(r.parent_last_name || (r.parent_name || "").split(" ").slice(1).join(" ") || "");
       return f === fn && l === ln;
