@@ -122,6 +122,9 @@ const MembershipsAdmin = () => {
   const [includeInactive, setIncludeInactive] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [enrollFamilyOpen, setEnrollFamilyOpen] = useState(false);
+  const [holdsRefresh, setHoldsRefresh] = useState(0);
+
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [occLoading, setOccLoading] = useState(false);
 
