@@ -126,7 +126,9 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
     setRows([]);
     setAssigningKey(null);
     setPlanChoice(null);
+    setTakenNotice(null);
     setSendResults([]);
+
   }, [open]);
 
   const priceOf = useCallback(
