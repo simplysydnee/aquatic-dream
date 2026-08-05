@@ -235,7 +235,7 @@ export function useFamilySearch(query: string, options: UseFamilySearchOptions =
 
       if (groupByFamily) {
         setResults([]);
-        setFamilies(groupMatches(list).slice(0, 12));
+        setFamilies(groupFamilyMatches(list).slice(0, 12));
       } else {
         setResults(list.slice(0, 12));
         setFamilies([]);
