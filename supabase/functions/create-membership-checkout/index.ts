@@ -3,6 +3,12 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient } from "../_shared/stripe.ts";
 import { computeMembershipQuote } from "../_shared/membership-pricing.ts";
+import { resolveParentStripeCustomer, verifySavedCard } from "../_shared/stripe-customer.ts";
+import {
+  completeMembershipWithSavedCard,
+  MembershipSlotFullError,
+  MembershipCardDeclinedError,
+} from "../_shared/membership-completion.ts";
 
 type StripeEnv = "sandbox" | "live";
 
@@ -45,6 +51,7 @@ serve(async (req) => {
       sms_consent_text,
       sms_consent_version,
       returnUrl,
+      reuse_token,
     } = body ?? {};
 
     // SECURITY: the Stripe environment is server-controlled only. Any
@@ -240,7 +247,7 @@ serve(async (req) => {
         if (card) {
           try {
             const result = await completeMembershipWithSavedCard({
-              pendingId: pending.id as string,
+              pendingId,
               customerId: (tok as any).stripe_customer_id,
               paymentMethodId: card.paymentMethodId,
               env: ENV,
@@ -282,6 +289,14 @@ serve(async (req) => {
             // Anything else: fall through to normal Checkout so the parent
             // can still enroll by entering a card.
             console.error("[create-membership-checkout] saved-card completion failed", e?.message || e);
+            // The pending row above may already be claimed by the failed
+            // attempt, so stage a fresh one for the Checkout fallback.
+            const { data: retryPending } = await supabaseAdmin
+              .from("pending_memberships")
+              .insert({ payload })
+              .select("id")
+              .single();
+            if (retryPending?.id) pendingId = retryPending.id as string;
           }
         }
       }
@@ -299,7 +314,7 @@ serve(async (req) => {
       session = await stripe.checkout.sessions.create({
         mode: "setup",
         ui_mode: "embedded_page",
-        customer: customer.id,
+        customer: customerId,
         currency: "usd",
         return_url:
           returnUrl || `${origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}`,
@@ -341,7 +356,7 @@ serve(async (req) => {
     await supabaseAdmin
       .from("pending_memberships")
       .update({ stripe_session_id: session.id })
-      .eq("id", pending.id);
+      .eq("id", pendingId);
 
     return json({
       clientSecret: session.client_secret,
