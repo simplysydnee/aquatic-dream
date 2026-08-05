@@ -28,6 +28,8 @@ import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
 import { Link } from "react-router-dom";
 import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPanel";
 import { EnrollFamilyDialog } from "@/components/admin/holds/EnrollFamilyDialog";
+import { FAMILY_ENROLL_ENABLED } from "@/lib/familyEnrollGate";
+
 
 
 
@@ -321,7 +323,9 @@ const MembershipsAdmin = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setEnrollFamilyOpen(true)}>Enroll a family</Button>
+          {FAMILY_ENROLL_ENABLED && (
+            <Button onClick={() => setEnrollFamilyOpen(true)}>Enroll a family</Button>
+          )}
           <Button variant="outline" asChild>
             <Link to="/admin/standing-slots">Hold a spot over the phone</Link>
           </Button>
@@ -330,14 +334,17 @@ const MembershipsAdmin = () => {
 
       </div>
 
-      <EnrollFamilyDialog
-        open={enrollFamilyOpen}
-        onOpenChange={setEnrollFamilyOpen}
-        onSent={() => {
-          setHoldsRefresh((v) => v + 1);
-          void fetchData();
-        }}
-      />
+      {FAMILY_ENROLL_ENABLED && (
+        <EnrollFamilyDialog
+          open={enrollFamilyOpen}
+          onOpenChange={setEnrollFamilyOpen}
+          onSent={() => {
+            setHoldsRefresh((v) => v + 1);
+            void fetchData();
+          }}
+        />
+      )}
+
 
       <MembershipHoldsPanel refreshKey={holdsRefresh} />
 

@@ -13,6 +13,8 @@ import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
 import { resolveSwimmerWaiver } from "@/lib/swimmerWaiver";
 import { useFamilySearch, type FamilyGroup } from "@/hooks/useFamilySearch";
 import { useSlotOpenings, type OpeningPlanKey, type OpeningSlot } from "@/hooks/useSlotOpenings";
+import { computeOpenTimes } from "@/lib/openTimes";
+
 
 interface Props {
   open: boolean;
@@ -81,6 +83,26 @@ interface RosterRow {
   assignment: Assignment | null;
 }
 
+/** Reads the status and message out of a failed edge function call. */
+const readFunctionError = async (
+  error: unknown,
+  data: { error?: string } | null,
+): Promise<{ status: number | null; message: string }> => {
+  const fallback = data?.error || (error as { message?: string } | null)?.message || "Could not hold that time";
+  const context = (error as { context?: Response } | null)?.context;
+  if (context && typeof context.status === "number") {
+    let message = fallback;
+    try {
+      const body = await context.clone().json();
+      if (body?.error) message = String(body.error);
+    } catch {
+      // non-JSON body, keep the fallback
+    }
+    return { status: context.status, message };
+  }
+  return { status: null, message: fallback };
+};
+
 export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
   const [step, setStep] = useState<"search" | "roster" | "assign" | "review">("search");
   const [query, setQuery] = useState("");
@@ -89,7 +111,9 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
   const [assigningKey, setAssigningKey] = useState<string | null>(null);
   const [planChoice, setPlanChoice] = useState<OpeningPlanKey | null>(null);
   const [busy, setBusy] = useState(false);
+  const [takenNotice, setTakenNotice] = useState<string | null>(null);
   const [sendResults, setSendResults] = useState<{ label: string; ok: boolean; detail: string }[]>([]);
+
 
   const { families, searching } = useFamilySearch(query, { groupByFamily: true });
   const { slots, occupancy, instructorNames, plans, refresh } = useSlotOpenings();
@@ -102,7 +126,9 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
     setRows([]);
     setAssigningKey(null);
     setPlanChoice(null);
+    setTakenNotice(null);
     setSendResults([]);
+
   }, [open]);
 
   const priceOf = useCallback(
@@ -229,38 +255,11 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
 
   const assignRow = rows.find((r) => r.key === assigningKey) ?? null;
 
-  const openTimes = useMemo(() => {
-    if (!planChoice) return [];
-    const list = slots.filter((s) => s.plan_key === planChoice);
-    const byDay = new Map<number, OpeningSlot[]>();
-    for (const s of list) {
-      const arr = byDay.get(s.day_of_week) ?? [];
-      arr.push(s);
-      byDay.set(s.day_of_week, arr);
-    }
-    return Array.from(byDay.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([dow, daySlots]) => {
-        const byTime = new Map<string, OpeningSlot[]>();
-        for (const s of daySlots) {
-          const arr = byTime.get(s.start_time) ?? [];
-          arr.push(s);
-          byTime.set(s.start_time, arr);
-        }
-        const times = Array.from(byTime.entries())
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([start, group]) => {
-            const openSlots = group.filter((s) => openOf(s) > 0);
-            const count = planChoice === "private"
-              ? openSlots.length
-              : group.reduce((a, s) => a + openOf(s), 0);
-            return { start, openSlots, count };
-          })
-          .filter((t) => t.count > 0);
-        return { dow, times };
-      })
-      .filter((d) => d.times.length > 0);
-  }, [planChoice, slots, openOf]);
+  const openTimes = useMemo(
+    () => computeOpenTimes(slots, occupancy, planChoice),
+    [planChoice, slots, occupancy],
+  );
+
 
   const [coachChoice, setCoachChoice] = useState<OpeningSlot[] | null>(null);
 
@@ -280,6 +279,7 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
       return;
     }
     setBusy(true);
+    setTakenNotice(null);
     try {
       const { data, error } = await supabase.functions.invoke("create-membership-hold", {
         body: {
@@ -294,7 +294,22 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
           hold_minutes: DRAFT_HOLD_MINUTES,
         },
       });
-      if (error || data?.error) throw new Error(data?.error || error?.message || "Could not hold that time");
+
+      if (error || data?.error) {
+        const detail = await readFunctionError(error, data);
+        if (detail.status === 409 || detail.status === 404) {
+          // Someone on /join (or another desk tab) took it while this list was on screen.
+          setCoachChoice(null);
+          await refresh();
+          const label = `${DAYS[slot.day_of_week]} ${fmtTime(slot.start_time)}`;
+          const message = `${label} was just taken. Times below are refreshed, pick another.`;
+          setTakenNotice(message);
+          toast.error(message);
+          return;
+        }
+        throw new Error(detail.message);
+      }
+
       const assignment: Assignment = {
         holdId: data.hold_id,
         slotId: slot.id,
@@ -316,6 +331,7 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
       setBusy(false);
     }
   };
+
 
   const unassign = async (row: RosterRow) => {
     if (!row.assignment) return;
@@ -546,6 +562,15 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
               <span className="font-medium">{assignRow.name || "this swimmer"}</span>
             </div>
 
+            {takenNotice && (
+              <div
+                role="status"
+                className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {takenNotice}
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2">
               {PLAN_ORDER.filter((p) => slots.some((s) => s.plan_key === p)).map((p) => (
                 <Button
@@ -555,12 +580,14 @@ export function EnrollFamilyDialog({ open, onOpenChange, onSent }: Props) {
                   onClick={() => {
                     setPlanChoice(p);
                     setCoachChoice(null);
+                    setTakenNotice(null);
                   }}
                 >
                   {PLAN_LABELS[p]}
                 </Button>
               ))}
             </div>
+
 
             {planChoice && coachChoice && (
               <div className="space-y-2 rounded-md border bg-muted/30 p-3">
