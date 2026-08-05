@@ -2076,14 +2076,55 @@ function JoinMembershipForm() {
                   <strong>{fmtPrice(plan.monthly_price_cents)}</strong> on the 1st of every month
                   until you cancel.
                 </p>
-                <div className="overflow-hidden rounded-lg border border-[#2a5e84]/20">
-                  <EmbeddedCheckoutProvider
-                    stripe={getStripe()}
-                    options={{ fetchClientSecret }}
-                  >
-                    <EmbeddedCheckout />
-                  </EmbeddedCheckoutProvider>
-                </div>
+                {savedCardError && (
+                  <div className="mb-4 rounded-lg border border-[#F58B76] bg-[#F58B76]/10 px-4 py-3 text-sm text-[#1a3a8a]">
+                    {savedCardError}
+                  </div>
+                )}
+
+                {savedCard && !useNewCard ? (
+                  <div className="rounded-lg border border-[#2a5e84]/20 p-4">
+                    <p className="text-sm font-medium text-[#1a3a8a]">
+                      Use your card on file
+                    </p>
+                    <p className="mt-1 text-sm text-[#2a5e84]">
+                      {savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1)} ending in{" "}
+                      {savedCard.last4}
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => void paySavedCard()}
+                      disabled={savedCardSubmitting}
+                      className="mt-4 w-full bg-[#F58B76] py-6 text-base hover:bg-[#F58B76]/90"
+                    >
+                      {savedCardSubmitting
+                        ? "Confirming..."
+                        : quote
+                          ? `Pay ${fmtPrice(quote.firstChargeCents)} and enroll`
+                          : "Pay and enroll"}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUseNewCard(true);
+                        setSavedCardError(null);
+                      }}
+                      className="mt-3 w-full text-sm text-[#2a5e84] hover:underline"
+                    >
+                      Use a different card
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-lg border border-[#2a5e84]/20">
+                    <EmbeddedCheckoutProvider
+                      stripe={getStripe()}
+                      options={{ fetchClientSecret }}
+                    >
+                      <EmbeddedCheckout />
+                    </EmbeddedCheckoutProvider>
+                  </div>
+                )}
+
               </>
             )}
 
