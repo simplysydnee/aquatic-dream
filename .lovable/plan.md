@@ -94,3 +94,6 @@ Pricing, proration, checkout, occurrence generation, check-in, and calendar are 
 3. Load `/admin/memberships`: confirm the column, the filter, and the banner while a failure is present.
 4. Snapshot `membership_occurrences` row count and the check-in and calendar queries before and after the failure replay and show they are identical.
 5. Re-replay the same failed invoice event and confirm the failure count does not increment twice.
+6. Grep the changed handlers and confirm zero email or SMS call sites on any payment-failure path.
+7. Report the backfill row count after the migration runs.
+
