@@ -233,7 +233,8 @@ const StandingSlotsAdmin = () => {
     if (filterPlan !== "all") list = list.filter((s) => s.plan_key === filterPlan);
     if (filterInstructor !== "all") list = list.filter((s) => s.instructor_id === filterInstructor);
     if (filterDay !== "all") list = list.filter((s) => s.day_of_week === parseInt(filterDay, 10));
-    if (filterActive === "active") list = list.filter((s) => s.active);
+    // A slot with people in it is never hidden, whatever the status filter says.
+    if (filterActive === "active") list = list.filter((s) => s.active || (enrolledCounts[s.id] || 0) > 0);
     else if (filterActive === "inactive") list = list.filter((s) => !s.active);
 
     list.sort((a, b) => {
