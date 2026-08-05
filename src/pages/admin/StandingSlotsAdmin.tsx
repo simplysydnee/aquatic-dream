@@ -522,7 +522,7 @@ const StandingSlotsAdmin = () => {
           <Select value={filterActive} onValueChange={setFilterActive}>
             <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="active">Active only</SelectItem>
+              <SelectItem value="active">Active + occupied</SelectItem>
               <SelectItem value="inactive">Inactive only</SelectItem>
               <SelectItem value="all">All</SelectItem>
             </SelectContent>
