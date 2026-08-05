@@ -588,6 +588,55 @@ const MembershipsAdmin = () => {
                   )}
                 </div>
 
+                <div
+                  className={`space-y-1 rounded border p-3 ${
+                    paymentBucket(selected) === "failed" ? "border-destructive/40 bg-destructive/5" : ""
+                  }`}
+                >
+                  <div className="font-medium">Last payment</div>
+                  {paymentBucket(selected) === "awaiting" ? (
+                    <div className="text-muted-foreground">No charge has run yet.</div>
+                  ) : (
+                    <>
+                      <div>
+                        {paymentLabel(selected)} · {paymentAmountLabel(selected.last_payment_amount_cents)}
+                      </div>
+                      {selected.last_payment_at && (
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(selected.last_payment_at).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      )}
+                      {selected.last_invoice_id && (
+                        <div className="text-xs text-muted-foreground">Invoice {selected.last_invoice_id}</div>
+                      )}
+                      {paymentBucket(selected) === "failed" && (
+                        <div className="pt-1 text-destructive">
+                          <div>{plainDeclineReason(selected.payment_failure_reason)}</div>
+                          {selected.payment_failure_reason && (
+                            <div className="text-xs opacity-80">Stripe said: {selected.payment_failure_reason}</div>
+                          )}
+                          <div className="text-xs opacity-80">
+                            Failed charges in a row: {selected.payment_failure_count ?? 1}. The swimmer stays enrolled.
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {selected.stripe_subscription_status && (
+                    <div className="text-xs text-muted-foreground">
+                      Stripe subscription status: {selected.stripe_subscription_status.replace("_", " ")}
+                    </div>
+                  )}
+                </div>
+
+
+
                 {!selected.waiver_id && (
                   <div className="flex items-center gap-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive">
                     <AlertTriangle className="h-4 w-4" /> No waiver on file
