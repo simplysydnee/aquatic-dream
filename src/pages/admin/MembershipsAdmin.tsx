@@ -468,7 +468,9 @@ const MembershipsAdmin = () => {
                 <th className="px-3 py-2 font-medium">Instructor</th>
                 <th className="px-3 py-2 font-medium">Level</th>
                 <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Payment</th>
                 <th className="px-3 py-2 font-medium">Next charge</th>
+
                 <th className="px-3 py-2 font-medium">Flags</th>
               </tr>
             </thead>
