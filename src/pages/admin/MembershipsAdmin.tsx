@@ -161,7 +161,7 @@ const MembershipsAdmin = () => {
       supabase
         .from("memberships")
         .select(
-          "id, plan_key, standing_slot_id, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status, start_date, current_period_end, cancel_effective_date, recurring_consent_amount_cents, medical_notes, notes, waiver_id, swim_level, manage_token",
+          "id, plan_key, standing_slot_id, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status, start_date, current_period_end, cancel_effective_date, recurring_consent_amount_cents, medical_notes, notes, waiver_id, swim_level, manage_token, last_invoice_id, last_payment_status, last_payment_at, last_payment_amount_cents, payment_failure_count, payment_failure_reason, stripe_subscription_status",
         )
         .order("created_at", { ascending: false }),
       supabase
