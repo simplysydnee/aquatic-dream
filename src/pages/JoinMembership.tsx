@@ -134,6 +134,30 @@ const fmtHeldUntil = (iso: string | null): string | null => {
   });
 };
 
+/**
+ * After one swimmer in a batched invite finishes checkout, look up who is
+ * still held on the same group token so the success screen can hand the
+ * parent straight to the next swimmer instead of the original SMS.
+ */
+const fetchNextHeldSwimmer = async (
+  token: string,
+): Promise<{ name: string; remaining: number } | null> => {
+  try {
+    const { data } = await supabase.functions.invoke("get-membership-hold", {
+      body: { token },
+    });
+    const entries = ((data as { groupHolds?: GroupHoldEntry[] } | null)?.groupHolds ??
+      []) as GroupHoldEntry[];
+    const held = entries.filter((e) => e.status === "held");
+    if (held.length === 0) return null;
+    return { name: held[0].swimmerName || "your next swimmer", remaining: held.length };
+  } catch {
+    return null;
+  }
+};
+
+
+
 const HOLD_PROBLEMS: Record<
   "expired" | "converted" | "cancelled" | "not_found",
   { title: string; body: string }
@@ -881,10 +905,18 @@ function JoinMembershipForm() {
       setReturnError(null);
       setStep(8);
       if (holdToken) {
-        void supabase.functions.invoke("get-membership-hold", {
-          body: { token: holdToken, action: "convert" },
-        });
+        const token = holdToken;
+        void (async () => {
+          await supabase.functions.invoke("get-membership-hold", {
+            body: { token, action: "convert" },
+          });
+          const next = await fetchNextHeldSwimmer(token);
+          if (!next) return;
+          setNextSwimmerToken(token);
+          setNextSwimmer(next);
+        })();
       }
+
       return;
     }
 
@@ -904,6 +936,9 @@ function JoinMembershipForm() {
   const [manageToken, setManageToken] = useState<string | null>(null);
   const [returnStillWorking, setReturnStillWorking] = useState(false);
   const [returnSlotFull, setReturnSlotFull] = useState<string | null>(null);
+  // Next swimmer still held on the same batched invite link.
+  const [nextSwimmer, setNextSwimmer] = useState<{ name: string; remaining: number } | null>(null);
+  const [nextSwimmerToken, setNextSwimmerToken] = useState<string | null>(null);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get("membership") !== "success") return;
@@ -920,12 +955,18 @@ function JoinMembershipForm() {
 
     const finishHold = () => {
       const returningHold = p.get("hold");
-      if (returningHold) {
-        void supabase.functions.invoke("get-membership-hold", {
+      if (!returningHold) return;
+      void (async () => {
+        await supabase.functions.invoke("get-membership-hold", {
           body: { token: returningHold, action: "convert" },
         });
-      }
+        const next = await fetchNextHeldSwimmer(returningHold);
+        if (cancelled || !next) return;
+        setNextSwimmerToken(returningHold);
+        setNextSwimmer(next);
+      })();
     };
+
 
     // The webhook may still be finalizing the same checkout. A 202 means
     // "payment received, still working" so we keep polling instead of
@@ -2234,7 +2275,31 @@ function JoinMembershipForm() {
                     />
                   </>
                 )}
+
+                {!returnFinalizing && nextSwimmer && nextSwimmerToken && (
+                  <div className="mx-auto mt-8 max-w-md rounded-lg border border-[#F58B76]/40 bg-[#F58B76]/10 p-4 text-left">
+                    <p className="text-sm font-medium text-[#1a3a8a]">
+                      {nextSwimmer.remaining === 1
+                        ? "One more swimmer to enroll"
+                        : `${nextSwimmer.remaining} more swimmers to enroll`}
+                    </p>
+                    <p className="mt-1 text-sm text-[#2a5e84]">
+                      Their spot is still held. Your card on file will be offered, so there is
+                      nothing to re-enter.
+                    </p>
+                    <Button
+                      type="button"
+                      className="mt-3 w-full bg-[#F58B76] hover:bg-[#F58B76]/90"
+                      onClick={() => {
+                        window.location.href = `/join?hold=${encodeURIComponent(nextSwimmerToken)}`;
+                      }}
+                    >
+                      Continue to {nextSwimmer.name}
+                    </Button>
+                  </div>
+                )}
               </div>
+
             )}
 
 
