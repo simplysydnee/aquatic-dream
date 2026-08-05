@@ -228,29 +228,40 @@ function OpenTimes({ slots, loading }: { slots: OpenSlot[]; loading: boolean }) 
             ) : (
               <div className="space-y-4">
                 {days.map((day) => {
-                  const dayS = open
+                  // Several instructors can hold the same time; merge into one
+                  // chip per time (and per level for Small Group) with total spots.
+                  const merged = new Map<string, { time: string; level: string | null; spots: number }>();
+                  open
                     .filter((s) => s.day_of_week === day)
-                    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+                    .forEach((s) => {
+                      const key = `${s.start_time}|${s.swim_level ?? ""}`;
+                      const cur = merged.get(key);
+                      if (cur) cur.spots += s.spots_left;
+                      else merged.set(key, { time: s.start_time, level: s.swim_level, spots: s.spots_left });
+                    });
+                  const chips = Array.from(merged.values()).sort(
+                    (a, b) => a.time.localeCompare(b.time) || (a.level ?? "").localeCompare(b.level ?? ""),
+                  );
                   return (
                     <div key={day}>
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                         {DAY_NAMES[day]}
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {dayS.map((s) => (
+                        {chips.map((c) => (
                           <span
-                            key={s.id}
+                            key={`${c.time}-${c.level ?? ""}`}
                             className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground"
                           >
                             <Clock className="w-3 h-3 text-muted-foreground" />
-                            {formatTime(s.start_time)}
-                            {s.swim_level && (
+                            {formatTime(c.time)}
+                            {c.level && (
                               <span className="opacity-70">
-                                · {LEVELS.find((l) => l.level === s.swim_level)?.group ?? s.swim_level}
+                                · {LEVELS.find((l) => l.level === c.level)?.group ?? c.level}
                               </span>
                             )}
                             <span className="opacity-70">
-                              · {s.spots_left} {s.spots_left === 1 ? "spot" : "spots"}
+                              · {c.spots} {c.spots === 1 ? "spot" : "spots"}
                             </span>
                           </span>
                         ))}
@@ -258,6 +269,7 @@ function OpenTimes({ slots, loading }: { slots: OpenSlot[]; loading: boolean }) 
                     </div>
                   );
                 })}
+
               </div>
             )}
           </Card>
