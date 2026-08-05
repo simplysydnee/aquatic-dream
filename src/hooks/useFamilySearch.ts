@@ -149,14 +149,16 @@ export function useFamilySearch(query: string, options: UseFamilySearchOptions =
           .limit(20),
         supabase
           .from("lesson_bookings")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
+          .select("parent_first_name,parent_last_name,parent_name,parent_email,parent_phone,child_first_name,child_last_name,child_name,child_dob,updated_at")
           .or(
             [
               `parent_email.ilike.${like}`,
               `parent_first_name.ilike.${like}`,
               `parent_last_name.ilike.${like}`,
+              `parent_name.ilike.${like}`,
               `child_first_name.ilike.${like}`,
               `child_last_name.ilike.${like}`,
+              `child_name.ilike.${like}`,
               `parent_phone.ilike.${like}`,
               ...(phoneLike ? [`parent_phone.ilike.${phoneLike}`] : []),
             ].join(","),
@@ -165,14 +167,16 @@ export function useFamilySearch(query: string, options: UseFamilySearchOptions =
           .limit(20),
         supabase
           .from("swim_enrollments")
-          .select("parent_first_name,parent_last_name,parent_email,parent_phone,child_first_name,child_last_name,child_dob,updated_at")
+          .select("parent_first_name,parent_last_name,parent_name,parent_email,parent_phone,child_first_name,child_last_name,child_name,child_dob,updated_at")
           .or(
             [
               `parent_email.ilike.${like}`,
               `parent_first_name.ilike.${like}`,
               `parent_last_name.ilike.${like}`,
+              `parent_name.ilike.${like}`,
               `child_first_name.ilike.${like}`,
               `child_last_name.ilike.${like}`,
+              `child_name.ilike.${like}`,
               `parent_phone.ilike.${like}`,
               ...(phoneLike ? [`parent_phone.ilike.${phoneLike}`] : []),
             ].join(","),
