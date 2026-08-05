@@ -129,6 +129,7 @@ const StandingSlotsAdmin = () => {
   const [occupancyCounts, setOccupancyCounts] = useState<Record<string, number>>({});
   const [holdTarget, setHoldTarget] = useState<HoldSlotTarget | null>(null);
   const [holdsRefresh, setHoldsRefresh] = useState(0);
+  const [deactivateTarget, setDeactivateTarget] = useState<{ slot: Slot; enrolled: number } | null>(null);
 
   const [expandedSlots, setExpandedSlots] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
