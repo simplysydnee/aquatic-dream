@@ -770,12 +770,29 @@ function JoinMembershipForm() {
   };
 
   const handleFinalize = () => {
-    if (!plan || !slot || !canContinueStep3 || !canContinueStep5 || !waiverId) {
-      toast.error("Please complete all fields");
+    if (!plan || !slot) {
+      toast.error("Please pick a program and a class time");
+      setStep(1);
+      return;
+    }
+    if (!canContinueStep3) {
+      toast.error("We need a little more swimmer and contact information");
+      setStep(3);
+      return;
+    }
+    if (!waiverId) {
+      toast.error("We need a signed waiver before payment");
+      setStep(4);
+      return;
+    }
+    if (!canContinueStep5) {
+      toast.error("Please accept the agreement and consents");
+      setStep(5);
       return;
     }
     setStep(7);
   };
+
 
   const [charges, setCharges] = useState<{ firstChargeCents: number; monthlyCents: number } | null>(
     null,
