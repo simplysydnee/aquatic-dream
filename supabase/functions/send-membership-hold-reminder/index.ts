@@ -4,6 +4,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { formatHoldWindow, formatPTTime, sendAndLogBookingConfirmation } from "../_shared/textmagic.ts";
+import { firstLessonDateForSlot } from "../_shared/first-lesson-date.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -86,8 +87,11 @@ Deno.serve(async (req) => {
     const swimmerName = String(hold.swimmer_name || "");
     const firstName = swimmerName.split(/\s+/)[0] || swimmerName;
     const program = slot ? PLAN_LABELS[slot.plan_key] || "swim" : "swim";
+    const firstLesson = slot ? await firstLessonDateForSlot(slot.day_of_week) : null;
     const when = slot
-      ? `${DAYS[slot.day_of_week] ?? ""} ${formatPTTime(slot.start_time)}`.trim()
+      ? firstLesson
+        ? `${firstLesson.label}, ${formatPTTime(slot.start_time)}`
+        : `${DAYS[slot.day_of_week] ?? ""} ${formatPTTime(slot.start_time)}`.trim()
       : "";
     const link = `${SITE_URL}/join?hold=${hold.group_token || hold.token}`;
     const remainingMinutes = Math.round((heldUntilMs - nowMs) / 60000);

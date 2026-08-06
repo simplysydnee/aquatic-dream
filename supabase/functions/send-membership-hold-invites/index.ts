@@ -5,6 +5,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { formatPTTime, normalizePhone, sendAndLogBookingConfirmation } from "../_shared/textmagic.ts";
+import { firstLessonDateForSlot } from "../_shared/first-lesson-date.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -113,15 +114,18 @@ Deno.serve(async (req) => {
       return json({ error: "Could not extend the holds" }, 500);
     }
 
-    const parts = sendable.map((h) => {
+    const parts = await Promise.all(sendable.map(async (h) => {
       const slot = (h.standing_slots ?? null) as SlotShape | null;
       const first = String(h.swimmer_name || "").split(/\s+/)[0] || String(h.swimmer_name || "");
       const program = slot ? PLAN_LABELS[slot.plan_key] || "swim" : "swim";
+      const firstLesson = slot ? await firstLessonDateForSlot(slot.day_of_week) : null;
       const when = slot
-        ? `${DAYS[slot.day_of_week] ?? ""} ${formatPTTime(slot.start_time)}`.trim()
+        ? firstLesson
+          ? `${firstLesson.label}, ${formatPTTime(slot.start_time)}`
+          : `${DAYS[slot.day_of_week] ?? ""} ${formatPTTime(slot.start_time)}`.trim()
         : "";
       return when ? `${first} (${program}, ${when})` : `${first} (${program})`;
-    });
+    }));
     const list = parts.length === 1
       ? parts[0]
       : parts.length === 2
