@@ -327,6 +327,43 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
           </table>
         </div>
       )}
+
+      <AlertDialog
+        open={!!remindTarget}
+        onOpenChange={(open) => {
+          if (!open) setRemindTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Text {remindTarget?.swimmer_name}'s family again?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {remindTarget && (
+                <>
+                  Sends the same signup link to {remindTarget.parent_name} at{" "}
+                  {formatPhone(remindTarget.parent_phone)}. This does not change when the
+                  spot expires, and one reminder can go out every 30 minutes.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Not now</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const target = remindTarget;
+                setRemindTarget(null);
+                if (target) void sendReminder(target);
+              }}
+            >
+              Send reminder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
+
