@@ -88,6 +88,8 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
   const [loading, setLoading] = useState(true);
   const [showExpired, setShowExpired] = useState(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [remindTarget, setRemindTarget] = useState<HoldRow | null>(null);
+  const [reminding, setReminding] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,8 +97,9 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
       supabase
         .from("membership_holds")
         .select(
-          "id, status, plan_key, swim_level, swimmer_name, parent_name, parent_phone, parent_email, held_until, sms_sent_at, reminder_sent_at, expired_at, converted_at, created_at, standing_slot_id, standing_slots(day_of_week, start_time, instructor_id)",
+          "id, status, plan_key, swim_level, swimmer_name, parent_name, parent_phone, parent_email, held_until, sms_sent_at, reminder_sent_at, last_manual_reminder_at, expired_at, converted_at, created_at, standing_slot_id, standing_slots(day_of_week, start_time, instructor_id)",
         )
+
         .in("status", ["held", "expired", "cancelled"])
         .order("held_until", { ascending: true }),
       supabase.rpc("get_instructors_admin"),
