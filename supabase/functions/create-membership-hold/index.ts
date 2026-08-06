@@ -134,7 +134,10 @@ Deno.serve(async (req) => {
 
     const firstName = swimmerName.split(/\s+/)[0] || swimmerName;
     const program = PLAN_LABELS[slot.plan_key] || "swim";
-    const when = `${DAYS[slot.day_of_week] ?? ""} ${formatPTTime(slot.start_time)}`.trim();
+    const firstLesson = await firstLessonDateForSlot(slot.day_of_week);
+    const when = firstLesson
+      ? `${firstLesson.label}, ${formatPTTime(slot.start_time)}`
+      : `${DAYS[slot.day_of_week] ?? ""} ${formatPTTime(slot.start_time)}`.trim();
     const link = `${SITE_URL}/join?hold=${hold.token}`;
     const message =
       `Aquatic Dreams: we're holding a ${program} spot for ${firstName}, ${when}. ` +
