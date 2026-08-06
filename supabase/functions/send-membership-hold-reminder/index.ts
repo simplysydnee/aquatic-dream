@@ -4,6 +4,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { formatHoldWindow, formatPTTime, sendAndLogBookingConfirmation } from "../_shared/textmagic.ts";
+import { firstLessonDateForSlot } from "../_shared/first-lesson-date.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
