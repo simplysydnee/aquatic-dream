@@ -27,6 +27,7 @@ import ClosureScheduleNote from "@/components/ClosureScheduleNote";
 import { JOIN_OPEN } from "@/lib/joinGate";
 import AgeGatePanel from "@/components/swim-enrollment/AgeGatePanel";
 import { programAgeMismatch, PROGRAM_AGE_LABELS } from "@/lib/programEligibility";
+import { resolveJoinSrc } from "@/lib/joinSrc";
 
 import {
   resolveSwimmerWaiver,
