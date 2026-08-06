@@ -90,6 +90,8 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [remindTarget, setRemindTarget] = useState<HoldRow | null>(null);
   const [reminding, setReminding] = useState<string | null>(null);
+  const [previewText, setPreviewText] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
