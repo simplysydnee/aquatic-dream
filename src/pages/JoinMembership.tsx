@@ -278,6 +278,10 @@ function JoinMembershipForm() {
   const [waiverId, setWaiverId] = useState<string | null>(null);
   const [waiverOnFile, setWaiverOnFile] = useState<ActiveWaiver | null>(null);
   const [waiverChecking, setWaiverChecking] = useState(false);
+  // True when a waiver exists in their history but no signed record can be
+  // attached to this membership, so a fresh signature is required.
+  const [needsFreshWaiver, setNeedsFreshWaiver] = useState(false);
+
   // Waiver id carried on the hold (front desk matched an existing family).
   const [holdWaiverId, setHoldWaiverId] = useState<string | null>(null);
   // Assessed level that the held Small Group class does not accept.
