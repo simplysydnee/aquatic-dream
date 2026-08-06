@@ -285,6 +285,10 @@ function JoinMembershipForm() {
 
   const [waiverSubmitting, setWaiverSubmitting] = useState(false);
 
+  // Campaign tag (/join?src=summer2026), kept for the whole session so it
+  // survives Stripe and lands on the membership record.
+  const [joinSrc] = useState<string | null>(() => resolveJoinSrc());
+
   // Phone-booked hold state (/join?hold=<token>).
   // Decided from the URL before first paint so the program picker never flashes.
   const [holdToken, setHoldToken] = useState<string | null>(() => {
