@@ -30,11 +30,24 @@ The gate runs synchronously before `JoinMembership` renders, so the picker never
 
 **3. Session-only suppression.** `sessionStorage` key `welcomeBackSeen`, set when the welcome page renders. Back button, refresh, or re-tapping the SMS in the same tab session goes straight to `/join`. Nothing persists across browser sessions.
 
-**4. `src` preservation through checkout.** `JoinMembership` reads `src` off the URL once and:
-- keeps it on the Stripe `returnUrl` so the success return still carries it,
-- sends it as the membership `source` value instead of the hardcoded `"public"` (falls back to `"public"` when absent).
+**4. `src` preservation through checkout, including multi-swimmer batches.**
+
+Checked the batch flow, and with a naive URL-only approach swimmers 2 and 3 would be mis-attributed. Two places drop the param today:
+
+- the Stripe `returnUrl` (line ~835) carries only `membership=success`, `session_id`, and `hold`
+- the "Continue to <next swimmer>" button (line ~2294) hard-navigates to `/join?hold=<token>` with nothing else
+
+So swimmer 1 would be `summer2026` and swimmers 2 and 3 would fall back to `"public"`.
+
+The fix: `src` is captured once on first arrival and stored in `sessionStorage` (`joinSrc`), then resolved as "URL param, else stored value". On top of that, both hand-off points get the param appended so the URL stays truthful:
+
+- Stripe `returnUrl` gains `&src=<value>` when present
+- the Continue button navigates to `/join?hold=<token>&src=<value>`
+
+`JoinMembership` sends the resolved value as the membership `source` instead of the hardcoded `"public"` (falls back to `"public"` when absent), so every swimmer in the batch is attributed. The stored value clears with the browser session, same as the welcome-page suppression key.
 
 This is the only change to existing join behavior, and it is inert for any visit without `src`.
+
 
 ## Not touched
 
@@ -44,6 +57,8 @@ Pricing, program picker, slot picker, consent, waiver skip logic, hold flow, che
 
 - Fresh session, `/join?src=summer2026` -> welcome page, no picker.
 - Click through -> `/join?src=summer2026`, and `src` reaches the checkout payload and return URL.
+- Three-swimmer batch off the same link: all three memberships land with `source = summer2026`, not just the first. Checked directly in the `memberships` rows after the run.
+
 - `/join` bare and `/join?hold=<token>` -> unchanged, verified against a live hold link.
 - Reload / back in the same session -> straight to `/join`, welcome page not repeated.
 - Grep the welcome page for `$` and any digit-amount pattern: none.
