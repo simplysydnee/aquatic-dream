@@ -226,6 +226,8 @@ serve(async (req) => {
       membership_agreement_version: membership_agreement_version || null,
       membership_agreement_text: membership_agreement_text || null,
       membership_agreement_accepted: membership_agreement_accepted === true,
+      // Campaign tag from /join?src=..., kept short and sanitized.
+      source: (String(source || "public").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40)) || "public",
     };
 
     const { data: pending, error: pendErr } = await supabaseAdmin
