@@ -49,6 +49,11 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+    if (isOptOutMessage(text)) {
+      await recordOptOut(admin, phone, "inbound_sms");
+    }
+
+
     const { data: existing } = await admin
       .from("sms_conversations")
       .select("id, parent_name")
