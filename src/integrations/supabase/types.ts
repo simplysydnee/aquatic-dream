@@ -2542,6 +2542,30 @@ export type Database = {
           },
         ]
       }
+      sms_opt_outs: {
+        Row: {
+          created_at: string
+          id: string
+          opted_out_at: string
+          phone: string
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          opted_out_at?: string
+          phone: string
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          opted_out_at?: string
+          phone?: string
+          source?: string
+        }
+        Relationships: []
+      }
       standing_slots: {
         Row: {
           accepted_levels: string[] | null
