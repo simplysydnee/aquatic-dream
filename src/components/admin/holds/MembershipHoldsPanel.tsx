@@ -142,6 +142,37 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
     onChanged?.();
   };
 
+  const sendReminder = async (row: HoldRow) => {
+    setReminding(row.id);
+    const { data, error } = await supabase.functions.invoke("send-membership-hold-reminder", {
+      body: { hold_id: row.id },
+    });
+    setReminding(null);
+    if (error) {
+      let detail = error.message;
+      const ctx = (error as { context?: { text?: () => Promise<string> } }).context;
+      if (ctx?.text) {
+        try {
+          const parsed = JSON.parse(await ctx.text()) as { error?: string };
+          if (parsed?.error) detail = parsed.error;
+        } catch {
+          // keep the generic message
+        }
+      }
+      toast.error(detail || "Could not send the reminder");
+      return;
+    }
+    const payload = data as { success?: boolean; error?: string } | null;
+    if (!payload?.success) {
+      toast.error(payload?.error || "Could not send the reminder");
+      return;
+    }
+    toast.success(`Reminder texted to ${row.parent_name}`);
+    load();
+  };
+
+
+
   // Nothing held and nothing to review collapses to a single muted line.
   if (!loading && !showExpired && visible.length === 0) {
     return (
