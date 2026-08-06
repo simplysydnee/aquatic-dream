@@ -107,7 +107,10 @@ Deno.serve(async (req) => {
       attempted: targets.length,
       sent,
       failed,
-      skipped_already_sent: list.recipients.filter((r) => r.segment === segment && sentPhones.has(r.phone)).length,
+      skipped_already_sent: segmentAll.filter((r) => sentPhones.has(r.phone)).length,
+      skipped_opted_out: optedOutSkipped.length,
+      opted_out_phones: optedOutSkipped.map((r) => r.phone),
+
       errors: errors.slice(0, 20),
     });
   } catch (e) {
