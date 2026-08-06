@@ -2,7 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, MessageSquare, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { formatPhone } from "@/lib/phone";
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
@@ -26,6 +36,7 @@ interface HoldRow {
   held_until: string;
   sms_sent_at: string | null;
   reminder_sent_at: string | null;
+  last_manual_reminder_at: string | null;
   expired_at: string | null;
   converted_at: string | null;
   created_at: string;
@@ -36,6 +47,7 @@ interface HoldRow {
     instructor_id: string | null;
   } | null;
 }
+
 
 const fmtTime = (t: string) => {
   const [h, m] = t.split(":").map((n) => parseInt(n, 10));
@@ -76,6 +88,8 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
   const [loading, setLoading] = useState(true);
   const [showExpired, setShowExpired] = useState(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [remindTarget, setRemindTarget] = useState<HoldRow | null>(null);
+  const [reminding, setReminding] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,8 +97,9 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
       supabase
         .from("membership_holds")
         .select(
-          "id, status, plan_key, swim_level, swimmer_name, parent_name, parent_phone, parent_email, held_until, sms_sent_at, reminder_sent_at, expired_at, converted_at, created_at, standing_slot_id, standing_slots(day_of_week, start_time, instructor_id)",
+          "id, status, plan_key, swim_level, swimmer_name, parent_name, parent_phone, parent_email, held_until, sms_sent_at, reminder_sent_at, last_manual_reminder_at, expired_at, converted_at, created_at, standing_slot_id, standing_slots(day_of_week, start_time, instructor_id)",
         )
+
         .in("status", ["held", "expired", "cancelled"])
         .order("held_until", { ascending: true }),
       supabase.rpc("get_instructors_admin"),
@@ -126,6 +141,37 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
     load();
     onChanged?.();
   };
+
+  const sendReminder = async (row: HoldRow) => {
+    setReminding(row.id);
+    const { data, error } = await supabase.functions.invoke("send-membership-hold-reminder", {
+      body: { hold_id: row.id },
+    });
+    setReminding(null);
+    if (error) {
+      let detail = error.message;
+      const ctx = (error as { context?: { text?: () => Promise<string> } }).context;
+      if (ctx?.text) {
+        try {
+          const parsed = JSON.parse(await ctx.text()) as { error?: string };
+          if (parsed?.error) detail = parsed.error;
+        } catch {
+          // keep the generic message
+        }
+      }
+      toast.error(detail || "Could not send the reminder");
+      return;
+    }
+    const payload = data as { success?: boolean; error?: string } | null;
+    if (!payload?.success) {
+      toast.error(payload?.error || "Could not send the reminder");
+      return;
+    }
+    toast.success(`Reminder texted to ${row.parent_name}`);
+    load();
+  };
+
+
 
   // Nothing held and nothing to review collapses to a single muted line.
   if (!loading && !showExpired && visible.length === 0) {
@@ -219,7 +265,14 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
                       {fmtWhen(r.sms_sent_at)}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
-                      {r.reminder_sent_at ? fmtWhen(r.reminder_sent_at) : "Not yet"}
+                      <span className="block">
+                        {r.reminder_sent_at ? fmtWhen(r.reminder_sent_at) : "Not yet"}
+                      </span>
+                      {r.last_manual_reminder_at && (
+                        <span className="block text-xs">
+                          Manually resent {fmtWhen(r.last_manual_reminder_at)}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap">
                       {live ? (
@@ -237,20 +290,36 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
                     </td>
                     <td className="py-2 text-right">
                       {live && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => cancelHold(r.id)}
-                          disabled={cancelling === r.id}
-                        >
-                          {cancelling === r.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setRemindTarget(r)}
+                            disabled={reminding === r.id}
+                          >
+                            {reminding === r.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <MessageSquare className="h-4 w-4" />
+                            )}
+                            <span className="ml-1 hidden sm:inline">Send reminder</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => cancelHold(r.id)}
+                            disabled={cancelling === r.id}
+                          >
+                            {cancelling === r.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </td>
+
                   </tr>
                 );
               })}
@@ -258,6 +327,43 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
           </table>
         </div>
       )}
+
+      <AlertDialog
+        open={!!remindTarget}
+        onOpenChange={(open) => {
+          if (!open) setRemindTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Text {remindTarget?.swimmer_name}'s family again?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {remindTarget && (
+                <>
+                  Sends the same signup link to {remindTarget.parent_name} at{" "}
+                  {formatPhone(remindTarget.parent_phone)}. This does not change when the
+                  spot expires, and one reminder can go out every 30 minutes.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Not now</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const target = remindTarget;
+                setRemindTarget(null);
+                if (target) void sendReminder(target);
+              }}
+            >
+              Send reminder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
+

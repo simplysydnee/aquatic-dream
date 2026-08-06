@@ -1414,6 +1414,7 @@ export type Database = {
           group_token: string | null
           held_until: string
           id: string
+          last_manual_reminder_at: string | null
           notes: string | null
           parent_email: string | null
           parent_name: string
@@ -1436,6 +1437,7 @@ export type Database = {
           group_token?: string | null
           held_until: string
           id?: string
+          last_manual_reminder_at?: string | null
           notes?: string | null
           parent_email?: string | null
           parent_name: string
@@ -1458,6 +1460,7 @@ export type Database = {
           group_token?: string | null
           held_until?: string
           id?: string
+          last_manual_reminder_at?: string | null
           notes?: string | null
           parent_email?: string | null
           parent_name?: string

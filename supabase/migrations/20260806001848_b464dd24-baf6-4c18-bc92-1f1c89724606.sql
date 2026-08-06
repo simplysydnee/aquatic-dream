@@ -1,0 +1,1 @@
+ALTER TABLE public.membership_holds ADD COLUMN IF NOT EXISTS last_manual_reminder_at timestamptz;
