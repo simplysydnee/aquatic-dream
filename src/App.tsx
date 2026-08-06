@@ -145,7 +145,9 @@ const App = () => (
             <Route path="/enrollment-waiver/:token" element={<EnrollmentWaiver />} />
 
             {/* Standalone membership sign-up (no public chrome) */}
-            <Route path="/join" element={<JoinMembership />} />
+            <Route path="/join" element={<JoinEntry />} />
+            <Route path="/welcome-back" element={<WelcomeBack />} />
+
             <Route path="/cancel" element={<MembershipCancelRequest />} />
             <Route path="/manage/:token" element={<MembershipManage />} />
 
