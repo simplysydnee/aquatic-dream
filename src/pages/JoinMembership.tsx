@@ -2292,7 +2292,10 @@ function JoinMembershipForm() {
                       type="button"
                       className="mt-3 w-full bg-[#F58B76] hover:bg-[#F58B76]/90"
                       onClick={() => {
-                        window.location.href = `/join?hold=${encodeURIComponent(nextSwimmerToken)}`;
+                        const src = resolveJoinSrc();
+                        window.location.href = `/join?hold=${encodeURIComponent(nextSwimmerToken)}${
+                          src ? `&src=${encodeURIComponent(src)}` : ""
+                        }`;
                       }}
                     >
                       Continue to {nextSwimmer.name}
