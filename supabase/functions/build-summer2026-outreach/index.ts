@@ -3,6 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { buildSummer2026List, SUMMER2026_KIND } from "../_shared/summer2026-outreach.ts";
+import { loadOptOutPhones, optOutPhoneKey } from "../_shared/sms-opt-out.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
