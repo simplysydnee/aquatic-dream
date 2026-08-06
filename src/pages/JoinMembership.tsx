@@ -759,6 +759,8 @@ function JoinMembershipForm() {
         source: "public",
       });
       setWaiverId(id);
+      setNeedsFreshWaiver(false);
+
       toast.success("Waiver signed");
       setStep(5);
     } catch (e) {
