@@ -4,6 +4,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { sendSms, logSms, normalizePhone } from "../_shared/textmagic.ts";
+import { loadOptOutPhones, optOutPhoneKey } from "../_shared/sms-opt-out.ts";
 import { buildSummer2026List, SUMMER2026_KIND, type Segment } from "../_shared/summer2026-outreach.ts";
 
 const supabaseAdmin = createClient(
