@@ -90,6 +90,8 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [remindTarget, setRemindTarget] = useState<HoldRow | null>(null);
   const [reminding, setReminding] = useState<string | null>(null);
+  const [previewText, setPreviewText] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -117,6 +119,33 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
   useEffect(() => {
     load();
   }, [load, refreshKey]);
+
+  // Fetch the exact text each time the dialog opens, never cached across opens:
+  // the remaining-time phrase keeps ticking.
+  useEffect(() => {
+    if (!remindTarget) {
+      setPreviewText(null);
+      setPreviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setPreviewText(null);
+    setPreviewLoading(true);
+    void supabase.functions
+      .invoke("send-membership-hold-reminder", {
+        body: { hold_id: remindTarget.id, preview: true },
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        const payload = data as { message?: string } | null;
+        setPreviewText(!error && payload?.message ? payload.message : null);
+        setPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [remindTarget]);
+
 
   const visible = useMemo(() => {
     const now = Date.now();
@@ -342,13 +371,23 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
             <AlertDialogDescription>
               {remindTarget && (
                 <>
-                  Sends the same signup link to {remindTarget.parent_name} at{" "}
+                  {previewText ? "Sends this text to" : "Sends the same signup link to"}{" "}
+                  {remindTarget.parent_name} at{" "}
                   {formatPhone(remindTarget.parent_phone)}. This does not change when the
                   spot expires, and one reminder can go out every 30 minutes.
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {previewLoading ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading the message
+            </p>
+          ) : previewText ? (
+            <blockquote className="rounded-md border-l-4 border-primary bg-muted/60 px-3 py-2 text-sm text-foreground">
+              {previewText}
+            </blockquote>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel>Not now</AlertDialogCancel>
             <AlertDialogAction
