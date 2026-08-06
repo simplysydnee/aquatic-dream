@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const holdId = String(body?.hold_id || "");
+    const preview = body?.preview === true;
     if (!holdId) return json({ error: "hold_id required" }, 400);
 
     const { data: hold, error: holdErr } = await supabaseAdmin
@@ -93,6 +94,12 @@ Deno.serve(async (req) => {
     const message =
       `Aquatic Dreams: we're holding a ${program} spot for ${firstName}${when ? `, ${when}` : ""}. ` +
       `Finish enrollment within ${formatHoldWindow(remainingMinutes)}: ${link}`;
+
+    // Preview mode: everything above runs (status, expiry, rate limit,
+    // composition) but nothing is sent and nothing is stamped.
+    if (preview) {
+      return json({ success: true, preview: true, sent: false, message, hold_id: hold.id });
+    }
 
     const smsResult = await sendAndLogBookingConfirmation(supabaseAdmin, {
       phoneRaw: hold.parent_phone as string,
