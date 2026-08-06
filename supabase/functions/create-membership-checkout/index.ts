@@ -52,6 +52,7 @@ serve(async (req) => {
       sms_consent_version,
       returnUrl,
       reuse_token,
+      source,
     } = body ?? {};
 
     // SECURITY: the Stripe environment is server-controlled only. Any
