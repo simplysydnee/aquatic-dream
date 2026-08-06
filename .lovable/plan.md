@@ -57,6 +57,8 @@ Pricing, program picker, slot picker, consent, waiver skip logic, hold flow, che
 
 - Fresh session, `/join?src=summer2026` -> welcome page, no picker.
 - Click through -> `/join?src=summer2026`, and `src` reaches the checkout payload and return URL.
+- Three-swimmer batch off the same link: all three memberships land with `source = summer2026`, not just the first. Checked directly in the `memberships` rows after the run.
+
 - `/join` bare and `/join?hold=<token>` -> unchanged, verified against a live hold link.
 - Reload / back in the same session -> straight to `/join`, welcome page not repeated.
 - Grep the welcome page for `$` and any digit-amount pattern: none.
