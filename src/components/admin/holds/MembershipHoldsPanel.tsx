@@ -2,7 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, MessageSquare, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { formatPhone } from "@/lib/phone";
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
@@ -26,6 +36,7 @@ interface HoldRow {
   held_until: string;
   sms_sent_at: string | null;
   reminder_sent_at: string | null;
+  last_manual_reminder_at: string | null;
   expired_at: string | null;
   converted_at: string | null;
   created_at: string;
@@ -36,6 +47,7 @@ interface HoldRow {
     instructor_id: string | null;
   } | null;
 }
+
 
 const fmtTime = (t: string) => {
   const [h, m] = t.split(":").map((n) => parseInt(n, 10));
