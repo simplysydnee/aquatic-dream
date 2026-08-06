@@ -27,6 +27,7 @@ import ClosureScheduleNote from "@/components/ClosureScheduleNote";
 import { JOIN_OPEN } from "@/lib/joinGate";
 import AgeGatePanel from "@/components/swim-enrollment/AgeGatePanel";
 import { programAgeMismatch, PROGRAM_AGE_LABELS } from "@/lib/programEligibility";
+import { resolveJoinSrc } from "@/lib/joinSrc";
 
 import {
   resolveSwimmerWaiver,
@@ -283,6 +284,10 @@ function JoinMembershipForm() {
   const [holdLevelMismatch, setHoldLevelMismatch] = useState<SwimLevel | null>(null);
 
   const [waiverSubmitting, setWaiverSubmitting] = useState(false);
+
+  // Campaign tag (/join?src=summer2026), kept for the whole session so it
+  // survives Stripe and lands on the membership record.
+  const [joinSrc] = useState<string | null>(() => resolveJoinSrc());
 
   // Phone-booked hold state (/join?hold=<token>).
   // Decided from the URL before first paint so the program picker never flashes.
@@ -832,10 +837,11 @@ function JoinMembershipForm() {
       membership_agreement_version: MEMBERSHIP_AGREEMENT_VERSION,
       membership_agreement_text: MEMBERSHIP_AGREEMENT_TEXT,
       membership_agreement_accepted: agreementAccepted,
-      returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}${holdToken ? `&hold=${encodeURIComponent(holdToken)}` : ""}`,
+      source: joinSrc || "public",
+      returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}${holdToken ? `&hold=${encodeURIComponent(holdToken)}` : ""}${joinSrc ? `&src=${encodeURIComponent(joinSrc)}` : ""}`,
       environment: getStripeEnvironment(),
     };
-  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId, agreementAccepted, holdToken]);
+  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId, agreementAccepted, holdToken, joinSrc]);
 
   const fetchClientSecret = useCallback(async (): Promise<string> => {
     if (!plan || !slot) throw new Error("Missing plan or slot");
@@ -2291,7 +2297,10 @@ function JoinMembershipForm() {
                       type="button"
                       className="mt-3 w-full bg-[#F58B76] hover:bg-[#F58B76]/90"
                       onClick={() => {
-                        window.location.href = `/join?hold=${encodeURIComponent(nextSwimmerToken)}`;
+                        const src = resolveJoinSrc();
+                        window.location.href = `/join?hold=${encodeURIComponent(nextSwimmerToken)}${
+                          src ? `&src=${encodeURIComponent(src)}` : ""
+                        }`;
                       }}
                     >
                       Continue to {nextSwimmer.name}

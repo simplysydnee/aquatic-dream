@@ -1766,6 +1766,7 @@ export type Database = {
           sms_consent_at: string | null
           sms_consent_text: string | null
           sms_consent_version: string | null
+          source: string
           standing_slot_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["membership_status"]
@@ -1813,6 +1814,7 @@ export type Database = {
           sms_consent_at?: string | null
           sms_consent_text?: string | null
           sms_consent_version?: string | null
+          source?: string
           standing_slot_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["membership_status"]
@@ -1860,6 +1862,7 @@ export type Database = {
           sms_consent_at?: string | null
           sms_consent_text?: string | null
           sms_consent_version?: string | null
+          source?: string
           standing_slot_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["membership_status"]

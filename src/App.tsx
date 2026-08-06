@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import SwimLessons from "./pages/SwimLessons";
@@ -56,6 +56,19 @@ import UnsubscribeMarketing from "./pages/UnsubscribeMarketing";
 import ScrollToTop from "./components/ScrollToTop";
 import OAuthConsent from "./pages/OAuthConsent";
 import JoinMembership from "./pages/JoinMembership";
+import WelcomeBack from "./pages/WelcomeBack";
+import { WELCOME_BACK_SRC, hasSeenWelcomeBack, readSrcParam } from "./lib/joinSrc";
+
+/**
+ * Families texted the summer 2026 link get the "what changed" page first, once
+ * per browser session. Every other visit to /join is untouched.
+ */
+const JoinEntry = () => {
+  if (readSrcParam() === WELCOME_BACK_SRC && !hasSeenWelcomeBack()) {
+    return <Navigate to="/welcome-back" replace />;
+  }
+  return <JoinMembership />;
+};
 import MembershipCancelRequest from "./pages/MembershipCancelRequest";
 import MembershipManage from "./pages/MembershipManage";
 
@@ -132,7 +145,9 @@ const App = () => (
             <Route path="/enrollment-waiver/:token" element={<EnrollmentWaiver />} />
 
             {/* Standalone membership sign-up (no public chrome) */}
-            <Route path="/join" element={<JoinMembership />} />
+            <Route path="/join" element={<JoinEntry />} />
+            <Route path="/welcome-back" element={<WelcomeBack />} />
+
             <Route path="/cancel" element={<MembershipCancelRequest />} />
             <Route path="/manage/:token" element={<MembershipManage />} />
 
