@@ -3,6 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { buildSummer2026List, SUMMER2026_KIND } from "../_shared/summer2026-outreach.ts";
+import { loadOptOutPhones, optOutPhoneKey } from "../_shared/sms-opt-out.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -42,6 +43,9 @@ Deno.serve(async (req) => {
       (alreadySent ?? []).map((r: { phone: string | null }) => (r.phone ?? "").replace(/\D/g, "").slice(-10)),
     );
 
+    const optedOut = await loadOptOutPhones(supabaseAdmin);
+    const optedOutRecipients = list.recipients.filter((r) => optedOut.has(optOutPhoneKey(r.phone) ?? r.phone));
+
     const samples = (segment: string) =>
       list.recipients.filter((r) => r.segment === segment).slice(0, 5).map((r) => r.message);
 
@@ -49,8 +53,15 @@ Deno.serve(async (req) => {
       counts: list.counts,
       already_sent: list.recipients.filter((r) => sentPhones.has(r.phone)).length,
       excluded_active_member_phones: list.excludedMemberPhones,
+      opted_out_total: optedOut.size,
+      opted_out_in_list: optedOutRecipients.length,
+      opted_out: optedOutRecipients.map((r) => ({
+        phone: r.phone,
+        parent: r.parentFirstName,
+        segment: r.segment,
+      })),
       samples: { GROUP: samples("GROUP"), PRIVATE: samples("PRIVATE"), BOTH: samples("BOTH") },
-      recipients: list.recipients,
+      recipients: list.recipients.filter((r) => !optedOut.has(optOutPhoneKey(r.phone) ?? r.phone)),
       no_phone: list.excluded.filter((e) => e.reason === "no_phone"),
       unusable_name: list.excluded.filter((e) => e.reason === "unusable_name"),
     });

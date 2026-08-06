@@ -4,6 +4,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { sendSms, logSms, normalizePhone } from "../_shared/textmagic.ts";
+import { loadOptOutPhones, optOutPhoneKey } from "../_shared/sms-opt-out.ts";
 import { buildSummer2026List, SUMMER2026_KIND, type Segment } from "../_shared/summer2026-outreach.ts";
 
 const supabaseAdmin = createClient(
@@ -56,8 +57,15 @@ Deno.serve(async (req) => {
       (alreadySent ?? []).map((r: { phone: string | null }) => (r.phone ?? "").replace(/\D/g, "").slice(-10)),
     );
 
-    let targets = list.recipients.filter((r) => r.segment === segment && !sentPhones.has(r.phone));
+    const optedOut = await loadOptOutPhones(supabaseAdmin);
+    const segmentAll = list.recipients.filter((r) => r.segment === segment);
+    const optedOutSkipped = segmentAll.filter((r) => optedOut.has(optOutPhoneKey(r.phone) ?? r.phone));
+
+    let targets = segmentAll.filter(
+      (r) => !sentPhones.has(r.phone) && !optedOut.has(optOutPhoneKey(r.phone) ?? r.phone),
+    );
     if (limit) targets = targets.slice(0, limit);
+
 
     let sent = 0;
     let failed = 0;
@@ -99,7 +107,10 @@ Deno.serve(async (req) => {
       attempted: targets.length,
       sent,
       failed,
-      skipped_already_sent: list.recipients.filter((r) => r.segment === segment && sentPhones.has(r.phone)).length,
+      skipped_already_sent: segmentAll.filter((r) => sentPhones.has(r.phone)).length,
+      skipped_opted_out: optedOutSkipped.length,
+      opted_out_phones: optedOutSkipped.map((r) => r.phone),
+
       errors: errors.slice(0, 20),
     });
   } catch (e) {

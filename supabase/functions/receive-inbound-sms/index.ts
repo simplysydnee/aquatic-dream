@@ -3,6 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { normalizePhone } from "../_shared/textmagic.ts";
+import { isOptOutMessage, recordOptOut } from "../_shared/sms-opt-out.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -47,6 +48,11 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+
+    if (isOptOutMessage(text)) {
+      await recordOptOut(admin, phone, "inbound_sms");
+    }
+
 
     const { data: existing } = await admin
       .from("sms_conversations")
