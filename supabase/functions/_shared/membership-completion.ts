@@ -567,6 +567,7 @@ async function ensureMembershipRecord(options: {
       sms_consent_at: smsConsent ? new Date().toISOString() : null,
       sms_consent_text: asNullableString(options.payload.sms_consent_text),
       sms_consent_version: asNullableString(options.payload.sms_consent_version),
+      source: asNullableString(options.payload.source) || "public",
     })
     .select("id")
     .single();
