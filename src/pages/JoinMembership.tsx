@@ -1979,6 +1979,13 @@ function JoinMembershipForm() {
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
+                {needsFreshWaiver && (
+                  <div className="mb-4 rounded-lg border border-[#2a5e84]/20 bg-[#2a5e84]/5 p-3 text-sm text-[#1a3a8a]">
+                    We have a waiver for {form.child_first} from a past session, but memberships need
+                    a current one on file. It only takes a moment.
+                  </div>
+                )}
+
                 <LegalAgreements
                   parentName={
                     isAdult
