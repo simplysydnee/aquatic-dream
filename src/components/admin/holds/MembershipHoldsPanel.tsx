@@ -371,7 +371,8 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
             <AlertDialogDescription>
               {remindTarget && (
                 <>
-                  Sends this text to {remindTarget.parent_name} at{" "}
+                  {previewText ? "Sends this text to" : "Sends the same signup link to"}{" "}
+                  {remindTarget.parent_name} at{" "}
                   {formatPhone(remindTarget.parent_phone)}. This does not change when the
                   spot expires, and one reminder can go out every 30 minutes.
                 </>
