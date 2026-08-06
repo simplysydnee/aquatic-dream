@@ -63,8 +63,17 @@ Deno.serve(async (req) => {
     let failed = 0;
     const errors: { phone: string; error: string }[] = [];
 
-    for (const r of targets) {
+    // Pace sends so a whole segment does not hit TextMagic in one burst.
+    const PACING_MS = Number.isFinite(body?.pacing_ms)
+      ? Math.min(10000, Math.max(0, Number(body.pacing_ms)))
+      : 1500;
+    const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+    for (let i = 0; i < targets.length; i++) {
+      const r = targets[i];
+      if (i > 0 && PACING_MS > 0) await sleep(PACING_MS);
       const phone = normalizePhone(r.phone);
+
       if (!phone) {
         failed++;
         continue;
