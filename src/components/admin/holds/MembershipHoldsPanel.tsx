@@ -265,7 +265,14 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
                       {fmtWhen(r.sms_sent_at)}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
-                      {r.reminder_sent_at ? fmtWhen(r.reminder_sent_at) : "Not yet"}
+                      <span className="block">
+                        {r.reminder_sent_at ? fmtWhen(r.reminder_sent_at) : "Not yet"}
+                      </span>
+                      {r.last_manual_reminder_at && (
+                        <span className="block text-xs">
+                          Manually resent {fmtWhen(r.last_manual_reminder_at)}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap">
                       {live ? (
@@ -283,20 +290,36 @@ export function MembershipHoldsPanel({ refreshKey, onChanged, collapsedPrefix }:
                     </td>
                     <td className="py-2 text-right">
                       {live && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => cancelHold(r.id)}
-                          disabled={cancelling === r.id}
-                        >
-                          {cancelling === r.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setRemindTarget(r)}
+                            disabled={reminding === r.id}
+                          >
+                            {reminding === r.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <MessageSquare className="h-4 w-4" />
+                            )}
+                            <span className="ml-1 hidden sm:inline">Send reminder</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => cancelHold(r.id)}
+                            disabled={cancelling === r.id}
+                          >
+                            {cancelling === r.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </td>
+
                   </tr>
                 );
               })}
