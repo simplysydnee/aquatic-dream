@@ -833,10 +833,11 @@ function JoinMembershipForm() {
       membership_agreement_version: MEMBERSHIP_AGREEMENT_VERSION,
       membership_agreement_text: MEMBERSHIP_AGREEMENT_TEXT,
       membership_agreement_accepted: agreementAccepted,
-      returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}${holdToken ? `&hold=${encodeURIComponent(holdToken)}` : ""}`,
+      source: joinSrc || "public",
+      returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}${holdToken ? `&hold=${encodeURIComponent(holdToken)}` : ""}${joinSrc ? `&src=${encodeURIComponent(joinSrc)}` : ""}`,
       environment: getStripeEnvironment(),
     };
-  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId, agreementAccepted, holdToken]);
+  }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId, agreementAccepted, holdToken, joinSrc]);
 
   const fetchClientSecret = useCallback(async (): Promise<string> => {
     if (!plan || !slot) throw new Error("Missing plan or slot");
