@@ -278,6 +278,10 @@ function JoinMembershipForm() {
   const [waiverId, setWaiverId] = useState<string | null>(null);
   const [waiverOnFile, setWaiverOnFile] = useState<ActiveWaiver | null>(null);
   const [waiverChecking, setWaiverChecking] = useState(false);
+  // True when a waiver exists in their history but no signed record can be
+  // attached to this membership, so a fresh signature is required.
+  const [needsFreshWaiver, setNeedsFreshWaiver] = useState(false);
+
   // Waiver id carried on the hold (front desk matched an existing family).
   const [holdWaiverId, setHoldWaiverId] = useState<string | null>(null);
   // Assessed level that the held Small Group class does not accept.
@@ -702,10 +706,21 @@ function JoinMembershipForm() {
         parentPhone: form.parent_phone,
       });
       if (status.waiver) setWaiverOnFile(status.waiver);
-      if (status.onFile || holdWaiverId) {
-        setWaiverId(status.waiverId ?? holdWaiverId);
+      const resolvedId = status.waiverId ?? holdWaiverId;
+      if (resolvedId) {
+        setWaiverId(resolvedId);
         if (status.onFile) toast.success("Waiver already on file — skipping the legal step");
         setStep(5);
+        return;
+      }
+      // A waiver exists somewhere in their history (old enrollment or private
+      // booking) but no signed record we can attach to this membership. Never
+      // skip the step in that case, or the review screen dead-ends.
+      if (status.onFile) {
+        setWaiverOnFile(null);
+        setWaiverId(null);
+        setNeedsFreshWaiver(true);
+        setStep(4);
         return;
       }
     } catch (e) {
@@ -720,7 +735,9 @@ function JoinMembershipForm() {
     }
     setWaiverOnFile(null);
     setWaiverId(null);
+    setNeedsFreshWaiver(false);
     setStep(4);
+
   };
 
   const handleLegalSubmit = async (legal: LegalAgreementData) => {
@@ -742,6 +759,8 @@ function JoinMembershipForm() {
         source: "public",
       });
       setWaiverId(id);
+      setNeedsFreshWaiver(false);
+
       toast.success("Waiver signed");
       setStep(5);
     } catch (e) {
@@ -753,12 +772,29 @@ function JoinMembershipForm() {
   };
 
   const handleFinalize = () => {
-    if (!plan || !slot || !canContinueStep3 || !canContinueStep5 || !waiverId) {
-      toast.error("Please complete all fields");
+    if (!plan || !slot) {
+      toast.error("Please pick a program and a class time");
+      setStep(1);
+      return;
+    }
+    if (!canContinueStep3) {
+      toast.error("We need a little more swimmer and contact information");
+      setStep(3);
+      return;
+    }
+    if (!waiverId) {
+      toast.error("We need a signed waiver before payment");
+      setStep(4);
+      return;
+    }
+    if (!canContinueStep5) {
+      toast.error("Please accept the agreement and consents");
+      setStep(5);
       return;
     }
     setStep(7);
   };
+
 
   const [charges, setCharges] = useState<{ firstChargeCents: number; monthlyCents: number } | null>(
     null,
@@ -1945,6 +1981,13 @@ function JoinMembershipForm() {
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
+                {needsFreshWaiver && (
+                  <div className="mb-4 rounded-lg border border-[#2a5e84]/20 bg-[#2a5e84]/5 p-3 text-sm text-[#1a3a8a]">
+                    We have a waiver for {form.child_first} from a past session, but memberships need
+                    a current one on file. It only takes a moment.
+                  </div>
+                )}
+
                 <LegalAgreements
                   parentName={
                     isAdult
@@ -2087,7 +2130,11 @@ function JoinMembershipForm() {
                   {form.has_medical === "yes" && (
                     <Row label="Medical" value={form.medical_notes} />
                   )}
-                  <Row label="Waiver" value={waiverOnFile || holdWaiverId ? "On file" : "Signed today"} />
+                  <Row
+                    label="Waiver"
+                    value={waiverOnFile || holdWaiverId ? "On file" : waiverId ? "Signed today" : "Not signed yet"}
+                  />
+
                   <div className="space-y-2 border-t border-[#2a5e84]/20 pt-3">
                     {quoteLoading && !quote && (
                       <div className="text-sm text-[#2a5e84]">Calculating your first charge…</div>
