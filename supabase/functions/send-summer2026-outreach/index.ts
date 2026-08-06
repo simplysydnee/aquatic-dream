@@ -57,8 +57,15 @@ Deno.serve(async (req) => {
       (alreadySent ?? []).map((r: { phone: string | null }) => (r.phone ?? "").replace(/\D/g, "").slice(-10)),
     );
 
-    let targets = list.recipients.filter((r) => r.segment === segment && !sentPhones.has(r.phone));
+    const optedOut = await loadOptOutPhones(supabaseAdmin);
+    const segmentAll = list.recipients.filter((r) => r.segment === segment);
+    const optedOutSkipped = segmentAll.filter((r) => optedOut.has(optOutPhoneKey(r.phone) ?? r.phone));
+
+    let targets = segmentAll.filter(
+      (r) => !sentPhones.has(r.phone) && !optedOut.has(optOutPhoneKey(r.phone) ?? r.phone),
+    );
     if (limit) targets = targets.slice(0, limit);
+
 
     let sent = 0;
     let failed = 0;
