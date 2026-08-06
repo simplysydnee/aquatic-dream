@@ -2121,7 +2121,11 @@ function JoinMembershipForm() {
                   {form.has_medical === "yes" && (
                     <Row label="Medical" value={form.medical_notes} />
                   )}
-                  <Row label="Waiver" value={waiverOnFile || holdWaiverId ? "On file" : "Signed today"} />
+                  <Row
+                    label="Waiver"
+                    value={waiverOnFile || holdWaiverId ? "On file" : waiverId ? "Signed today" : "Not signed yet"}
+                  />
+
                   <div className="space-y-2 border-t border-[#2a5e84]/20 pt-3">
                     {quoteLoading && !quote && (
                       <div className="text-sm text-[#2a5e84]">Calculating your first charge…</div>
