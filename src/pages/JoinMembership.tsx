@@ -702,10 +702,21 @@ function JoinMembershipForm() {
         parentPhone: form.parent_phone,
       });
       if (status.waiver) setWaiverOnFile(status.waiver);
-      if (status.onFile || holdWaiverId) {
-        setWaiverId(status.waiverId ?? holdWaiverId);
+      const resolvedId = status.waiverId ?? holdWaiverId;
+      if (resolvedId) {
+        setWaiverId(resolvedId);
         if (status.onFile) toast.success("Waiver already on file — skipping the legal step");
         setStep(5);
+        return;
+      }
+      // A waiver exists somewhere in their history (old enrollment or private
+      // booking) but no signed record we can attach to this membership. Never
+      // skip the step in that case, or the review screen dead-ends.
+      if (status.onFile) {
+        setWaiverOnFile(null);
+        setWaiverId(null);
+        setNeedsFreshWaiver(true);
+        setStep(4);
         return;
       }
     } catch (e) {
@@ -720,7 +731,9 @@ function JoinMembershipForm() {
     }
     setWaiverOnFile(null);
     setWaiverId(null);
+    setNeedsFreshWaiver(false);
     setStep(4);
+
   };
 
   const handleLegalSubmit = async (legal: LegalAgreementData) => {
