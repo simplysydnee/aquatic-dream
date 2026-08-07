@@ -568,6 +568,27 @@ const MembershipsAdmin = () => {
         )}
       </Card>
 
+      <FixPaymentDialog
+        membership={
+          fixTarget
+            ? {
+                id: fixTarget.id,
+                swimmerName: swimmerName(fixTarget),
+                parentName: parentName(fixTarget),
+                parentEmail: fixTarget.parent_email,
+                parentPhone: fixTarget.parent_phone,
+                lastPaymentAmountCents: fixTarget.last_payment_amount_cents,
+                lastPaymentAt: fixTarget.last_payment_at,
+                paymentFailureReason: fixTarget.payment_failure_reason,
+                cardLinkSentAt: fixTarget.card_link_sent_at,
+                cardUpdatedAt: fixTarget.card_updated_at,
+              }
+            : null
+        }
+        onOpenChange={(o) => !o && setFixPaymentId(null)}
+        onDone={() => void fetchData()}
+      />
+
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelectedId(null)}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
           {selected && (
