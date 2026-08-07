@@ -114,6 +114,8 @@ Deno.serve(async (req) => {
       conversation_id: conversationId,
       direction: "inbound",
       body: text,
+      kind: "inbound",
+      sent_by_label: "Parent",
       status: "received",
       textmagic_message_id: messageId || null,
     });
