@@ -192,6 +192,10 @@ const MembershipsAdmin = () => {
     () => memberships.find((m) => m.id === selectedId) ?? null,
     [memberships, selectedId],
   );
+  const fixTarget = useMemo(
+    () => memberships.find((m) => m.id === fixPaymentId) ?? null,
+    [memberships, fixPaymentId],
+  );
   const selectedSlot = selected?.standing_slot_id ? slotById.get(selected.standing_slot_id) ?? null : null;
 
   useEffect(() => {
