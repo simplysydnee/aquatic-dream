@@ -104,6 +104,8 @@ export interface PrivateLessonBooking {
   parent_phone: string | null;
   child_name: string | null;
   child_age: number | null;
+  child_dob: string | null;
+
   start_time: string;
   end_time: string;
   pool_area: string;
