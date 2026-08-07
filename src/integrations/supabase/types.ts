@@ -2471,6 +2471,41 @@ export type Database = {
           },
         ]
       }
+      sms_conversation_reads: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          last_read_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          last_read_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          last_read_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_conversation_reads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "sms_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_conversations: {
         Row: {
           created_at: string
@@ -3714,6 +3749,10 @@ export type Database = {
       }
       link_visitor_waiver: { Args: { _waiver_id: string }; Returns: undefined }
       mark_lesson_waiver_signed: { Args: { _token: string }; Returns: string }
+      mark_sms_conversation_read: {
+        Args: { _conversation_id: string }
+        Returns: undefined
+      }
       mark_swim_enrollment_waiver_signed: {
         Args: { _token: string }
         Returns: string
@@ -3767,6 +3806,7 @@ export type Database = {
         Returns: boolean
       }
       text_soundex: { Args: { "": string }; Returns: string }
+      unread_sms_conversation_count: { Args: never; Returns: number }
       unsubscribe_marketing_by_token: {
         Args: { _reason?: string; _token: string }
         Returns: {
