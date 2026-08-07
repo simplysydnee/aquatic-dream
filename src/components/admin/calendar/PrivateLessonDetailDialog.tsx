@@ -22,6 +22,7 @@ import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe
 import { getStripe, getStripeEnvironment } from "@/lib/stripe";
 import ChargeConfirmDialog from "@/components/admin/calendar/ChargeConfirmDialog";
 import { getPrivateLessonPrice, isPromoDate, PROMO_LABEL } from "@/lib/privateLessonPricing";
+import AdultTag from "@/components/admin/AdultTag";
 
 interface Props {
   lesson: PrivateLessonBooking | null;
@@ -311,7 +312,10 @@ export default function PrivateLessonDetailDialog({ lesson, onClose, onChanged }
           )}
           <Separator />
           <div>
-            <p className="font-semibold">{lesson.child_name || lesson.parent_name}</p>
+            <p className="font-semibold flex items-center gap-1">
+              {lesson.child_name || lesson.parent_name}
+              <AdultTag dob={lesson.child_dob} />
+            </p>
             {lesson.child_age != null && <p className="text-xs text-muted-foreground">Age {lesson.child_age}</p>}
           </div>
           <div className="text-xs text-muted-foreground space-y-1">

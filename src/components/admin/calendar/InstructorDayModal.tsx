@@ -12,6 +12,7 @@ import CancelLessonDialog from "./CancelLessonDialog";
 import ReassignDialog from "./ReassignDialog";
 import type { CancelTarget } from "@/lib/lessonCancel";
 import { getPrivateLessonPrice } from "@/lib/privateLessonPricing";
+import { isAdultSwimmer } from "@/components/admin/AdultTag";
 
 interface Props {
   open: boolean;
@@ -161,7 +162,7 @@ const InstructorDayModal = ({ open, onOpenChange, instructorName, initialDate, o
           id: `lo-${o.id}`,
           kind: "lesson_occurrence",
           title: b.child_name || b.parent_name,
-          subtitle: b.lesson_type === "semi-private" ? "Semi-private" : "Private",
+          subtitle: `${b.lesson_type === "semi-private" ? "Semi-private" : "Private"}${isAdultSwimmer(b.child_dob) ? " · Adult" : ""}`,
           timeLabel,
           cancelled: o.status === "cancelled",
           cancelTarget: {
