@@ -31,7 +31,6 @@ import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPa
 import { EnrollFamilyDialog } from "@/components/admin/holds/EnrollFamilyDialog";
 import { FAMILY_ENROLL_ENABLED } from "@/lib/familyEnrollGate";
 import {
-import AdultTag from "@/components/admin/AdultTag";
   type MembershipPaymentState,
   hasPaymentProblem,
   paymentAmountLabel,
