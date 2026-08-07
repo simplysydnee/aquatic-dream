@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Send, Inbox, AlertCircle, RotateCcw, Link2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import TextsThread from "./TextsThread";
 import type { Swimmer } from "@/hooks/useSwimmers";
 
 interface Props {
@@ -110,6 +112,23 @@ function htmlToPlain(html: string): string {
 }
 
 export default function CommunicationsTab({ swimmer }: Props) {
+  return (
+    <Tabs defaultValue="email" className="space-y-3">
+      <TabsList>
+        <TabsTrigger value="email">Email</TabsTrigger>
+        <TabsTrigger value="texts">Texts</TabsTrigger>
+      </TabsList>
+      <TabsContent value="email" className="mt-0">
+        <EmailPanel swimmer={swimmer} />
+      </TabsContent>
+      <TabsContent value="texts" className="mt-0">
+        <TextsThread parentPhone={swimmer.parent_phone} parentName={swimmer.parent_name} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function EmailPanel({ swimmer }: Props) {
   const { toast } = useToast();
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
