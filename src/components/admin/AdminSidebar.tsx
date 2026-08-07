@@ -30,6 +30,7 @@ import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useAdminBadgeCounts } from "@/hooks/useAdminBadgeCounts";
+import { useUnreadTexts } from "@/hooks/useUnreadTexts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Sidebar,
@@ -55,6 +56,7 @@ export function AdminSidebar() {
   const collapsed = state === "collapsed";
   const { signOut, user } = useAuth();
   const { newGroupEnrollments, newPrivateBookings } = useAdminBadgeCounts();
+  const { unreadTexts } = useUnreadTexts();
   const { pathname } = useLocation();
 
   const groups: NavGroup[] = [
@@ -63,7 +65,7 @@ export function AdminSidebar() {
       items: [
         { title: "Calendar", url: "/admin", icon: CalendarDays, badge: 0 },
         { title: "Check-in", url: "/admin/checkin", icon: CheckSquare, badge: 0 },
-        { title: "Messages", url: "/admin/messages", icon: MessageSquare, badge: 0 },
+        { title: "Messages", url: "/admin/messages", icon: MessageSquare, badge: unreadTexts },
       ],
     },
     {

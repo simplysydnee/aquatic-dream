@@ -52,6 +52,8 @@ interface Props {
   onOpenEnrollment: (id: string) => void;
   onSelectSwimmer: (s: Swimmer) => void;
   onChanged?: (newKey?: string) => void;
+  /** Opens the drawer directly on a given tab, e.g. "comms" for messages. */
+  initialTab?: string;
 }
 
 
@@ -108,7 +110,7 @@ export default function SwimmerDetailDrawer({
   onOpenEnrollment,
   onSelectSwimmer,
   onChanged,
-
+  initialTab = "overview",
 }: Props) {
   const { isAdmin } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
@@ -270,7 +272,7 @@ export default function SwimmerDetailDrawer({
           <SwimmerStatusBadges statuses={swimmer.statuses} className="mt-2" />
         </SheetHeader>
 
-        <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <Tabs key={`${swimmer?.key ?? "none"}-${initialTab}`} defaultValue={initialTab} className="flex-1 flex flex-col overflow-hidden min-w-0">
           <TabsList className="mx-3 sm:mx-6 mt-3 sm:mt-4 grid grid-cols-6 w-auto h-auto p-1 border border-border bg-muted/40 rounded-lg gap-1">
             {[
               { value: "overview", icon: Info, label: "Info" },
@@ -609,7 +611,7 @@ export default function SwimmerDetailDrawer({
             </TabsContent>
 
             <TabsContent value="comms" className="p-4 sm:p-6 mt-0">
-              <CommunicationsTab swimmer={swimmer} />
+              <CommunicationsTab swimmer={swimmer} initialSubTab={initialTab === "comms" ? "texts" : "email"} />
             </TabsContent>
 
             <TabsContent value="notes" className="p-4 sm:p-6 mt-0">

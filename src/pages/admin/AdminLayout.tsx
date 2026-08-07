@@ -3,11 +3,13 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { SwimmerModalProvider } from "@/components/admin/swimmer/SwimmerModalProvider";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+import InboundSmsNotifier from "@/components/admin/InboundSmsNotifier";
 
 const AdminLayout = () => {
   return (
     <SidebarProvider>
       <SwimmerModalProvider>
+        <InboundSmsNotifier />
         <div className="min-h-screen flex w-full overflow-x-hidden flex-col">
           <PaymentTestModeBanner />
           <div className="flex flex-1 w-full overflow-x-hidden">

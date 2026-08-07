@@ -22,6 +22,10 @@ interface Props {
   swimmer: Swimmer;
 }
 
+interface TabProps extends Props {
+  initialSubTab?: "email" | "texts";
+}
+
 interface LogRow {
   id: string;
   template_name: string;
@@ -111,9 +115,9 @@ function htmlToPlain(html: string): string {
   return s;
 }
 
-export default function CommunicationsTab({ swimmer }: Props) {
+export default function CommunicationsTab({ swimmer, initialSubTab = "email" }: TabProps) {
   return (
-    <Tabs defaultValue="email" className="space-y-3">
+    <Tabs defaultValue={initialSubTab} className="space-y-3">
       <TabsList>
         <TabsTrigger value="email">Email</TabsTrigger>
         <TabsTrigger value="texts">Texts</TabsTrigger>
