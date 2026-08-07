@@ -9,6 +9,7 @@ import {
   needsCardAtDesk,
 } from "@/lib/lessonBookingStatus";
 import { format } from "date-fns";
+import { isAdultSwimmer } from "@/components/admin/AdultTag";
 
 
 interface Session {
@@ -29,6 +30,7 @@ interface Enrollment {
   id: string;
   child_name: string;
   child_age: number;
+  child_dob: string | null;
   parent_name: string;
   parent_phone: string | null;
   parent_email: string;
@@ -71,6 +73,7 @@ interface PrivateOccurrence {
   pool_area: string | null;
   child_name: string;
   child_age: number | null;
+  child_dob: string | null;
   parent_name: string;
   parent_phone: string | null;
   notes: string | null;
@@ -88,6 +91,7 @@ interface MembershipOccurrence {
   location: string | null;
   swim_level: string | null;
   swimmer_name: string;
+  child_dob: string | null;
   parent_name: string;
   parent_phone: string | null;
   notes: string | null;
@@ -142,7 +146,7 @@ export default function PrintDaySchedule() {
         supabase
           .from("swim_enrollments")
           .select(
-            "id, child_name, child_age, parent_name, parent_phone, parent_email, swim_level, session_id, status, medical_notes"
+            "id, child_name, child_age, child_dob, parent_name, parent_phone, parent_email, swim_level, session_id, status, medical_notes"
           )
           .in("status", ["pending", "confirmed", "enrolled", "pending_payment"]),
         supabase
@@ -154,14 +158,14 @@ export default function PrintDaySchedule() {
           .eq("lesson_date", date),
         supabase
           .from("lesson_booking_occurrences")
-          .select("id, status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_phone, child_name, child_age, start_time, end_time, pool_area, notes, status, booking_source, stripe_payment_method_id)")
+          .select("id, status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_phone, child_name, child_age, child_dob, start_time, end_time, pool_area, notes, status, booking_source, stripe_payment_method_id)")
           .eq("occurrence_date", date)
           .not("status", "in", DEAD_STATUS_FILTER),
         // Membership lessons: scheduling only, no payment fields exist on these rows.
         supabase
           .from("membership_occurrences")
           .select(
-            "id, occurrence_date, start_time, end_time, instructor_id, status, memberships!inner(plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_phone, notes, medical_notes, standing_slots(start_time, end_time, instructor_id, location, swim_level), visitor_waivers(emergency_contact_first_name, emergency_contact_last_name, emergency_contact_phone, emergency_contact_relationship))"
+            "id, occurrence_date, start_time, end_time, instructor_id, status, memberships!inner(plan_key, child_first_name, child_last_name, child_dob, parent_first_name, parent_last_name, parent_phone, notes, medical_notes, standing_slots(start_time, end_time, instructor_id, location, swim_level), visitor_waivers(emergency_contact_first_name, emergency_contact_last_name, emergency_contact_phone, emergency_contact_relationship))"
           )
           .eq("occurrence_date", date)
           .eq("status", "scheduled"),
@@ -197,6 +201,7 @@ export default function PrintDaySchedule() {
               pool_area: b.pool_area || null,
               child_name: b.child_name || "",
               child_age: b.child_age ?? null,
+              child_dob: b.child_dob || null,
               parent_name: b.parent_name || "",
               parent_phone: b.parent_phone || null,
               notes: b.notes || null,
@@ -236,6 +241,7 @@ export default function PrintDaySchedule() {
             location: slot?.location || null,
             swim_level: slot?.swim_level || null,
             swimmer_name: `${m?.child_first_name || ""} ${m?.child_last_name || ""}`.trim(),
+            child_dob: m?.child_dob || null,
             parent_name: `${m?.parent_first_name || ""} ${m?.parent_last_name || ""}`.trim(),
             parent_phone: m?.parent_phone || null,
             notes: m?.notes || null,
@@ -521,6 +527,7 @@ export default function PrintDaySchedule() {
                               <>
                                 <td className="swimmer-cell">
                                   {e.child_name} <span className="age">({e.child_age})</span>
+                                  {isAdultSwimmer(e.child_dob) && <span className="age"> Adult</span>}
                                 </td>
                                 <td>
                                   {firstName(e.parent_name)}
@@ -576,7 +583,10 @@ export default function PrintDaySchedule() {
                               <div style={{ fontSize: "7.5pt", color: "#555" }}>{ml.location}</div>
                             )}
                           </td>
-                          <td className="swimmer-cell">{ml.swimmer_name || "—"}</td>
+                          <td className="swimmer-cell">
+                            {ml.swimmer_name || "—"}
+                            {isAdultSwimmer(ml.child_dob, ml.plan_key) && <span className="age"> Adult</span>}
+                          </td>
                           <td>
                             {firstName(ml.parent_name)}
                             <div style={{ color: "#555" }}>{ml.parent_phone || "—"}</div>
@@ -636,6 +646,7 @@ export default function PrintDaySchedule() {
                         <td className="swimmer-cell">
                           {p.child_name}
                           {p.child_age != null && <span className="age"> ({p.child_age})</span>}
+                          {isAdultSwimmer(p.child_dob) && <span className="age"> Adult</span>}
                         </td>
                         <td>
                           {firstName(p.parent_name)}

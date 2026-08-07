@@ -58,6 +58,7 @@ const PLAN_LABELS: Record<PlanKey, string> = {
 
 const SWIM_LEVELS: SwimLevel[] = ["white", "red", "yellow", "blue", "green"];
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
+import AdultTag from "@/components/admin/AdultTag";
 const LEVEL_LABELS = LEVEL_GROUP_NAMES;
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -167,7 +168,7 @@ const StandingSlotsAdmin = () => {
       supabase.from("standing_slots").select("*"),
       supabase
         .from("memberships")
-        .select("id, standing_slot_id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status")
+        .select("id, standing_slot_id, plan_key, child_first_name, child_last_name, child_dob, parent_first_name, parent_last_name, parent_email, parent_phone, status")
         .eq("status", "active"),
       supabase
         .from("memberships")
@@ -862,7 +863,10 @@ const StandingSlotsAdmin = () => {
                               return (
                                 <div key={m.id} className="rounded-md border bg-card px-3 py-2 text-xs">
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-medium text-foreground truncate">{childName}</span>
+                                    <span className="font-medium text-foreground truncate">
+                                      {childName}
+                                      <AdultTag dob={(m as { child_dob?: string | null }).child_dob} planKey={m.plan_key} className="ml-1" />
+                                    </span>
                                     {s.plan_key === "kid_group" && s.swim_level && (
                                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">
                                         {s.swim_level}

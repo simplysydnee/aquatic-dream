@@ -104,6 +104,8 @@ export interface PrivateLessonBooking {
   parent_phone: string | null;
   child_name: string | null;
   child_age: number | null;
+  child_dob: string | null;
+
   start_time: string;
   end_time: string;
   pool_area: string;
@@ -132,6 +134,8 @@ export interface MembershipLesson {
   instructor_id: string | null;
   instructor_name: string | null;
   swimmer_name: string;
+  child_dob: string | null;
+
   parent_name: string;
   parent_email: string;
   parent_phone: string | null;
@@ -220,7 +224,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .lte("lesson_date", rangeEnd),
       supabase
         .from("lesson_booking_occurrences")
-        .select("id, booking_id, occurrence_date, status, payment_status, charge_status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id, confirmation_email_status, confirmation_email_sent_at, confirmation_email_error, status, booking_source)")
+        .select("id, booking_id, occurrence_date, status, payment_status, charge_status, created_at, start_time_override, end_time_override, instructor_override_id, instructor_override_name, lesson_bookings!inner(id, lesson_type, instructor_id, instructor_name, parent_name, parent_email, parent_phone, child_name, child_age, child_dob, start_time, end_time, pool_area, price_per_session, recurring, notes, waiver_token, waiver_signed_at, stripe_customer_id, stripe_payment_method_id, confirmation_email_status, confirmation_email_sent_at, confirmation_email_error, status, booking_source)")
         .gte("occurrence_date", rangeStart)
         .lte("occurrence_date", rangeEnd)
         .not("status", "in", DEAD_STATUS_FILTER),
@@ -233,7 +237,7 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         .lte("lesson_date", rangeEnd),
       supabase
         .from("membership_occurrences")
-        .select("id, membership_id, occurrence_date, start_time, end_time, instructor_id, status, memberships!inner(id, plan_key, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, notes, medical_notes, standing_slots(id, start_time, end_time, instructor_id, location, swim_level), visitor_waivers(emergency_contact_first_name, emergency_contact_last_name, emergency_contact_phone, emergency_contact_relationship))")
+        .select("id, membership_id, occurrence_date, start_time, end_time, instructor_id, status, memberships!inner(id, plan_key, child_first_name, child_last_name, child_dob, parent_first_name, parent_last_name, parent_email, parent_phone, notes, medical_notes, standing_slots(id, start_time, end_time, instructor_id, location, swim_level), visitor_waivers(emergency_contact_first_name, emergency_contact_last_name, emergency_contact_phone, emergency_contact_relationship))")
         .gte("occurrence_date", rangeStart)
         .lte("occurrence_date", rangeEnd)
         .eq("status", "scheduled"),
@@ -324,6 +328,8 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
         parent_phone: b?.parent_phone || null,
         child_name: b?.child_name || null,
         child_age: b?.child_age ?? null,
+        child_dob: b?.child_dob || null,
+
         start_time: effStart,
         end_time: effEnd,
         pool_area: b?.pool_area || "shallow",
@@ -398,6 +404,8 @@ export function useCalendarData(currentDate: Date, view: "day" | "week") {
           ? (_instructorNameMap.get(instructorId) || null)
           : null,
         swimmer_name: [m.child_first_name, m.child_last_name].filter(Boolean).join(" ").trim(),
+        child_dob: m.child_dob || null,
+
         parent_name: [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ").trim(),
         parent_email: m.parent_email || "",
         parent_phone: m.parent_phone || null,

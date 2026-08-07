@@ -13,6 +13,7 @@ import BookingQuickDialog from "@/components/admin/booking/BookingQuickDialog";
 import PrivateLessonDetailDialog from "./PrivateLessonDetailDialog";
 import ReschedulePrivateLessonDialog from "@/components/admin/booking/ReschedulePrivateLessonDialog";
 import QuickEditLessonDialog, { type QuickEditLesson } from "@/components/admin/booking/QuickEditLessonDialog";
+import AdultTag from "@/components/admin/AdultTag";
 
 interface Props {
   date: Date;
@@ -166,6 +167,7 @@ export default function PrivateLessonsPanel({ date, privateLessons, openSlots, o
                       <div className="text-xs font-medium text-foreground truncate">
                         {l.child_name || l.parent_name}
                         {l.lesson_type === "semi_private" && <span className="ml-1 text-[10px] text-muted-foreground">(semi)</span>}
+                        <AdultTag dob={l.child_dob} className="ml-1" />
                       </div>
                       <div className="text-[10px] text-muted-foreground truncate">
                         {l.instructor_name || "Unassigned"}

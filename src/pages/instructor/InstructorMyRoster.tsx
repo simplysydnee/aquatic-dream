@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
+import AdultTag from "@/components/admin/AdultTag";
 
 interface SwimSession {
   id: string;
@@ -18,6 +19,7 @@ interface Enrollment {
   id: string;
   child_name: string;
   child_age: number;
+  child_dob: string | null;
   swim_level: string;
   session_id: string | null;
   status: string;
@@ -56,7 +58,7 @@ export default function InstructorMyRoster() {
       if (sessionIds.length) {
         const enrRes = await supabase
           .from("swim_enrollments")
-          .select("id, child_name, child_age, swim_level, session_id, status, medical_notes, is_first_time")
+          .select("id, child_name, child_age, child_dob, swim_level, session_id, status, medical_notes, is_first_time")
           .in("session_id", sessionIds)
           .in("status", ["confirmed", "pending"])
           .order("child_name");
@@ -113,7 +115,10 @@ export default function InstructorMyRoster() {
                 {roster.map((e) => (
                   <div key={e.id} className="flex items-start justify-between text-sm border-b last:border-0 py-1.5">
                     <div>
-                      <div className="font-medium">{e.child_name} <span className="text-xs text-muted-foreground">· age {e.child_age}</span></div>
+                      <div className="font-medium flex items-center gap-1">
+                        {e.child_name} <span className="text-xs text-muted-foreground">· age {e.child_age}</span>
+                        <AdultTag dob={e.child_dob} />
+                      </div>
                       {e.medical_notes && (
                         <div className="text-xs text-amber-700 mt-0.5">⚠ {e.medical_notes}</div>
                       )}
