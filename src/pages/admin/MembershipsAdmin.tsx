@@ -88,6 +88,8 @@ interface Membership extends MembershipPaymentState {
   waiver_id: string | null;
   swim_level: SwimLevel | null;
   manage_token: string | null;
+  card_link_sent_at: string | null;
+  card_updated_at: string | null;
 }
 
 
