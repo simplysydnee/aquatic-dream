@@ -1733,6 +1733,8 @@ export type Database = {
         Row: {
           cancel_effective_date: string | null
           cancel_requested_at: string | null
+          card_link_sent_at: string | null
+          card_updated_at: string | null
           child_dob: string | null
           child_first_name: string | null
           child_last_name: string | null
@@ -1781,6 +1783,8 @@ export type Database = {
         Insert: {
           cancel_effective_date?: string | null
           cancel_requested_at?: string | null
+          card_link_sent_at?: string | null
+          card_updated_at?: string | null
           child_dob?: string | null
           child_first_name?: string | null
           child_last_name?: string | null
@@ -1829,6 +1833,8 @@ export type Database = {
         Update: {
           cancel_effective_date?: string | null
           cancel_requested_at?: string | null
+          card_link_sent_at?: string | null
+          card_updated_at?: string | null
           child_dob?: string | null
           child_first_name?: string | null
           child_last_name?: string | null

@@ -9,6 +9,39 @@ import {
   MembershipSlotFullError,
   MembershipCardDeclinedError,
 } from "../_shared/membership-completion.ts";
+import { attachCardAndRetry, paymentMethodFromSetupSession } from "../_shared/membership-card.ts";
+
+/**
+ * A parent finished the card update link we texted or emailed them. Put the
+ * new card on the subscription and retry the open invoice right away.
+ */
+async function handleMembershipCardUpdated(session: any, env: StripeEnv) {
+  const membershipId = session?.metadata?.membership_id as string | undefined;
+  if (!membershipId) return;
+  const { data: membership } = await supabase
+    .from("memberships")
+    .select("id, stripe_customer_id, stripe_subscription_id")
+    .eq("id", membershipId)
+    .maybeSingle();
+  if (!membership) {
+    console.error("[membership card update] membership not found", membershipId);
+    return;
+  }
+  const stripe = createStripeClient(env);
+  const { paymentMethodId, customerId } = await paymentMethodFromSetupSession(stripe, session.id);
+  if (!paymentMethodId) {
+    console.error("[membership card update] no payment method on session", session.id);
+    return;
+  }
+  const result = await attachCardAndRetry(
+    supabase,
+    stripe,
+    membership as any,
+    paymentMethodId,
+    customerId,
+  );
+  console.log("[membership card update]", membershipId, result.outcome);
+}
 
 
 const supabase = createClient(
@@ -69,7 +102,9 @@ serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const obj = event.data.object;
-        if (obj?.metadata?.type === "membership_setup" || (obj?.mode === "setup" && !obj?.metadata?.type)) {
+        if (obj?.metadata?.type === "membership_card_update" && obj?.metadata?.membership_id) {
+          await handleMembershipCardUpdated(obj, env);
+        } else if (obj?.metadata?.type === "membership_setup" || (obj?.mode === "setup" && !obj?.metadata?.type)) {
           await handleMembershipSetupCompleted(obj, env);
         } else if (obj?.metadata?.type === "membership") {
           await handleMembershipCheckoutCompleted(obj, env);
