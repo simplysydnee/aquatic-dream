@@ -3,6 +3,11 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createStripeClient } from "../_shared/stripe.ts";
 import { computeMembershipQuote } from "../_shared/membership-pricing.ts";
+import {
+  programEligibilityError,
+  waiverDobMismatch,
+  type ProgramKey,
+} from "../_shared/program-eligibility.ts";
 import { resolveParentStripeCustomer, verifySavedCard } from "../_shared/stripe-customer.ts";
 import {
   completeMembershipWithSavedCard,
@@ -71,24 +76,27 @@ serve(async (req) => {
     // closed on Aug 1). The caller must present a real Supabase JWT whose
     // user passes the server-side has_role(uid,'admin') check, so a public
     // /join request can never produce a test-mode membership.
-    if (ENV === "sandbox") {
-      const authHeader = req.headers.get("Authorization") ?? "";
-      const token = authHeader.toLowerCase().startsWith("bearer ")
-        ? authHeader.slice(7).trim()
-        : "";
-      let isAdmin = false;
-      if (token) {
-        const { data: userData } = await supabaseAdmin.auth.getUser(token);
-        const uid = userData?.user?.id;
-        if (uid) {
-          const { data: hasRole } = await supabaseAdmin.rpc("has_role", {
-            _user_id: uid,
-            _role: "admin",
-          });
-          isAdmin = hasRole === true;
-        }
+    // Verified admin caller, used by the sandbox gate below and by the age
+    // gate (front desk keeps full program choice).
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const bearer = authHeader.toLowerCase().startsWith("bearer ")
+      ? authHeader.slice(7).trim()
+      : "";
+    let isAdminCaller = false;
+    if (bearer) {
+      const { data: userData } = await supabaseAdmin.auth.getUser(bearer);
+      const uid = userData?.user?.id;
+      if (uid) {
+        const { data: hasRole } = await supabaseAdmin.rpc("has_role", {
+          _user_id: uid,
+          _role: "admin",
+        });
+        isAdminCaller = hasRole === true;
       }
-      if (!isAdmin) {
+    }
+
+    if (ENV === "sandbox") {
+      if (!isAdminCaller) {
         console.warn("[create-membership-checkout] sandbox request rejected: not an admin");
         return json(
           {
@@ -117,6 +125,18 @@ serve(async (req) => {
     if (!child_dob || Number.isNaN(Date.parse(child_dob))) {
       return json({ error: "Swimmer date of birth required" }, 400);
     }
+
+    // SECURITY: the /join age gate runs in the browser, so it is a courtesy,
+    // not a guarantee. Re-check the age against the program here, where a
+    // hand-rolled request or a stale client cannot skip it. Admin and front
+    // desk requests keep full program choice.
+    if (!isAdminCaller) {
+      const ageError = programEligibilityError(plan_key as ProgramKey, child_dob);
+      if (ageError) {
+        console.warn("[create-membership-checkout] age gate rejected", { plan_key, child_dob });
+        return json({ error: ageError, ageBlocked: true }, 400);
+      }
+    }
     if (!parent_email || !emailRe.test(parent_email)) {
       return json({ error: "Valid parent_email required" }, 400);
     }
@@ -125,6 +145,27 @@ serve(async (req) => {
     }
     if (waiver_id && !uuidRe.test(waiver_id)) {
       return json({ error: "Invalid waiver_id" }, 400);
+    }
+
+    // A signed waiver is the record of truth for the swimmer's date of birth.
+    // If the submitted one disagrees, stop rather than quietly trusting the
+    // newer value.
+    if (waiver_id && !isAdminCaller) {
+      const { data: waiverRow } = await supabaseAdmin
+        .from("visitor_waivers")
+        .select("swimmers")
+        .eq("id", waiver_id)
+        .maybeSingle();
+      const dobError = waiverDobMismatch(
+        waiverRow?.swimmers,
+        child_first_name,
+        child_last_name,
+        child_dob,
+      );
+      if (dobError) {
+        console.warn("[create-membership-checkout] waiver dob mismatch", { waiver_id });
+        return json({ error: dobError, dobMismatch: true }, 400);
+      }
     }
 
     const { data: plan, error: planErr } = await supabaseAdmin

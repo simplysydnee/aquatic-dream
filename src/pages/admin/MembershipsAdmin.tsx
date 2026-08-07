@@ -75,6 +75,7 @@ interface Membership extends MembershipPaymentState {
   standing_slot_id: string | null;
   child_first_name: string | null;
   child_last_name: string | null;
+  child_dob: string | null;
   parent_first_name: string | null;
   parent_last_name: string | null;
   parent_email: string | null;
@@ -126,6 +127,39 @@ const swimmerName = (m: Membership) =>
 const parentName = (m: Membership) =>
   [m.parent_first_name, m.parent_last_name].filter(Boolean).join(" ") || "--";
 
+const ageFromDob = (dob?: string | null) => {
+  if (!dob) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dob).slice(0, 10));
+  if (!m) return null;
+  const today = new Date();
+  let age = today.getFullYear() - Number(m[1]);
+  const beforeBirthday =
+    today.getMonth() + 1 < Number(m[2]) ||
+    (today.getMonth() + 1 === Number(m[2]) && today.getDate() < Number(m[3]));
+  if (beforeBirthday) age -= 1;
+  return age;
+};
+
+const norm = (v?: string | null) => (v ?? "").trim().toLowerCase();
+
+/**
+ * Cheap tell for an adult who enrolled themselves as a child: the swimmer name
+ * exactly matches the parent name on a kids program, or the date of birth is
+ * missing or already reads as an adult.
+ */
+const needsAgeReview = (m: Membership) => {
+  if (!ACTIVE_STATUSES.includes(m.status)) return false;
+  const age = ageFromDob(m.child_dob);
+  if (m.plan_key === "adult_group") return age !== null && age < 18;
+  if (age === null) return true;
+  if (age >= 18) return true;
+  return (
+    norm(m.child_first_name) === norm(m.parent_first_name) &&
+    norm(m.child_last_name) === norm(m.parent_last_name) &&
+    norm(m.child_first_name) !== ""
+  );
+};
+
 const MembershipsAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -133,6 +167,9 @@ const MembershipsAdmin = () => {
   const [instructors, setInstructors] = useState<Record<string, string>>({});
 
   const [search, setSearch] = useState("");
+  const [ageReviewOnly, setAgeReviewOnly] = useState(false);
+  const [dobDraft, setDobDraft] = useState("");
+  const [savingDob, setSavingDob] = useState(false);
   const [planFilter, setPlanFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dayFilter, setDayFilter] = useState<string>("all");
@@ -167,7 +204,7 @@ const MembershipsAdmin = () => {
       supabase
         .from("memberships")
         .select(
-          "id, plan_key, standing_slot_id, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status, start_date, current_period_end, cancel_effective_date, recurring_consent_amount_cents, medical_notes, notes, waiver_id, swim_level, manage_token, last_invoice_id, last_payment_status, last_payment_at, last_payment_amount_cents, payment_failure_count, payment_failure_reason, stripe_subscription_status, card_link_sent_at, card_updated_at",
+          "id, plan_key, standing_slot_id, child_first_name, child_last_name, child_dob, parent_first_name, parent_last_name, parent_email, parent_phone, status, start_date, current_period_end, cancel_effective_date, recurring_consent_amount_cents, medical_notes, notes, waiver_id, swim_level, manage_token, last_invoice_id, last_payment_status, last_payment_at, last_payment_amount_cents, payment_failure_count, payment_failure_reason, stripe_subscription_status, card_link_sent_at, card_updated_at",
         )
         .order("created_at", { ascending: false }),
       supabase
@@ -200,6 +237,7 @@ const MembershipsAdmin = () => {
 
   useEffect(() => {
     setLevelDraft(selected?.swim_level ?? "");
+    setDobDraft(selected?.child_dob ?? "");
     setCancelResult(null);
     if (!selectedId) {
       setOccurrences([]);
@@ -234,6 +272,7 @@ const MembershipsAdmin = () => {
         const slot = m.standing_slot_id ? slotById.get(m.standing_slot_id) : null;
         if (!slot || String(slot.day_of_week) !== dayFilter) return false;
       }
+      if (ageReviewOnly && !needsAgeReview(m)) return false;
       if (paymentFilter === "problem" && !hasPaymentProblem(m)) return false;
       if (paymentFilter !== "all" && paymentFilter !== "problem" && paymentBucket(m) !== paymentFilter) return false;
       if (!q) return true;
@@ -248,11 +287,14 @@ const MembershipsAdmin = () => {
         .toLowerCase();
       return hay.includes(q) || hay.includes(q.replace(/\D/g, ""));
     });
-  }, [memberships, search, planFilter, statusFilter, dayFilter, paymentFilter, includeInactive, slotById]);
+  }, [memberships, search, planFilter, statusFilter, dayFilter, paymentFilter, ageReviewOnly, includeInactive, slotById]);
 
   // Payment problems are surfaced across the whole book, not just the current
   // filter, so a filtered view can never hide a declined card.
   const paymentProblems = useMemo(() => memberships.filter(hasPaymentProblem), [memberships]);
+
+  // Age checks are surfaced across the whole book for the same reason.
+  const ageReviews = useMemo(() => memberships.filter(needsAgeReview), [memberships]);
 
 
   const targetSlots = useMemo(() => {
@@ -374,6 +416,36 @@ const MembershipsAdmin = () => {
 
 
       <MembershipHoldsPanel refreshKey={holdsRefresh} />
+
+      {ageReviews.length > 0 && (
+        <Card className="border-amber-300 bg-amber-50 p-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
+            <span className="text-amber-900">
+              {ageReviews.length === 1
+                ? "1 membership needs an age check."
+                : `${ageReviews.length} memberships need an age check.`}{" "}
+              The swimmer's date of birth is missing, reads as an adult, or matches the parent's name. Nobody is
+              cancelled automatically.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setAgeReviewOnly(true);
+                setIncludeInactive(false);
+              }}
+            >
+              Show them
+            </Button>
+            {ageReviewOnly && (
+              <Button size="sm" variant="ghost" onClick={() => setAgeReviewOnly(false)}>
+                Clear filter
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
 
       {paymentProblems.length > 0 && (
         <Card className="border-destructive/40 bg-destructive/5 p-3">
@@ -557,6 +629,14 @@ const MembershipsAdmin = () => {
                             <FileWarning className="h-3 w-3" /> Waiver
                           </span>
                         )}
+                        {needsAgeReview(m) && (
+                          <span
+                            title="Check the swimmer's date of birth"
+                            className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900"
+                          >
+                            <AlertTriangle className="h-3 w-3" /> Age check
+                          </span>
+                        )}
                         {m.medical_notes && (
                           <span title="Medical notes" className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900">
                             <Stethoscope className="h-3 w-3" /> Medical
@@ -611,6 +691,14 @@ const MembershipsAdmin = () => {
                   <Detail
                     label="Instructor"
                     value={selectedSlot?.instructor_id ? instructors[selectedSlot.instructor_id] ?? "--" : "Unassigned"}
+                  />
+                  <Detail
+                    label="Date of birth"
+                    value={
+                      selected.child_dob
+                        ? `${dateLabel(selected.child_dob)} (${ageFromDob(selected.child_dob)} yrs)`
+                        : "Not on file"
+                    }
                   />
                   <Detail label="Parent" value={parentName(selected)} />
                   <Detail label="Parent email" value={selected.parent_email ?? "--"} />
@@ -678,6 +766,46 @@ const MembershipsAdmin = () => {
                 </div>
 
 
+
+                {needsAgeReview(selected) && (
+                  <div className="space-y-2 rounded border border-amber-300 bg-amber-50 p-3 text-amber-900">
+                    <div className="flex items-center gap-2 font-medium">
+                      <AlertTriangle className="h-4 w-4" /> Age check
+                    </div>
+                    <div className="text-xs">
+                      Confirm the swimmer's date of birth with the family. Private and Small Group are ages 3 to 17,
+                      Adult Swim is 18 and over.
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        type="date"
+                        className="h-8 w-40"
+                        value={dobDraft}
+                        onChange={(e) => setDobDraft(e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        disabled={!dobDraft || dobDraft === (selected.child_dob ?? "") || savingDob}
+                        onClick={async () => {
+                          setSavingDob(true);
+                          const { error } = await supabase
+                            .from("memberships")
+                            .update({ child_dob: dobDraft })
+                            .eq("id", selected.id);
+                          setSavingDob(false);
+                          if (error) {
+                            toast({ title: "Could not save the date of birth", description: error.message, variant: "destructive" });
+                            return;
+                          }
+                          toast({ title: "Date of birth updated" });
+                          void fetchData();
+                        }}
+                      >
+                        {savingDob ? "Saving..." : "Save date of birth"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {!selected.waiver_id && (
                   <div className="flex items-center gap-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive">
