@@ -31,6 +31,7 @@ import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPa
 import { EnrollFamilyDialog } from "@/components/admin/holds/EnrollFamilyDialog";
 import { FAMILY_ENROLL_ENABLED } from "@/lib/familyEnrollGate";
 import {
+import AdultTag from "@/components/admin/AdultTag";
   type MembershipPaymentState,
   hasPaymentProblem,
   paymentAmountLabel,
@@ -565,6 +566,7 @@ const MembershipsAdmin = () => {
                   >
                     <td className="px-3 py-2 font-medium">
                       {swimmerName(m)}
+                      <AdultTag dob={m.child_dob} planKey={m.plan_key} className="ml-1" />
                       <div className="text-xs text-muted-foreground">{parentName(m)}</div>
                     </td>
                     <td className="px-3 py-2">{PLAN_LABELS[m.plan_key]}</td>
