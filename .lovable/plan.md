@@ -1,27 +1,39 @@
-# Let adults book Private Swim
+# Adult tag on lessons
 
-Adults can now choose either Adult Swim (small group of two) or Private Swim (one on one). The only remaining age rules: Small Group stays kids only, and Adult Swim stays 18 and over.
+Now that adults can book Private, staff and instructors need to see at a glance that a lesson is an adult lesson. Any swimmer whose date of birth makes them 18 or over gets a small "Adult" tag next to their name, everywhere their name appears for staff.
 
-## What changes for a parent or adult swimmer on /join
+## Rule
 
-- An 18+ date of birth with Private selected goes straight through. No block panel, no forced switch.
-- An 18+ date of birth with Small Group still shows the existing panel offering Adult Swim or Private.
-- An under 18 date of birth with Adult Swim still shows the panel pointing to Private or Small Group.
-- Program cards read: Private Swim "All ages", Small Group "Ages 3 to 17", Adult Swim "18 and over".
+- Adult = date of birth on file, 18 or over as of today.
+- Adult Swim memberships are always tagged adult, even if no date of birth is on file.
+- No date of birth on file and not Adult Swim: no tag. Nothing is guessed from the name.
+- Tag only. No change to pricing, scheduling, capacity, or booking rules.
 
-## Rules kept
+## Where the tag appears
 
-- Minimum age 3 for every program.
-- Future dates, implausible dates, and dates that contradict a signed waiver are still refused at checkout.
-- Admin and front desk flows stay ungated.
-- The "Age check" flag on /admin/memberships stays, but stops flagging adults in Private. It keeps flagging swimmer name matching parent name and impossible dates.
+- Admin calendar: day view and week view lesson blocks, and the block detail panel.
+- Instructor day modal and the private lessons panel.
+- Private lesson detail dialog.
+- Printed day schedule, so the tag is on the paper the instructor carries.
+- Instructor "My roster".
+- Class times roster rows on /admin/class-times.
+- Memberships list on /admin/memberships.
+
+Wording: a small "Adult" chip in the neutral/navy style already used for the "(semi)" marker, placed right after the swimmer name.
 
 ## Technical notes
 
-- `src/lib/programEligibility.ts`: `programAgeMismatch` returns `adult_in_kids` only for `kid_group`; Private is allowed at any age. `PROGRAM_AGE_LABELS.private` becomes "All ages".
-- `supabase/functions/_shared/program-eligibility.ts`: same relaxation in `programEligibilityError`, with the message reworded to "Small Group is for ages 3 to 17. Adults join Adult Swim or Private Swim."
-- `src/components/swim-enrollment/AgeGatePanel.tsx`: the adult copy offers both Adult Swim and Private instead of Adult Swim only.
-- `src/pages/JoinMembership.tsx`: no logic change needed beyond the shared helper; the assessment path at line 551 already checks `kid_group` specifically.
-- Copy updates on `src/pages/Index.tsx` and `src/pages/SwimLessons.tsx` for the Private card blurb.
-- `src/pages/admin/MembershipsAdmin.tsx`: drop "adult in Private" from `needsAgeReview`; adjust the helper line about Adult Swim.
-- Redeploy `create-membership-checkout`. No database or Stripe changes.
+`memberships.child_dob`, `lesson_bookings.child_dob`, and `swim_enrollments.child_dob` all exist. No migration is needed. The gap is that most queries do not select the column.
+
+- New helper in `src/lib/programEligibility.ts` (reusing `ageFromDob`): `isAdultSwimmer({ dob, planKey })` returning true for 18+ or `adult_group`.
+- New shared chip `src/components/admin/AdultTag.tsx`, rendered conditionally.
+- Add `child_dob` to the selects in:
+  - `src/hooks/useCalendarData.ts:222` (`lesson_bookings` join) and the `membership_occurrences` join (`memberships.child_dob`), plus the `PrivateLessonBooking` and `MembershipLesson` interfaces.
+  - `src/pages/admin/PrintDaySchedule.tsx:145,157`
+  - `src/pages/instructor/InstructorMyRoster.tsx:59`
+  - `src/pages/admin/StandingSlotsAdmin.tsx:170`
+- Render the tag at the existing name elements: `CalendarDayView.tsx:1203,1236,1299`, `InstructorDayModal.tsx:301`, `PrivateLessonsPanel.tsx:167`, `PrivateLessonDetailDialog.tsx:314`, `PrintDaySchedule.tsx:523,637`, `InstructorMyRoster.tsx:116`, `StandingSlotsAdmin.tsx:864`, and the swimmer cell in `MembershipsAdmin.tsx`.
+- `CalendarWeekView.tsx` renders blocks through the shared helper; confirm during the build whether it needs its own insertion point.
+- `KioskCheckIn.tsx` already has `memberships.child_dob`; add the tag there only if the same name row is shown to staff.
+
+No database, Stripe, or edge function changes.
