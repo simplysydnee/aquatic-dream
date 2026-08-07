@@ -237,6 +237,7 @@ const MembershipsAdmin = () => {
 
   useEffect(() => {
     setLevelDraft(selected?.swim_level ?? "");
+    setDobDraft(selected?.child_dob ?? "");
     setCancelResult(null);
     if (!selectedId) {
       setOccurrences([]);
