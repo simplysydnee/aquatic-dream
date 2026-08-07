@@ -69,7 +69,9 @@ serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const obj = event.data.object;
-        if (obj?.metadata?.type === "membership_setup" || (obj?.mode === "setup" && !obj?.metadata?.type)) {
+        if (obj?.metadata?.type === "membership_card_update" && obj?.metadata?.membership_id) {
+          await handleMembershipCardUpdated(obj, env);
+        } else if (obj?.metadata?.type === "membership_setup" || (obj?.mode === "setup" && !obj?.metadata?.type)) {
           await handleMembershipSetupCompleted(obj, env);
         } else if (obj?.metadata?.type === "membership") {
           await handleMembershipCheckoutCompleted(obj, env);
