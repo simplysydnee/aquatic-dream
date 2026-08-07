@@ -42,6 +42,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import InstructorDayModal from "./InstructorDayModal";
 import { UserCircle2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import AdultTag, { isAdultSwimmer } from "@/components/admin/AdultTag";
 
 /* ── ICS session from Airtable edge function ── */
 export interface ICSSession {
@@ -319,7 +320,7 @@ const CalendarDayView = ({
         // Synthetic CalendarPoolEvent-shaped object; id prefixed so click handlers can detect.
         id: `pl:${p.occurrence_id}`,
         event_type: p.lesson_type === "semi_private" ? "semi-private-lesson" : "private-lesson",
-        title: p.child_name || p.parent_name || "Private lesson",
+        title: `${p.child_name || p.parent_name || "Private lesson"}${isAdultSwimmer(p.child_dob) ? " · Adult" : ""}`,
         event_date: p.occurrence_date,
         start_time: p.start_time,
         end_time: p.end_time,
@@ -344,7 +345,7 @@ const CalendarDayView = ({
             : m.plan_key === "kid_group"
             ? "membership-group"
             : "membership-private",
-        title: m.swimmer_name || m.parent_name || m.plan_name,
+        title: `${m.swimmer_name || m.parent_name || m.plan_name}${isAdultSwimmer(m.child_dob, m.plan_key) ? " · Adult" : ""}`,
         event_date: m.occurrence_date,
         start_time: m.start_time,
         end_time: m.end_time,
