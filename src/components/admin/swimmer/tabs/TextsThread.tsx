@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, MessageSquare, Send } from "lucide-react";
+import { notifyUnreadTextsChanged } from "@/hooks/useUnreadTexts";
 
 interface Props {
   parentPhone: string | null;
@@ -80,6 +81,14 @@ export default function TextsThread({ parentPhone, parentName }: Props) {
       .limit(500);
     setMessages((data || []) as TextRow[]);
     setLoading(false);
+
+    // Opening this family's Texts tab is the only thing that clears the
+    // unread badge, and only for the staff member who opened it.
+    const { error: readErr } = await supabase.rpc("mark_sms_conversation_read", {
+      _conversation_id: conv.id,
+    });
+    if (readErr) console.error("mark conversation read failed", readErr);
+    else notifyUnreadTextsChanged();
   }, [phone]);
 
   useEffect(() => {
