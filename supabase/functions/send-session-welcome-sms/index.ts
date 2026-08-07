@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
         message = `Hi! Your swimmers (${list}) start their next session ${startDateFmt} at Aquatic Dreams. First lessons this week — check your email (and spam) for the full schedule. Reply STOP to opt out.`;
       }
 
-      const result = await sendSms(phone, message);
+      const result = await sendSms(phone, message, { admin, kind: "welcome", sentByLabel: "System - session welcome" });
       await logSms(admin, {
         swimmer_name: g.firstNames.join(", ") || null,
         enrollment_id: g.enrollmentIds[0] || null,

@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
         .replaceAll("{ChildFirst}", names[0] || "your swimmer")
         .replaceAll("{StartDate}", startDateLabel);
 
-      const result = await sendSms(phone, message);
+      const result = await sendSms(phone, message, { admin, kind: "outreach", sentByLabel: "System - outreach" });
       await logSms(admin, {
         swimmer_name: names.join(", ") || null,
         phone,

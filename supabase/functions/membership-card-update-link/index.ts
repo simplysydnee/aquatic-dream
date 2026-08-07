@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     const sent = { sms: false, email: false };
     const phone = normalizePhone(membership.parent_phone as string | null);
     if (channels.includes("sms") && phone) {
-      const res = await sendSms(phone, message);
+      const res = await sendSms(phone, message, { admin: supabaseAdmin, kind: "card_update", sentByLabel: "System - card update link" });
       sent.sms = res.ok;
       if (!res.ok) console.error("[membership-card-update-link] sms failed", res.error);
     }

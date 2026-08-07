@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { logOutboundSms } from "../_shared/sms-log.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -188,6 +189,7 @@ Deno.serve(async (req) => {
         }
 
         const result = await sendSms(phone, message);
+    await logOutboundSms({ admin: admin, kind: "reminder", sentByLabel: "System - group lesson reminder" }, { phone, body: message, status: result.ok ? "sent" : "failed", error: result.ok ? null : result.error ?? null });
         await admin.from("reminder_logs").insert({
           swimmer_name: e.child_name, session_lesson_date_id: sld.id, enrollment_id: e.id,
           channel: "sms", reminder_kind: t.kind, phone, message,

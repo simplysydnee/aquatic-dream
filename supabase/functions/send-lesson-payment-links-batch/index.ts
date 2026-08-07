@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
           lessons.length > 1 ? "s" : ""
         } on ${dateList}. You can pay securely here: ${report.payment_link} — Reply STOP to opt out.`;
 
-      const result = await sendSms(phone, message);
+      const result = await sendSms(phone, message, { admin: supabase, kind: "payment_link", sentByLabel: "System - lesson payment link" });
       report.sms_status = result.ok ? "sent" : "failed";
       report.error = result.ok ? null : result.error ?? "sms_failed";
       await logSms(supabase, {

@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     const message =
       `Hi ${parentFirst}, here's the secure link to pay ${childFirst}'s Aquatic Dreams session fee (${amount}): ${paymentLink} — Reply STOP to opt out.`
 
-    const result = await sendSms(phone, message)
+    const result = await sendSms(phone, message, { admin: supabase, kind: "payment_link", sentByLabel: "System - session payment link" })
     await logSms(supabase, {
       swimmer_name: enrollment.child_name,
       enrollment_id: enrollmentId,
