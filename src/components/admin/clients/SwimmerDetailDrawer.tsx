@@ -52,6 +52,8 @@ interface Props {
   onOpenEnrollment: (id: string) => void;
   onSelectSwimmer: (s: Swimmer) => void;
   onChanged?: (newKey?: string) => void;
+  /** Opens the drawer directly on a given tab, e.g. "comms" for messages. */
+  initialTab?: string;
 }
 
 
@@ -609,7 +611,7 @@ export default function SwimmerDetailDrawer({
             </TabsContent>
 
             <TabsContent value="comms" className="p-4 sm:p-6 mt-0">
-              <CommunicationsTab swimmer={swimmer} />
+              <CommunicationsTab swimmer={swimmer} initialSubTab={initialTab === "comms" ? "texts" : "email"} />
             </TabsContent>
 
             <TabsContent value="notes" className="p-4 sm:p-6 mt-0">

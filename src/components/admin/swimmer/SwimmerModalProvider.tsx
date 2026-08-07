@@ -8,10 +8,16 @@ import { toast } from "sonner";
 
 type Identity = { child_name: string; parent_email: string };
 
+type SwimmerTab = "overview" | "activity" | "compliance" | "payments" | "comms" | "notes";
+
 interface SwimmerModalContext {
-  open: (id: Identity) => void;
+  open: (id: Identity, tab?: SwimmerTab) => void;
+  /** Opens the family whose parent phone matches. Returns false when unknown. */
+  openByPhone: (phone: string, tab?: SwimmerTab) => boolean;
   close: () => void;
 }
+
+const last10 = (raw: string | null | undefined) => (raw || "").replace(/\D/g, "").slice(-10);
 
 const Ctx = createContext<SwimmerModalContext | undefined>(undefined);
 
@@ -22,6 +28,7 @@ export function SwimmerModalProvider({ children }: { children: ReactNode }) {
   const { swimmers } = useSwimmers();
   const [selected, setSelected] = useState<Swimmer | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [initialTab, setInitialTab] = useState<SwimmerTab>("overview");
 
   const [activeRequest, setActiveRequest] = useState<LessonRequest | null>(null);
   const [reqOpen, setReqOpen] = useState(false);
@@ -30,7 +37,8 @@ export function SwimmerModalProvider({ children }: { children: ReactNode }) {
   const [enrollmentOpen, setEnrollmentOpen] = useState(false);
 
   const open = useCallback(
-    async (id: Identity) => {
+    async (id: Identity, tab: SwimmerTab = "overview") => {
+      setInitialTab(tab);
       const k = keyOf(id);
       const found = swimmers.find((s) => s.key === k) || null;
       if (found) {
@@ -102,6 +110,20 @@ export function SwimmerModalProvider({ children }: { children: ReactNode }) {
     [swimmers],
   );
 
+  const openByPhone = useCallback(
+    (phone: string, tab: SwimmerTab = "overview") => {
+      const digits = last10(phone);
+      if (!digits) return false;
+      const match = swimmers.find((s) => last10(s.parent_phone) === digits);
+      if (!match) return false;
+      setInitialTab(tab);
+      setSelected(match);
+      setDrawerOpen(true);
+      return true;
+    },
+    [swimmers],
+  );
+
   const close = useCallback(() => setDrawerOpen(false), []);
 
   const siblingsOf = (s: Swimmer) =>
@@ -125,7 +147,7 @@ export function SwimmerModalProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const value = useMemo(() => ({ open, close }), [open, close]);
+  const value = useMemo(() => ({ open, openByPhone, close }), [open, openByPhone, close]);
 
   return (
     <Ctx.Provider value={value}>
@@ -134,6 +156,7 @@ export function SwimmerModalProvider({ children }: { children: ReactNode }) {
       <SwimmerDetailDrawer
         swimmer={selected}
         siblings={selected ? siblingsOf(selected) : []}
+        initialTab={initialTab}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         onOpenRequest={onOpenRequest}
