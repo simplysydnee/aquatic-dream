@@ -1202,6 +1202,8 @@ const CalendarDayView = ({
                               <p key={enr.id} className="text-[10px] truncate leading-tight flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 shrink-0" />
                                 {enr.child_name}
+                                <AdultTag dob={(enr as { child_dob?: string | null }).child_dob} />
+
                               </p>
                             ))}
                             {sessionEnrollments.length > Math.floor((height - 56) / 14) && (
@@ -1234,7 +1236,7 @@ const CalendarDayView = ({
                         {sessionEnrollments.length > 0 && (
                           <ul className="mt-1 space-y-0.5">
                             {sessionEnrollments.slice(0, 5).map((enr) => (
-                              <li key={enr.id}>• {enr.child_name} (age {enr.child_age})</li>
+                              <li key={enr.id}>• {enr.child_name} (age {enr.child_age}){isAdultSwimmer((enr as { child_dob?: string | null }).child_dob) ? " · Adult" : ""}</li>
                             ))}
                             {sessionEnrollments.length > 5 && <li>+{sessionEnrollments.length - 5} more</li>}
                           </ul>
@@ -1297,7 +1299,10 @@ const CalendarDayView = ({
                   ),
                   isML && ml ? (
                     <div className="space-y-1 text-xs">
-                      <p className="font-semibold">{ml.swimmer_name || ml.parent_name}</p>
+                      <p className="font-semibold flex items-center gap-1">
+                        {ml.swimmer_name || ml.parent_name}
+                        <AdultTag dob={ml.child_dob} planKey={ml.plan_key} />
+                      </p>
                       <p>{ml.plan_name} membership</p>
                       <p>{fmtTime(e.start_time)} – {fmtTime(e.end_time)}</p>
                       <p>Instructor: {ml.instructor_name || "Unassigned"}</p>
@@ -1445,6 +1450,7 @@ const CalendarDayView = ({
           <DialogHeader>
             <DialogTitle>
               {membershipDetail?.swimmer_name || membershipDetail?.parent_name || "Membership lesson"}
+              <AdultTag dob={membershipDetail?.child_dob} planKey={membershipDetail?.plan_key} className="ml-2" />
             </DialogTitle>
             <DialogDescription>
               {membershipDetail?.plan_name} membership
