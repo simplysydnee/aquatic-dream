@@ -117,6 +117,27 @@ export async function logSms(admin: any, row: LogSmsRow): Promise<void> {
   }
 }
 
+// Map a reminder_kind onto an inbox kind + human readable system label so
+// every send through this helper lands in the client's Texts thread.
+export function inboxContextFor(
+  reminderKind: string | undefined,
+): { kind: import("./sms-log.ts").SmsKind; label: string } {
+  const k = (reminderKind || "").toLowerCase();
+  if (k.includes("hold_reminder")) return { kind: "hold_invite", label: "System - hold reminder" };
+  if (k.includes("hold")) return { kind: "hold_invite", label: "System - hold invite" };
+  if (k.includes("outreach")) return { kind: "outreach", label: "System - outreach" };
+  if (k.includes("payment_link") || k.includes("pay_link")) {
+    return { kind: "payment_link", label: "System - payment link" };
+  }
+  if (k.includes("card")) return { kind: "card_update", label: "System - card update" };
+  if (k.includes("welcome")) return { kind: "welcome", label: "System - welcome" };
+  if (k.includes("reminder")) return { kind: "reminder", label: `System - ${k.replace(/_/g, " ")}` };
+  if (k.includes("confirmation") || k.includes("booking")) {
+    return { kind: "booking", label: "System - booking confirmation" };
+  }
+  return { kind: "other", label: k ? `System - ${k.replace(/_/g, " ")}` : "System" };
+}
+
 // Convenience: build message + send + log. Returns the result.
 export async function sendAndLogBookingConfirmation(
   admin: any,
@@ -145,7 +166,13 @@ export async function sendAndLogBookingConfirmation(
     });
     return { ok: false, error: "no_phone", skipped: true };
   }
-  const result = await sendSms(phone, args.message);
+  const inbox = inboxContextFor(args.reminder_kind);
+  const result = await sendSms(phone, args.message, {
+    admin,
+    kind: inbox.kind,
+    sentByLabel: inbox.label,
+  });
+
   await logSms(admin, {
     swimmer_name: args.swimmer_name,
     booking_id: args.booking_id,
