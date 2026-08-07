@@ -311,7 +311,7 @@ Deno.serve(async (req) => {
 
     for (const r of rows) {
       if (!r.willSend || !r.routedPhone) continue
-      const result = await sendSms(r.routedPhone, r.message)
+      const result = await sendSms(r.routedPhone, r.message, { admin: supabase, kind: "reminder", sentByLabel: "System - session start reminder" })
       await supabase.from('reminder_logs').insert({
         swimmer_name: r.childName,
         enrollment_id: r.enrollmentId,

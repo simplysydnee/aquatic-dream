@@ -2512,7 +2512,9 @@ export type Database = {
           direction: string
           error: string | null
           id: string
+          kind: string | null
           sent_by: string | null
+          sent_by_label: string | null
           status: string
           textmagic_message_id: string | null
         }
@@ -2523,7 +2525,9 @@ export type Database = {
           direction: string
           error?: string | null
           id?: string
+          kind?: string | null
           sent_by?: string | null
+          sent_by_label?: string | null
           status: string
           textmagic_message_id?: string | null
         }
@@ -2534,7 +2538,9 @@ export type Database = {
           direction?: string
           error?: string | null
           id?: string
+          kind?: string | null
           sent_by?: string | null
+          sent_by_label?: string | null
           status?: string
           textmagic_message_id?: string | null
         }

@@ -105,10 +105,19 @@ Deno.serve(async (req) => {
 
     const result = await sendSms(parentPhone, body);
 
+    const { data: senderProfile } = await admin
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+    const senderName = senderProfile?.full_name || senderProfile?.email || "Staff";
+
     await admin.from("sms_messages").insert({
       conversation_id: conversationId,
       direction: "outbound",
       body,
+      kind: "staff_reply",
+      sent_by_label: senderName,
       sent_by: userId,
       status: result.ok ? "sent" : "failed",
       error: result.ok ? null : result.error ?? null,

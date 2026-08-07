@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
         failed++;
         continue;
       }
-      const result = await sendSms(phone, r.message);
+      const result = await sendSms(phone, r.message, { admin: supabaseAdmin, kind: "outreach", sentByLabel: "System - outreach" });
       await logSms(supabaseAdmin, {
         swimmer_name: r.childNames.join(", "),
         phone,
