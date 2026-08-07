@@ -30,6 +30,7 @@ import { FixPaymentDialog } from "@/components/admin/memberships/FixPaymentDialo
 import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPanel";
 import { EnrollFamilyDialog } from "@/components/admin/holds/EnrollFamilyDialog";
 import { FAMILY_ENROLL_ENABLED } from "@/lib/familyEnrollGate";
+import AdultTag from "@/components/admin/AdultTag";
 import {
   type MembershipPaymentState,
   hasPaymentProblem,
