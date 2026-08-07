@@ -26,6 +26,7 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, Search, AlertTriangle, FileWarning, Stethoscope } from "lucide-react";
 import { LEVEL_GROUP_NAMES } from "@/components/swim-enrollment/types";
 import { Link } from "react-router-dom";
+import { FixPaymentDialog } from "@/components/admin/memberships/FixPaymentDialog";
 import { MembershipHoldsPanel } from "@/components/admin/holds/MembershipHoldsPanel";
 import { EnrollFamilyDialog } from "@/components/admin/holds/EnrollFamilyDialog";
 import { FAMILY_ENROLL_ENABLED } from "@/lib/familyEnrollGate";
@@ -142,6 +143,7 @@ const MembershipsAdmin = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [enrollFamilyOpen, setEnrollFamilyOpen] = useState(false);
   const [holdsRefresh, setHoldsRefresh] = useState(0);
+  const [fixPaymentId, setFixPaymentId] = useState<string | null>(null);
 
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [occLoading, setOccLoading] = useState(false);
@@ -165,7 +167,7 @@ const MembershipsAdmin = () => {
       supabase
         .from("memberships")
         .select(
-          "id, plan_key, standing_slot_id, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status, start_date, current_period_end, cancel_effective_date, recurring_consent_amount_cents, medical_notes, notes, waiver_id, swim_level, manage_token, last_invoice_id, last_payment_status, last_payment_at, last_payment_amount_cents, payment_failure_count, payment_failure_reason, stripe_subscription_status",
+          "id, plan_key, standing_slot_id, child_first_name, child_last_name, parent_first_name, parent_last_name, parent_email, parent_phone, status, start_date, current_period_end, cancel_effective_date, recurring_consent_amount_cents, medical_notes, notes, waiver_id, swim_level, manage_token, last_invoice_id, last_payment_status, last_payment_at, last_payment_amount_cents, payment_failure_count, payment_failure_reason, stripe_subscription_status, card_link_sent_at, card_updated_at",
         )
         .order("created_at", { ascending: false }),
       supabase
@@ -518,6 +520,19 @@ const MembershipsAdmin = () => {
                       >
                         {paymentLabel(m)}
                       </span>
+                      {hasPaymentProblem(m) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-2 h-6 px-2 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFixPaymentId(m.id);
+                          }}
+                        >
+                          Fix payment
+                        </Button>
+                      )}
                       {m.stripe_subscription_status &&
                         ["past_due", "unpaid", "canceled"].includes(m.stripe_subscription_status) && (
                           <div className="text-xs text-destructive">
