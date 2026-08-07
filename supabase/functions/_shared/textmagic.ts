@@ -46,8 +46,22 @@ export function formatPTDate(
 export async function sendSms(
   phone: string,
   text: string,
+  ctx?: import("./sms-log.ts").SmsLogContext,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!TM_USER || !TM_KEY) return { ok: false, error: "textmagic_not_configured" };
+  const finish = async (result: { ok: boolean; error?: string }) => {
+    if (ctx) {
+      const { logOutboundSms } = await import("./sms-log.ts");
+      await logOutboundSms(ctx, {
+        phone,
+        body: text,
+        status: result.ok ? "sent" : "failed",
+        error: result.ok ? null : result.error ?? null,
+      });
+    }
+    return result;
+  };
+
+  if (!TM_USER || !TM_KEY) return await finish({ ok: false, error: "textmagic_not_configured" });
   try {
     const body = new URLSearchParams({ text, phones: phone });
     const res = await fetch("https://rest.textmagic.com/api/v2/messages", {
@@ -60,12 +74,13 @@ export async function sendSms(
       body: body.toString(),
     });
     const txt = await res.text();
-    if (!res.ok) return { ok: false, error: `tm_${res.status}: ${txt.slice(0, 200)}` };
-    return { ok: true };
+    if (!res.ok) return await finish({ ok: false, error: `tm_${res.status}: ${txt.slice(0, 200)}` });
+    return await finish({ ok: true });
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    return await finish({ ok: false, error: e instanceof Error ? e.message : String(e) });
   }
 }
+
 
 export interface LogSmsRow {
   swimmer_name?: string | null;
