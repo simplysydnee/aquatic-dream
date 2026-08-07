@@ -793,10 +793,10 @@ const MembershipsAdmin = () => {
                             .eq("id", selected.id);
                           setSavingDob(false);
                           if (error) {
-                            toast.error("Could not save the date of birth");
+                            toast({ title: "Could not save the date of birth", description: error.message, variant: "destructive" });
                             return;
                           }
-                          toast.success("Date of birth updated");
+                          toast({ title: "Date of birth updated" });
                           void fetchData();
                         }}
                       >
