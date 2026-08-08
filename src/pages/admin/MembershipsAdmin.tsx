@@ -769,45 +769,41 @@ const MembershipsAdmin = () => {
 
 
 
-                {needsAgeReview(selected) && (
-                  <div className="space-y-2 rounded border border-amber-300 bg-amber-50 p-3 text-amber-900">
-                    <div className="flex items-center gap-2 font-medium">
-                      <AlertTriangle className="h-4 w-4" /> Age check
-                    </div>
-                    <div className="text-xs">
-                      Confirm the swimmer's date of birth with the family. Private and Small Group are ages 3 to 17,
-                      Adult Swim is 18 and over.
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Input
-                        type="date"
-                        className="h-8 w-40"
-                        value={dobDraft}
-                        onChange={(e) => setDobDraft(e.target.value)}
-                      />
-                      <Button
-                        size="sm"
-                        disabled={!dobDraft || dobDraft === (selected.child_dob ?? "") || savingDob}
-                        onClick={async () => {
-                          setSavingDob(true);
-                          const { error } = await supabase
-                            .from("memberships")
-                            .update({ child_dob: dobDraft })
-                            .eq("id", selected.id);
-                          setSavingDob(false);
-                          if (error) {
-                            toast({ title: "Could not save the date of birth", description: error.message, variant: "destructive" });
-                            return;
-                          }
-                          toast({ title: "Date of birth updated" });
-                          void fetchData();
-                        }}
-                      >
-                        {savingDob ? "Saving..." : "Save date of birth"}
-                      </Button>
-                    </div>
+                <div className="space-y-2 rounded border bg-muted/40 p-3">
+                  <div className="font-medium">Date of birth</div>
+                  <div className="text-xs text-muted-foreground">
+                    Swimmers 18 and over are tagged Adult so instructors can see it at a glance.
                   </div>
-                )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      type="date"
+                      className="h-8 w-40"
+                      value={dobDraft}
+                      onChange={(e) => setDobDraft(e.target.value)}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!dobDraft || dobDraft === (selected.child_dob ?? "") || savingDob}
+                      onClick={async () => {
+                        setSavingDob(true);
+                        const { error } = await supabase
+                          .from("memberships")
+                          .update({ child_dob: dobDraft })
+                          .eq("id", selected.id);
+                        setSavingDob(false);
+                        if (error) {
+                          toast({ title: "Could not save the date of birth", description: error.message, variant: "destructive" });
+                          return;
+                        }
+                        toast({ title: "Date of birth updated" });
+                        void fetchData();
+                      }}
+                    >
+                      {savingDob ? "Saving..." : "Save date of birth"}
+                    </Button>
+                  </div>
+                </div>
+
 
                 {!selected.waiver_id && (
                   <div className="flex items-center gap-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive">
