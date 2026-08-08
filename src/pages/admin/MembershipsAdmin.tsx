@@ -631,14 +631,8 @@ const MembershipsAdmin = () => {
                             <FileWarning className="h-3 w-3" /> Waiver
                           </span>
                         )}
-                        {needsAgeReview(m) && (
-                          <span
-                            title="Check the swimmer's date of birth"
-                            className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900"
-                          >
-                            <AlertTriangle className="h-3 w-3" /> Age check
-                          </span>
-                        )}
+                        <AdultTag dob={m.child_dob} planKey={m.plan_key} />
+
                         {m.medical_notes && (
                           <span title="Medical notes" className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900">
                             <Stethoscope className="h-3 w-3" /> Medical
