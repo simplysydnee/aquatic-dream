@@ -418,35 +418,8 @@ const MembershipsAdmin = () => {
 
       <MembershipHoldsPanel refreshKey={holdsRefresh} />
 
-      {ageReviews.length > 0 && (
-        <Card className="border-amber-300 bg-amber-50 p-3">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
-            <span className="text-amber-900">
-              {ageReviews.length === 1
-                ? "1 membership needs an age check."
-                : `${ageReviews.length} memberships need an age check.`}{" "}
-              The swimmer's date of birth is missing, reads as an adult, or matches the parent's name. Nobody is
-              cancelled automatically.
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setAgeReviewOnly(true);
-                setIncludeInactive(false);
-              }}
-            >
-              Show them
-            </Button>
-            {ageReviewOnly && (
-              <Button size="sm" variant="ghost" onClick={() => setAgeReviewOnly(false)}>
-                Clear filter
-              </Button>
-            )}
-          </div>
-        </Card>
-      )}
+
+
 
       {paymentProblems.length > 0 && (
         <Card className="border-destructive/40 bg-destructive/5 p-3">
