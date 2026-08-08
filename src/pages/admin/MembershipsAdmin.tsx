@@ -141,7 +141,6 @@ const ageFromDob = (dob?: string | null) => {
   return age;
 };
 
-const norm = (v?: string | null) => (v ?? "").trim().toLowerCase();
 
 const MembershipsAdmin = () => {
   const [loading, setLoading] = useState(true);
