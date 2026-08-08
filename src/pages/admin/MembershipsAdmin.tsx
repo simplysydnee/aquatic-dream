@@ -143,24 +143,6 @@ const ageFromDob = (dob?: string | null) => {
 
 const norm = (v?: string | null) => (v ?? "").trim().toLowerCase();
 
-/**
- * Cheap tell for an adult who enrolled themselves as a child: the swimmer name
- * exactly matches the parent name on a kids program, or the date of birth is
- * missing or already reads as an adult.
- */
-const needsAgeReview = (m: Membership) => {
-  if (!ACTIVE_STATUSES.includes(m.status)) return false;
-  const age = ageFromDob(m.child_dob);
-  if (m.plan_key === "adult_group") return age !== null && age < 18;
-  if (age === null) return true;
-  if (age >= 18) return true;
-  return (
-    norm(m.child_first_name) === norm(m.parent_first_name) &&
-    norm(m.child_last_name) === norm(m.parent_last_name) &&
-    norm(m.child_first_name) !== ""
-  );
-};
-
 const MembershipsAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -168,7 +150,6 @@ const MembershipsAdmin = () => {
   const [instructors, setInstructors] = useState<Record<string, string>>({});
 
   const [search, setSearch] = useState("");
-  const [ageReviewOnly, setAgeReviewOnly] = useState(false);
   const [dobDraft, setDobDraft] = useState("");
   const [savingDob, setSavingDob] = useState(false);
   const [planFilter, setPlanFilter] = useState<string>("all");
@@ -273,7 +254,6 @@ const MembershipsAdmin = () => {
         const slot = m.standing_slot_id ? slotById.get(m.standing_slot_id) : null;
         if (!slot || String(slot.day_of_week) !== dayFilter) return false;
       }
-      if (ageReviewOnly && !needsAgeReview(m)) return false;
       if (paymentFilter === "problem" && !hasPaymentProblem(m)) return false;
       if (paymentFilter !== "all" && paymentFilter !== "problem" && paymentBucket(m) !== paymentFilter) return false;
       if (!q) return true;
@@ -288,7 +268,7 @@ const MembershipsAdmin = () => {
         .toLowerCase();
       return hay.includes(q) || hay.includes(q.replace(/\D/g, ""));
     });
-  }, [memberships, search, planFilter, statusFilter, dayFilter, paymentFilter, ageReviewOnly, includeInactive, slotById]);
+  }, [memberships, search, planFilter, statusFilter, dayFilter, paymentFilter, includeInactive, slotById]);
 
   // Payment problems are surfaced across the whole book, not just the current
   // filter, so a filtered view can never hide a declined card.
