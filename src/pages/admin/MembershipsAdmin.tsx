@@ -294,8 +294,6 @@ const MembershipsAdmin = () => {
   // filter, so a filtered view can never hide a declined card.
   const paymentProblems = useMemo(() => memberships.filter(hasPaymentProblem), [memberships]);
 
-  // Age checks are surfaced across the whole book for the same reason.
-  const ageReviews = useMemo(() => memberships.filter(needsAgeReview), [memberships]);
 
 
   const targetSlots = useMemo(() => {
