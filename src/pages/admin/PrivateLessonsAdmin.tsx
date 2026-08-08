@@ -166,6 +166,27 @@ export default function PrivateLessonsAdmin() {
     }
   };
 
+  const unreviewedCount = allPrivateBookings.filter(
+    (b) => !b.admin_reviewed_at && b.status === "active",
+  ).length;
+
+  const acknowledgeAllBookings = async () => {
+    const reviewedAt = new Date().toISOString();
+    const { error } = await supabase
+      .from("lesson_bookings")
+      .update({ admin_reviewed_at: reviewedAt })
+      .is("admin_reviewed_at", null)
+      .eq("status", "active");
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "All bookings marked reviewed" });
+    setBookings((prev) => prev.map((b) => (b.admin_reviewed_at ? b : { ...b, admin_reviewed_at: reviewedAt })));
+    setAllPrivateBookings((prev) => prev.map((b) => (b.admin_reviewed_at ? b : { ...b, admin_reviewed_at: reviewedAt })));
+  };
+
+
   useEffect(() => { load(); }, []);
 
 
@@ -654,10 +675,18 @@ export default function PrivateLessonsAdmin() {
     <div className="p-4 sm:p-6 max-w-6xl">
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <h1 className="font-display text-2xl font-bold">Private & Semi-Private Lessons</h1>
-        <Button onClick={() => (window.location.href = "/admin/private-lessons/new")}>
-          <Plus className="w-4 h-4 mr-1" /> Book a lesson
-        </Button>
+        <div className="flex items-center gap-2">
+          {unreviewedCount > 0 && (
+            <Button variant="outline" onClick={acknowledgeAllBookings}>
+              Mark all reviewed ({unreviewedCount})
+            </Button>
+          )}
+          <Button onClick={() => (window.location.href = "/admin/private-lessons/new")}>
+            <Plus className="w-4 h-4 mr-1" /> Book a lesson
+          </Button>
+        </div>
       </div>
+
       <p className="text-xs text-muted-foreground mb-3">
         <span className="font-semibold">Open Availability</span> = instructor booking blocks shown on the public site. <span className="font-semibold">Booked Lessons</span> = actual private/semi-private bookings on the calendar.
       </p>
