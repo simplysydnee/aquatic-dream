@@ -166,6 +166,27 @@ export default function PrivateLessonsAdmin() {
     }
   };
 
+  const unreviewedCount = allPrivateBookings.filter(
+    (b) => !b.admin_reviewed_at && b.status === "active",
+  ).length;
+
+  const acknowledgeAllBookings = async () => {
+    const reviewedAt = new Date().toISOString();
+    const { error } = await supabase
+      .from("lesson_bookings")
+      .update({ admin_reviewed_at: reviewedAt })
+      .is("admin_reviewed_at", null)
+      .eq("status", "active");
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "All bookings marked reviewed" });
+    setBookings((prev) => prev.map((b) => (b.admin_reviewed_at ? b : { ...b, admin_reviewed_at: reviewedAt })));
+    setAllPrivateBookings((prev) => prev.map((b) => (b.admin_reviewed_at ? b : { ...b, admin_reviewed_at: reviewedAt })));
+  };
+
+
   useEffect(() => { load(); }, []);
 
 
