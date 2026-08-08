@@ -573,48 +573,87 @@ async function ensureMembershipRecord(options: {
     .single();
 
   if (insertErr || !membership?.id) {
-    // Unique index backstop: another caller inserted the row for this session or
-    // subscription first. Reconcile onto that row instead of failing the parent.
-    if (insertErr?.code === "23505") {
-      const { data: winner } = await supabase
-        .from("memberships")
-        .select("id")
-        .or(
-          options.sessionId
-            ? `stripe_subscription_id.eq.${options.subscriptionId},stripe_session_id.eq.${options.sessionId}`
-            : `stripe_subscription_id.eq.${options.subscriptionId}`,
-        )
-
-        .limit(1)
-        .maybeSingle();
-      if (winner?.id) {
-        const occurrenceCountExisting = await ensureOccurrences(winner.id as string, options.payload);
-        await sendWelcomeIfNeeded(winner.id as string, options.payload).catch((e) =>
-          console.error("[membership completion] welcome send failed", errorMessage(e)),
-        );
-        return {
-          membershipId: winner.id as string,
-          subscriptionId: options.subscriptionId,
-          occurrenceCount: occurrenceCountExisting,
-          firstChargeCents: asNumber(options.payload.first_charge_cents),
-          monthlyCents: asNumber(options.payload.recurring_consent_amount_cents),
-          alreadyProcessed: true,
-        };
-      }
+    // Replay reconciliation, checked BEFORE any capacity handling.
+    //
+    // The BEFORE INSERT capacity trigger fires ahead of the unique index, so a
+    // duplicate completion of a signup that already succeeded surfaces as
+    // MEMBERSHIP_SLOT_FULL rather than 23505 — especially on a capacity-1
+    // private slot, where the winning row alone makes the slot full. Treating
+    // that as a real capacity failure previously cancelled the live
+    // subscription belonging to the row that had just been created.
+    //
+    // If a membership already exists for this exact subscription id, or this
+    // exact session id, this is provably a replay: reconcile onto that row and
+    // never cancel. Two different subscriptions competing for one seat find no
+    // such row and still get rejected and cancelled below.
+    const replayFilter = options.sessionId
+      ? `stripe_subscription_id.eq.${options.subscriptionId},stripe_session_id.eq.${options.sessionId}`
+      : `stripe_subscription_id.eq.${options.subscriptionId}`;
+    const { data: winner } = await supabase
+      .from("memberships")
+      .select("id")
+      .or(replayFilter)
+      .limit(1)
+      .maybeSingle();
+    if (winner?.id) {
+      console.log(
+        "[membership completion] replay_reconciled",
+        "membership", winner.id,
+        "subscription", options.subscriptionId,
+        "session", options.sessionId ?? "none",
+        "pending", options.pendingId,
+        "insert_error", insertErr?.code || insertErr?.message || "unknown",
+      );
+      const occurrenceCountExisting = await ensureOccurrences(winner.id as string, options.payload);
+      await sendWelcomeIfNeeded(winner.id as string, options.payload).catch((e) =>
+        console.error("[membership completion] welcome send failed", errorMessage(e)),
+      );
+      return {
+        membershipId: winner.id as string,
+        subscriptionId: options.subscriptionId,
+        occurrenceCount: occurrenceCountExisting,
+        firstChargeCents: asNumber(options.payload.first_charge_cents),
+        monthlyCents: asNumber(options.payload.recurring_consent_amount_cents),
+        alreadyProcessed: true,
+      };
     }
+
     // Capacity trigger backstop: the slot filled between the pre-flight check
     // and the insert. Surface a clean reseat outcome, not a stack trace.
     if (isSlotFullDbError(insertErr)) {
       const slotId = asString(options.payload.standing_slot_id) || "";
-      // The subscription exists but there is no seat behind it, so cancel it
-      // now. It is still inside its trial, so nothing has been charged.
+      // Cancel is a last resort. Re-check that no membership anywhere holds
+      // this subscription before killing it; only a genuinely orphaned
+      // subscription (a seat that does not exist) gets cancelled.
       let cancelled = false;
-      try {
-        const stripeCancel = createStripeClient(options.env);
-        await stripeCancel.subscriptions.cancel(options.subscriptionId, { prorate: false });
-        cancelled = true;
-      } catch (e) {
-        console.error("[membership completion] slot-full subscription cancel failed", errorMessage(e));
+      const { data: attached } = await supabase
+        .from("memberships")
+        .select("id")
+        .eq("stripe_subscription_id", options.subscriptionId)
+        .limit(1)
+        .maybeSingle();
+      if (attached?.id) {
+        console.warn(
+          "[membership completion] slot-full cancel SKIPPED: subscription already attached",
+          "subscription", options.subscriptionId,
+          "membership", attached.id,
+          "slot", slotId,
+        );
+      } else {
+        try {
+          const stripeCancel = createStripeClient(options.env);
+          console.warn(
+            "[membership completion] cancelling orphaned subscription",
+            "subscription", options.subscriptionId,
+            "slot", slotId,
+            "pending", options.pendingId,
+            "reason", "slot_full_no_membership_row",
+          );
+          await stripeCancel.subscriptions.cancel(options.subscriptionId, { prorate: false });
+          cancelled = true;
+        } catch (e) {
+          console.error("[membership completion] slot-full subscription cancel failed", errorMessage(e));
+        }
       }
       await alertAdminSlotFull({
         standingSlotId: slotId,
@@ -630,6 +669,7 @@ async function ensureMembershipRecord(options: {
     }
 
     throw new Error(`Membership insert failed: ${insertErr?.message || "no row returned"}`);
+
 
   }
 
