@@ -141,25 +141,6 @@ const ageFromDob = (dob?: string | null) => {
   return age;
 };
 
-const norm = (v?: string | null) => (v ?? "").trim().toLowerCase();
-
-/**
- * Cheap tell for an adult who enrolled themselves as a child: the swimmer name
- * exactly matches the parent name on a kids program, or the date of birth is
- * missing or already reads as an adult.
- */
-const needsAgeReview = (m: Membership) => {
-  if (!ACTIVE_STATUSES.includes(m.status)) return false;
-  const age = ageFromDob(m.child_dob);
-  if (m.plan_key === "adult_group") return age !== null && age < 18;
-  if (age === null) return true;
-  if (age >= 18) return true;
-  return (
-    norm(m.child_first_name) === norm(m.parent_first_name) &&
-    norm(m.child_last_name) === norm(m.parent_last_name) &&
-    norm(m.child_first_name) !== ""
-  );
-};
 
 const MembershipsAdmin = () => {
   const [loading, setLoading] = useState(true);
@@ -168,7 +149,6 @@ const MembershipsAdmin = () => {
   const [instructors, setInstructors] = useState<Record<string, string>>({});
 
   const [search, setSearch] = useState("");
-  const [ageReviewOnly, setAgeReviewOnly] = useState(false);
   const [dobDraft, setDobDraft] = useState("");
   const [savingDob, setSavingDob] = useState(false);
   const [planFilter, setPlanFilter] = useState<string>("all");
@@ -273,7 +253,6 @@ const MembershipsAdmin = () => {
         const slot = m.standing_slot_id ? slotById.get(m.standing_slot_id) : null;
         if (!slot || String(slot.day_of_week) !== dayFilter) return false;
       }
-      if (ageReviewOnly && !needsAgeReview(m)) return false;
       if (paymentFilter === "problem" && !hasPaymentProblem(m)) return false;
       if (paymentFilter !== "all" && paymentFilter !== "problem" && paymentBucket(m) !== paymentFilter) return false;
       if (!q) return true;
@@ -288,14 +267,12 @@ const MembershipsAdmin = () => {
         .toLowerCase();
       return hay.includes(q) || hay.includes(q.replace(/\D/g, ""));
     });
-  }, [memberships, search, planFilter, statusFilter, dayFilter, paymentFilter, ageReviewOnly, includeInactive, slotById]);
+  }, [memberships, search, planFilter, statusFilter, dayFilter, paymentFilter, includeInactive, slotById]);
 
   // Payment problems are surfaced across the whole book, not just the current
   // filter, so a filtered view can never hide a declined card.
   const paymentProblems = useMemo(() => memberships.filter(hasPaymentProblem), [memberships]);
 
-  // Age checks are surfaced across the whole book for the same reason.
-  const ageReviews = useMemo(() => memberships.filter(needsAgeReview), [memberships]);
 
 
   const targetSlots = useMemo(() => {
@@ -418,35 +395,8 @@ const MembershipsAdmin = () => {
 
       <MembershipHoldsPanel refreshKey={holdsRefresh} />
 
-      {ageReviews.length > 0 && (
-        <Card className="border-amber-300 bg-amber-50 p-3">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
-            <span className="text-amber-900">
-              {ageReviews.length === 1
-                ? "1 membership needs an age check."
-                : `${ageReviews.length} memberships need an age check.`}{" "}
-              The swimmer's date of birth is missing, reads as an adult, or matches the parent's name. Nobody is
-              cancelled automatically.
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setAgeReviewOnly(true);
-                setIncludeInactive(false);
-              }}
-            >
-              Show them
-            </Button>
-            {ageReviewOnly && (
-              <Button size="sm" variant="ghost" onClick={() => setAgeReviewOnly(false)}>
-                Clear filter
-              </Button>
-            )}
-          </div>
-        </Card>
-      )}
+
+
 
       {paymentProblems.length > 0 && (
         <Card className="border-destructive/40 bg-destructive/5 p-3">
@@ -631,14 +581,8 @@ const MembershipsAdmin = () => {
                             <FileWarning className="h-3 w-3" /> Waiver
                           </span>
                         )}
-                        {needsAgeReview(m) && (
-                          <span
-                            title="Check the swimmer's date of birth"
-                            className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900"
-                          >
-                            <AlertTriangle className="h-3 w-3" /> Age check
-                          </span>
-                        )}
+                        <AdultTag dob={m.child_dob} planKey={m.plan_key} />
+
                         {m.medical_notes && (
                           <span title="Medical notes" className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900">
                             <Stethoscope className="h-3 w-3" /> Medical
@@ -769,45 +713,41 @@ const MembershipsAdmin = () => {
 
 
 
-                {needsAgeReview(selected) && (
-                  <div className="space-y-2 rounded border border-amber-300 bg-amber-50 p-3 text-amber-900">
-                    <div className="flex items-center gap-2 font-medium">
-                      <AlertTriangle className="h-4 w-4" /> Age check
-                    </div>
-                    <div className="text-xs">
-                      Confirm the swimmer's date of birth with the family. Private and Small Group are ages 3 to 17,
-                      Adult Swim is 18 and over.
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Input
-                        type="date"
-                        className="h-8 w-40"
-                        value={dobDraft}
-                        onChange={(e) => setDobDraft(e.target.value)}
-                      />
-                      <Button
-                        size="sm"
-                        disabled={!dobDraft || dobDraft === (selected.child_dob ?? "") || savingDob}
-                        onClick={async () => {
-                          setSavingDob(true);
-                          const { error } = await supabase
-                            .from("memberships")
-                            .update({ child_dob: dobDraft })
-                            .eq("id", selected.id);
-                          setSavingDob(false);
-                          if (error) {
-                            toast({ title: "Could not save the date of birth", description: error.message, variant: "destructive" });
-                            return;
-                          }
-                          toast({ title: "Date of birth updated" });
-                          void fetchData();
-                        }}
-                      >
-                        {savingDob ? "Saving..." : "Save date of birth"}
-                      </Button>
-                    </div>
+                <div className="space-y-2 rounded border bg-muted/40 p-3">
+                  <div className="font-medium">Date of birth</div>
+                  <div className="text-xs text-muted-foreground">
+                    Swimmers 18 and over are tagged Adult so instructors can see it at a glance.
                   </div>
-                )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      type="date"
+                      className="h-8 w-40"
+                      value={dobDraft}
+                      onChange={(e) => setDobDraft(e.target.value)}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!dobDraft || dobDraft === (selected.child_dob ?? "") || savingDob}
+                      onClick={async () => {
+                        setSavingDob(true);
+                        const { error } = await supabase
+                          .from("memberships")
+                          .update({ child_dob: dobDraft })
+                          .eq("id", selected.id);
+                        setSavingDob(false);
+                        if (error) {
+                          toast({ title: "Could not save the date of birth", description: error.message, variant: "destructive" });
+                          return;
+                        }
+                        toast({ title: "Date of birth updated" });
+                        void fetchData();
+                      }}
+                    >
+                      {savingDob ? "Saving..." : "Save date of birth"}
+                    </Button>
+                  </div>
+                </div>
+
 
                 {!selected.waiver_id && (
                   <div className="flex items-center gap-2 rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive">
