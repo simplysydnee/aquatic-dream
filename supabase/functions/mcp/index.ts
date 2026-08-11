@@ -1455,6 +1455,60 @@ var search_repo_default = defineTool25({
   }
 });
 
+// src/lib/mcp/tools/create-membership-hold.ts
+import { defineTool as defineTool26 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z26 } from "npm:zod@^3.23.8";
+var create_membership_hold_default = defineTool26({
+  name: "create_membership_hold",
+  title: "Create a membership hold",
+  description: "Hold a standing slot for a swimmer and text the parent a link to finish enrollment. Thin wrapper around the create-membership-hold edge function (capacity checks and SMS happen there). Requires confirm=true.",
+  inputSchema: {
+    standing_slot_id: z26.string().uuid(),
+    swimmer_name: z26.string(),
+    parent_name: z26.string(),
+    parent_phone: z26.string(),
+    parent_email: z26.string().optional(),
+    swim_level: z26.enum(["white", "red", "yellow", "blue", "green"]).optional(),
+    existing_waiver_id: z26.string().uuid().optional(),
+    notes: z26.string().optional(),
+    hold_minutes: z26.number().optional().describe("Hold length in minutes. Defaults to 48 hours."),
+    confirm: z26.boolean().default(false)
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: async (input, ctx) => {
+    if (!ctx.isAuthenticated()) return notAuthed();
+    const { confirm, ...fields } = input;
+    if (!confirm) {
+      return refuseUnconfirmed(
+        `Would hold slot ${fields.standing_slot_id} for ${fields.swimmer_name} (parent ${fields.parent_name}, ${fields.parent_phone}).`,
+        fields
+      );
+    }
+    const baseUrl = process.env.SUPABASE_URL;
+    if (!baseUrl) return errResult("SUPABASE_URL is not configured");
+    const res = await fetch(`${baseUrl}/functions/v1/create-membership-hold`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ctx.getToken()}`
+      },
+      body: JSON.stringify(fields)
+    });
+    const text = await res.text();
+    let body;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = { raw: text };
+    }
+    if (!res.ok) {
+      const message = body?.error ?? `create-membership-hold failed (${res.status})`;
+      return errResult(message);
+    }
+    return okResult(body);
+  }
+});
+
 // src/lib/mcp/index.ts
 var projectRef = "jilrijklnehbfuulykty";
 var mcp_default = defineMcp({
@@ -1491,7 +1545,8 @@ var mcp_default = defineMcp({
     complete_membership_checkout_default,
     run_readonly_sql_default,
     describe_table_default,
-    search_repo_default
+    search_repo_default,
+    create_membership_hold_default
   ]
 });
 

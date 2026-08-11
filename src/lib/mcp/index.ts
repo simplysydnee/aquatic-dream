@@ -24,6 +24,7 @@ import completeMembershipCheckout from "./tools/complete-membership-checkout";
 import runReadonlySql from "./tools/run-readonly-sql";
 import describeTable from "./tools/describe-table";
 import searchRepo from "./tools/search-repo";
+import createMembershipHold from "./tools/create-membership-hold";
 
 
 // Build the issuer from the project ref so the OAuth issuer matches the direct
@@ -66,6 +67,7 @@ export default defineMcp({
     runReadonlySql,
     describeTable,
     searchRepo,
+    createMembershipHold,
   ],
 
 });
