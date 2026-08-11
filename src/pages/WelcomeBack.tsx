@@ -31,6 +31,8 @@ const POINTS = [
 
 const WelcomeBack = () => {
   const navigate = useNavigate();
+  const src = resolveJoinSrc();
+  const headline = (src && HEADLINES[src]) || DEFAULT_HEADLINE;
 
   useEffect(() => {
     document.title = "Welcome back to Aquatic Dreams";
@@ -44,9 +46,7 @@ const WelcomeBack = () => {
           <p className="text-sm font-medium uppercase tracking-wide text-primary">
             Swim. Dive. Dream.
           </p>
-          <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
-            Thank you for swimming with us this summer
-          </h1>
+          <h1 className="text-3xl font-bold text-foreground sm:text-4xl">{headline}</h1>
           <p className="text-base text-muted-foreground">
             We are continuing into fall a little differently. Here is what changed, in plain terms.
           </p>
