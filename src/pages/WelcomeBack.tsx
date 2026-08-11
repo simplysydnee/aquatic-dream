@@ -2,7 +2,13 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { WELCOME_BACK_SRC, markWelcomeBackSeen } from "@/lib/joinSrc";
+import { markWelcomeBackSeen, resolveJoinSrc } from "@/lib/joinSrc";
+
+const HEADLINES: Record<string, string> = {
+  summer2026: "Thank you for swimming with us this summer",
+  fall2026: "Fall lessons are here at Aquatic Dreams",
+};
+const DEFAULT_HEADLINE = "Welcome back to Aquatic Dreams";
 
 const POINTS = [
   {
