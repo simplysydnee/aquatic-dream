@@ -222,6 +222,8 @@ const MembershipsAdmin = () => {
   useEffect(() => {
     setLevelDraft(selected?.swim_level ?? "");
     setDobDraft(selected?.child_dob ?? "");
+    setFirstNameDraft(selected?.child_first_name ?? "");
+    setLastNameDraft(selected?.child_last_name ?? "");
     setCancelResult(null);
     if (!selectedId) {
       setOccurrences([]);
