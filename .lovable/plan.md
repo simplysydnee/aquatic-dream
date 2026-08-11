@@ -22,6 +22,7 @@ A phone in both is PREVIOUS.
 - New: phones with a `swim_enrollments` row where `status = 'confirmed'` and the joined `swim_sessions.session_end_date >= current_date`. Built as a real join on `session_id` (verified today this matches 0 phones, so it will not change counts now, but holds on rerun).
 - Opt-out list via the existing `_shared/sms-opt-out.ts`
 - Unusable parent first name, and no phone on any row (both reported)
+- The same "usable child first name distinct from the parent" exclusion carries over to the INQUIRY bucket exactly as summer2026 applied it to GROUP/PRIVATE, reported under `unusable_name` the same way
 
 **Copy** (parent first name only, no child names, no dollar amounts)
 - PREVIOUS: `Hi ${parentFirst}! Fall lessons are here at Aquatic Dreams, come join us. Weekly spots are limited: ${FALL2026_LINK}`
