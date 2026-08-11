@@ -16,13 +16,16 @@ serve(async (req) => {
     const url = new URL(req.url);
     let planKey = url.searchParams.get("plan_key");
     let swimLevel = url.searchParams.get("swim_level");
+    let excludeHoldToken = url.searchParams.get("exclude_hold_token");
     if (req.method === "POST") {
       try {
         const body = await req.json();
         planKey = body.plan_key ?? planKey;
         swimLevel = body.swim_level ?? swimLevel;
+        excludeHoldToken = body.exclude_hold_token ?? excludeHoldToken;
       } catch { /* no body */ }
     }
+
 
     let plansQuery = supabase
       .from("membership_plans")
