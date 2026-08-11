@@ -1004,6 +1004,71 @@
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
         "outputSchema": null
+      },
+      {
+        "name": "create_membership_hold",
+        "title": "Create a membership hold",
+        "description": "Hold a standing slot for a swimmer and text the parent a link to finish enrollment. Thin wrapper around the create-membership-hold edge function (capacity checks and SMS happen there). Requires confirm=true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "standing_slot_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "swimmer_name": {
+              "type": "string"
+            },
+            "parent_name": {
+              "type": "string"
+            },
+            "parent_phone": {
+              "type": "string"
+            },
+            "parent_email": {
+              "type": "string"
+            },
+            "swim_level": {
+              "type": "string",
+              "enum": [
+                "white",
+                "red",
+                "yellow",
+                "blue",
+                "green"
+              ]
+            },
+            "existing_waiver_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "notes": {
+              "type": "string"
+            },
+            "hold_minutes": {
+              "type": "number",
+              "description": "Hold length in minutes. Defaults to 48 hours."
+            },
+            "confirm": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "standing_slot_id",
+            "swimmer_name",
+            "parent_name",
+            "parent_phone"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
       }
     ]
   }
