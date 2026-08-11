@@ -151,6 +151,9 @@ const MembershipsAdmin = () => {
   const [search, setSearch] = useState("");
   const [dobDraft, setDobDraft] = useState("");
   const [savingDob, setSavingDob] = useState(false);
+  const [firstNameDraft, setFirstNameDraft] = useState("");
+  const [lastNameDraft, setLastNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
   const [planFilter, setPlanFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dayFilter, setDayFilter] = useState<string>("all");
