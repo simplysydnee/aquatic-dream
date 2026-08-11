@@ -151,6 +151,9 @@ const MembershipsAdmin = () => {
   const [search, setSearch] = useState("");
   const [dobDraft, setDobDraft] = useState("");
   const [savingDob, setSavingDob] = useState(false);
+  const [firstNameDraft, setFirstNameDraft] = useState("");
+  const [lastNameDraft, setLastNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
   const [planFilter, setPlanFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dayFilter, setDayFilter] = useState<string>("all");
@@ -219,6 +222,8 @@ const MembershipsAdmin = () => {
   useEffect(() => {
     setLevelDraft(selected?.swim_level ?? "");
     setDobDraft(selected?.child_dob ?? "");
+    setFirstNameDraft(selected?.child_first_name ?? "");
+    setLastNameDraft(selected?.child_last_name ?? "");
     setCancelResult(null);
     if (!selectedId) {
       setOccurrences([]);
@@ -711,6 +716,55 @@ const MembershipsAdmin = () => {
                   )}
                 </div>
 
+
+                <div className="space-y-2 rounded border bg-muted/40 p-3">
+                  <div className="font-medium">Swimmer name</div>
+                  <div className="text-xs text-muted-foreground">
+                    Correct the swimmer name if it was entered wrong at signup.
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      className="h-8 w-36"
+                      placeholder="First name"
+                      value={firstNameDraft}
+                      onChange={(e) => setFirstNameDraft(e.target.value)}
+                    />
+                    <Input
+                      className="h-8 w-36"
+                      placeholder="Last name"
+                      value={lastNameDraft}
+                      onChange={(e) => setLastNameDraft(e.target.value)}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={
+                        savingName ||
+                        !firstNameDraft.trim() ||
+                        (firstNameDraft.trim() === (selected.child_first_name ?? "").trim() &&
+                          lastNameDraft.trim() === (selected.child_last_name ?? "").trim())
+                      }
+                      onClick={async () => {
+                        setSavingName(true);
+                        const { error } = await supabase
+                          .from("memberships")
+                          .update({
+                            child_first_name: firstNameDraft.trim(),
+                            child_last_name: lastNameDraft.trim() || null,
+                          })
+                          .eq("id", selected.id);
+                        setSavingName(false);
+                        if (error) {
+                          toast({ title: "Could not save the swimmer name", description: error.message, variant: "destructive" });
+                          return;
+                        }
+                        toast({ title: "Swimmer name updated" });
+                        void fetchData();
+                      }}
+                    >
+                      {savingName ? "Saving..." : "Save swimmer name"}
+                    </Button>
+                  </div>
+                </div>
 
 
                 <div className="space-y-2 rounded border bg-muted/40 p-3">
