@@ -3,7 +3,12 @@
  * The src param rides through the whole join flow, including the Stripe
  * return_url, so a finished membership is traceable back to the text.
  */
-export const WELCOME_BACK_SRC = "summer2026";
+export const RECOGNIZED_OUTREACH_SRCS = ["summer2026", "fall2026"] as const;
+
+export type OutreachSrc = (typeof RECOGNIZED_OUTREACH_SRCS)[number];
+
+export const isRecognizedOutreachSrc = (src: string | null): boolean =>
+  !!src && (RECOGNIZED_OUTREACH_SRCS as readonly string[]).includes(src);
 
 const SEEN_KEY = "welcomeBackSeen";
 const SRC_KEY = "joinSrc";

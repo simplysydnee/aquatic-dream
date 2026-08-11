@@ -2,7 +2,13 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { WELCOME_BACK_SRC, markWelcomeBackSeen } from "@/lib/joinSrc";
+import { markWelcomeBackSeen, resolveJoinSrc } from "@/lib/joinSrc";
+
+const HEADLINES: Record<string, string> = {
+  summer2026: "Thank you for swimming with us this summer",
+  fall2026: "Fall lessons are here at Aquatic Dreams",
+};
+const DEFAULT_HEADLINE = "Welcome back to Aquatic Dreams";
 
 const POINTS = [
   {
@@ -25,6 +31,8 @@ const POINTS = [
 
 const WelcomeBack = () => {
   const navigate = useNavigate();
+  const src = resolveJoinSrc();
+  const headline = (src && HEADLINES[src]) || DEFAULT_HEADLINE;
 
   useEffect(() => {
     document.title = "Welcome back to Aquatic Dreams";
@@ -38,9 +46,7 @@ const WelcomeBack = () => {
           <p className="text-sm font-medium uppercase tracking-wide text-primary">
             Swim. Dive. Dream.
           </p>
-          <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
-            Thank you for swimming with us this summer
-          </h1>
+          <h1 className="text-3xl font-bold text-foreground sm:text-4xl">{headline}</h1>
           <p className="text-base text-muted-foreground">
             We are continuing into fall a little differently. Here is what changed, in plain terms.
           </p>
@@ -59,7 +65,7 @@ const WelcomeBack = () => {
           <Button
             size="lg"
             className="w-full sm:w-auto"
-            onClick={() => navigate(`/join?src=${WELCOME_BACK_SRC}`)}
+            onClick={() => navigate(src ? `/join?src=${encodeURIComponent(src)}` : "/join")}
           >
             Choose your program
           </Button>

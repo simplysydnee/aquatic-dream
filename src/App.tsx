@@ -57,14 +57,15 @@ import ScrollToTop from "./components/ScrollToTop";
 import OAuthConsent from "./pages/OAuthConsent";
 import JoinMembership from "./pages/JoinMembership";
 import WelcomeBack from "./pages/WelcomeBack";
-import { WELCOME_BACK_SRC, hasSeenWelcomeBack, readSrcParam } from "./lib/joinSrc";
+import { isRecognizedOutreachSrc, hasSeenWelcomeBack, resolveJoinSrc } from "./lib/joinSrc";
 
 /**
- * Families texted the summer 2026 link get the "what changed" page first, once
+ * Families texted an outreach link get the "what changed" page first, once
  * per browser session. Every other visit to /join is untouched.
  */
 const JoinEntry = () => {
-  if (readSrcParam() === WELCOME_BACK_SRC && !hasSeenWelcomeBack()) {
+  // resolveJoinSrc also persists the src so /welcome-back can read it back.
+  if (isRecognizedOutreachSrc(resolveJoinSrc()) && !hasSeenWelcomeBack()) {
     return <Navigate to="/welcome-back" replace />;
   }
   return <JoinMembership />;
