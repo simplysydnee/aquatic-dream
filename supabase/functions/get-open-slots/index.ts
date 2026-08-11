@@ -16,13 +16,16 @@ serve(async (req) => {
     const url = new URL(req.url);
     let planKey = url.searchParams.get("plan_key");
     let swimLevel = url.searchParams.get("swim_level");
+    let excludeHoldToken = url.searchParams.get("exclude_hold_token");
     if (req.method === "POST") {
       try {
         const body = await req.json();
         planKey = body.plan_key ?? planKey;
         swimLevel = body.swim_level ?? swimLevel;
+        excludeHoldToken = body.exclude_hold_token ?? excludeHoldToken;
       } catch { /* no body */ }
     }
+
 
     let plansQuery = supabase
       .from("membership_plans")
@@ -62,15 +65,30 @@ serve(async (req) => {
           .in("status", ["active", "pending_cancel", "paused"])
       : { data: [] as { standing_slot_id: string; status: string }[] };
 
+    // The requester's own hold must not count against them, the same way the
+    // capacity trigger excludes the row being evaluated.
+    let excludeHoldId: string | null = null;
+    if (excludeHoldToken) {
+      const { data: ownHold } = await supabase
+        .from("membership_holds")
+        .select("id")
+        .eq("token", excludeHoldToken)
+        .maybeSingle();
+      excludeHoldId = ownHold?.id ?? null;
+    }
+
     // Phone-booked holds reserve a spot until they expire or are cancelled.
+    let holdsQuery = supabase
+      .from("membership_holds")
+      .select("standing_slot_id")
+      .in("standing_slot_id", slotIds)
+      .eq("status", "held")
+      .gt("held_until", new Date().toISOString());
+    if (excludeHoldId) holdsQuery = holdsQuery.neq("id", excludeHoldId);
     const { data: holds } = slotIds.length
-      ? await supabase
-          .from("membership_holds")
-          .select("standing_slot_id")
-          .in("standing_slot_id", slotIds)
-          .eq("status", "held")
-          .gt("held_until", new Date().toISOString())
+      ? await holdsQuery
       : { data: [] as { standing_slot_id: string }[] };
+
 
     const counts = new Map<string, number>();
     (memberships || []).forEach((m) => {

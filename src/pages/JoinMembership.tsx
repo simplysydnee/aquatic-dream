@@ -374,6 +374,7 @@ function JoinMembershipForm() {
         body: {
           plan_key: plan.plan_key,
           swim_level: plan.plan_key === "kid_group" ? swimLevel : undefined,
+          ...(holdToken ? { exclude_hold_token: holdToken } : {}),
         },
       });
       if (error) throw error;
@@ -385,7 +386,8 @@ function JoinMembershipForm() {
     } finally {
       setSlotsLoading(false);
     }
-  }, [plan, swimLevel]);
+  }, [plan, swimLevel, holdToken]);
+
 
   useEffect(() => {
     loadSlots();
