@@ -65,7 +65,7 @@ const WelcomeBack = () => {
           <Button
             size="lg"
             className="w-full sm:w-auto"
-            onClick={() => navigate(`/join?src=${WELCOME_BACK_SRC}`)}
+            onClick={() => navigate(src ? `/join?src=${encodeURIComponent(src)}` : "/join")}
           >
             Choose your program
           </Button>
