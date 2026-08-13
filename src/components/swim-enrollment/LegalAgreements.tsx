@@ -42,6 +42,7 @@ const DocumentSection = ({
   onAcceptChange,
   error,
   checkboxLabel,
+  id,
 }: {
   title: string;
   icon: React.ElementType;
@@ -50,6 +51,7 @@ const DocumentSection = ({
   onAcceptChange: (v: boolean) => void;
   error?: string;
   checkboxLabel: string;
+  id?: string;
 }) => (
   <div className="border border-border rounded-lg overflow-hidden">
     <div className="bg-muted/50 px-4 py-3 flex items-center gap-2 border-b border-border">
