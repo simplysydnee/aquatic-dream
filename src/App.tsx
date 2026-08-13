@@ -68,6 +68,16 @@ const JoinEntry = () => {
   }
   return <JoinMembership />;
 };
+
+/**
+ * Session-based enrollment pages are retired. Old links land on /join,
+ * keeping any tracking params so outreach attribution still works.
+ */
+const JoinRedirect = () => {
+  const { search } = useLocation();
+  return <Navigate to={`/join${search}`} replace />;
+};
+
 import MembershipCancelRequest from "./pages/MembershipCancelRequest";
 import MembershipManage from "./pages/MembershipManage";
 
