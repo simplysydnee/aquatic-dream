@@ -154,8 +154,8 @@ const App = () => (
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Index />} />
               <Route path="/swim-lessons" element={<SwimLessons />} />
-              <Route path="/swim-enrollment" element={<SwimEnrollment />} />
-              <Route path="/book-private-lesson" element={<BookPrivateLesson />} />
+              <Route path="/swim-enrollment" element={<JoinRedirect />} />
+              <Route path="/book-private-lesson" element={<JoinRedirect />} />
               <Route path="/waivers" element={<Waivers />} />
               <Route path="/sms-terms" element={<SmsTerms />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
