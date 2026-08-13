@@ -53,7 +53,7 @@ const DocumentSection = ({
   checkboxLabel: string;
   id?: string;
 }) => (
-  <div className="border border-border rounded-lg overflow-hidden">
+  <div id={id} className="border border-border rounded-lg overflow-hidden">
     <div className="bg-muted/50 px-4 py-3 flex items-center gap-2 border-b border-border">
       <Icon className="w-4 h-4 text-primary" />
       <h4 className="font-semibold text-sm text-foreground">{title}</h4>
