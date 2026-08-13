@@ -122,6 +122,29 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sameAsSigner, setSameAsSigner] = useState(false);
 
+  const fieldToSectionId: Record<string, string> = {
+    waiverAccepted: "section-waiver",
+    privacyPolicyAccepted: "section-privacy",
+    termsAccepted: "section-terms",
+    photoReleaseAccepted: "section-photo",
+    signatureText: "section-signature",
+    emergencyContactFirstName: "section-emergency",
+    emergencyContactLastName: "section-emergency",
+    emergencyContactPhone: "section-emergency",
+    emergencyContactRelationship: "section-emergency",
+  };
+  const fieldOrder = [
+    "waiverAccepted",
+    "privacyPolicyAccepted",
+    "termsAccepted",
+    "photoReleaseAccepted",
+    "emergencyContactFirstName",
+    "emergencyContactLastName",
+    "emergencyContactRelationship",
+    "emergencyContactPhone",
+    "signatureText",
+  ];
+
   const fillEmergencyFromSigner = (checked: boolean) => {
     setSameAsSigner(checked);
     if (checked) {
