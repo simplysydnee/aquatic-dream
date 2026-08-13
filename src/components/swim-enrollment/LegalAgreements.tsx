@@ -42,6 +42,7 @@ const DocumentSection = ({
   onAcceptChange,
   error,
   checkboxLabel,
+  id,
 }: {
   title: string;
   icon: React.ElementType;
@@ -50,8 +51,9 @@ const DocumentSection = ({
   onAcceptChange: (v: boolean) => void;
   error?: string;
   checkboxLabel: string;
+  id?: string;
 }) => (
-  <div className="border border-border rounded-lg overflow-hidden">
+  <div id={id} className="border border-border rounded-lg overflow-hidden">
     <div className="bg-muted/50 px-4 py-3 flex items-center gap-2 border-b border-border">
       <Icon className="w-4 h-4 text-primary" />
       <h4 className="font-semibold text-sm text-foreground">{title}</h4>
@@ -120,6 +122,29 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sameAsSigner, setSameAsSigner] = useState(false);
 
+  const fieldToSectionId: Record<string, string> = {
+    waiverAccepted: "section-waiver",
+    privacyPolicyAccepted: "section-privacy",
+    termsAccepted: "section-terms",
+    photoReleaseAccepted: "section-photo",
+    signatureText: "section-signature",
+    emergencyContactFirstName: "section-emergency",
+    emergencyContactLastName: "section-emergency",
+    emergencyContactPhone: "section-emergency",
+    emergencyContactRelationship: "section-emergency",
+  };
+  const fieldOrder = [
+    "waiverAccepted",
+    "privacyPolicyAccepted",
+    "termsAccepted",
+    "photoReleaseAccepted",
+    "emergencyContactFirstName",
+    "emergencyContactLastName",
+    "emergencyContactRelationship",
+    "emergencyContactPhone",
+    "signatureText",
+  ];
+
   const fillEmergencyFromSigner = (checked: boolean) => {
     setSameAsSigner(checked);
     if (checked) {
@@ -157,6 +182,18 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         fieldErrors[issue.path[0] as string] = issue.message;
       });
       setErrors(fieldErrors);
+      const firstErrorField = fieldOrder.find((f) => fieldErrors[f]);
+      if (firstErrorField) {
+        const sectionId = fieldToSectionId[firstErrorField];
+        const el = document.getElementById(sectionId);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+          const focusable = el.querySelector(
+            "input, button, textarea, select, [tabindex]:not([tabindex='-1'])"
+          ) as HTMLElement | null;
+          focusable?.focus();
+        }
+      }
       return null;
     }
     setErrors({});
@@ -223,6 +260,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Liability Waiver */}
         <DocumentSection
+          id="section-waiver"
           title="Waiver and Release of Liability"
           icon={Scale}
           text={LIABILITY_WAIVER_TEXT}
@@ -234,6 +272,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
 
         {/* Privacy Policy */}
         <DocumentSection
+          id="section-privacy"
           title="Privacy Policy"
           icon={ShieldCheck}
           text={PRIVACY_POLICY_TEXT}
@@ -245,6 +284,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
 
         {/* Terms of Service */}
         <DocumentSection
+          id="section-terms"
           title="Terms of Service"
           icon={FileText}
           text={TERMS_OF_SERVICE_TEXT}
@@ -255,7 +295,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         />
 
         {/* Photo Release */}
-        <div className="border border-border rounded-lg p-4">
+        <div id="section-photo" className="border border-border rounded-lg p-4">
           <h4 className="text-sm font-semibold text-foreground mb-1">
             Photo & Video Release *
           </h4>
@@ -285,7 +325,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         </div>
 
         {/* Emergency Contact */}
-        <div className="border border-border rounded-lg p-4 space-y-3">
+        <div id="section-emergency" className="border border-border rounded-lg p-4 space-y-3">
           <h4 className="text-sm font-semibold text-foreground">
             Emergency Contact Information *
           </h4>
@@ -366,7 +406,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         </div>
 
         {/* Signature */}
-        <div className="border-2 border-primary/30 rounded-lg p-4 bg-primary/5 space-y-3">
+        <div id="section-signature" className="border-2 border-primary/30 rounded-lg p-4 bg-primary/5 space-y-3">
           <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Scale className="w-4 h-4 text-primary" />
             Electronic Signature *

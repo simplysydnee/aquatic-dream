@@ -679,7 +679,7 @@ function JoinMembershipForm() {
         (form.has_medical !== "yes" || form.medical_notes.trim().length > 0)
       ));
 
-  const canContinueStep5 = authRecurring && smsConsent && agreementAccepted;
+  const canContinueStep5 = authRecurring && agreementAccepted;
 
   // Advance from info: check for on-file waiver before rendering step 4.
   const handleInfoContinue = async () => {
