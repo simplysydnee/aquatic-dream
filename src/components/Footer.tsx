@@ -25,7 +25,7 @@ const Footer = () => {
             <h5 className="font-semibold mb-4 text-sm uppercase tracking-wider text-secondary-foreground/60">Programs</h5>
             <ul className="space-y-2 text-sm text-secondary-foreground/70">
               <li><Link to="/swim-lessons" className="hover:text-primary transition-colors">Swim Lessons</Link></li>
-              <li><Link to="/swim-enrollment" className="hover:text-primary transition-colors">Enroll Now</Link></li>
+              <li><Link to="/join" className="hover:text-primary transition-colors">Join</Link></li>
               <li><a href="https://icanswim209.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">I Can Swim 209</a></li>
               
             </ul>
