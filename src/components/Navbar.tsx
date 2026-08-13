@@ -8,8 +8,7 @@ import logoMain from "@/assets/logo-main.png";
 const navLinks = [
   { to: "/", label: "Home" },
   { to: "/swim-lessons", label: "Swim Lessons" },
-  { to: "/swim-enrollment", label: "Enroll" },
-  { to: "/book-private-lesson", label: "Book Private" },
+  { to: "/join", label: "Join" },
   { to: "/waivers", label: "Waivers" },
 ];
 
