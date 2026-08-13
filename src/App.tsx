@@ -7,7 +7,6 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import SwimLessons from "./pages/SwimLessons";
 import LessonWaiver from "./pages/LessonWaiver";
-import LessonWaiver from "./pages/LessonWaiver";
 import EnrollmentWaiver from "./pages/EnrollmentWaiver";
 import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
