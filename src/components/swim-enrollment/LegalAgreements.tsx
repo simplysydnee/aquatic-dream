@@ -182,6 +182,18 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         fieldErrors[issue.path[0] as string] = issue.message;
       });
       setErrors(fieldErrors);
+      const firstErrorField = fieldOrder.find((f) => fieldErrors[f]);
+      if (firstErrorField) {
+        const sectionId = fieldToSectionId[firstErrorField];
+        const el = document.getElementById(sectionId);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+          const focusable = el.querySelector(
+            "input, button, textarea, select, [tabindex]:not([tabindex='-1'])"
+          ) as HTMLElement | null;
+          focusable?.focus();
+        }
+      }
       return null;
     }
     setErrors({});
