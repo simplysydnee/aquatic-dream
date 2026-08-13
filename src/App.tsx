@@ -2,12 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import SwimLessons from "./pages/SwimLessons";
-import SwimEnrollment from "./pages/SwimEnrollment";
-import BookPrivateLesson from "./pages/BookPrivateLesson";
 import LessonWaiver from "./pages/LessonWaiver";
 import EnrollmentWaiver from "./pages/EnrollmentWaiver";
 import AdminLogin from "./pages/AdminLogin";
@@ -70,6 +68,16 @@ const JoinEntry = () => {
   }
   return <JoinMembership />;
 };
+
+/**
+ * Session-based enrollment pages are retired. Old links land on /join,
+ * keeping any tracking params so outreach attribution still works.
+ */
+const JoinRedirect = () => {
+  const { search } = useLocation();
+  return <Navigate to={`/join${search}`} replace />;
+};
+
 import MembershipCancelRequest from "./pages/MembershipCancelRequest";
 import MembershipManage from "./pages/MembershipManage";
 
@@ -156,8 +164,8 @@ const App = () => (
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Index />} />
               <Route path="/swim-lessons" element={<SwimLessons />} />
-              <Route path="/swim-enrollment" element={<SwimEnrollment />} />
-              <Route path="/book-private-lesson" element={<BookPrivateLesson />} />
+              <Route path="/swim-enrollment" element={<JoinRedirect />} />
+              <Route path="/book-private-lesson" element={<JoinRedirect />} />
               <Route path="/waivers" element={<Waivers />} />
               <Route path="/sms-terms" element={<SmsTerms />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />

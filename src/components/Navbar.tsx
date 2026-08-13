@@ -8,8 +8,7 @@ import logoMain from "@/assets/logo-main.png";
 const navLinks = [
   { to: "/", label: "Home" },
   { to: "/swim-lessons", label: "Swim Lessons" },
-  { to: "/swim-enrollment", label: "Enroll" },
-  { to: "/book-private-lesson", label: "Book Private" },
+  { to: "/join", label: "Join" },
   { to: "/waivers", label: "Waivers" },
 ];
 
@@ -64,7 +63,7 @@ const Navbar = () => {
 
           <div className="hidden lg:flex items-center gap-3">
             <Button asChild size="sm" className="bg-coral hover:bg-coral/90 text-coral-foreground">
-              <Link to="/swim-enrollment">Enroll Now</Link>
+              <Link to="/join">Join</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link to="/admin/login">Staff Login</Link>
@@ -107,7 +106,7 @@ const Navbar = () => {
                 ))}
                 <div className="flex gap-3 mt-4 px-4">
                   <Button asChild size="sm" className="flex-1 bg-coral hover:bg-coral/90 text-coral-foreground">
-                    <Link to="/swim-enrollment" onClick={() => setIsOpen(false)}>Enroll Now</Link>
+                    <Link to="/join" onClick={() => setIsOpen(false)}>Join</Link>
                   </Button>
                   <Button asChild variant="outline" size="sm" className="flex-1">
                     <Link to="/admin/login" onClick={() => setIsOpen(false)}>Staff Login</Link>

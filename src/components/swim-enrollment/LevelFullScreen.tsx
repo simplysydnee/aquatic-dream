@@ -136,7 +136,7 @@ const LevelFullScreen = ({ level, childAge, ageGroup, onBack, reason = "full" }:
                 </button>
               )}
               <button
-                onClick={() => navigate("/book-private-lesson")}
+                onClick={() => navigate("/join")}
                 className="text-left p-5 rounded-xl border-2 border-border hover:border-primary bg-card transition-all group"
               >
                 <Sparkles className="w-6 h-6 text-primary mb-2" />
@@ -214,7 +214,7 @@ const LevelFullScreen = ({ level, childAge, ageGroup, onBack, reason = "full" }:
             </p>
             <div className="grid sm:grid-cols-2 gap-3 mt-6 max-w-md mx-auto">
               <Button variant="outline" onClick={onBack}>Pick a different level</Button>
-              <Button onClick={() => navigate("/book-private-lesson")} className="bg-primary text-primary-foreground">
+              <Button onClick={() => navigate("/join")} className="bg-primary text-primary-foreground">
                 <Sparkles className="mr-1 w-4 h-4" /> See private lessons
               </Button>
             </div>

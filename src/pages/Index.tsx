@@ -229,7 +229,7 @@ const PrivateLessonsNote = () => {
       <div className="container">
         <p className="text-sm text-muted-foreground max-w-2xl">
           Prefer a one-off lesson first? Private lessons are still bookable through August 16.{" "}
-          <Link to="/book-private-lesson" className="text-primary font-medium underline">
+          <Link to="/join" className="text-primary font-medium underline">
             Book a private lesson
           </Link>
         </p>

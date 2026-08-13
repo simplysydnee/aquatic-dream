@@ -172,7 +172,7 @@ export default function SessionFullFallback({
           <Button
             size="lg"
             className="w-full h-auto py-4 flex-col items-start text-left whitespace-normal"
-            onClick={() => navigate("/book-private-lesson")}
+            onClick={() => navigate("/join")}
           >
             <div className="flex items-center gap-2 font-semibold">
               <Sparkles className="w-4 h-4" />
