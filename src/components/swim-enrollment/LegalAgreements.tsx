@@ -260,6 +260,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Liability Waiver */}
         <DocumentSection
+          id="section-waiver"
           title="Waiver and Release of Liability"
           icon={Scale}
           text={LIABILITY_WAIVER_TEXT}
@@ -271,6 +272,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
 
         {/* Privacy Policy */}
         <DocumentSection
+          id="section-privacy"
           title="Privacy Policy"
           icon={ShieldCheck}
           text={PRIVACY_POLICY_TEXT}
@@ -282,6 +284,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
 
         {/* Terms of Service */}
         <DocumentSection
+          id="section-terms"
           title="Terms of Service"
           icon={FileText}
           text={TERMS_OF_SERVICE_TEXT}
@@ -292,7 +295,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         />
 
         {/* Photo Release */}
-        <div className="border border-border rounded-lg p-4">
+        <div id="section-photo" className="border border-border rounded-lg p-4">
           <h4 className="text-sm font-semibold text-foreground mb-1">
             Photo & Video Release *
           </h4>
@@ -322,7 +325,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         </div>
 
         {/* Emergency Contact */}
-        <div className="border border-border rounded-lg p-4 space-y-3">
+        <div id="section-emergency" className="border border-border rounded-lg p-4 space-y-3">
           <h4 className="text-sm font-semibold text-foreground">
             Emergency Contact Information *
           </h4>
@@ -403,7 +406,7 @@ const LegalAgreements = ({ parentName, childName, onSubmit, onBack, submitting, 
         </div>
 
         {/* Signature */}
-        <div className="border-2 border-primary/30 rounded-lg p-4 bg-primary/5 space-y-3">
+        <div id="section-signature" className="border-2 border-primary/30 rounded-lg p-4 bg-primary/5 space-y-3">
           <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Scale className="w-4 h-4 text-primary" />
             Electronic Signature *
