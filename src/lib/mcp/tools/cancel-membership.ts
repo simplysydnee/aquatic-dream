@@ -34,7 +34,7 @@ export default defineTool({
     const { error: upErr } = await supabase
       .from("memberships")
       .update({
-        status: "canceled",
+        status: "cancelled",
         cancel_requested_at: nowIso,
         cancel_effective_date: effective,
       })
@@ -47,6 +47,6 @@ export default defineTool({
       reason_detail: reason_detail ?? null,
     });
     if (insErr) return errResult(`membership updated, but cancellation row failed: ${insErr.message}`);
-    return okResult({ id, status: "canceled", effective_date: effective });
+    return okResult({ id, status: "cancelled", effective_date: effective });
   },
 });

@@ -536,7 +536,7 @@ var list_standing_slots_default = defineTool8({
     const slotIds = (slots ?? []).map((s) => s.id);
     const counts = /* @__PURE__ */ new Map();
     if (slotIds.length) {
-      const { data: mems } = await supabase.from("memberships").select("standing_slot_id").in("standing_slot_id", slotIds).eq("status", "active");
+      const { data: mems } = await supabase.from("memberships").select("standing_slot_id").in("standing_slot_id", slotIds).in("status", ["active", "pending_cancel", "paused"]);
       for (const m of mems ?? []) {
         counts.set(m.standing_slot_id, (counts.get(m.standing_slot_id) ?? 0) + 1);
       }
@@ -582,7 +582,7 @@ var list_memberships_default = defineTool9({
   title: "List memberships",
   description: "List memberships with swimmer, plan, standing-slot (day/time/level), status, billing period, and parent contact. Optional filters: status, plan_key, and a name/email query.",
   inputSchema: {
-    status: z9.enum(["active", "past_due", "canceled", "paused", "pending"]).optional(),
+    status: z9.enum(["active", "pending_cancel", "cancelled", "paused"]).optional(),
     plan_key: z9.enum(["kid_group", "private", "adult_group"]).optional(),
     query: z9.string().trim().min(1).optional().describe("Optional fragment matched against swimmer name, parent name, or parent email."),
     limit: z9.number().int().min(1).max(200).default(100)
@@ -988,7 +988,7 @@ var cancel_membership_default = defineTool14({
     const supabase = adminClient(ctx);
     const nowIso = (/* @__PURE__ */ new Date()).toISOString();
     const { error: upErr } = await supabase.from("memberships").update({
-      status: "canceled",
+      status: "cancelled",
       cancel_requested_at: nowIso,
       cancel_effective_date: effective
     }).eq("id", id);
@@ -1000,7 +1000,7 @@ var cancel_membership_default = defineTool14({
       reason_detail: reason_detail ?? null
     });
     if (insErr) return errResult(`membership updated, but cancellation row failed: ${insErr.message}`);
-    return okResult({ id, status: "canceled", effective_date: effective });
+    return okResult({ id, status: "cancelled", effective_date: effective });
   }
 });
 
@@ -1047,13 +1047,13 @@ var move_membership_slot_default = defineTool16({
     const { data: m, error: mErr } = await supabase.from("memberships").select("id, plan_key, standing_slot_id, status").eq("id", membership_id).maybeSingle();
     if (mErr) return errResult(mErr.message);
     if (!m) return errResult("Membership not found");
-    const { data: slot, error: sErr } = await supabase.from("standing_slots").select("id, plan_key, is_active, capacity, day_of_week, start_time, end_time, swim_level").eq("id", new_standing_slot_id).maybeSingle();
+    const { data: slot, error: sErr } = await supabase.from("standing_slots").select("id, plan_key, active, capacity, day_of_week, start_time, end_time, swim_level").eq("id", new_standing_slot_id).maybeSingle();
     if (sErr) return errResult(sErr.message);
     if (!slot) return errResult("Destination slot not found");
-    if (!slot.is_active) return errResult("Destination slot is not active");
+    if (!slot.active) return errResult("Destination slot is not active");
     if (slot.plan_key !== m.plan_key)
       return errResult(`Plan mismatch: membership is ${m.plan_key}, slot is ${slot.plan_key}`);
-    const { count, error: cErr } = await supabase.from("memberships").select("id", { count: "exact", head: true }).eq("standing_slot_id", new_standing_slot_id).in("status", ["active", "past_due", "pending"]);
+    const { count, error: cErr } = await supabase.from("memberships").select("id", { count: "exact", head: true }).eq("standing_slot_id", new_standing_slot_id).in("status", ["active", "pending_cancel", "paused"]);
     if (cErr) return errResult(cErr.message);
     const enrolled = count ?? 0;
     if (enrolled >= (slot.capacity ?? 0))

@@ -26,12 +26,12 @@ export default defineTool({
 
     const { data: slot, error: sErr } = await supabase
       .from("standing_slots")
-      .select("id, plan_key, is_active, capacity, day_of_week, start_time, end_time, swim_level")
+      .select("id, plan_key, active, capacity, day_of_week, start_time, end_time, swim_level")
       .eq("id", new_standing_slot_id)
       .maybeSingle();
     if (sErr) return errResult(sErr.message);
     if (!slot) return errResult("Destination slot not found");
-    if (!slot.is_active) return errResult("Destination slot is not active");
+    if (!slot.active) return errResult("Destination slot is not active");
     if (slot.plan_key !== m.plan_key)
       return errResult(`Plan mismatch: membership is ${m.plan_key}, slot is ${slot.plan_key}`);
 
@@ -39,7 +39,7 @@ export default defineTool({
       .from("memberships")
       .select("id", { count: "exact", head: true })
       .eq("standing_slot_id", new_standing_slot_id)
-      .in("status", ["active", "past_due", "pending"]);
+      .in("status", ["active", "pending_cancel", "paused"]);
     if (cErr) return errResult(cErr.message);
     const enrolled = count ?? 0;
     if (enrolled >= (slot.capacity ?? 0))

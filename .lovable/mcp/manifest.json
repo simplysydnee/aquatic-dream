@@ -330,10 +330,9 @@
               "type": "string",
               "enum": [
                 "active",
-                "past_due",
-                "canceled",
-                "paused",
-                "pending"
+                "pending_cancel",
+                "cancelled",
+                "paused"
               ]
             },
             "plan_key": {
