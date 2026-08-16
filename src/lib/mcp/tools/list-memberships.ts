@@ -18,7 +18,7 @@ export default defineTool({
     "List memberships with swimmer, plan, standing-slot (day/time/level), status, billing period, and parent contact. Optional filters: status, plan_key, and a name/email query.",
   inputSchema: {
     status: z
-      .enum(["active", "past_due", "canceled", "paused", "pending"])
+      .enum(["active", "pending_cancel", "cancelled", "paused"])
       .optional(),
     plan_key: z.enum(["kid_group", "private", "adult_group"]).optional(),
     query: z

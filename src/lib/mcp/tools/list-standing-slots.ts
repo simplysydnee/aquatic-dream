@@ -54,7 +54,7 @@ export default defineTool({
         .from("memberships")
         .select("standing_slot_id")
         .in("standing_slot_id", slotIds)
-        .eq("status", "active");
+        .in("status", ["active", "pending_cancel", "paused"]);
       for (const m of (mems as any[]) ?? []) {
         counts.set(m.standing_slot_id, (counts.get(m.standing_slot_id) ?? 0) + 1);
       }
