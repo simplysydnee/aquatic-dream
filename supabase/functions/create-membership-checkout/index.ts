@@ -58,6 +58,7 @@ serve(async (req) => {
       returnUrl,
       reuse_token,
       source,
+      hold_token,
     } = body ?? {};
 
     // SECURITY: the Stripe environment is server-controlled only. Any
