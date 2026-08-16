@@ -78,6 +78,35 @@ const HARD_DECLINE_CODES = new Set([
 
 const OCCUPYING_STATUSES = ["active", "pending_cancel", "paused"];
 
+function normalizeName(value: unknown): string {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
+async function markHoldConverted(payload: JsonObject): Promise<void> {
+  const holdToken = asNullableString(payload.hold_token);
+  if (!holdToken) return;
+  try {
+    const { data: hold } = await supabase
+      .from("membership_holds")
+      .select("id, status")
+      .eq("token", holdToken)
+      .maybeSingle();
+    if (hold?.status === "held") {
+      await supabase
+        .from("membership_holds")
+        .update({ status: "converted", converted_at: new Date().toISOString() })
+        .eq("id", hold.id as string);
+      console.log("[membership completion] hold converted by token", hold.id, "token", holdToken);
+    }
+  } catch (e) {
+    console.error("[membership completion] markHoldConverted failed", errorMessage(e));
+  }
+}
+
 /** True when the slot has no room left for one more membership. */
 async function slotIsFull(standingSlotId: string): Promise<boolean> {
   const { data: slot, error: slotErr } = await supabase
