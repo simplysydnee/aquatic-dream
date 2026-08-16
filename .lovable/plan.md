@@ -27,7 +27,7 @@ Log every hold closed with hold id, membership id, and the matched rule. Never d
 The hold token never reaches the server today; it is only smuggled into the `returnUrl`. The enrollment travels in `pending_memberships.payload`, so the token travels there too.
 
 - `JoinMembership.tsx`: add `hold_token: holdToken || null` to `buildCheckoutBody()`. Existing `returnUrl` behavior unchanged.
-- `create-membership-checkout`: read `hold_token` from the body, validate it is a reasonable-length string or null, include it in the staged payload. Never fail checkout when missing.
+- `create-membership-checkout`: read `hold_token` from the body, validate it is a reasonable-length string or null, include it in the staged payload. Never fail checkout when missing. The Checkout session is setup-mode and carries no metadata. Do not put the token on the Stripe session.
 - `_shared/membership-completion.ts`: add `markHoldConverted(payload)` that flips a still-`held` hold matching `payload.hold_token` to `converted`. Idempotent, wrapped in try/catch so it can never throw into completion, called from all three success exits of `ensureMembershipRecord` (existing-subscription short-circuit, replay reconcile, fresh insert).
 
 No email/slot fallback here; 1a covers that in one place with the stricter rule.
