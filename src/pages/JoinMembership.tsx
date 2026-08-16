@@ -408,11 +408,12 @@ function JoinMembershipForm() {
     return list;
   }, [plan, slots, swimLevel]);
 
-  // For Small Group Swim, hide full slots whenever at least one bookable slot
-  // exists for the selected level so parents only see times they can actually
-  // book. If every option is full, keep today's behavior and show the waitlist.
+  // Hide full slots whenever at least one bookable slot exists so parents only
+  // see times they can actually book, and the count above the list matches what
+  // is rendered. If every option is full, show the full ones with the waitlist
+  // since that is the only path left.
   const displaySlots = useMemo(() => {
-    if (!plan || plan.plan_key !== "kid_group") return planSlots;
+    if (!plan) return planSlots;
     const bookable = planSlots.filter((s) => !(s.is_full ?? s.spots_left <= 0));
     return bookable.length > 0 ? bookable : planSlots;
   }, [plan, planSlots]);
