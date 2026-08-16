@@ -415,13 +415,17 @@ const MembershipsAdmin = () => {
             </span>
             <Button
               size="sm"
-              variant="outline"
+              variant={paymentFilter === "problem" ? "secondary" : "outline"}
               onClick={() => {
-                setPaymentFilter("problem");
-                setIncludeInactive(true);
+                if (paymentFilter === "problem") {
+                  setPaymentFilter("all");
+                } else {
+                  setPaymentFilter("problem");
+                  setIncludeInactive(true);
+                }
               }}
             >
-              Show them
+              {paymentFilter === "problem" ? "Show everyone" : "Show them"}
             </Button>
           </div>
         </Card>
@@ -484,6 +488,22 @@ const MembershipsAdmin = () => {
             <Switch checked={includeInactive} onCheckedChange={setIncludeInactive} />
             Include cancelled and paused
           </label>
+          {(search || planFilter !== "all" || statusFilter !== "all" || dayFilter !== "all" || paymentFilter !== "all" || includeInactive) && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setSearch("");
+                setPlanFilter("all");
+                setStatusFilter("all");
+                setDayFilter("all");
+                setPaymentFilter("all");
+                setIncludeInactive(false);
+              }}
+            >
+              Clear filters
+            </Button>
+          )}
         </div>
       </Card>
 

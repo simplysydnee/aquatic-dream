@@ -58,6 +58,7 @@ serve(async (req) => {
       returnUrl,
       reuse_token,
       source,
+      hold_token,
     } = body ?? {};
 
     // SECURITY: the Stripe environment is server-controlled only. Any
@@ -287,6 +288,7 @@ serve(async (req) => {
       membership_agreement_accepted: membership_agreement_accepted === true,
       // Campaign tag from /join?src=..., kept short and sanitized.
       source: (String(source || "public").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40)) || "public",
+      hold_token: typeof hold_token === "string" && hold_token.trim() ? hold_token.trim() : null,
     };
 
     const { data: pending, error: pendErr } = await supabaseAdmin

@@ -894,6 +894,7 @@ function JoinMembershipForm() {
       source: joinSrc || "public",
       returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}${holdToken ? `&hold=${encodeURIComponent(holdToken)}` : ""}${joinSrc ? `&src=${encodeURIComponent(joinSrc)}` : ""}`,
       environment: getStripeEnvironment(),
+      hold_token: holdToken || null,
     };
   }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId, agreementAccepted, holdToken, joinSrc]);
 
@@ -967,9 +968,13 @@ function JoinMembershipForm() {
       if (holdToken) {
         const token = holdToken;
         void (async () => {
-          await supabase.functions.invoke("get-membership-hold", {
-            body: { token, action: "convert" },
-          });
+          try {
+            await supabase.functions.invoke("get-membership-hold", {
+              body: { token, action: "convert" },
+            });
+          } catch (e) {
+            console.error("[JoinMembership] saved-card hold convert failed", e);
+          }
           const next = await fetchNextHeldSwimmer(token);
           if (!next) return;
           setNextSwimmerToken(token);
@@ -1017,9 +1022,13 @@ function JoinMembershipForm() {
       const returningHold = p.get("hold");
       if (!returningHold) return;
       void (async () => {
-        await supabase.functions.invoke("get-membership-hold", {
-          body: { token: returningHold, action: "convert" },
-        });
+        try {
+          await supabase.functions.invoke("get-membership-hold", {
+            body: { token: returningHold, action: "convert" },
+          });
+        } catch (e) {
+          console.error("[JoinMembership] return hold convert failed", e);
+        }
         const next = await fetchNextHeldSwimmer(returningHold);
         if (cancelled || !next) return;
         setNextSwimmerToken(returningHold);
