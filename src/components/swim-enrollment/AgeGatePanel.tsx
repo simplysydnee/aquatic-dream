@@ -38,15 +38,27 @@ const AgeGatePanel = ({ kind, holdReleaseNotice, switching, onSwitch, onBackToPr
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         {adultInKids ? (
-          <Button
-            type="button"
-            disabled={switching}
-            onClick={() => onSwitch("adult_group")}
-            className="h-12 w-full bg-[#F58B76] text-white hover:bg-[#F58B76]/90 sm:w-auto"
-          >
-            {switching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Switch to Adult Swim"}
-          </Button>
+          <>
+            <Button
+              type="button"
+              disabled={switching}
+              onClick={() => onSwitch("adult_group")}
+              className="h-12 w-full bg-[#F58B76] text-white hover:bg-[#F58B76]/90 sm:w-auto"
+            >
+              {switching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Switch to Adult Swim"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={switching}
+              onClick={() => onSwitch("private")}
+              className="h-12 w-full border-[#2a5e84]/30 text-[#1a3a8a] hover:bg-[#2a5e84]/5 sm:w-auto"
+            >
+              Switch to Private Swim
+            </Button>
+          </>
         ) : (
+
           <>
             <Button
               type="button"
