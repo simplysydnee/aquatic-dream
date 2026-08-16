@@ -20,14 +20,14 @@ In `sweep-membership-holds`, before the expiry step, close any `held` hold that 
 
 Conditions 3 and 4 are not optional: adult-group families book several adults on one email into one slot. Hold `2daacf95` (Bhanuprett Kaurrh) matches a membership on email and slot alone, but that membership is a different swimmer created six days earlier.
 
-Log every hold closed with hold id, membership id, and the matched rule. Never delete a row, never touch a membership. Return the reconcile count alongside `expired` and `reminded`.
+Log every hold closed with hold id, membership id, and the matched rule. Never delete a row, never touch a membership. Return the reconcile count alongside `expired` and `reminded`. Implement the reconcile in TypeScript inside the edge function. A new Postgres function or view counts as a schema change and is out of scope.
 
 ### 1b. Close the hold at completion time
 
 The hold token never reaches the server today; it is only smuggled into the `returnUrl`. The enrollment travels in `pending_memberships.payload`, so the token travels there too.
 
 - `JoinMembership.tsx`: add `hold_token: holdToken || null` to `buildCheckoutBody()`. Existing `returnUrl` behavior unchanged.
-- `create-membership-checkout`: read `hold_token` from the body, validate it is a reasonable-length string or null, include it in the staged payload. Never fail checkout when missing.
+- `create-membership-checkout`: read `hold_token` from the body, validate it is a reasonable-length string or null, include it in the staged payload. Never fail checkout when missing. The Checkout session is setup-mode and carries no metadata. Do not put the token on the Stripe session.
 - `_shared/membership-completion.ts`: add `markHoldConverted(payload)` that flips a still-`held` hold matching `payload.hold_token` to `converted`. Idempotent, wrapped in try/catch so it can never throw into completion, called from all three success exits of `ensureMembershipRecord` (existing-subscription short-circuit, replay reconcile, fresh insert).
 
 No email/slot fallback here; 1a covers that in one place with the stricter rule.
