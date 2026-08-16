@@ -164,5 +164,7 @@ Private and adult_group slots are untouched by every statement above.
 ## Expected result after the backfill
 
 - `3c7ac5c2` (Mon 4:30 PM) becomes `swim_level = yellow`, matching its occupant and `accepted_levels`.
-- The four empty Monday slots get `swim_level = NULL`, correctly reading as open to any level.
-- The remaining locked slots already match and stay as they are.
+- Exactly FIVE slots end with `swim_level IS NULL`, correctly reading as open to any level.
+- The remaining six locked slots already match and stay as they are.
+- Post-change, the same 12-row table is printed and checked against those two expectations.
+
