@@ -397,14 +397,17 @@ function JoinMembershipForm() {
     if (!plan) return [];
     let list = slots.filter((s) => s.plan_key === plan.plan_key);
     if (plan.plan_key === "kid_group" && swimLevel) {
-      list = list.filter((s) =>
-        s.accepted_levels && s.accepted_levels.length > 0
-          ? s.accepted_levels.includes(swimLevel)
-          : s.swim_level === swimLevel,
+      // No accepted_levels means the class is unlocked and open to any group.
+      list = list.filter(
+        (s) =>
+          !s.accepted_levels ||
+          s.accepted_levels.length === 0 ||
+          s.accepted_levels.includes(swimLevel),
       );
     }
     return list;
   }, [plan, slots, swimLevel]);
+
 
   // Slot picker filters (step 2)
   const [filterDay, setFilterDay] = useState<string>("any");
@@ -536,13 +539,15 @@ function JoinMembershipForm() {
     }
   };
 
-  /** Levels a Small Group slot accepts, falling back to its single level. */
+  /**
+   * Levels a Small Group slot accepts. An empty list means the class is
+   * unlocked and open to any group until the first swimmer enrolls.
+   */
   const acceptedLevelsOf = (s: Slot | null): SwimLevel[] => {
     if (!s) return [];
-    const arr = (s.accepted_levels || []).filter(Boolean) as SwimLevel[];
-    if (arr.length > 0) return arr;
-    return s.swim_level ? [s.swim_level] : [];
+    return (s.accepted_levels || []).filter(Boolean) as SwimLevel[];
   };
+
 
   const handleAssessmentComplete = (level: SwimLevel, _age: number, dob: string) => {
     setSwimLevel(level);

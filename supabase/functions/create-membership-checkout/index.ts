@@ -177,7 +177,7 @@ serve(async (req) => {
 
     const { data: slot, error: slotErr } = await supabaseAdmin
       .from("standing_slots")
-      .select("id, plan_key, day_of_week, start_time, end_time, capacity, instructor_id, active, swim_level")
+      .select("id, plan_key, day_of_week, start_time, end_time, capacity, instructor_id, active, swim_level, accepted_levels")
       .eq("id", standing_slot_id)
       .maybeSingle();
     if (slotErr || !slot || !slot.active) return json({ error: "Slot not available" }, 404);
@@ -191,6 +191,24 @@ serve(async (req) => {
     if (cntErr) return json({ error: "Capacity check failed" }, 500);
     const spotsLeft = (slot.capacity ?? 0) - (usedCount ?? 0);
     if (spotsLeft <= 0) return json({ error: "This slot is full" }, 409);
+
+    // Small Group classes lock to the level of the first swimmer enrolled.
+    // An empty accepted_levels means the class is still open to any group.
+    if (plan_key === "kid_group") {
+      const accepted = ((slot as any).accepted_levels as string[] | null) ?? null;
+      if (accepted && accepted.length > 0 && !accepted.includes(swim_level)) {
+        return json(
+          {
+            error:
+              "This class is now set to a different swim group. Please pick another class time that matches your swimmer's group.",
+            levelMismatch: true,
+          },
+          409,
+        );
+      }
+    }
+
+
 
     const stripe = createStripeClient(ENV);
 
@@ -367,8 +385,16 @@ serve(async (req) => {
                   "Your bank declined the card we had on file. Please enter a different card below.",
               }, 402);
             }
+            if (String(e?.message || "").includes("MEMBERSHIP_LEVEL_MISMATCH")) {
+              return json({
+                levelMismatch: true,
+                error:
+                  "This class is now set to a different swim group. You have not been charged. Please pick another class time that matches your swimmer's group.",
+              }, 409);
+            }
             // Anything else: fall through to normal Checkout so the parent
             // can still enroll by entering a card.
+
             console.error("[create-membership-checkout] saved-card completion failed", e?.message || e);
             // The pending row above may already be claimed by the failed
             // attempt, so stage a fresh one for the Checkout fallback.
@@ -448,7 +474,18 @@ serve(async (req) => {
     console.error("[create-membership-checkout] error", {
       type: e?.type, code: e?.code, message: e?.message, raw: e?.raw?.message, stack: e?.stack,
     });
+    if (String(e?.message || "").includes("MEMBERSHIP_LEVEL_MISMATCH")) {
+      return json(
+        {
+          levelMismatch: true,
+          error:
+            "This class is now set to a different swim group. Please pick another class time that matches your swimmer's group.",
+        },
+        409,
+      );
+    }
     return json({ error: (e as Error).message, stripe_type: e?.type, stripe_code: e?.code }, 500);
+
   }
 });
 
