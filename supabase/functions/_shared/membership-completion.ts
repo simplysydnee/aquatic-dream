@@ -638,6 +638,7 @@ async function ensureMembershipRecord(options: {
       await sendWelcomeIfNeeded(winner.id as string, options.payload).catch((e) =>
         console.error("[membership completion] welcome send failed", errorMessage(e)),
       );
+      await markHoldConverted(options.payload);
       return {
         membershipId: winner.id as string,
         subscriptionId: options.subscriptionId,
