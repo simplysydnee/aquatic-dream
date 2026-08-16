@@ -494,21 +494,22 @@ function JoinMembershipForm() {
       return;
     }
     setWaitlistSubmitting(true);
-    const { error } = await supabase.from("membership_waitlist").insert({
-      plan_key: plan.plan_key,
-      standing_slot_id: waitlistSlot?.id ?? null,
-      swim_level: plan.plan_key === "kid_group" ? swimLevel : null,
-      preferred_day: waitlistSlot?.day_of_week ?? null,
-      preferred_time: waitlistSlot?.start_time ?? null,
-      swimmer_name: waitlistForm.swimmer_name.trim(),
-      parent_name: waitlistForm.parent_name.trim(),
-      parent_email: waitlistForm.parent_email.trim(),
-      parent_phone: waitlistForm.parent_phone.trim(),
-      notes: waitlistForm.notes.trim() || null,
-      status: "open",
+    const { data, error } = await supabase.functions.invoke("submit-membership-waitlist", {
+      body: {
+        planKey: plan.plan_key,
+        standingSlotId: waitlistSlot?.id ?? null,
+        swimLevel: plan.plan_key === "kid_group" ? swimLevel : null,
+        preferredDay: waitlistSlot?.day_of_week ?? null,
+        preferredTime: waitlistSlot?.start_time ?? null,
+        swimmerName: waitlistForm.swimmer_name.trim(),
+        parentName: waitlistForm.parent_name.trim(),
+        parentEmail: waitlistForm.parent_email.trim(),
+        parentPhone: waitlistForm.parent_phone.trim(),
+        notes: waitlistForm.notes.trim() || null,
+      },
     });
     setWaitlistSubmitting(false);
-    if (error) {
+    if (error || !(data as { success?: boolean } | null)?.success) {
       toast.error("Could not save your request. Please call (209) 577-3483.");
       return;
     }
