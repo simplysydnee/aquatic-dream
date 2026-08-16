@@ -397,14 +397,17 @@ function JoinMembershipForm() {
     if (!plan) return [];
     let list = slots.filter((s) => s.plan_key === plan.plan_key);
     if (plan.plan_key === "kid_group" && swimLevel) {
-      list = list.filter((s) =>
-        s.accepted_levels && s.accepted_levels.length > 0
-          ? s.accepted_levels.includes(swimLevel)
-          : s.swim_level === swimLevel,
+      // No accepted_levels means the class is unlocked and open to any group.
+      list = list.filter(
+        (s) =>
+          !s.accepted_levels ||
+          s.accepted_levels.length === 0 ||
+          s.accepted_levels.includes(swimLevel),
       );
     }
     return list;
   }, [plan, slots, swimLevel]);
+
 
   // Slot picker filters (step 2)
   const [filterDay, setFilterDay] = useState<string>("any");

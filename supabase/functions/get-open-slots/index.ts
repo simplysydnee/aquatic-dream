@@ -128,15 +128,16 @@ serve(async (req) => {
       });
 
     // Optional level filter — only applies to kid_group (Small Group Swim).
-    // Match against accepted_levels when present, falling back to swim_level.
+    // A slot with no accepted_levels is unlocked and accepts ANY level; the
+    // first swimmer to enroll locks it (DB trigger owns that).
     if (swimLevel) {
       result = result.filter((s) => {
         if (s.plan_key !== "kid_group") return true;
-        return s.accepted_levels && s.accepted_levels.length > 0
-          ? s.accepted_levels.includes(swimLevel)
-          : s.swim_level === swimLevel;
+        if (!s.accepted_levels || s.accepted_levels.length === 0) return true;
+        return s.accepted_levels.includes(swimLevel);
       });
     }
+
 
     return new Response(
       JSON.stringify({ slots: result, plans: plans || [] }),
