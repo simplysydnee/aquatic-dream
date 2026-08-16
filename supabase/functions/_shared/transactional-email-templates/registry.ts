@@ -71,6 +71,8 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'internal-membership-cancellation-alert': internalMembershipCancellationAlert,
   'lesson-billing-audit': lessonBillingAudit,
   'lesson-charge-receipt': lessonChargeReceipt,
+  'membership-waitlist-confirmation': membershipWaitlistConfirmation,
+  'internal-membership-waitlist-alert': internalMembershipWaitlistAlert,
 
 }
 
