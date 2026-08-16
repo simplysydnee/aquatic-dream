@@ -32,7 +32,67 @@ Deno.serve(async (req) => {
       .select("id");
     if (expErr) throw expErr;
 
-    // 2. One reminder per hold, ever.
+    // 2. Reconcile held phone holds that already became memberships. A parent
+    // may complete checkout but close the browser before the return URL fires,
+    // leaving the hold in 'held'. Match by slot + email + normalized swimmer
+    // name + membership created no earlier than the hold.
+    const { data: heldForReconcile, error: recErr } = await supabase
+      .from("membership_holds")
+      .select("id, standing_slot_id, parent_email, swimmer_name, created_at")
+      .eq("status", "held");
+    if (recErr) throw recErr;
+
+    function normalizeName(value: string): string {
+      return value
+        .toLowerCase()
+        .replace(/\s+/g, " ") // collapse whitespace
+        .replace(/[^a-z0-9]/g, "") // drop punctuation
+        .trim();
+    }
+
+    let reconciled = 0;
+    if ((heldForReconcile ?? []).length > 0) {
+      const slotIds = [...new Set(heldForReconcile!.map((h) => h.standing_slot_id))];
+      const { data: slotMembers, error: memErr } = await supabase
+        .from("memberships")
+        .select("id, standing_slot_id, parent_email, child_first_name, child_last_name, status, created_at")
+        .in("standing_slot_id", slotIds)
+        .not("status", "eq", "cancelled");
+      if (memErr) throw memErr;
+
+      const memberMap = new Map<string, typeof slotMembers>();
+      for (const m of slotMembers ?? []) {
+        const list = memberMap.get(m.standing_slot_id) ?? [];
+        list.push(m);
+        memberMap.set(m.standing_slot_id, list);
+      }
+
+      const now = new Date().toISOString();
+      for (const hold of heldForReconcile ?? []) {
+        const holdName = normalizeName(hold.swimmer_name || "");
+        const candidates = memberMap.get(hold.standing_slot_id) ?? [];
+        const match = candidates.find((m) => {
+          if ((m.parent_email || "").toLowerCase() !== (hold.parent_email || "").toLowerCase()) return false;
+          const memberName = normalizeName(`${m.child_first_name || ""} ${m.child_last_name || ""}`);
+          if (memberName !== holdName) return false;
+          if (new Date(m.created_at).getTime() < new Date(hold.created_at).getTime()) return false;
+          return true;
+        });
+        if (match) {
+          await supabase
+            .from("membership_holds")
+            .update({
+              status: "converted",
+              converted_at: now,
+              notes: `Reconciled by sweep: membership ${match.id} completed ${match.created_at}.`,
+            })
+            .eq("id", hold.id);
+          reconciled++;
+        }
+      }
+    }
+
+    // 3. One reminder per hold, ever.
     const reminderCutoff = new Date(nowMs - REMINDER_AFTER_HOURS * 60 * 60 * 1000).toISOString();
     const { data: due, error: dueErr } = await supabase
       .from("membership_holds")
