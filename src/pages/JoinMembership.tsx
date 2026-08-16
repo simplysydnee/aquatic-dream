@@ -894,6 +894,7 @@ function JoinMembershipForm() {
       source: joinSrc || "public",
       returnUrl: `${window.location.origin}/join?membership=success&session_id={CHECKOUT_SESSION_ID}${holdToken ? `&hold=${encodeURIComponent(holdToken)}` : ""}${joinSrc ? `&src=${encodeURIComponent(joinSrc)}` : ""}`,
       environment: getStripeEnvironment(),
+      hold_token: holdToken || null,
     };
   }, [plan, slot, form, authRecurring, smsConsent, swimLevel, childDob, waiverId, agreementAccepted, holdToken, joinSrc]);
 
