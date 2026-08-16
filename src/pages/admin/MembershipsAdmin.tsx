@@ -488,6 +488,22 @@ const MembershipsAdmin = () => {
             <Switch checked={includeInactive} onCheckedChange={setIncludeInactive} />
             Include cancelled and paused
           </label>
+          {(search || planFilter !== "all" || statusFilter !== "all" || dayFilter !== "all" || paymentFilter !== "all" || includeInactive) && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setSearch("");
+                setPlanFilter("all");
+                setStatusFilter("all");
+                setDayFilter("all");
+                setPaymentFilter("all");
+                setIncludeInactive(false);
+              }}
+            >
+              Clear filters
+            </Button>
+          )}
         </div>
       </Card>
 
