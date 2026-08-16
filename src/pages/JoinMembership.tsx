@@ -408,6 +408,15 @@ function JoinMembershipForm() {
     return list;
   }, [plan, slots, swimLevel]);
 
+  // For Small Group Swim, hide full slots whenever at least one bookable slot
+  // exists for the selected level so parents only see times they can actually
+  // book. If every option is full, keep today's behavior and show the waitlist.
+  const displaySlots = useMemo(() => {
+    if (!plan || plan.plan_key !== "kid_group") return planSlots;
+    const bookable = planSlots.filter((s) => !(s.is_full ?? s.spots_left <= 0));
+    return bookable.length > 0 ? bookable : planSlots;
+  }, [plan, planSlots]);
+
 
   // Slot picker filters (step 2)
   const [filterDay, setFilterDay] = useState<string>("any");
@@ -421,15 +430,15 @@ function JoinMembershipForm() {
   }, []);
 
   const dayOptions = useMemo(
-    () => Array.from(new Set(planSlots.map((s) => s.day_of_week))).sort((a, b) => a - b),
-    [planSlots],
+    () => Array.from(new Set(displaySlots.map((s) => s.day_of_week))).sort((a, b) => a - b),
+    [displaySlots],
   );
   const instructorOptions = useMemo(
     () =>
       Array.from(
-        new Set(planSlots.map((s) => s.instructor_name).filter((n): n is string => !!n)),
+        new Set(displaySlots.map((s) => s.instructor_name).filter((n): n is string => !!n)),
       ).sort((a, b) => a.localeCompare(b)),
-    [planSlots],
+    [displaySlots],
   );
 
   const timeBucket = (start: string) => {
@@ -439,17 +448,17 @@ function JoinMembershipForm() {
     return "evening";
   };
 
-  const showFilterBar = planSlots.length > 8;
+  const showFilterBar = displaySlots.length > 8;
 
   const visibleSlots = useMemo(() => {
-    if (!showFilterBar) return planSlots;
-    return planSlots.filter((s) => {
+    if (!showFilterBar) return displaySlots;
+    return displaySlots.filter((s) => {
       if (filterDay !== "any" && String(s.day_of_week) !== filterDay) return false;
       if (filterInstructor !== "any" && s.instructor_name !== filterInstructor) return false;
       if (filterTime !== "any" && timeBucket(s.start_time) !== filterTime) return false;
       return true;
     });
-  }, [planSlots, showFilterBar, filterDay, filterInstructor, filterTime]);
+  }, [displaySlots, showFilterBar, filterDay, filterInstructor, filterTime]);
 
   const groupedSlots = useMemo(() => {
     const map = new Map<number, Slot[]>();
@@ -1638,7 +1647,7 @@ function JoinMembershipForm() {
                       Try again
                     </Button>
                   </div>
-                ) : planSlots.length === 0 ? (
+                ) : displaySlots.length === 0 ? (
                   <div className="py-8 text-center text-[#2a5e84]">
                     <p className="mb-4">
                       {plan.plan_key === "kid_group" && swimLevel
