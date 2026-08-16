@@ -177,7 +177,7 @@ serve(async (req) => {
 
     const { data: slot, error: slotErr } = await supabaseAdmin
       .from("standing_slots")
-      .select("id, plan_key, day_of_week, start_time, end_time, capacity, instructor_id, active, swim_level")
+      .select("id, plan_key, day_of_week, start_time, end_time, capacity, instructor_id, active, swim_level, accepted_levels")
       .eq("id", standing_slot_id)
       .maybeSingle();
     if (slotErr || !slot || !slot.active) return json({ error: "Slot not available" }, 404);
