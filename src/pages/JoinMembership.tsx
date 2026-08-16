@@ -968,9 +968,13 @@ function JoinMembershipForm() {
       if (holdToken) {
         const token = holdToken;
         void (async () => {
-          await supabase.functions.invoke("get-membership-hold", {
-            body: { token, action: "convert" },
-          });
+          try {
+            await supabase.functions.invoke("get-membership-hold", {
+              body: { token, action: "convert" },
+            });
+          } catch (e) {
+            console.error("[JoinMembership] saved-card hold convert failed", e);
+          }
           const next = await fetchNextHeldSwimmer(token);
           if (!next) return;
           setNextSwimmerToken(token);
