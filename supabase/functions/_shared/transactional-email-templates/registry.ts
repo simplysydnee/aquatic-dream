@@ -36,6 +36,8 @@ import { template as membershipCancellationConfirmation } from './membership-can
 import { template as internalMembershipCancellationAlert } from './internal-membership-cancellation-alert.tsx'
 import { template as lessonBillingAudit } from './lesson-billing-audit.tsx'
 import { template as lessonChargeReceipt } from './lesson-charge-receipt.tsx'
+import { template as membershipWaitlistConfirmation } from './membership-waitlist-confirmation.tsx'
+import { template as internalMembershipWaitlistAlert } from './internal-membership-waitlist-alert.tsx'
 
 
 
