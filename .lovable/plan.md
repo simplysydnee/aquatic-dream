@@ -4,10 +4,26 @@
 
 `standing_slots.swim_level` is stale seed data. The lock triggers only write `accepted_levels`, so the two fields drift.
 
-Verified in the database right now (kid_group slots):
+Verified in the database right now (all 12 kid_group slots, all Monday, capacity 3):
 
-- Monday 4:30 PM slot `3c7ac5c2`: `swim_level = red` but `accepted_levels = ['yellow']` — the only occupant is yellow, so every admin screen reading `swim_level` shows the wrong level.
-- Four empty Monday slots still carry a leftover `swim_level` (white, red, yellow, red) while `accepted_levels` is NULL, meaning they are actually open to any level.
+| id | time | swim_level | accepted_levels | occupants |
+|---|---|---|---|---|
+| e2d825e1 | 4:00 PM | white | NULL | 0 |
+| 79039baa | 4:00 PM | red | {red} | 1 |
+| 3c7ac5c2 | 4:30 PM | red | {yellow} | 1 |
+| b73757c1 | 4:30 PM | blue | {blue,green} | 3 |
+| 046769b4 | 5:00 PM | white | {white} | 1 |
+| bd34a699 | 5:00 PM | blue | {blue,green} | 3 |
+| 4241c649 | 5:30 PM | yellow | NULL | 0 |
+| aae7c3ab | 5:30 PM | red | NULL | 0 |
+| 83c18cfa | 6:00 PM | red | NULL | 0 |
+| dbcd3032 | 6:00 PM | white | NULL | 0 |
+| 71379f21 | 6:30 PM | yellow | {yellow} | 1 |
+| 778fde91 | 6:30 PM | blue | {blue,green} | 3 |
+
+- Slot `3c7ac5c2` (4:30 PM): `swim_level = red` but `accepted_levels = ['yellow']` — its only occupant is yellow, so every admin screen reading `swim_level` shows the wrong level.
+- FIVE empty slots carry a leftover `swim_level` while `accepted_levels` is NULL: 4:00 PM white, 5:30 PM yellow, 5:30 PM red, 6:00 PM red, 6:00 PM white.
+
 
 ## What changes
 
