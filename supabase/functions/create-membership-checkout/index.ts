@@ -192,6 +192,24 @@ serve(async (req) => {
     const spotsLeft = (slot.capacity ?? 0) - (usedCount ?? 0);
     if (spotsLeft <= 0) return json({ error: "This slot is full" }, 409);
 
+    // Small Group classes lock to the level of the first swimmer enrolled.
+    // An empty accepted_levels means the class is still open to any group.
+    if (plan_key === "kid_group") {
+      const accepted = ((slot as any).accepted_levels as string[] | null) ?? null;
+      if (accepted && accepted.length > 0 && !accepted.includes(swim_level)) {
+        return json(
+          {
+            error:
+              "This class is now set to a different swim group. Please pick another class time that matches your swimmer's group.",
+            levelMismatch: true,
+          },
+          409,
+        );
+      }
+    }
+
+
+
     const stripe = createStripeClient(ENV);
 
     // Cache Stripe product/price IDs PER ENVIRONMENT.
