@@ -474,7 +474,18 @@ serve(async (req) => {
     console.error("[create-membership-checkout] error", {
       type: e?.type, code: e?.code, message: e?.message, raw: e?.raw?.message, stack: e?.stack,
     });
+    if (String(e?.message || "").includes("MEMBERSHIP_LEVEL_MISMATCH")) {
+      return json(
+        {
+          levelMismatch: true,
+          error:
+            "This class is now set to a different swim group. Please pick another class time that matches your swimmer's group.",
+        },
+        409,
+      );
+    }
     return json({ error: (e as Error).message, stripe_type: e?.type, stripe_code: e?.code }, 500);
+
   }
 });
 
