@@ -31,6 +31,10 @@ export type AgeGateKind = "adult_in_kids" | "minor_in_adult";
 /**
  * Returns the mismatch between the swimmer's age and the chosen program, or
  * null when the pairing is allowed (or the DOB is not usable yet).
+ *
+ * Adults (18 and over) may book Private Swim; those lessons are tagged Adult
+ * for staff. Only Small Group is kids only, since it groups swimmers by level
+ * and age.
  */
 export function programAgeMismatch(
   planKey: ProgramKey | null | undefined,
@@ -41,14 +45,15 @@ export function programAgeMismatch(
   const age = ageFromDob(dob, today);
   if (age === null || age < 0) return null;
   const adult = isAdultAge(age);
-  if (adult && planKey !== "adult_group") return "adult_in_kids";
+  if (adult && planKey === "kid_group") return "adult_in_kids";
   if (!adult && planKey === "adult_group") return "minor_in_adult";
   return null;
 }
 
 /** Audience label shown on the program picker and the landing page cards. */
 export const PROGRAM_AGE_LABELS: Record<ProgramKey, string> = {
-  private: "Ages 3 to 17",
+  private: "Ages 3 and up",
   kid_group: "Ages 3 to 17",
   adult_group: "18 and over",
 };
+
