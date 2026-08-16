@@ -20,7 +20,7 @@ In `sweep-membership-holds`, before the expiry step, close any `held` hold that 
 
 Conditions 3 and 4 are not optional: adult-group families book several adults on one email into one slot. Hold `2daacf95` (Bhanuprett Kaurrh) matches a membership on email and slot alone, but that membership is a different swimmer created six days earlier.
 
-Log every hold closed with hold id, membership id, and the matched rule. Never delete a row, never touch a membership. Return the reconcile count alongside `expired` and `reminded`.
+Log every hold closed with hold id, membership id, and the matched rule. Never delete a row, never touch a membership. Return the reconcile count alongside `expired` and `reminded`. Implement the reconcile in TypeScript inside the edge function. A new Postgres function or view counts as a schema change and is out of scope.
 
 ### 1b. Close the hold at completion time
 
