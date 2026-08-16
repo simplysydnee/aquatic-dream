@@ -45,7 +45,7 @@ interface OpenSlot {
 const PROGRAM_ORDER: PlanKey[] = ["private", "kid_group", "adult_group"];
 
 const PROGRAM_COPY: Record<PlanKey, { name: string; blurb: string }> = {
-  private: { name: "Private Swim", blurb: "One-on-one · Ages 3 to 17" },
+  private: { name: "Private Swim", blurb: "One-on-one · Ages 3 and up" },
   kid_group: { name: "Small Group", blurb: "Max 3 swimmers · Ages 3 to 17" },
   adult_group: { name: "Adult Swim", blurb: "2 adults max · 18 and over" },
 };

@@ -21,12 +21,13 @@ const AgeGatePanel = ({ kind, holdReleaseNotice, switching, onSwitch, onBackToPr
   return (
     <div className="rounded-lg border-2 border-[#F58B76] bg-[#F58B76]/5 p-5 sm:p-6">
       <h2 className="text-xl font-semibold text-[#1a3a8a]">
-        {adultInKids ? "Adult Swim is the right fit" : "Adult Swim is for 18 and over"}
+        {adultInKids ? "Small Group is for swimmers under 18" : "Adult Swim is for 18 and over"}
       </h2>
       <p className="mt-3 text-sm leading-relaxed text-[#2a5e84]">
         {adultInKids
-          ? "Swimmers 18 and over enroll in Adult Swim. It is $140 a month instead of $200, runs Tuesday evenings at 7:15, and is a small group of two adults."
+          ? "Small Group classes are grouped by level and age for swimmers under 18. Swimmers 18 and over join Adult Swim, which is $140 a month, runs Tuesday evenings at 7:15, and holds two adults. One on one Private Swim is also open to adults."
           : "Adult Swim is for swimmers 18 and over. Swimmers under 18 join Private Swim for one on one coaching, or Small Group with no more than three swimmers matched by level."}
+
       </p>
 
       {holdReleaseNotice && (
@@ -37,15 +38,27 @@ const AgeGatePanel = ({ kind, holdReleaseNotice, switching, onSwitch, onBackToPr
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         {adultInKids ? (
-          <Button
-            type="button"
-            disabled={switching}
-            onClick={() => onSwitch("adult_group")}
-            className="h-12 w-full bg-[#F58B76] text-white hover:bg-[#F58B76]/90 sm:w-auto"
-          >
-            {switching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Switch to Adult Swim"}
-          </Button>
+          <>
+            <Button
+              type="button"
+              disabled={switching}
+              onClick={() => onSwitch("adult_group")}
+              className="h-12 w-full bg-[#F58B76] text-white hover:bg-[#F58B76]/90 sm:w-auto"
+            >
+              {switching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Switch to Adult Swim"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={switching}
+              onClick={() => onSwitch("private")}
+              className="h-12 w-full border-[#2a5e84]/30 text-[#1a3a8a] hover:bg-[#2a5e84]/5 sm:w-auto"
+            >
+              Switch to Private Swim
+            </Button>
+          </>
         ) : (
+
           <>
             <Button
               type="button"
