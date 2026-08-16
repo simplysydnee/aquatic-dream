@@ -385,8 +385,16 @@ serve(async (req) => {
                   "Your bank declined the card we had on file. Please enter a different card below.",
               }, 402);
             }
+            if (String(e?.message || "").includes("MEMBERSHIP_LEVEL_MISMATCH")) {
+              return json({
+                levelMismatch: true,
+                error:
+                  "This class is now set to a different swim group. You have not been charged. Please pick another class time that matches your swimmer's group.",
+              }, 409);
+            }
             // Anything else: fall through to normal Checkout so the parent
             // can still enroll by entering a card.
+
             console.error("[create-membership-checkout] saved-card completion failed", e?.message || e);
             // The pending row above may already be claimed by the failed
             // attempt, so stage a fresh one for the Checkout fallback.
