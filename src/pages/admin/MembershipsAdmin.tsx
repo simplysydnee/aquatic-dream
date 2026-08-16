@@ -415,13 +415,17 @@ const MembershipsAdmin = () => {
             </span>
             <Button
               size="sm"
-              variant="outline"
+              variant={paymentFilter === "problem" ? "secondary" : "outline"}
               onClick={() => {
-                setPaymentFilter("problem");
-                setIncludeInactive(true);
+                if (paymentFilter === "problem") {
+                  setPaymentFilter("all");
+                } else {
+                  setPaymentFilter("problem");
+                  setIncludeInactive(true);
+                }
               }}
             >
-              Show them
+              {paymentFilter === "problem" ? "Show everyone" : "Show them"}
             </Button>
           </div>
         </Card>
