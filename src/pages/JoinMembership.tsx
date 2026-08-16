@@ -1647,7 +1647,7 @@ function JoinMembershipForm() {
                       Try again
                     </Button>
                   </div>
-                ) : planSlots.length === 0 ? (
+                ) : displaySlots.length === 0 ? (
                   <div className="py-8 text-center text-[#2a5e84]">
                     <p className="mb-4">
                       {plan.plan_key === "kid_group" && swimLevel
