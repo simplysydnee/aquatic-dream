@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
       reminded++;
     }
 
-    return json({ expired: (expired ?? []).length, reminded });
+    return json({ expired: (expired ?? []).length, reconciled, reminded });
   } catch (e) {
     console.error("[sweep-membership-holds] error", e);
     return json({ error: (e as Error).message || "Something went wrong" }, 500);
