@@ -539,13 +539,15 @@ function JoinMembershipForm() {
     }
   };
 
-  /** Levels a Small Group slot accepts, falling back to its single level. */
+  /**
+   * Levels a Small Group slot accepts. An empty list means the class is
+   * unlocked and open to any group until the first swimmer enrolls.
+   */
   const acceptedLevelsOf = (s: Slot | null): SwimLevel[] => {
     if (!s) return [];
-    const arr = (s.accepted_levels || []).filter(Boolean) as SwimLevel[];
-    if (arr.length > 0) return arr;
-    return s.swim_level ? [s.swim_level] : [];
+    return (s.accepted_levels || []).filter(Boolean) as SwimLevel[];
   };
+
 
   const handleAssessmentComplete = (level: SwimLevel, _age: number, dob: string) => {
     setSwimLevel(level);
