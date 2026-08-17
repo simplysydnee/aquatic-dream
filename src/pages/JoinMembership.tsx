@@ -1874,13 +1874,31 @@ function JoinMembershipForm() {
                     <Input
                       type="date"
                       value={childDob}
-                      onChange={(e) => setChildDob(e.target.value)}
+                      onChange={(e) => {
+                        setChildDob(e.target.value);
+                        setDobSettled(false);
+                      }}
+                      onBlur={() => setDobSettled(true)}
                       max={new Date().toISOString().slice(0, 10)}
                     />
-                    {plan.plan_key === "kid_group" && !!childDob && (
+                    {plan.plan_key === "kid_group" && !!childDob && !ageMismatch && (
                       <p className="mt-1 text-xs text-[#2a5e84]">
                         From your assessment. Edit if needed.
                       </p>
+                    )}
+                    {ageMismatch && (
+                      <div className="mt-3">
+                        <AgeGatePanel
+                          kind={ageMismatch}
+                          holdReleaseNotice={holdReleaseNotice}
+                          switching={switchingProgram}
+                          onSwitch={switchProgram}
+                          onBackToPrograms={holdToken ? undefined : backToPrograms}
+                        />
+                        <p className="mt-2 text-xs text-[#2a5e84]">
+                          Entered the wrong date? Just fix the date of birth above.
+                        </p>
+                      </div>
                     )}
                   </div>
                   {!isAdult && (
