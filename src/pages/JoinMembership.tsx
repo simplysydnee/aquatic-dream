@@ -259,6 +259,10 @@ function JoinMembershipForm() {
   const [slot, setSlot] = useState<Slot | null>(null);
   const [swimLevel, setSwimLevel] = useState<SwimLevel | null>(null);
   const [childDob, setChildDob] = useState<string>("");
+  // The age gate only reads a settled date of birth: on blur, on Continue, or
+  // straight from the assessment. Never mid-typing, which used to swap the
+  // whole form out for the switch-programs panel.
+  const [dobSettled, setDobSettled] = useState(false);
   const [form, setForm] = useState({
     child_first: "",
     child_last: "",

@@ -15,6 +15,9 @@ export function ageFromDob(dob: string | null | undefined, today: Date = new Dat
   const month = Number(m[2]);
   const day = Number(m[3]);
   if (!year || !month || !day) return null;
+  // An in-progress or implausible date must never drive the age gate.
+  if (year < 1900 || year > today.getFullYear()) return null;
+  if (month > 12 || day > 31) return null;
   let age = today.getFullYear() - year;
   const beforeBirthday =
     today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day);
