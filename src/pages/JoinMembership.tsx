@@ -259,6 +259,10 @@ function JoinMembershipForm() {
   const [slot, setSlot] = useState<Slot | null>(null);
   const [swimLevel, setSwimLevel] = useState<SwimLevel | null>(null);
   const [childDob, setChildDob] = useState<string>("");
+  // The age gate only reads a settled date of birth: on blur, on Continue, or
+  // straight from the assessment. Never mid-typing, which used to swap the
+  // whole form out for the switch-programs panel.
+  const [dobSettled, setDobSettled] = useState(false);
   const [form, setForm] = useState({
     child_first: "",
     child_last: "",
@@ -563,6 +567,7 @@ function JoinMembershipForm() {
   const handleAssessmentComplete = (level: SwimLevel, _age: number, dob: string) => {
     setSwimLevel(level);
     setChildDob(dob);
+    setDobSettled(true);
     setShowAssessment(false);
     // 18 and over cannot be in Small Group. Stay on step 1, where the age gate
     // panel renders in place of the program picker.
@@ -606,7 +611,7 @@ function JoinMembershipForm() {
   };
 
   // ---- Age gate (public /join only) ----------------------------------------
-  const ageMismatch = programAgeMismatch(plan?.plan_key, childDob);
+  const ageMismatch = programAgeMismatch(plan?.plan_key, dobSettled ? childDob : null);
   const [switchingProgram, setSwitchingProgram] = useState(false);
 
   const holdReleaseNotice =
@@ -699,6 +704,10 @@ function JoinMembershipForm() {
 
   // Advance from info: check for on-file waiver before rendering step 4.
   const handleInfoContinue = async () => {
+    // Settle the date of birth first, so a value typed and never blurred is
+    // still checked against the program before anyone moves on.
+    setDobSettled(true);
+    if (programAgeMismatch(plan?.plan_key, childDob)) return;
     if (!canContinueStep3) {
       toast.error("Please complete all required fields");
       return;
@@ -1825,17 +1834,7 @@ function JoinMembershipForm() {
               </>
             )}
 
-            {step === 3 && plan && ageMismatch && (
-              <AgeGatePanel
-                kind={ageMismatch}
-                holdReleaseNotice={holdReleaseNotice}
-                switching={switchingProgram}
-                onSwitch={switchProgram}
-                onBackToPrograms={holdToken ? undefined : backToPrograms}
-              />
-            )}
-
-            {step === 3 && plan && !ageMismatch && (
+            {step === 3 && plan && (
               <>
                 {!holdToken && (
                   <button
@@ -1875,13 +1874,31 @@ function JoinMembershipForm() {
                     <Input
                       type="date"
                       value={childDob}
-                      onChange={(e) => setChildDob(e.target.value)}
+                      onChange={(e) => {
+                        setChildDob(e.target.value);
+                        setDobSettled(false);
+                      }}
+                      onBlur={() => setDobSettled(true)}
                       max={new Date().toISOString().slice(0, 10)}
                     />
-                    {plan.plan_key === "kid_group" && !!childDob && (
+                    {plan.plan_key === "kid_group" && !!childDob && !ageMismatch && (
                       <p className="mt-1 text-xs text-[#2a5e84]">
                         From your assessment. Edit if needed.
                       </p>
+                    )}
+                    {ageMismatch && (
+                      <div className="mt-3">
+                        <AgeGatePanel
+                          kind={ageMismatch}
+                          holdReleaseNotice={holdReleaseNotice}
+                          switching={switchingProgram}
+                          onSwitch={switchProgram}
+                          onBackToPrograms={holdToken ? undefined : backToPrograms}
+                        />
+                        <p className="mt-2 text-xs text-[#2a5e84]">
+                          Entered the wrong date? Just fix the date of birth above.
+                        </p>
+                      </div>
                     )}
                   </div>
                   {!isAdult && (
