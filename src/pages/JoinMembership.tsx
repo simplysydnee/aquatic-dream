@@ -567,6 +567,7 @@ function JoinMembershipForm() {
   const handleAssessmentComplete = (level: SwimLevel, _age: number, dob: string) => {
     setSwimLevel(level);
     setChildDob(dob);
+    setDobSettled(true);
     setShowAssessment(false);
     // 18 and over cannot be in Small Group. Stay on step 1, where the age gate
     // panel renders in place of the program picker.
@@ -610,7 +611,7 @@ function JoinMembershipForm() {
   };
 
   // ---- Age gate (public /join only) ----------------------------------------
-  const ageMismatch = programAgeMismatch(plan?.plan_key, childDob);
+  const ageMismatch = programAgeMismatch(plan?.plan_key, dobSettled ? childDob : null);
   const [switchingProgram, setSwitchingProgram] = useState(false);
 
   const holdReleaseNotice =
