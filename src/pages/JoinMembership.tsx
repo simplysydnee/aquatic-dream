@@ -704,6 +704,10 @@ function JoinMembershipForm() {
 
   // Advance from info: check for on-file waiver before rendering step 4.
   const handleInfoContinue = async () => {
+    // Settle the date of birth first, so a value typed and never blurred is
+    // still checked against the program before anyone moves on.
+    setDobSettled(true);
+    if (programAgeMismatch(plan?.plan_key, childDob)) return;
     if (!canContinueStep3) {
       toast.error("Please complete all required fields");
       return;
@@ -1830,17 +1834,7 @@ function JoinMembershipForm() {
               </>
             )}
 
-            {step === 3 && plan && ageMismatch && (
-              <AgeGatePanel
-                kind={ageMismatch}
-                holdReleaseNotice={holdReleaseNotice}
-                switching={switchingProgram}
-                onSwitch={switchProgram}
-                onBackToPrograms={holdToken ? undefined : backToPrograms}
-              />
-            )}
-
-            {step === 3 && plan && !ageMismatch && (
+            {step === 3 && plan && (
               <>
                 {!holdToken && (
                   <button
