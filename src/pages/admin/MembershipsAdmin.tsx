@@ -141,6 +141,24 @@ const ageFromDob = (dob?: string | null) => {
   return age;
 };
 
+const matchesSearch = (m: Membership, terms: string[]) => {
+  if (terms.length === 0) return true;
+  const hay = [
+    swimmerName(m),
+    parentName(m),
+    m.parent_email ?? "",
+    m.parent_phone ?? "",
+    (m.parent_phone ?? "").replace(/\D/g, ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return terms.every((t) => {
+    if (hay.includes(t)) return true;
+    const digits = t.replace(/\D/g, "");
+    return digits.length >= 3 && hay.includes(digits);
+  });
+};
+
 
 const MembershipsAdmin = () => {
   const [loading, setLoading] = useState(true);
@@ -249,7 +267,8 @@ const MembershipsAdmin = () => {
   }, [selectedId]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const raw = search.trim().toLowerCase();
+    const terms = raw.split(/\s+/).filter(Boolean);
     return memberships.filter((m) => {
       if (!includeInactive && !ACTIVE_STATUSES.includes(m.status)) return false;
       if (planFilter !== "all" && m.plan_key !== planFilter) return false;
@@ -260,19 +279,19 @@ const MembershipsAdmin = () => {
       }
       if (paymentFilter === "problem" && !hasPaymentProblem(m)) return false;
       if (paymentFilter !== "all" && paymentFilter !== "problem" && paymentBucket(m) !== paymentFilter) return false;
-      if (!q) return true;
-      const hay = [
-        swimmerName(m),
-        parentName(m),
-        m.parent_email ?? "",
-        (m.parent_phone ?? "").replace(/\D/g, ""),
-        m.parent_phone ?? "",
-      ]
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q) || hay.includes(q.replace(/\D/g, ""));
+      return matchesSearch(m, terms);
     });
   }, [memberships, search, planFilter, statusFilter, dayFilter, paymentFilter, includeInactive, slotById]);
+
+  const hiddenByStatusMatches = useMemo(() => {
+    const raw = search.trim().toLowerCase();
+    const terms = raw.split(/\s+/).filter(Boolean);
+    if (terms.length === 0 || includeInactive) return 0;
+    return memberships.filter((m) => {
+      if (ACTIVE_STATUSES.includes(m.status)) return false;
+      return matchesSearch(m, terms);
+    }).length;
+  }, [memberships, search, includeInactive]);
 
   // Payment problems are surfaced across the whole book, not just the current
   // filter, so a filtered view can never hide a declined card.
@@ -505,6 +524,11 @@ const MembershipsAdmin = () => {
             </Button>
           )}
         </div>
+        {(search || planFilter !== "all" || statusFilter !== "all" || dayFilter !== "all" || paymentFilter !== "all" || includeInactive) && (
+          <div className="text-xs text-muted-foreground">
+            Showing {filtered.length} of {memberships.length}
+          </div>
+        )}
       </Card>
 
       <Card className="overflow-x-auto">
@@ -513,7 +537,21 @@ const MembershipsAdmin = () => {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading memberships
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-6 text-sm text-muted-foreground">No memberships match.</div>
+          <div className="p-6 text-sm text-muted-foreground">
+            {hiddenByStatusMatches > 0 ? (
+              <div className="space-y-2">
+                <p>
+                  No active memberships match. {hiddenByStatusMatches} cancelled or paused{" "}
+                  {hiddenByStatusMatches === 1 ? "match is" : "matches are"} hidden.
+                </p>
+                <Button size="sm" variant="outline" onClick={() => setIncludeInactive(true)}>
+                  Show cancelled and paused
+                </Button>
+              </div>
+            ) : (
+              "No memberships match."
+            )}
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left">
