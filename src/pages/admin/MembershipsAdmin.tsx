@@ -267,7 +267,8 @@ const MembershipsAdmin = () => {
   }, [selectedId]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const raw = search.trim().toLowerCase();
+    const terms = raw.split(/\s+/).filter(Boolean);
     return memberships.filter((m) => {
       if (!includeInactive && !ACTIVE_STATUSES.includes(m.status)) return false;
       if (planFilter !== "all" && m.plan_key !== planFilter) return false;
@@ -278,19 +279,19 @@ const MembershipsAdmin = () => {
       }
       if (paymentFilter === "problem" && !hasPaymentProblem(m)) return false;
       if (paymentFilter !== "all" && paymentFilter !== "problem" && paymentBucket(m) !== paymentFilter) return false;
-      if (!q) return true;
-      const hay = [
-        swimmerName(m),
-        parentName(m),
-        m.parent_email ?? "",
-        (m.parent_phone ?? "").replace(/\D/g, ""),
-        m.parent_phone ?? "",
-      ]
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q) || hay.includes(q.replace(/\D/g, ""));
+      return matchesSearch(m, terms);
     });
   }, [memberships, search, planFilter, statusFilter, dayFilter, paymentFilter, includeInactive, slotById]);
+
+  const hiddenByStatusMatches = useMemo(() => {
+    const raw = search.trim().toLowerCase();
+    const terms = raw.split(/\s+/).filter(Boolean);
+    if (terms.length === 0 || includeInactive) return 0;
+    return memberships.filter((m) => {
+      if (ACTIVE_STATUSES.includes(m.status)) return false;
+      return matchesSearch(m, terms);
+    }).length;
+  }, [memberships, search, includeInactive]);
 
   // Payment problems are surfaced across the whole book, not just the current
   // filter, so a filtered view can never hide a declined card.
