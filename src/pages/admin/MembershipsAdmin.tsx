@@ -141,6 +141,24 @@ const ageFromDob = (dob?: string | null) => {
   return age;
 };
 
+const matchesSearch = (m: Membership, terms: string[]) => {
+  if (terms.length === 0) return true;
+  const hay = [
+    swimmerName(m),
+    parentName(m),
+    m.parent_email ?? "",
+    m.parent_phone ?? "",
+    (m.parent_phone ?? "").replace(/\D/g, ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return terms.every((t) => {
+    if (hay.includes(t)) return true;
+    const digits = t.replace(/\D/g, "");
+    return digits.length >= 3 && hay.includes(digits);
+  });
+};
+
 
 const MembershipsAdmin = () => {
   const [loading, setLoading] = useState(true);
