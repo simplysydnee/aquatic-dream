@@ -537,7 +537,21 @@ const MembershipsAdmin = () => {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading memberships
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-6 text-sm text-muted-foreground">No memberships match.</div>
+          <div className="p-6 text-sm text-muted-foreground">
+            {hiddenByStatusMatches > 0 ? (
+              <div className="space-y-2">
+                <p>
+                  No active memberships match. {hiddenByStatusMatches} cancelled or paused{" "}
+                  {hiddenByStatusMatches === 1 ? "match is" : "matches are"} hidden.
+                </p>
+                <Button size="sm" variant="outline" onClick={() => setIncludeInactive(true)}>
+                  Show cancelled and paused
+                </Button>
+              </div>
+            ) : (
+              "No memberships match."
+            )}
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left">
