@@ -524,6 +524,11 @@ const MembershipsAdmin = () => {
             </Button>
           )}
         </div>
+        {(search || planFilter !== "all" || statusFilter !== "all" || dayFilter !== "all" || paymentFilter !== "all" || includeInactive) && (
+          <div className="text-xs text-muted-foreground">
+            Showing {filtered.length} of {memberships.length}
+          </div>
+        )}
       </Card>
 
       <Card className="overflow-x-auto">
