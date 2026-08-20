@@ -64,6 +64,9 @@ type Slot = {
   is_full?: boolean;
   swim_level: SwimLevel | null;
   accepted_levels: SwimLevel[] | null;
+  /** Display-only private lesson gating from get-open-slots. */
+  gated?: boolean;
+
 };
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
