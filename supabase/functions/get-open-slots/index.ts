@@ -124,8 +124,61 @@ serve(async (req) => {
           enrolled_count: enrolled,
           spots_left,
           is_full: spots_left <= 0,
+          // Display-only flag. Never affects capacity, checkout or holds.
+          gated: false,
         };
       });
+
+    // Private lesson gating: on a configured day, a non-primary instructor's
+    // open slots stay hidden from parents until the primary coach for that day
+    // is down to 1 or 0 open slots. Display only, and never applied to
+    // kid_group or adult_group. An empty or unreadable rule set means no
+    // gating at all, which is the pre-existing behavior.
+    try {
+      const { data: rules, error: rulesErr } = await supabase
+        .from("private_slot_gating_rules")
+        .select("day_of_week, primary_instructor_id")
+        .eq("active", true);
+      if (rulesErr) throw rulesErr;
+
+      for (const rule of (rules || []) as { day_of_week: number; primary_instructor_id: string }[]) {
+        const daySlots = result.filter(
+          (s) => s.plan_key === "private" && s.day_of_week === rule.day_of_week,
+        );
+        if (daySlots.length === 0) continue;
+
+        const primaryOpen = daySlots.filter(
+          (s) => s.instructor_id === rule.primary_instructor_id && s.spots_left > 0,
+        ).length;
+        const primaryHasSlots = daySlots.some(
+          (s) => s.instructor_id === rule.primary_instructor_id,
+        );
+        // Primary not scheduled that day, or already down to 1 or 0 open.
+        if (!primaryHasSlots || primaryOpen < 2) continue;
+
+        for (const s of daySlots) {
+          if (!s.instructor_id) continue; // unassigned slots are never gated
+          if (s.instructor_id === rule.primary_instructor_id) continue;
+          s.gated = true;
+        }
+
+        // Mandatory fallback: a day must never go dark because of gating.
+        const stillOpen = daySlots.filter((s) => s.spots_left > 0 && !s.gated).length;
+        if (stillOpen === 0) {
+          console.error(
+            "private slot gating fallback fired — clearing gate",
+            JSON.stringify({
+              day_of_week: rule.day_of_week,
+              primary_instructor_id: rule.primary_instructor_id,
+            }),
+          );
+          for (const s of daySlots) s.gated = false;
+        }
+      }
+    } catch (gateErr) {
+      console.error("private slot gating skipped", gateErr);
+      for (const s of result) s.gated = false;
+    }
 
     // Optional level filter — only applies to kid_group (Small Group Swim).
     // A slot with no accepted_levels is unlocked and accepts ANY level; the
@@ -137,6 +190,7 @@ serve(async (req) => {
         return s.accepted_levels.includes(swimLevel);
       });
     }
+
 
 
     return new Response(

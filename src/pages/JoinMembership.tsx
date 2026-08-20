@@ -64,6 +64,9 @@ type Slot = {
   is_full?: boolean;
   swim_level: SwimLevel | null;
   accepted_levels: SwimLevel[] | null;
+  /** Display-only private lesson gating from get-open-slots. */
+  gated?: boolean;
+
 };
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -416,11 +419,18 @@ function JoinMembershipForm() {
   // see times they can actually book, and the count above the list matches what
   // is rendered. If every option is full, show the full ones with the waitlist
   // since that is the only path left.
+  // Private lesson gating (server computed, display only) is applied on top,
+  // and can never empty the list: it falls back to the ungated bookable slots.
   const displaySlots = useMemo(() => {
     if (!plan) return planSlots;
     const bookable = planSlots.filter((s) => !(s.is_full ?? s.spots_left <= 0));
-    return bookable.length > 0 ? bookable : planSlots;
+    if (bookable.length === 0) return planSlots;
+    const ungated = bookable.filter((s) => !s.gated);
+    if (ungated.length > 0) return ungated;
+    console.error("slot gating hid every bookable slot — showing ungated list", plan.plan_key);
+    return bookable;
   }, [plan, planSlots]);
+
 
 
   // Slot picker filters (step 2)
