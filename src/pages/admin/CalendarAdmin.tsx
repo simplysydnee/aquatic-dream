@@ -3,7 +3,6 @@ import { format, addDays, startOfWeek, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Calendar as CalIcon, Plus, ArrowRightLeft, Printer, Send, CreditCard } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import CalendarDayView from "@/components/admin/calendar/CalendarDayView";
