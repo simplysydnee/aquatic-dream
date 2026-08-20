@@ -341,6 +341,13 @@ const CalendarAdmin = () => {
         date={currentDate}
       />
 
+      <SendRemindersDialog
+        open={showRemindersPreview}
+        onOpenChange={setShowRemindersPreview}
+      />
+
+
+
       <PrivateLessonDetailDialog
         lesson={activePrivateLesson}
         onClose={() => setActivePrivateLesson(null)}
