@@ -94,7 +94,23 @@ Deno.serve(async (req) => {
     });
   }
 
+  const reqBody = await req.json().catch(() => ({})) as { dryRun?: boolean };
+  const dryRun = reqBody?.dryRun === true;
+
   const today = ptToday();
+
+  // Within one run, never text the same phone twice for the same lesson slot.
+  const runKeys = new Set<string>();
+  let suppressedDuplicatePhone = 0;
+  const dryRunPlan: Array<{
+    source: "legacy" | "membership";
+    phone: string;
+    message: string;
+    occurrence_id: string;
+    swimmer: string;
+  }> = [];
+
+
 
   const { data: alreadySent } = await admin
     .from("reminder_logs")
