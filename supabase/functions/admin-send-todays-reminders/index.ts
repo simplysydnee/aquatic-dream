@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
   }
 
   // ===== Membership occurrences (current system) =====
-  let skippedNoConsent = 0, skippedOptedOut = 0;
+
 
   const { data: mOccs, error: mErr } = await admin
     .from("membership_occurrences")
