@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
     runKeys.add(key);
 
     if (dryRun) {
-      dryRunPlan.push({ source: "membership", phone, message, occurrence_id: o.id, swimmer: swimmerName ?? "" });
+      dryRunPlan.push({ source: "membership", phone, message, occurrence_id: o.id, swimmer: swimmerName ?? "", time: timeStr });
       membershipSent++;
       continue;
     }
