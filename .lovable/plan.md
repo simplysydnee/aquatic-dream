@@ -75,3 +75,30 @@ A parent whose page is already open keeps the slot list they loaded. If a slot b
 ## Out of scope
 
 No capacity trigger, checkout, or webhook changes. No kid_group or adult_group changes. No middle-slot vs edge-slot logic. No admin config UI.
+
+## Changing the rules without an admin UI
+
+Turn a day on (or add one), Wednesday shown, `day_of_week` is 0=Sunday through 6=Saturday:
+
+```sql
+insert into public.private_slot_gating_rules (day_of_week, primary_instructor_id, active)
+select 3, id, true from public.instructors where name = 'Karolina Imfeld'
+on conflict (day_of_week) do update
+  set primary_instructor_id = excluded.primary_instructor_id, active = true;
+```
+
+Turn a day off (keeps the row, restores today's behavior for that day):
+
+```sql
+update public.private_slot_gating_rules set active = false where day_of_week = 3;
+```
+
+Repoint a day to a different instructor:
+
+```sql
+update public.private_slot_gating_rules
+set primary_instructor_id = (select id from public.instructors where name = 'Liana Herrera')
+where day_of_week = 3;
+```
+
+Turn the whole feature off: `update public.private_slot_gating_rules set active = false;`
