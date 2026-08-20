@@ -138,8 +138,11 @@ Deno.serve(async (req) => {
   let legacySent = 0, membershipSent = 0, failed = 0;
   const errors: Array<{ occurrence_id: string; error: string }> = [];
 
-  const runKey = (phone: string, date: string, time: string | null) =>
-    `${phone.replace(/\D/g, "").slice(-10)}|${date}|${time ?? ""}`;
+  // Identity is the swimmer, not the phone: siblings share a phone and a start time
+  // and must each get their own text. Only the SAME swimmer enrolled twice collapses.
+  // identity falls back to a per-row unique id when swimmer identity is unknown.
+  const runKey = (phone: string, date: string, time: string | null, identity: string) =>
+    `${phone.replace(/\D/g, "").slice(-10)}|${date}|${time ?? ""}|${identity}`;
 
   for (const o of (occs || []) as any[]) {
     const b = o.lesson_bookings;
