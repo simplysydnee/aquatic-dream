@@ -111,4 +111,5 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.extend-membership-occurrences]
     verify_jwt = false
-
+  [functions.send-membership-lesson-reminders]
+    verify_jwt = false
