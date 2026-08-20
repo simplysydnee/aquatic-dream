@@ -34,6 +34,7 @@ export interface ReminderRunResult {
   suppressed_duplicate_phone: number;
   skipped_no_consent: number;
   skipped_opted_out: number;
+  skipped_already_started: number;
   errors: Array<{ occurrence_id: string; error: string }>;
   would_send?: PlanRow[];
 }
@@ -108,10 +109,31 @@ export async function runLessonReminders(
 ): Promise<ReminderRunResult> {
   const dayWord = reminderKind === "lesson_24h" ? "tomorrow" : "today";
 
+  // One lesson gets one reminder, no matter who sends it: idempotency is scoped to the
+  // occurrence across ALL reminder kinds, so the manual button is a catch-up tool only.
+  const ALL_KINDS = ["lesson_24h", "manual_today"];
+
+  // When the target date is today (Pacific), a lesson already underway must not be texted.
+  const isToday = targetDate === ptDate(0);
+  const nowPtMinutes = (() => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles", hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(new Date());
+    const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+    const m = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+    return h * 60 + m;
+  })();
+  const hasStarted = (t: string | null | undefined): boolean => {
+    if (!isToday || !t) return false;
+    const [h, m] = t.split(":");
+    return Number(h) * 60 + Number(m) <= nowPtMinutes;
+  };
+
   const runKeys = new Set<string>();
   let suppressedDuplicatePhone = 0;
   let skippedNoConsent = 0;
   let skippedOptedOut = 0;
+  let skippedAlreadyStarted = 0;
   let legacySent = 0, membershipSent = 0, failed = 0;
   const dryRunPlan: PlanRow[] = [];
   const errors: Array<{ occurrence_id: string; error: string }> = [];
@@ -137,7 +159,7 @@ export async function runLessonReminders(
       .select("lesson_occurrence_id")
       .eq("channel", "sms")
       .eq("status", "sent")
-      .eq("reminder_kind", reminderKind)
+      .in("reminder_kind", ALL_KINDS)
       .in("lesson_occurrence_id", legacyList.map((o) => o.id));
     for (const r of (alreadySent || []) as AnyClient[]) sentIds.add(r.lesson_occurrence_id);
   }
@@ -149,6 +171,7 @@ export async function runLessonReminders(
 
     const firstName = b.child_first_name || (b.child_name || "").split(" ")[0] || "Your swimmer";
     const startTime = o.start_time_override || b.start_time;
+    if (hasStarted(startTime)) { skippedAlreadyStarted++; continue; }
     const phone = normalizePhone(b.parent_phone);
     const timeStr = startTime ? formatPTTime(startTime) : "";
     const message =
@@ -214,7 +237,7 @@ export async function runLessonReminders(
       .select("membership_occurrence_id")
       .eq("channel", "sms")
       .eq("status", "sent")
-      .eq("reminder_kind", reminderKind)
+      .in("reminder_kind", ALL_KINDS)
       .in("membership_occurrence_id", mList.map((o) => o.id));
     for (const r of (mAlready || []) as AnyClient[]) mSentIds.add(r.membership_occurrence_id);
   }
@@ -226,6 +249,8 @@ export async function runLessonReminders(
     if (mSentIds.has(o.id)) continue;
     // Consent fails closed: NULL is not consent.
     if (m.sms_consent !== true) { skippedNoConsent++; continue; }
+
+    if (hasStarted(o.start_time)) { skippedAlreadyStarted++; continue; }
 
     const swimmerName = [m.child_first_name, m.child_last_name].filter(Boolean).join(" ") || null;
     const phone = normalizePhone(m.parent_phone);
@@ -288,6 +313,7 @@ export async function runLessonReminders(
     suppressed_duplicate_phone: suppressedDuplicatePhone,
     skipped_no_consent: skippedNoConsent,
     skipped_opted_out: skippedOptedOut,
+    skipped_already_started: skippedAlreadyStarted,
     errors,
     ...(dryRun ? { would_send: dryRunPlan } : {}),
   };
