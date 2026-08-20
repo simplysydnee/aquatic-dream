@@ -138,8 +138,11 @@ Deno.serve(async (req) => {
   let legacySent = 0, membershipSent = 0, failed = 0;
   const errors: Array<{ occurrence_id: string; error: string }> = [];
 
-  const runKey = (phone: string, date: string, time: string | null) =>
-    `${phone.replace(/\D/g, "").slice(-10)}|${date}|${time ?? ""}`;
+  // Identity is the swimmer, not the phone: siblings share a phone and a start time
+  // and must each get their own text. Only the SAME swimmer enrolled twice collapses.
+  // identity falls back to a per-row unique id when swimmer identity is unknown.
+  const runKey = (phone: string, date: string, time: string | null, identity: string) =>
+    `${phone.replace(/\D/g, "").slice(-10)}|${date}|${time ?? ""}|${identity}`;
 
   for (const o of (occs || []) as any[]) {
     const b = o.lesson_bookings;
@@ -165,7 +168,7 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    const key = runKey(phone, today, startTime);
+    const key = runKey(phone, today, startTime, `legacy-booking:${b.id}`);
     if (runKeys.has(key)) { suppressedDuplicatePhone++; continue; }
     runKeys.add(key);
 
@@ -194,7 +197,7 @@ Deno.serve(async (req) => {
   const { data: mOccs, error: mErr } = await admin
     .from("membership_occurrences")
     .select(`id, occurrence_date, status, start_time,
-             memberships!inner(id, status, plan_key, sms_consent, parent_phone, child_first_name, child_last_name)`)
+             memberships!inner(id, swimmer_id, status, plan_key, sms_consent, parent_phone, child_first_name, child_last_name)`)
     .eq("occurrence_date", today)
     .eq("status", "scheduled");
 
@@ -247,7 +250,8 @@ Deno.serve(async (req) => {
     const optKey = optOutPhoneKey(phone);
     if (optKey && optedOut.has(optKey)) { skippedOptedOut++; continue; }
 
-    const key = runKey(phone, today, o.start_time);
+    const identity = m.swimmer_id ? `swimmer:${m.swimmer_id}` : `membership:${m.id}`;
+    const key = runKey(phone, today, o.start_time, identity);
     if (runKeys.has(key)) { suppressedDuplicatePhone++; continue; }
     runKeys.add(key);
 
