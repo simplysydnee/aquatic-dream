@@ -229,14 +229,13 @@ Deno.serve(async (req) => {
     for (const r of (mAlready || []) as any[]) mSentIds.add(r.membership_occurrence_id);
   }
 
-  const optedOut = await loadOptOutPhones(admin);
-
   for (const o of mList) {
     const m = o.memberships;
     if (!m) continue;
     if (!["active", "pending_cancel", "paused"].includes(m.status)) continue;
     if (mSentIds.has(o.id)) continue;
-    if (m.sms_consent === false) { skippedNoConsent++; continue; }
+    // Consent fails closed: NULL is not consent.
+    if (m.sms_consent !== true) { skippedNoConsent++; continue; }
 
     const swimmerName = [m.child_first_name, m.child_last_name].filter(Boolean).join(" ") || null;
     const phone = normalizePhone(m.parent_phone);
