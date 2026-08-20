@@ -2047,6 +2047,41 @@ export type Database = {
         }
         Relationships: []
       }
+      private_slot_gating_rules: {
+        Row: {
+          active: boolean
+          created_at: string
+          day_of_week: number
+          id: string
+          primary_instructor_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          day_of_week: number
+          id?: string
+          primary_instructor_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          primary_instructor_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "private_slot_gating_rules_primary_instructor_id_fkey"
+            columns: ["primary_instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
