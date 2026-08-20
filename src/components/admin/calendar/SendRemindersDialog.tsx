@@ -33,6 +33,7 @@ type PreviewResponse = {
   suppressed_duplicate_phone: number;
   skipped_no_consent: number;
   skipped_opted_out: number;
+  skipped_already_started?: number;
   errors: Array<{ occurrence_id: string; error: string }>;
   would_send?: PlanRow[];
 };
@@ -138,6 +139,7 @@ export const SendRemindersDialog = ({ open, onOpenChange }: SendRemindersDialogP
               <Badge variant="secondary">Duplicates suppressed {preview.suppressed_duplicate_phone}</Badge>
               <Badge variant="secondary">No consent {preview.skipped_no_consent}</Badge>
               <Badge variant="secondary">Opted out {preview.skipped_opted_out}</Badge>
+              <Badge variant="secondary">Already started {preview.skipped_already_started ?? 0}</Badge>
               <Badge variant={preview.failed > 0 ? "destructive" : "secondary"}>
                 Failed {preview.failed}
               </Badge>
