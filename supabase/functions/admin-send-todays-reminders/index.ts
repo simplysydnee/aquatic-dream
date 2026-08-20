@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logOutboundSms } from "../_shared/sms-log.ts";
+import { loadOptOutPhones, optOutPhoneKey } from "../_shared/sms-opt-out.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
