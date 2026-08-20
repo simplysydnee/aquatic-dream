@@ -175,15 +175,19 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    const legacyOptKey = optOutPhoneKey(phone);
+    if (legacyOptKey && optedOut.has(legacyOptKey)) { skippedOptedOut++; continue; }
+
     const key = runKey(phone, today, startTime, `legacy-booking:${b.id}`);
     if (runKeys.has(key)) { suppressedDuplicatePhone++; continue; }
     runKeys.add(key);
 
     if (dryRun) {
-      dryRunPlan.push({ source: "legacy", phone, message, occurrence_id: o.id, swimmer: b.child_name });
+      dryRunPlan.push({ source: "legacy", phone, message, occurrence_id: o.id, swimmer: b.child_name, time: timeStr });
       legacySent++;
       continue;
     }
+
 
     const result = await sendSms(phone, message);
     await logOutboundSms({ admin: admin, kind: "reminder", sentByLabel: "System - today's reminders" }, { phone, body: message, status: result.ok ? "sent" : "failed", error: result.ok ? null : result.error ?? null });
