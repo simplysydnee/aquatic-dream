@@ -2233,6 +2233,7 @@ export type Database = {
           error: string | null
           id: string
           lesson_occurrence_id: string | null
+          membership_occurrence_id: string | null
           message: string | null
           phone: string | null
           reminder_kind: string
@@ -2250,6 +2251,7 @@ export type Database = {
           error?: string | null
           id?: string
           lesson_occurrence_id?: string | null
+          membership_occurrence_id?: string | null
           message?: string | null
           phone?: string | null
           reminder_kind: string
@@ -2267,6 +2269,7 @@ export type Database = {
           error?: string | null
           id?: string
           lesson_occurrence_id?: string | null
+          membership_occurrence_id?: string | null
           message?: string | null
           phone?: string | null
           reminder_kind?: string
@@ -2296,6 +2299,13 @@ export type Database = {
             columns: ["lesson_occurrence_id"]
             isOneToOne: false
             referencedRelation: "lesson_booking_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminder_logs_membership_occurrence_id_fkey"
+            columns: ["membership_occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "membership_occurrences"
             referencedColumns: ["id"]
           },
           {
