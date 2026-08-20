@@ -25,7 +25,7 @@ After the existing `result` array is built (so `enrolled_count`, `spots_left`, `
 2. Load active rules. No rules, no rule for that day, or a rule whose primary instructor has no active private slots that day → the day stays ungated.
 3. For a configured day, open count per instructor = private slots on that day with `spots_left > 0` and a non-null `instructor_id`.
 4. If the primary's open count is >= 2, mark every non-primary private slot on that day `gated = true`. Primary slots and null-instructor slots stay `gated = false`.
-5. Fallback, evaluated per day immediately after step 4 and before the response is assembled: count private slots on that day with `spots_left > 0 && !gated`. If that is 0, clear `gated` on every private slot for that day.
+5. Fallback, evaluated per day immediately after step 4 and before the response is assembled: count private slots on that day with `spots_left > 0 && !gated`. If that is 0, clear `gated` on every private slot for that day AND emit a `console.error` naming the day and rule, since the rule makes this unreachable and a firing means a config change broke an assumption.
 
 Full slots are untouched by the logic beyond being excluded from the open counts. The level filter and hold-exclusion logic run exactly as today.
 
@@ -33,15 +33,23 @@ Against current live data this produces: Wednesday, Karolina has 4 open, so Lian
 
 ## Frontend
 
-`src/pages/JoinMembership.tsx` is the parent-facing private slot list on /join (loads via `supabase.functions.invoke("get-open-slots")` in `loadSlots`, then `planSlots` → `displaySlots` → `visibleSlots` → `groupedSlots`). Add one filter inside `planSlots`: drop `s.gated === true`. Everything downstream (day/instructor/time filters, counts, waitlist fallback) then agrees automatically.
+`src/pages/JoinMembership.tsx` is the parent-facing private slot list on /join (loads via `supabase.functions.invoke("get-open-slots")` in `loadSlots`, then `planSlots` → `displaySlots` → `visibleSlots` → `groupedSlots`).
 
-`src/pages/SwimLessons.tsx` also calls `get-open-slots` for the public "when each program runs" cards and open times. It is parent-facing, so it filters out `gated` slots too, otherwise the marketing page advertises times /join will not show.
+- `planSlots` stays ungated. It keeps every slot for the plan so no availability decision loses sight of gated times.
+- `displaySlots` does the gating: bookable-and-ungated when that list is non-empty, otherwise bookable (with a `console.error`), otherwise `planSlots`.
+- The "No open spots right now / Join the waitlist" branch changes from `displaySlots.length === 0` to `planSlots.length === 0`, so gating can never trigger the full/waitlist state. The waitlist is still only ever opened by an explicit tap and never auto-submitted.
+
+`src/pages/SwimLessons.tsx` also calls `get-open-slots`.
+
+- `ProgramCards` and `summarizeWhen` keep using the full slots array. They describe when a program runs, not what is available, so they never filter `gated`.
+- Only `OpenTimes` filters `gated`, and only for the rendered times. Its `FullNotice` branch is computed from ungated availability (`openAll.length === 0`), so gating can never make a program read as full. If gating empties a program's visible times while ungated ones exist, it falls back to showing the ungated list and logs a `console.error`.
 
 ## Every path that reads standing_slots, and what happens to it
 
 Parent-facing, gets the filter:
-- `src/pages/JoinMembership.tsx` (via get-open-slots)
-- `src/pages/SwimLessons.tsx` (via get-open-slots)
+- `src/pages/JoinMembership.tsx` display list only (via get-open-slots)
+- `src/pages/SwimLessons.tsx` `OpenTimes` only (via get-open-slots)
+
 
 Parent-facing but slot already chosen, must NOT be gated (unchanged):
 - `get-membership-hold`, `get-membership-quote`, `create-membership-checkout`, `membership-completion`, `submit-membership-waitlist`, `membership-calendar-ics`, `get-membership-by-token`, `move-membership-slot`, `sweep-membership-holds`.
@@ -67,3 +75,30 @@ A parent whose page is already open keeps the slot list they loaded. If a slot b
 ## Out of scope
 
 No capacity trigger, checkout, or webhook changes. No kid_group or adult_group changes. No middle-slot vs edge-slot logic. No admin config UI.
+
+## Changing the rules without an admin UI
+
+Turn a day on (or add one), Wednesday shown, `day_of_week` is 0=Sunday through 6=Saturday:
+
+```sql
+insert into public.private_slot_gating_rules (day_of_week, primary_instructor_id, active)
+select 3, id, true from public.instructors where name = 'Karolina Imfeld'
+on conflict (day_of_week) do update
+  set primary_instructor_id = excluded.primary_instructor_id, active = true;
+```
+
+Turn a day off (keeps the row, restores today's behavior for that day):
+
+```sql
+update public.private_slot_gating_rules set active = false where day_of_week = 3;
+```
+
+Repoint a day to a different instructor:
+
+```sql
+update public.private_slot_gating_rules
+set primary_instructor_id = (select id from public.instructors where name = 'Liana Herrera')
+where day_of_week = 3;
+```
+
+Turn the whole feature off: `update public.private_slot_gating_rules set active = false;`
