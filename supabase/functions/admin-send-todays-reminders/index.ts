@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { logOutboundSms } from "../_shared/sms-log.ts";
+import { loadOptOutPhones, optOutPhoneKey } from "../_shared/sms-opt-out.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -93,7 +94,23 @@ Deno.serve(async (req) => {
     });
   }
 
+  const reqBody = await req.json().catch(() => ({})) as { dryRun?: boolean };
+  const dryRun = reqBody?.dryRun === true;
+
   const today = ptToday();
+
+  // Within one run, never text the same phone twice for the same lesson slot.
+  const runKeys = new Set<string>();
+  let suppressedDuplicatePhone = 0;
+  const dryRunPlan: Array<{
+    source: "legacy" | "membership";
+    phone: string;
+    message: string;
+    occurrence_id: string;
+    swimmer: string;
+  }> = [];
+
+
 
   const { data: alreadySent } = await admin
     .from("reminder_logs")
@@ -118,8 +135,11 @@ Deno.serve(async (req) => {
     });
   }
 
-  let sent = 0, failed = 0;
+  let legacySent = 0, membershipSent = 0, failed = 0;
   const errors: Array<{ occurrence_id: string; error: string }> = [];
+
+  const runKey = (phone: string, date: string, time: string | null) =>
+    `${phone.replace(/\D/g, "").slice(-10)}|${date}|${time ?? ""}`;
 
   for (const o of (occs || []) as any[]) {
     const b = o.lesson_bookings;
@@ -135,11 +155,23 @@ Deno.serve(async (req) => {
     if (!phone) {
       failed++;
       errors.push({ occurrence_id: o.id, error: "no_phone" });
-      await admin.from("reminder_logs").insert({
-        swimmer_name: b.child_name, lesson_occurrence_id: o.id, booking_id: b.id,
-        channel: "sms", reminder_kind: "manual_today", phone: null, message,
-        status: "failed", error: "no_phone",
-      });
+      if (!dryRun) {
+        await admin.from("reminder_logs").insert({
+          swimmer_name: b.child_name, lesson_occurrence_id: o.id, booking_id: b.id,
+          channel: "sms", reminder_kind: "manual_today", phone: null, message,
+          status: "failed", error: "no_phone",
+        });
+      }
+      continue;
+    }
+
+    const key = runKey(phone, today, startTime);
+    if (runKeys.has(key)) { suppressedDuplicatePhone++; continue; }
+    runKeys.add(key);
+
+    if (dryRun) {
+      dryRunPlan.push({ source: "legacy", phone, message, occurrence_id: o.id, swimmer: b.child_name });
+      legacySent++;
       continue;
     }
 
@@ -152,11 +184,107 @@ Deno.serve(async (req) => {
       status: result.ok ? "sent" : "failed",
       error: result.ok ? null : result.error,
     });
-    if (result.ok) sent++;
+    if (result.ok) legacySent++;
     else { failed++; errors.push({ occurrence_id: o.id, error: result.error || "unknown" }); }
   }
 
-  return new Response(JSON.stringify({ ok: true, sent, failed, errors, date: today }), {
+  // ===== Membership occurrences (current system) =====
+  let skippedNoConsent = 0, skippedOptedOut = 0;
+
+  const { data: mOccs, error: mErr } = await admin
+    .from("membership_occurrences")
+    .select(`id, occurrence_date, status, start_time,
+             memberships!inner(id, status, plan_key, sms_consent, parent_phone, child_first_name, child_last_name)`)
+    .eq("occurrence_date", today)
+    .eq("status", "scheduled");
+
+  if (mErr) {
+    errors.push({ occurrence_id: "membership_query", error: mErr.message });
+  }
+
+  const mList = (mOccs || []) as any[];
+  const mSentIds = new Set<string>();
+  if (mList.length) {
+    const { data: mAlready } = await admin
+      .from("reminder_logs")
+      .select("membership_occurrence_id")
+      .eq("channel", "sms")
+      .eq("status", "sent")
+      .eq("reminder_kind", "manual_today")
+      .in("membership_occurrence_id", mList.map((o) => o.id));
+    for (const r of (mAlready || []) as any[]) mSentIds.add(r.membership_occurrence_id);
+  }
+
+  const optedOut = await loadOptOutPhones(admin);
+
+  for (const o of mList) {
+    const m = o.memberships;
+    if (!m) continue;
+    if (!["active", "pending_cancel", "paused"].includes(m.status)) continue;
+    if (mSentIds.has(o.id)) continue;
+    if (m.sms_consent === false) { skippedNoConsent++; continue; }
+
+    const swimmerName = [m.child_first_name, m.child_last_name].filter(Boolean).join(" ") || null;
+    const phone = normalizePhone(m.parent_phone);
+    const timeStr = o.start_time ? formatPTTime(o.start_time) : "";
+    const message = m.plan_key === "adult_group"
+      ? `You have a swim lesson today at ${timeStr} at Aquatic Dreams. See you there!`
+      : `${m.child_first_name || "Your swimmer"} has a swim lesson today at ${timeStr} at Aquatic Dreams. See you there!`;
+
+    if (!phone) {
+      failed++;
+      errors.push({ occurrence_id: o.id, error: "no_phone" });
+      if (!dryRun) {
+        await admin.from("reminder_logs").insert({
+          swimmer_name: swimmerName, membership_occurrence_id: o.id,
+          channel: "sms", reminder_kind: "manual_today", phone: null, message,
+          status: "failed", error: "no_phone",
+        });
+      }
+      continue;
+    }
+
+    const optKey = optOutPhoneKey(phone);
+    if (optKey && optedOut.has(optKey)) { skippedOptedOut++; continue; }
+
+    const key = runKey(phone, today, o.start_time);
+    if (runKeys.has(key)) { suppressedDuplicatePhone++; continue; }
+    runKeys.add(key);
+
+    if (dryRun) {
+      dryRunPlan.push({ source: "membership", phone, message, occurrence_id: o.id, swimmer: swimmerName ?? "" });
+      membershipSent++;
+      continue;
+    }
+
+    const result = await sendSms(phone, message);
+    await logOutboundSms({ admin: admin, kind: "reminder", sentByLabel: "System - today's reminders" }, { phone, body: message, status: result.ok ? "sent" : "failed", error: result.ok ? null : result.error ?? null });
+    await admin.from("reminder_logs").insert({
+      swimmer_name: swimmerName, membership_occurrence_id: o.id,
+      channel: "sms", reminder_kind: "manual_today", phone, message,
+      sent_at: result.ok ? new Date().toISOString() : null,
+      status: result.ok ? "sent" : "failed",
+      error: result.ok ? null : result.error,
+    });
+    if (result.ok) membershipSent++;
+    else { failed++; errors.push({ occurrence_id: o.id, error: result.error || "unknown" }); }
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    date: today,
+    dry_run: dryRun,
+    legacy_sent: legacySent,
+    membership_sent: membershipSent,
+    sent: legacySent + membershipSent,
+    failed,
+    suppressed_duplicate_phone: suppressedDuplicatePhone,
+    skipped_no_consent: skippedNoConsent,
+    skipped_opted_out: skippedOptedOut,
+    errors,
+    ...(dryRun ? { would_send: dryRunPlan } : {}),
+  }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
+
   });
 });
