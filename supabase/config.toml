@@ -109,3 +109,6 @@ project_id = "jilrijklnehbfuulykty"
 
   [functions.reconcile-membership-payments]
     verify_jwt = false
+  [functions.extend-membership-occurrences]
+    verify_jwt = false
+
