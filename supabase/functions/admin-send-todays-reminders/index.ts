@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
   const { data: mOccs, error: mErr } = await admin
     .from("membership_occurrences")
     .select(`id, occurrence_date, status, start_time,
-             memberships!inner(id, status, plan_key, sms_consent, parent_phone, child_first_name, child_last_name)`)
+             memberships!inner(id, swimmer_id, status, plan_key, sms_consent, parent_phone, child_first_name, child_last_name)`)
     .eq("occurrence_date", today)
     .eq("status", "scheduled");
 
