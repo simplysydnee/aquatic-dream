@@ -37,7 +37,7 @@ Against current live data this produces: Wednesday, Karolina has 4 open, so Lian
 
 - `planSlots` stays ungated. It keeps every slot for the plan so no availability decision loses sight of gated times.
 - `displaySlots` does the gating: bookable-and-ungated when that list is non-empty, otherwise bookable (with a `console.error`), otherwise `planSlots`.
-- The "No open spots right now / Join the waitlist" branch changes from `displaySlots.length === 0` to `planSlots.length === 0`, so gating can never trigger the full/waitlist state. The waitlist is still only ever opened by an explicit tap and never auto-submitted.
+- The "No open spots right now / Join the waitlist" branch keeps its current condition, `displaySlots.length === 0`. Because the chain always falls back past gating, that condition is unchanged in meaning: it fires only when the plan (and level) has no slots at all, exactly as today. Gating can never reach it, full slots still render with their per-slot "Join waitlist" buttons on a sold-out program, and the waitlist is still only ever opened by an explicit tap, never auto-submitted.
 
 `src/pages/SwimLessons.tsx` also calls `get-open-slots`.
 
