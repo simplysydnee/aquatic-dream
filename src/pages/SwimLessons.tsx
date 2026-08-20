@@ -288,7 +288,7 @@ function OpenTimes({ slots, loading }: { slots: OpenSlot[]; loading: boolean }) 
               )}
             </h3>
 
-            {open.length === 0 ? (
+            {openAll.length === 0 ? (
               <FullNotice name={PROGRAM_COPY[key].name} />
             ) : isGroup ? (
               <div className="space-y-3">
