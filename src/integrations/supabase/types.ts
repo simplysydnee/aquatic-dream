@@ -629,6 +629,38 @@ export type Database = {
           },
         ]
       }
+      instructor_pins: {
+        Row: {
+          failed_count: number
+          instructor_id: string
+          locked_until: string | null
+          pin_hash: string
+          updated_at: string
+        }
+        Insert: {
+          failed_count?: number
+          instructor_id: string
+          locked_until?: string | null
+          pin_hash: string
+          updated_at?: string
+        }
+        Update: {
+          failed_count?: number
+          instructor_id?: string
+          locked_until?: string | null
+          pin_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_pins_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: true
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instructors: {
         Row: {
           created_at: string
@@ -1095,6 +1127,67 @@ export type Database = {
             columns: ["instructor_id"]
             isOneToOne: false
             referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_notes: {
+        Row: {
+          audience: string
+          body: string
+          created_at: string
+          id: string
+          instructor_id: string
+          occurrence_id: string | null
+          sms_sent_at: string | null
+          sms_status: string | null
+          swim_level: string | null
+          swimmer_id: string
+        }
+        Insert: {
+          audience: string
+          body: string
+          created_at?: string
+          id?: string
+          instructor_id: string
+          occurrence_id?: string | null
+          sms_sent_at?: string | null
+          sms_status?: string | null
+          swim_level?: string | null
+          swimmer_id: string
+        }
+        Update: {
+          audience?: string
+          body?: string
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          occurrence_id?: string | null
+          sms_sent_at?: string | null
+          sms_status?: string | null
+          swim_level?: string | null
+          swimmer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_notes_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_notes_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "membership_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_notes_swimmer_id_fkey"
+            columns: ["swimmer_id"]
+            isOneToOne: false
+            referencedRelation: "swimmers"
             referencedColumns: ["id"]
           },
         ]
@@ -1777,6 +1870,7 @@ export type Database = {
           stripe_subscription_id: string | null
           stripe_subscription_status: string | null
           swim_level: string | null
+          swimmer_id: string | null
           waiver_id: string | null
           welcome_sent_at: string | null
         }
@@ -1827,6 +1921,7 @@ export type Database = {
           stripe_subscription_id?: string | null
           stripe_subscription_status?: string | null
           swim_level?: string | null
+          swimmer_id?: string | null
           waiver_id?: string | null
           welcome_sent_at?: string | null
         }
@@ -1877,6 +1972,7 @@ export type Database = {
           stripe_subscription_id?: string | null
           stripe_subscription_status?: string | null
           swim_level?: string | null
+          swimmer_id?: string | null
           waiver_id?: string | null
           welcome_sent_at?: string | null
         }
@@ -1886,6 +1982,13 @@ export type Database = {
             columns: ["standing_slot_id"]
             isOneToOne: false
             referencedRelation: "standing_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_swimmer_id_fkey"
+            columns: ["swimmer_id"]
+            isOneToOne: false
+            referencedRelation: "swimmers"
             referencedColumns: ["id"]
           },
           {
@@ -2465,6 +2568,83 @@ export type Database = {
           },
         ]
       }
+      skill_definitions: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["skill_kind"]
+          name: string
+          position: number
+          success_goal: string | null
+          swim_level: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind: Database["public"]["Enums"]["skill_kind"]
+          name: string
+          position: number
+          success_goal?: string | null
+          swim_level: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["skill_kind"]
+          name?: string
+          position?: number
+          success_goal?: string | null
+          swim_level?: string
+        }
+        Relationships: []
+      }
+      skill_milestone_sends: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          milestone: string
+          phone: string | null
+          sent_at: string | null
+          status: string | null
+          swim_level: string
+          swimmer_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          milestone: string
+          phone?: string | null
+          sent_at?: string | null
+          status?: string | null
+          swim_level: string
+          swimmer_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          milestone?: string
+          phone?: string | null
+          sent_at?: string | null
+          status?: string | null
+          swim_level?: string
+          swimmer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skill_milestone_sends_swimmer_id_fkey"
+            columns: ["swimmer_id"]
+            isOneToOne: false
+            referencedRelation: "swimmers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       slot_holds: {
         Row: {
           created_at: string
@@ -2645,6 +2825,24 @@ export type Database = {
           opted_out_at?: string
           phone?: string
           source?: string
+        }
+        Relationships: []
+      }
+      staff_kiosk_accounts: {
+        Row: {
+          created_at: string
+          label: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          label?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          label?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -3003,6 +3201,218 @@ export type Database = {
             columns: ["session_period_id"]
             isOneToOne: false
             referencedRelation: "session_periods_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      swimmer_level_history: {
+        Row: {
+          created_at: string
+          from_level: string | null
+          id: string
+          instructor_id: string | null
+          reason: string
+          swimmer_id: string
+          to_level: string
+        }
+        Insert: {
+          created_at?: string
+          from_level?: string | null
+          id?: string
+          instructor_id?: string | null
+          reason?: string
+          swimmer_id: string
+          to_level: string
+        }
+        Update: {
+          created_at?: string
+          from_level?: string | null
+          id?: string
+          instructor_id?: string | null
+          reason?: string
+          swimmer_id?: string
+          to_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swimmer_level_history_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swimmer_level_history_swimmer_id_fkey"
+            columns: ["swimmer_id"]
+            isOneToOne: false
+            referencedRelation: "swimmers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      swimmer_match_reviews: {
+        Row: {
+          candidate_swimmer_id: string | null
+          created_at: string
+          id: string
+          membership_id: string
+          reason: string
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          candidate_swimmer_id?: string | null
+          created_at?: string
+          id?: string
+          membership_id: string
+          reason: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          candidate_swimmer_id?: string | null
+          created_at?: string
+          id?: string
+          membership_id?: string
+          reason?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swimmer_match_reviews_candidate_swimmer_id_fkey"
+            columns: ["candidate_swimmer_id"]
+            isOneToOne: false
+            referencedRelation: "swimmers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swimmer_match_reviews_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: true
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      swimmer_skills: {
+        Row: {
+          id: string
+          met_at: string | null
+          met_by: string | null
+          occurrence_id: string | null
+          skill_definition_id: string
+          state: Database["public"]["Enums"]["skill_state"]
+          swimmer_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          met_at?: string | null
+          met_by?: string | null
+          occurrence_id?: string | null
+          skill_definition_id: string
+          state?: Database["public"]["Enums"]["skill_state"]
+          swimmer_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          met_at?: string | null
+          met_by?: string | null
+          occurrence_id?: string | null
+          skill_definition_id?: string
+          state?: Database["public"]["Enums"]["skill_state"]
+          swimmer_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swimmer_skills_met_by_fkey"
+            columns: ["met_by"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swimmer_skills_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "membership_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swimmer_skills_skill_definition_id_fkey"
+            columns: ["skill_definition_id"]
+            isOneToOne: false
+            referencedRelation: "skill_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swimmer_skills_swimmer_id_fkey"
+            columns: ["swimmer_id"]
+            isOneToOne: false
+            referencedRelation: "swimmers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swimmer_skills_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      swimmers: {
+        Row: {
+          created_at: string
+          current_level: string | null
+          dob: string | null
+          first_name: string
+          id: string
+          is_active: boolean
+          last_name: string
+          level_set_at: string | null
+          level_set_by: string | null
+          share_token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_level?: string | null
+          dob?: string | null
+          first_name: string
+          id?: string
+          is_active?: boolean
+          last_name: string
+          level_set_at?: string | null
+          level_set_by?: string | null
+          share_token?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_level?: string | null
+          dob?: string | null
+          first_name?: string
+          id?: string
+          is_active?: boolean
+          last_name?: string
+          level_set_at?: string | null
+          level_set_by?: string | null
+          share_token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swimmers_level_set_by_fkey"
+            columns: ["level_set_by"]
+            isOneToOne: false
+            referencedRelation: "instructors"
             referencedColumns: ["id"]
           },
         ]
@@ -3467,6 +3877,7 @@ export type Database = {
           has_waiver: boolean
         }[]
       }
+      can_use_staff_mode: { Args: never; Returns: boolean }
       check_session_periods_public_access: { Args: never; Returns: Json }
       claim_open_shift: {
         Args: { _shift_id: string }
@@ -3782,6 +4193,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_staff_kiosk: { Args: never; Returns: boolean }
       link_visitor_waiver: { Args: { _waiver_id: string }; Returns: undefined }
       mark_lesson_waiver_signed: { Args: { _token: string }; Returns: string }
       mark_sms_conversation_read: {
@@ -3809,6 +4221,8 @@ export type Database = {
         }
         Returns: number
       }
+      norm_name: { Args: { t: string }; Returns: string }
+      norm_phone: { Args: { t: string }; Returns: string }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
@@ -3818,6 +4232,11 @@ export type Database = {
         }[]
       }
       release_slot_holds: { Args: { p_session_token: string }; Returns: number }
+      resolve_swimmer_for_membership: {
+        Args: { p_membership_id: string }
+        Returns: string
+      }
+      resolve_unlinked_swimmers: { Args: never; Returns: number }
       set_pending_membership_subscription: {
         Args: { p_id: string; p_sub: string }
         Returns: {
@@ -3826,6 +4245,77 @@ export type Database = {
         }[]
       }
       soundex: { Args: { "": string }; Returns: string }
+      staff_instructors_for_date: {
+        Args: { p_date: string }
+        Returns: {
+          first_lesson: string
+          instructor_id: string
+          instructor_name: string
+          lesson_count: number
+        }[]
+      }
+      staff_mark_skill: {
+        Args: {
+          p_instructor_id: string
+          p_occurrence_id?: string
+          p_skill_id: string
+          p_state: Database["public"]["Enums"]["skill_state"]
+          p_swimmer_id: string
+        }
+        Returns: undefined
+      }
+      staff_save_note: {
+        Args: {
+          p_audience: string
+          p_body: string
+          p_instructor_id: string
+          p_occurrence_id?: string
+          p_swimmer_id: string
+        }
+        Returns: string
+      }
+      staff_schedule: {
+        Args: { p_date: string; p_instructor_id: string }
+        Returns: {
+          cancel_reason: string
+          current_level: string
+          end_time: string
+          has_medical: boolean
+          needs_review: boolean
+          occurrence_id: string
+          plan_key: string
+          start_time: string
+          status: string
+          swimmer_first: string
+          swimmer_id: string
+          swimmer_last: string
+        }[]
+      }
+      staff_set_level: {
+        Args: {
+          p_instructor_id: string
+          p_level: string
+          p_reason?: string
+          p_swimmer_id: string
+        }
+        Returns: undefined
+      }
+      staff_swimmer_header: {
+        Args: { p_swimmer_id: string }
+        Returns: {
+          current_level: string
+          dob: string
+          first_name: string
+          has_medical: boolean
+          last_name: string
+          mastered: number
+          medical_notes: string
+          parent_name: string
+          parent_phone: string
+          plan_keys: string
+          swimmer_id: string
+        }[]
+      }
       swimmer_has_active_waiver: {
         Args: { _dob: string; _first: string; _last: string }
         Returns: boolean
@@ -3867,6 +4357,8 @@ export type Database = {
       closure_type: "planned" | "unplanned"
       membership_plan_key: "kid_group" | "private" | "adult_group"
       membership_status: "active" | "pending_cancel" | "cancelled" | "paused"
+      skill_kind: "safety_benchmark" | "skill_step" | "swim_benchmark"
+      skill_state: "not_started" | "emerging" | "met"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3999,6 +4491,8 @@ export const Constants = {
       closure_type: ["planned", "unplanned"],
       membership_plan_key: ["kid_group", "private", "adult_group"],
       membership_status: ["active", "pending_cancel", "cancelled", "paused"],
+      skill_kind: ["safety_benchmark", "skill_step", "swim_benchmark"],
+      skill_state: ["not_started", "emerging", "met"],
     },
   },
 } as const
