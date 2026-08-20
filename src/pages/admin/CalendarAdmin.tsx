@@ -56,7 +56,7 @@ const CalendarAdmin = () => {
   const [icsSource, setIcsSource] = useState<"airtable" | "supabase">(() => {
     return (localStorage.getItem("ics-data-source") as "airtable" | "supabase") || "airtable";
   });
-  const [sendingReminders, setSendingReminders] = useState(false);
+  const [showRemindersPreview, setShowRemindersPreview] = useState(false);
 
   const toggleIcsSource = () => {
     const next = icsSource === "airtable" ? "supabase" : "airtable";
@@ -64,29 +64,6 @@ const CalendarAdmin = () => {
     localStorage.setItem("ics-data-source", next);
   };
 
-  const handleSendTodaysReminders = async () => {
-    setSendingReminders(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("admin-send-todays-reminders");
-      if (error) throw error;
-      const sent = (data as any)?.sent ?? 0;
-      const failed = (data as any)?.failed ?? 0;
-      const errs = (data as any)?.errors ?? [];
-      if (failed > 0) {
-        toast.warning(`Sent ${sent}, failed ${failed}`, {
-          description: errs.slice(0, 3).map((e: any) => e.error).join(", "),
-        });
-      } else {
-        toast.success(`Sent ${sent} reminder${sent === 1 ? "" : "s"}`);
-      }
-    } catch (e) {
-      toast.error("Failed to send reminders", {
-        description: e instanceof Error ? e.message : String(e),
-      });
-    } finally {
-      setSendingReminders(false);
-    }
-  };
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
