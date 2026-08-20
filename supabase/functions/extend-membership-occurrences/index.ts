@@ -51,10 +51,12 @@ Deno.serve(async (req) => {
 
   // Service-role (pg_cron) or configured CRON_SECRET only.
   const bearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  const cronSecret = Deno.env.get("CRON_SECRET");
   const providedSecret = req.headers.get("x-cron-secret") || "";
+  const secrets = [Deno.env.get("CRON_INVOKE_SECRET"), Deno.env.get("CRON_SECRET")].filter(
+    (v): v is string => !!v,
+  );
   const isServiceRole = !!bearer && bearer === SERVICE_ROLE;
-  const isCronSecret = !!cronSecret && providedSecret === cronSecret;
+  const isCronSecret = !!providedSecret && secrets.includes(providedSecret);
   if (!isServiceRole && !isCronSecret) {
     return json({ error: "Unauthorized" }, 401);
   }
