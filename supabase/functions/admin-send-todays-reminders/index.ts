@@ -108,19 +108,11 @@ Deno.serve(async (req) => {
     message: string;
     occurrence_id: string;
     swimmer: string;
+    time: string;
   }> = [];
 
-
-
-  const { data: alreadySent } = await admin
-    .from("reminder_logs")
-    .select("lesson_occurrence_id")
-    .eq("channel", "sms")
-    .eq("status", "sent")
-    .eq("reminder_kind", "manual_today")
-    .gte("created_at", `${today}T00:00:00-08:00`)
-    .not("lesson_occurrence_id", "is", null);
-  const sentIds = new Set((alreadySent || []).map((r: any) => r.lesson_occurrence_id));
+  let skippedNoConsent = 0, skippedOptedOut = 0;
+  const optedOut = await loadOptOutPhones(admin);
 
   const { data: occs, error: occErr } = await admin
     .from("lesson_booking_occurrences")
@@ -135,7 +127,22 @@ Deno.serve(async (req) => {
     });
   }
 
+  const legacyList = (occs || []) as any[];
+  const sentIds = new Set<string>();
+  if (legacyList.length) {
+    // Scope by today's occurrence ids rather than a timestamp window: no timezone offset math.
+    const { data: alreadySent } = await admin
+      .from("reminder_logs")
+      .select("lesson_occurrence_id")
+      .eq("channel", "sms")
+      .eq("status", "sent")
+      .eq("reminder_kind", "manual_today")
+      .in("lesson_occurrence_id", legacyList.map((o) => o.id));
+    for (const r of (alreadySent || []) as any[]) sentIds.add(r.lesson_occurrence_id);
+  }
+
   let legacySent = 0, membershipSent = 0, failed = 0;
+
   const errors: Array<{ occurrence_id: string; error: string }> = [];
 
   // Identity is the swimmer, not the phone: siblings share a phone and a start time
