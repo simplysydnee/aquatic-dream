@@ -263,9 +263,18 @@ function OpenTimes({ slots, loading }: { slots: OpenSlot[]; loading: boolean }) 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto items-start">
       {PROGRAM_ORDER.map((key) => {
-        const open = slots.filter((s) => s.plan_key === key && !s.is_full);
+        // Availability drives the times we list. Private lesson gating is
+        // display only and must never make a program read as full, so the
+        // FullNotice branch below is computed from the ungated list.
+        const openAll = slots.filter((s) => s.plan_key === key && !s.is_full);
+        const ungated = openAll.filter((s) => !s.gated);
+        if (openAll.length > 0 && ungated.length === 0) {
+          console.error("slot gating hid every open time — showing ungated list", key);
+        }
+        const open = ungated.length > 0 ? ungated : openAll;
         const days = Array.from(new Set(open.map((s) => s.day_of_week))).sort((a, b) => a - b);
         const isGroup = key === "kid_group";
+
 
         return (
           <Card key={key} className="p-5">
