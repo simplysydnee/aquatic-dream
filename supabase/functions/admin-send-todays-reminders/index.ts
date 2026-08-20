@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    const key = runKey(phone, today, startTime);
+    const key = runKey(phone, today, startTime, `legacy-booking:${b.id}`);
     if (runKeys.has(key)) { suppressedDuplicatePhone++; continue; }
     runKeys.add(key);
 
