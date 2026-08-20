@@ -135,15 +135,13 @@ const CalendarAdmin = () => {
           <Button
             variant="default"
             size="sm"
-            onClick={handleSendTodaysReminders}
-            disabled={sendingReminders}
+            onClick={() => setShowRemindersPreview(true)}
             className="gap-1"
           >
             <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">
-              {sendingReminders ? "Sending..." : "Send today's reminders"}
-            </span>
+            <span className="hidden sm:inline">Send today's reminders</span>
           </Button>
+
           <Button
             size="sm"
             onClick={() => setShowChargeAll(true)}
