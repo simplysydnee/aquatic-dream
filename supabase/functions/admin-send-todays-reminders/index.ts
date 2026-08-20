@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
   const runKey = (phone: string, date: string, time: string | null, identity: string) =>
     `${phone.replace(/\D/g, "").slice(-10)}|${date}|${time ?? ""}|${identity}`;
 
-  for (const o of (occs || []) as any[]) {
+  for (const o of legacyList) {
     const b = o.lesson_bookings;
     if (!b || b.status === "cancelled") continue;
     if (sentIds.has(o.id)) continue;
