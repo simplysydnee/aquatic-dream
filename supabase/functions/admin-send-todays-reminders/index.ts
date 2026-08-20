@@ -250,7 +250,8 @@ Deno.serve(async (req) => {
     const optKey = optOutPhoneKey(phone);
     if (optKey && optedOut.has(optKey)) { skippedOptedOut++; continue; }
 
-    const key = runKey(phone, today, o.start_time);
+    const identity = m.swimmer_id ? `swimmer:${m.swimmer_id}` : `membership:${m.id}`;
+    const key = runKey(phone, today, o.start_time, identity);
     if (runKeys.has(key)) { suppressedDuplicatePhone++; continue; }
     runKeys.add(key);
 
