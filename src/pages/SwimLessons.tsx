@@ -35,7 +35,10 @@ interface OpenSlot {
   accepted_levels: string[] | null;
   spots_left: number;
   is_full: boolean;
+  /** Display-only private lesson gating from get-open-slots. */
+  gated?: boolean;
 }
+
 
 /* ───────── static copy ─────────
    Prices, days and times are read live from standing_slots and
