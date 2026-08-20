@@ -108,19 +108,11 @@ Deno.serve(async (req) => {
     message: string;
     occurrence_id: string;
     swimmer: string;
+    time: string;
   }> = [];
 
-
-
-  const { data: alreadySent } = await admin
-    .from("reminder_logs")
-    .select("lesson_occurrence_id")
-    .eq("channel", "sms")
-    .eq("status", "sent")
-    .eq("reminder_kind", "manual_today")
-    .gte("created_at", `${today}T00:00:00-08:00`)
-    .not("lesson_occurrence_id", "is", null);
-  const sentIds = new Set((alreadySent || []).map((r: any) => r.lesson_occurrence_id));
+  let skippedNoConsent = 0, skippedOptedOut = 0;
+  const optedOut = await loadOptOutPhones(admin);
 
   const { data: occs, error: occErr } = await admin
     .from("lesson_booking_occurrences")
@@ -135,7 +127,22 @@ Deno.serve(async (req) => {
     });
   }
 
+  const legacyList = (occs || []) as any[];
+  const sentIds = new Set<string>();
+  if (legacyList.length) {
+    // Scope by today's occurrence ids rather than a timestamp window: no timezone offset math.
+    const { data: alreadySent } = await admin
+      .from("reminder_logs")
+      .select("lesson_occurrence_id")
+      .eq("channel", "sms")
+      .eq("status", "sent")
+      .eq("reminder_kind", "manual_today")
+      .in("lesson_occurrence_id", legacyList.map((o) => o.id));
+    for (const r of (alreadySent || []) as any[]) sentIds.add(r.lesson_occurrence_id);
+  }
+
   let legacySent = 0, membershipSent = 0, failed = 0;
+
   const errors: Array<{ occurrence_id: string; error: string }> = [];
 
   // Identity is the swimmer, not the phone: siblings share a phone and a start time
@@ -144,7 +151,7 @@ Deno.serve(async (req) => {
   const runKey = (phone: string, date: string, time: string | null, identity: string) =>
     `${phone.replace(/\D/g, "").slice(-10)}|${date}|${time ?? ""}|${identity}`;
 
-  for (const o of (occs || []) as any[]) {
+  for (const o of legacyList) {
     const b = o.lesson_bookings;
     if (!b || b.status === "cancelled") continue;
     if (sentIds.has(o.id)) continue;
@@ -168,15 +175,19 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    const legacyOptKey = optOutPhoneKey(phone);
+    if (legacyOptKey && optedOut.has(legacyOptKey)) { skippedOptedOut++; continue; }
+
     const key = runKey(phone, today, startTime, `legacy-booking:${b.id}`);
     if (runKeys.has(key)) { suppressedDuplicatePhone++; continue; }
     runKeys.add(key);
 
     if (dryRun) {
-      dryRunPlan.push({ source: "legacy", phone, message, occurrence_id: o.id, swimmer: b.child_name });
+      dryRunPlan.push({ source: "legacy", phone, message, occurrence_id: o.id, swimmer: b.child_name, time: timeStr });
       legacySent++;
       continue;
     }
+
 
     const result = await sendSms(phone, message);
     await logOutboundSms({ admin: admin, kind: "reminder", sentByLabel: "System - today's reminders" }, { phone, body: message, status: result.ok ? "sent" : "failed", error: result.ok ? null : result.error ?? null });
@@ -192,7 +203,7 @@ Deno.serve(async (req) => {
   }
 
   // ===== Membership occurrences (current system) =====
-  let skippedNoConsent = 0, skippedOptedOut = 0;
+
 
   const { data: mOccs, error: mErr } = await admin
     .from("membership_occurrences")
@@ -218,14 +229,13 @@ Deno.serve(async (req) => {
     for (const r of (mAlready || []) as any[]) mSentIds.add(r.membership_occurrence_id);
   }
 
-  const optedOut = await loadOptOutPhones(admin);
-
   for (const o of mList) {
     const m = o.memberships;
     if (!m) continue;
     if (!["active", "pending_cancel", "paused"].includes(m.status)) continue;
     if (mSentIds.has(o.id)) continue;
-    if (m.sms_consent === false) { skippedNoConsent++; continue; }
+    // Consent fails closed: NULL is not consent.
+    if (m.sms_consent !== true) { skippedNoConsent++; continue; }
 
     const swimmerName = [m.child_first_name, m.child_last_name].filter(Boolean).join(" ") || null;
     const phone = normalizePhone(m.parent_phone);
@@ -256,7 +266,7 @@ Deno.serve(async (req) => {
     runKeys.add(key);
 
     if (dryRun) {
-      dryRunPlan.push({ source: "membership", phone, message, occurrence_id: o.id, swimmer: swimmerName ?? "" });
+      dryRunPlan.push({ source: "membership", phone, message, occurrence_id: o.id, swimmer: swimmerName ?? "", time: timeStr });
       membershipSent++;
       continue;
     }
