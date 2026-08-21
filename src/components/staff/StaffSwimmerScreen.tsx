@@ -83,6 +83,8 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
   const [settingLevel, setSettingLevel] = useState(false);
   const [milestone, setMilestone] = useState<3 | 6 | null>(null);
   const [pendingMilestone, setPendingMilestone] = useState<3 | 6 | null>(null);
+  const [sendingMilestone, setSendingMilestone] = useState(false);
+
 
   const level = (header?.current_level as SwimLevel | null) ?? null;
   /** Skills may only be marked on a lesson that is still scheduled. */
