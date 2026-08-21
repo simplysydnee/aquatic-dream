@@ -37,6 +37,7 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
   const [authorizerPin, setAuthorizerPin] = useState("");
   const [lockedUntil, setLockedUntil] = useState<string | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [dialogSuccess, setDialogSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
