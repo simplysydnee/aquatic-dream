@@ -263,7 +263,7 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     // the new level and its skills instead of a finished one.
     if (result.advanced && result.to) {
       const firstName = header?.first_name ?? "Swimmer";
-      toast({ title: `${firstName} advanced to ${LEVEL_LABELS[result.to as SwimLevel] ?? result.to}.` });
+      toast({ title: `${firstName} advanced to ${LEVEL_GROUP_NAMES[result.to as SwimLevel] ?? result.to}.` });
       await load();
     }
   };
