@@ -1583,6 +1583,7 @@ export type Database = {
       membership_occurrences: {
         Row: {
           cancel_reason: string | null
+          cancellation_id: string | null
           checked_in_at: string | null
           checked_in_by: string | null
           closure_id: string | null
@@ -1599,6 +1600,7 @@ export type Database = {
         }
         Insert: {
           cancel_reason?: string | null
+          cancellation_id?: string | null
           checked_in_at?: string | null
           checked_in_by?: string | null
           closure_id?: string | null
@@ -1615,6 +1617,7 @@ export type Database = {
         }
         Update: {
           cancel_reason?: string | null
+          cancellation_id?: string | null
           checked_in_at?: string | null
           checked_in_by?: string | null
           closure_id?: string | null
@@ -1630,6 +1633,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "membership_occurrences_cancellation_id_fkey"
+            columns: ["cancellation_id"]
+            isOneToOne: false
+            referencedRelation: "membership_cancellations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "membership_occurrences_closure_id_fkey"
             columns: ["closure_id"]
@@ -3863,6 +3873,17 @@ export type Database = {
         }
         Returns: number
       }
+      apply_membership_cancellation: {
+        Args: {
+          p_cancellation_id?: string
+          p_effective_date?: string
+          p_membership_id: string
+        }
+        Returns: {
+          cancelled_count: number
+          cutoff_date: string
+        }[]
+      }
       approve_shift_trade: {
         Args: { _trade_id: string }
         Returns: {
@@ -4253,6 +4274,12 @@ export type Database = {
         Returns: string
       }
       resolve_unlinked_swimmers: { Args: never; Returns: number }
+      reverse_membership_cancellation: {
+        Args: { p_cancellation_id?: string; p_membership_id: string }
+        Returns: {
+          restored_count: number
+        }[]
+      }
       set_pending_membership_subscription: {
         Args: { p_id: string; p_sub: string }
         Returns: {

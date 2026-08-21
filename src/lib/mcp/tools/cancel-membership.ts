@@ -6,7 +6,7 @@ export default defineTool({
   name: "cancel_membership",
   title: "Cancel membership",
   description:
-    "Mark a membership as canceled in the database and record a cancellation row. Does NOT cancel the Stripe subscription — do that separately in Stripe if needed. Requires confirm=true.",
+    "Mark a membership as canceled in the database, record a cancellation row, and cancel its future lessons (scheduled occurrences on/after the effective date; past lessons and holiday closures are untouched). Does NOT cancel the Stripe subscription — do that separately in Stripe if needed. Requires confirm=true.",
   inputSchema: {
     id: z.string().uuid(),
     effective_date: z
@@ -40,13 +40,35 @@ export default defineTool({
       })
       .eq("id", id);
     if (upErr) return errResult(upErr.message);
-    const { error: insErr } = await supabase.from("membership_cancellations").insert({
-      membership_id: id,
-      effective_date: effective,
-      reason: reason ?? null,
-      reason_detail: reason_detail ?? null,
-    });
+    const { data: cancelRow, error: insErr } = await supabase
+      .from("membership_cancellations")
+      .insert({
+        membership_id: id,
+        effective_date: effective,
+        reason: reason ?? null,
+        reason_detail: reason_detail ?? null,
+      })
+      .select("id")
+      .maybeSingle();
     if (insErr) return errResult(`membership updated, but cancellation row failed: ${insErr.message}`);
-    return okResult({ id, status: "cancelled", effective_date: effective });
+
+    // Close future lessons through the same routine the public cancel path uses.
+    const { data: applied, error: occErr } = await supabase.rpc("apply_membership_cancellation", {
+      p_membership_id: id,
+      p_cancellation_id: cancelRow?.id ?? null,
+      p_effective_date: effective,
+    });
+    if (occErr) {
+      return errResult(`membership cancelled, but future lessons were not closed: ${occErr.message}`);
+    }
+    const result = Array.isArray(applied) ? applied[0] : applied;
+    return okResult({
+      id,
+      status: "cancelled",
+      effective_date: effective,
+      cancellation_id: cancelRow?.id ?? null,
+      lessons_cancelled_from: result?.cutoff_date ?? effective,
+      lessons_cancelled: result?.cancelled_count ?? 0,
+    });
   },
 });

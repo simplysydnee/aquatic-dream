@@ -202,18 +202,9 @@ Deno.serve(async (req) => {
       .eq("id", m.id);
     if (updErr) console.error("[cancel-membership] membership update failed", updErr);
 
-    // Cancel occurrences on/after the effective end date (final paid month
-    // runs UP TO but not including effectiveDate).
-    const { error: occErr } = await supabase
-      .from("membership_occurrences")
-      .update({ status: "cancelled", cancel_reason: "membership_cancelled" })
-      .eq("membership_id", m.id)
-      .gte("occurrence_date", effectiveDate)
-      .neq("status", "cancelled");
-    if (occErr) console.error("[cancel-membership] occurrence prune failed", occErr);
-
-    // Insert cancellation record.
-    const { error: cancelErr } = await supabase
+    // Insert cancellation record first so the occurrences can be linked to it
+    // (that link is what makes a reversal possible later).
+    const { data: cancelRow, error: cancelErr } = await supabase
       .from("membership_cancellations")
       .insert({
         membership_id: m.id,
@@ -221,8 +212,21 @@ Deno.serve(async (req) => {
         effective_date: effectiveDate,
         reason,
         reason_detail: reasonDetailClean,
-      });
+      })
+      .select("id")
+      .maybeSingle();
     if (cancelErr) console.error("[cancel-membership] cancellation insert failed", cancelErr);
+
+    // Close future lessons. The shared routine cancels only scheduled
+    // occurrences on/after max(today Pacific, cancel effective date); past
+    // lessons and holiday 'closed' rows are never touched.
+    const { data: applied, error: occErr } = await supabase.rpc("apply_membership_cancellation", {
+      p_membership_id: m.id,
+      p_cancellation_id: cancelRow?.id ?? null,
+      p_effective_date: effectiveDate,
+    });
+    if (occErr) console.error("[cancel-membership] occurrence prune failed", occErr);
+    else console.log("[cancel-membership] occurrences cancelled", JSON.stringify(applied));
 
     const planName = PLAN_NAMES[String(m.plan_key)] || "swim";
     const familyName = (m.parent_first_name as string | null) || undefined;

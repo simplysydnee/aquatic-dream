@@ -966,7 +966,7 @@ function okResult(payload) {
 var cancel_membership_default = defineTool14({
   name: "cancel_membership",
   title: "Cancel membership",
-  description: "Mark a membership as canceled in the database and record a cancellation row. Does NOT cancel the Stripe subscription \u2014 do that separately in Stripe if needed. Requires confirm=true.",
+  description: "Mark a membership as canceled in the database, record a cancellation row, and cancel its future lessons (scheduled occurrences on/after the effective date; past lessons and holiday closures are untouched). Does NOT cancel the Stripe subscription \u2014 do that separately in Stripe if needed. Requires confirm=true.",
   inputSchema: {
     id: z14.string().uuid(),
     effective_date: z14.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Cancellation effective date (YYYY-MM-DD). Defaults to today."),
@@ -993,14 +993,30 @@ var cancel_membership_default = defineTool14({
       cancel_effective_date: effective
     }).eq("id", id);
     if (upErr) return errResult(upErr.message);
-    const { error: insErr } = await supabase.from("membership_cancellations").insert({
+    const { data: cancelRow, error: insErr } = await supabase.from("membership_cancellations").insert({
       membership_id: id,
       effective_date: effective,
       reason: reason ?? null,
       reason_detail: reason_detail ?? null
-    });
+    }).select("id").maybeSingle();
     if (insErr) return errResult(`membership updated, but cancellation row failed: ${insErr.message}`);
-    return okResult({ id, status: "cancelled", effective_date: effective });
+    const { data: applied, error: occErr } = await supabase.rpc("apply_membership_cancellation", {
+      p_membership_id: id,
+      p_cancellation_id: cancelRow?.id ?? null,
+      p_effective_date: effective
+    });
+    if (occErr) {
+      return errResult(`membership cancelled, but future lessons were not closed: ${occErr.message}`);
+    }
+    const result = Array.isArray(applied) ? applied[0] : applied;
+    return okResult({
+      id,
+      status: "cancelled",
+      effective_date: effective,
+      cancellation_id: cancelRow?.id ?? null,
+      lessons_cancelled_from: result?.cutoff_date ?? effective,
+      lessons_cancelled: result?.cancelled_count ?? 0
+    });
   }
 });
 
@@ -1010,7 +1026,7 @@ import { z as z15 } from "npm:zod@^3.23.8";
 var set_membership_status_default = defineTool15({
   name: "set_membership_status",
   title: "Pause or resume membership",
-  description: "Set a membership's status to 'paused' or 'active'. Use cancel_membership to cancel. Requires confirm=true.",
+  description: "Set a membership's status to 'paused' or 'active'. Setting it back to 'active' also reverses a prior cancellation: future lessons that cancellation closed are restored to scheduled. Use cancel_membership to cancel. Requires confirm=true.",
   inputSchema: {
     id: z15.string().uuid(),
     status: z15.enum(["paused", "active"]),
@@ -1024,6 +1040,18 @@ var set_membership_status_default = defineTool15({
     const { data, error } = await supabase.from("memberships").update({ status }).eq("id", id).select("id, status").maybeSingle();
     if (error) return errResult(error.message);
     if (!data) return errResult("Membership not found");
+    if (status === "active") {
+      const { data: restored, error: revErr } = await supabase.rpc("reverse_membership_cancellation", {
+        p_membership_id: id,
+        p_cancellation_id: null
+      });
+      if (revErr) {
+        return errResult(`status set to active, but lessons were not restored: ${revErr.message}`);
+      }
+      const row = Array.isArray(restored) ? restored[0] : restored;
+      await supabase.from("memberships").update({ cancel_requested_at: null, cancel_effective_date: null }).eq("id", id);
+      return okResult({ ...data, lessons_restored: row?.restored_count ?? 0 });
+    }
     return okResult(data);
   }
 });
