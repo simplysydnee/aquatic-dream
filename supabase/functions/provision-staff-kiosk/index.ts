@@ -3,8 +3,12 @@
 // The kiosk gets NO user_roles row: its only authority is that kiosk row.
 // The password is never logged, stored outside auth, or echoed back.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
