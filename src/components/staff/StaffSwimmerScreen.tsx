@@ -17,6 +17,7 @@ import LevelBadge from "@/components/LevelBadge";
 import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
 import { formatPhone, phoneHref } from "@/lib/phone";
 import { StaffSwimmerNotes } from "./StaffSwimmerNotes";
+import { StaffSkillCommentThread } from "./StaffSkillCommentThread";
 import {
   LEVEL_BORDER_CLASS,
   LEVEL_FILL_CLASS,
@@ -29,6 +30,7 @@ import {
   type StaffNoteRow,
   type StaffScheduleRow,
   type StaffSession,
+  type StaffSkillCommentRow,
   type StaffSkillStateRow,
   type StaffSwimmerHeaderRow,
 } from "./staffTypes";
@@ -71,6 +73,8 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
   const [definitions, setDefinitions] = useState<SkillDefinition[]>([]);
   const [states, setStates] = useState<Record<string, StaffSkillStateRow>>({});
   const [notes, setNotes] = useState<StaffNoteRow[]>([]);
+  const [skillComments, setSkillComments] = useState<StaffSkillCommentRow[]>([]);
+  const [openThreads, setOpenThreads] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notAuthorized, setNotAuthorized] = useState(false);
@@ -88,12 +92,13 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     if (!swimmerId) return;
     setLoading(true);
     setError(null);
-    const [headerRes, skillsRes, notesRes] = await Promise.all([
+    const [headerRes, skillsRes, notesRes, commentsRes] = await Promise.all([
       supabase.rpc("staff_swimmer_header", { p_swimmer_id: swimmerId }),
       supabase.rpc("staff_swimmer_skills", { p_swimmer_id: swimmerId }),
       supabase.rpc("staff_swimmer_notes", { p_swimmer_id: swimmerId }),
+      supabase.rpc("staff_swimmer_skill_comments", { p_swimmer_id: swimmerId }),
     ]);
-    const rpcError = headerRes.error ?? skillsRes.error ?? notesRes.error;
+    const rpcError = headerRes.error ?? skillsRes.error ?? notesRes.error ?? commentsRes.error;
     if (isNotAuthorized(rpcError?.message)) {
       setNotAuthorized(true);
       setLoading(false);
@@ -109,6 +114,7 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     const stateRows = (skillsRes.data ?? []) as StaffSkillStateRow[];
     setStates(Object.fromEntries(stateRows.map((s) => [s.skill_id, s])));
     setNotes((notesRes.data ?? []) as StaffNoteRow[]);
+    setSkillComments((commentsRes.data ?? []) as StaffSkillCommentRow[]);
     setLoading(false);
   }, [swimmerId]);
 
@@ -143,6 +149,15 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     () => definitions.filter((d) => states[d.id]?.state === "met").length,
     [definitions, states],
   );
+  /** Skill comments grouped by skill, newest first (RPC already orders). */
+  const commentsBySkill = useMemo(() => {
+    const map: Record<string, StaffSkillCommentRow[]> = {};
+    for (const c of skillComments) {
+      (map[c.skill_definition_id] ??= []).push(c);
+    }
+    return map;
+  }, [skillComments]);
+
   const total = definitions.length;
   const percent = total > 0 ? Math.round((masteredCount / total) * 100) : 0;
 
@@ -444,6 +459,19 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
                     {record?.met_by_first_name ? ` by ${record.met_by_first_name}` : ""}
                     {record?.met_at ? `, ${formatMetDate(record.met_at)}` : ""}
                   </p>
+                )}
+
+                {swimmerId && (
+                  <StaffSkillCommentThread
+                    swimmerId={swimmerId}
+                    skillId={def.id}
+                    occurrenceId={row.occurrence_id}
+                    session={session}
+                    comments={commentsBySkill[def.id] ?? []}
+                    expanded={!!openThreads[def.id]}
+                    onToggle={() => setOpenThreads((prev) => ({ ...prev, [def.id]: !prev[def.id] }))}
+                    onCommentAdded={(c) => setSkillComments((prev) => [c, ...prev])}
+                  />
                 )}
               </Card>
             );

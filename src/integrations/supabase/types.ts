@@ -1142,6 +1142,7 @@ export type Database = {
           id: string
           instructor_id: string
           occurrence_id: string | null
+          skill_definition_id: string | null
           sms_sent_at: string | null
           sms_status: string | null
           swim_level: string | null
@@ -1154,6 +1155,7 @@ export type Database = {
           id?: string
           instructor_id: string
           occurrence_id?: string | null
+          skill_definition_id?: string | null
           sms_sent_at?: string | null
           sms_status?: string | null
           swim_level?: string | null
@@ -1166,6 +1168,7 @@ export type Database = {
           id?: string
           instructor_id?: string
           occurrence_id?: string | null
+          skill_definition_id?: string | null
           sms_sent_at?: string | null
           sms_status?: string | null
           swim_level?: string | null
@@ -1184,6 +1187,13 @@ export type Database = {
             columns: ["occurrence_id"]
             isOneToOne: false
             referencedRelation: "membership_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_notes_skill_definition_id_fkey"
+            columns: ["skill_definition_id"]
+            isOneToOne: false
+            referencedRelation: "skill_definitions"
             referencedColumns: ["id"]
           },
           {
@@ -4292,6 +4302,24 @@ export type Database = {
         }[]
       }
       soundex: { Args: { "": string }; Returns: string }
+      staff_add_skill_comment: {
+        Args: {
+          p_body: string
+          p_instructor_id: string
+          p_occurrence_id?: string
+          p_skill_id: string
+          p_swimmer_id: string
+        }
+        Returns: {
+          body: string
+          created_at: string
+          instructor_first_name: string
+          instructor_id: string
+          note_id: string
+          skill_definition_id: string
+          swim_level: string
+        }[]
+      }
       staff_all_swimmers: {
         Args: never
         Returns: {
@@ -4434,6 +4462,18 @@ export type Database = {
           instructor_first_name: string
           instructor_id: string
           note_id: string
+          swim_level: string
+        }[]
+      }
+      staff_swimmer_skill_comments: {
+        Args: { p_swimmer_id: string }
+        Returns: {
+          body: string
+          created_at: string
+          instructor_first_name: string
+          instructor_id: string
+          note_id: string
+          skill_definition_id: string
           swim_level: string
         }[]
       }
