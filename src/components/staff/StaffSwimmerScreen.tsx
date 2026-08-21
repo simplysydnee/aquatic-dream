@@ -171,16 +171,15 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     });
   };
 
-  /** Optimistic mark with rollback on failure, plus an 8 second undo. */
-  const markSkill = async (skillId: string, next: SkillState, options?: { isUndo?: boolean }) => {
-    if (!canMark) return;
-    const snapshot = states[skillId];
-    const previous: SkillState = snapshot?.state ?? "not_started";
-    if (previous === next) return;
+  const deleteState = (skillId: string) => {
+    setStates((prev) => {
+      const copy = { ...prev };
+      delete copy[skillId];
+      return copy;
+    });
+  };
 
-    applyState(skillId, next); // optimistic
-    setSavingSkillId(skillId);
-
+  const saveSkillState = async (skillId: string, next: SkillState): Promise<boolean> => {
     const { error: rpcError } = await supabase.rpc("staff_mark_skill", {
       p_swimmer_id: swimmerId,
       p_skill_id: skillId,
@@ -188,9 +187,32 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
       p_instructor_id: session.instructorId,
       p_occurrence_id: row.occurrence_id,
     });
+    if (rpcError) {
+      toast({
+        title: "Not saved",
+        description: `${rpcError.message}. Check the wifi and tap again.`,
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  /** Optimistic mark with rollback on failure, plus an 8 second undo. */
+  const markSkill = async (skillId: string, next: SkillState) => {
+    if (!canMark) return;
+    const snapshot = states[skillId];
+    const previous: SkillState = snapshot?.state ?? "not_started";
+    if (previous === next) return;
+
+    const prevCount = definitions.filter((d) => states[d.id]?.state === "met").length;
+
+    applyState(skillId, next); // optimistic
+    setSavingSkillId(skillId);
+    const saved = await saveSkillState(skillId, next);
     setSavingSkillId(null);
 
-    if (rpcError) {
+    if (!saved) {
       // rollback to the exact previous row
       setStates((prev) => {
         const copy = { ...prev };
@@ -198,33 +220,43 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
         else delete copy[skillId];
         return copy;
       });
-      toast({
-        title: "Not saved",
-        description: `${rpcError.message}. Check the wifi and tap again.`,
-        variant: "destructive",
-      });
       return;
     }
 
-    if (!options?.isUndo) {
-      toast({
-        title: `Marked ${SKILL_STATE_LABELS[next].toLowerCase()}`,
-        duration: UNDO_MS,
-        action: (
-          <ToastAction altText="Undo" onClick={() => void markSkill(skillId, previous, { isUndo: true })}>
-            Undo
-          </ToastAction>
-        ),
-      });
+    toast({
+      title: `Marked ${SKILL_STATE_LABELS[next].toLowerCase()}`,
+      duration: UNDO_MS,
+      action: (
+        <ToastAction
+          altText="Undo"
+          onClick={() => {
+            // Restore the captured previous state locally, then persist it.
+            if (previous === "not_started" && !snapshot) {
+              deleteState(skillId);
+            } else {
+              applyState(skillId, previous);
+            }
+            void saveSkillState(skillId, previous).then((ok) => {
+              if (!ok) {
+                // The undo itself failed; restore the value we just showed.
+                applyState(skillId, next);
+              }
+            });
+          }}
+        >
+          Undo
+        </ToastAction>
+      ),
+    });
 
-      // Milestone check on the recomputed mastered count for the current level.
-      const nextCount = definitions.filter((d) =>
-        d.id === skillId ? next === "met" : states[d.id]?.state === "met",
-      ).length;
-      if (nextCount === 3 || nextCount === 6) {
-        setMilestone(nextCount as 3 | 6);
-        setPendingMilestone(null);
-      }
+    // Milestone check on the recomputed mastered count for the current level.
+    // Only celebrate when the count INCREASES across a threshold.
+    const nextCount = definitions.filter((d) =>
+      d.id === skillId ? next === "met" : states[d.id]?.state === "met",
+    ).length;
+    if ((prevCount < 3 && nextCount === 3) || (prevCount < 6 && nextCount === 6)) {
+      setMilestone(nextCount as 3 | 6);
+      setPendingMilestone(null);
     }
   };
 
