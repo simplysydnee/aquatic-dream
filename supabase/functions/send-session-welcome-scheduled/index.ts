@@ -1,8 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { isCronAuthorized, unauthorizedResponse } from '../_shared/cron-guard.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-cron-secret',
 }
 
 // Runs daily. Finds session_periods whose start_date is exactly 7 days from
@@ -11,6 +13,10 @@ const corsHeaders = {
 // won't duplicate sends.
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
+
+  // Service-role (pg_cron) or CRON_INVOKE_SECRET only.
+  if (!isCronAuthorized(req)) return unauthorizedResponse(corsHeaders)
+
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
