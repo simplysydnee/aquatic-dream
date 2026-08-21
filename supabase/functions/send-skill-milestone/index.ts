@@ -22,6 +22,61 @@ const LEVEL_GROUP_NAMES: Record<string, string> = {
 const SITE_URL = Deno.env.get("PUBLIC_SITE_URL") ?? "https://aquaticdreamsswim.com";
 
 
+// Fixed progression. Green is the top of the ladder; there is nothing after it.
+const LEVEL_ORDER = ["white", "red", "yellow", "blue", "green"] as const;
+
+type AdvanceResult =
+  | { advanced: true; from: string; to: string }
+  | { advanced: false; reason: string };
+
+/**
+ * Advances the swimmer one level after a 'mastered' milestone.
+ * Deliberately independent of whether any SMS went out.
+ */
+async function advanceLevel(
+  admin: ReturnType<typeof createClient>,
+  swimmerId: string,
+  swimLevel: string,
+  instructorId: string | undefined,
+  currentLevel: string | null,
+): Promise<AdvanceResult> {
+  // Guard against a double advance on retry: only move a swimmer who is still
+  // sitting on the level this milestone is for.
+  if (currentLevel !== swimLevel) {
+    return { advanced: false, reason: `swimmer is on ${currentLevel ?? "no level"}, not ${swimLevel}` };
+  }
+  const idx = LEVEL_ORDER.indexOf(swimLevel as typeof LEVEL_ORDER[number]);
+  const next = idx >= 0 ? LEVEL_ORDER[idx + 1] : undefined;
+  if (!next) {
+    // Green edge case: stay on green, no error, the send still counts.
+    return { advanced: false, reason: "already at the top level" };
+  }
+
+  const nowIso = new Date().toISOString();
+  const { error: updErr } = await admin
+    .from("swimmers")
+    .update({
+      current_level: next,
+      level_set_at: nowIso,
+      level_set_by: instructorId ?? null,
+      updated_at: nowIso,
+    })
+    .eq("id", swimmerId)
+    .eq("current_level", swimLevel); // conditional write, so a concurrent move wins
+  if (updErr) return { advanced: false, reason: updErr.message };
+
+  const { error: histErr } = await admin.from("swimmer_level_history").insert({
+    swimmer_id: swimmerId,
+    from_level: swimLevel,
+    to_level: next,
+    reason: "mastered",
+    instructor_id: instructorId ?? null,
+  });
+  if (histErr) console.error("level history insert failed", histErr);
+
+  return { advanced: true, from: swimLevel, to: next };
+}
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -124,7 +179,7 @@ Deno.serve(async (req) => {
 
   const { data: swimmer, error: swimmerErr } = await admin
     .from("swimmers")
-    .select("id, first_name, share_token")
+    .select("id, first_name, share_token, current_level")
     .eq("id", swimmerId)
     .maybeSingle();
   if (swimmerErr) return json({ error: swimmerErr.message }, 500);
@@ -178,7 +233,12 @@ Deno.serve(async (req) => {
         status: "no_recipient",
       });
     if (insErr && insErr.code === "23505") return json({ alreadySent: true, sent: 0 });
-    return json({ sent: 0, reason: "no eligible recipient" });
+    // Advancement must not depend on an SMS going out.
+    const advancement =
+      milestone === "mastered"
+        ? await advanceLevel(admin, swimmerId, swimLevel, body.instructor_id, swimmer.current_level ?? null)
+        : { advanced: false as const, reason: "not a mastered milestone" };
+    return json({ sent: 0, reason: "no eligible recipient", ...advancement });
   }
 
   // 3. Insert BEFORE sending. A conflict means we stop and send nothing.
@@ -215,6 +275,19 @@ Deno.serve(async (req) => {
     })
     .eq("id", sendRow.id);
 
-  if (sent === 0) return json({ sent: 0, error: errors.join("; ") || "send failed" }, 502);
-  return json({ sent, recipients: phones.length, errors: errors.length ? errors : undefined });
+  // Advancement runs whether or not the text went out.
+  const advancement =
+    milestone === "mastered"
+      ? await advanceLevel(admin, swimmerId, swimLevel, body.instructor_id, swimmer.current_level ?? null)
+      : { advanced: false as const, reason: "not a mastered milestone" };
+
+  if (sent === 0) {
+    return json({ sent: 0, error: errors.join("; ") || "send failed", ...advancement }, 502);
+  }
+  return json({
+    sent,
+    recipients: phones.length,
+    errors: errors.length ? errors : undefined,
+    ...advancement,
+  });
 });
