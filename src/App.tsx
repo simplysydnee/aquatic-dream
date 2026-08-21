@@ -49,6 +49,7 @@ import InstructorMyRoster from "./pages/instructor/InstructorMyRoster";
 import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
 import KioskCheckIn from "./pages/KioskCheckIn";
+import StaffMode from "./pages/staff/StaffMode";
 import Unsubscribe from "./pages/Unsubscribe";
 import UnsubscribeMarketing from "./pages/UnsubscribeMarketing";
 import ScrollToTop from "./components/ScrollToTop";
