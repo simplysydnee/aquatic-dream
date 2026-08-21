@@ -13,6 +13,7 @@ type ProvisionResult = {
   label: string;
   account_created: boolean;
   kiosk_row_created: boolean;
+  password_reset: boolean;
 };
 
 const UsersAdmin = () => {
