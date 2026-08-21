@@ -76,6 +76,17 @@ export interface StaffSkillStateRow {
   updated_at: string | null;
 }
 
+/** Internal-only comment attached to a single skill definition. */
+export interface StaffSkillCommentRow {
+  note_id: string;
+  skill_definition_id: string;
+  body: string;
+  swim_level: string | null;
+  instructor_id: string | null;
+  instructor_first_name: string | null;
+  created_at: string;
+}
+
 export interface StaffNoteRow {
   note_id: string;
   audience: string;
