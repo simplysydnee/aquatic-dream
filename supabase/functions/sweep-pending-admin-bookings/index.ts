@@ -131,6 +131,11 @@ async function alreadyTexted(kind: string, ids: string[]): Promise<Set<string>> 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Service-role (pg_cron) or CRON_INVOKE_SECRET only. This job sends SMS.
+  if (!isCronAuthorized(req)) return unauthorizedResponse(corsHeaders);
+
+
+
   try {
     const now = new Date();
     const canText = withinSendWindow(now);

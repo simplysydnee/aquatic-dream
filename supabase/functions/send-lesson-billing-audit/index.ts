@@ -9,8 +9,10 @@
 //   { dry_run: true }       return the JSON report without emailing
 //   { recipients: ["a@b.com"] }  override the default staff recipients
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { isCronAuthorized } from "../_shared/cron-guard.ts";
 import { createStripeClient, type StripeEnv } from "../_shared/stripe.ts";
 import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
