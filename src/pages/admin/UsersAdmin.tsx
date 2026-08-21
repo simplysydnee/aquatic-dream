@@ -88,7 +88,9 @@ const UsersAdmin = () => {
               <CardTitle>Pool deck kiosk login</CardTitle>
               <CardDescription>
                 Creates the shared tablet login for staff mode. The password is sent straight to the
-                backend and is never saved or shown here.
+                backend and is never saved or shown here. If the email already belongs to a kiosk
+                account, its password will be reset. If the email belongs to a non-kiosk account, it
+                will be refused.
               </CardDescription>
             </div>
           </div>
