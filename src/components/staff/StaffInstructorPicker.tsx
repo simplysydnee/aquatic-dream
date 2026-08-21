@@ -301,6 +301,7 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
                 />
               </div>
               {dialogError && <p className="text-center text-sm text-destructive">{dialogError}</p>}
+              {dialogSuccess && <p className="text-center text-sm text-primary">{dialogSuccess}</p>}
               <Button
                 className="h-14 w-full text-lg"
                 disabled={newPin.length < 4 || !authorizerId || authorizerPin.length < 4 || submitting}
