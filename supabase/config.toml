@@ -115,3 +115,5 @@ project_id = "jilrijklnehbfuulykty"
     verify_jwt = false
   [functions.get-swimmer-chart]
     verify_jwt = false
+  [functions.send-skill-milestone]
+    verify_jwt = false
