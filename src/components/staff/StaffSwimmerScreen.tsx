@@ -378,9 +378,11 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
 
   return (
     <div className="mx-auto max-w-3xl p-4 pb-16 sm:p-6">
-      <Button variant="outline" className="h-12 px-5 text-base" onClick={onBack}>
-        Back to schedule
-      </Button>
+      <div className="sticky top-16 z-[5] -mx-4 mb-4 border-b bg-background px-4 py-2 sm:-mx-6 sm:px-6">
+        <Button variant="outline" className="h-12 px-5 text-base" onClick={onBack}>
+          Back to schedule
+        </Button>
+      </div>
 
       {error && <p className="mt-4 text-destructive">{error}</p>}
 
