@@ -1040,6 +1040,18 @@ var set_membership_status_default = defineTool15({
     const { data, error } = await supabase.from("memberships").update({ status }).eq("id", id).select("id, status").maybeSingle();
     if (error) return errResult(error.message);
     if (!data) return errResult("Membership not found");
+    if (status === "active") {
+      const { data: restored, error: revErr } = await supabase.rpc("reverse_membership_cancellation", {
+        p_membership_id: id,
+        p_cancellation_id: null
+      });
+      if (revErr) {
+        return errResult(`status set to active, but lessons were not restored: ${revErr.message}`);
+      }
+      const row = Array.isArray(restored) ? restored[0] : restored;
+      await supabase.from("memberships").update({ cancel_requested_at: null, cancel_effective_date: null }).eq("id", id);
+      return okResult({ ...data, lessons_restored: row?.restored_count ?? 0 });
+    }
     return okResult(data);
   }
 });
