@@ -190,7 +190,54 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     });
   };
 
+  /** Sends the milestone celebration text. Never sends from the client itself. */
+  const sendMilestone = async (which: 3 | 6) => {
+    if (!level) return;
+    setSendingMilestone(true);
+    const { data, error: fnError } = await supabase.functions.invoke("send-skill-milestone", {
+      body: {
+        swimmer_id: swimmerId,
+        swim_level: level,
+        milestone: which === 6 ? "mastered" : "halfway",
+        instructor_id: session.instructorId,
+        dryRun: false,
+      },
+    });
+    setSendingMilestone(false);
+
+    const result = data as { sent?: number; alreadySent?: boolean; reason?: string } | null;
+
+    if (fnError) {
+      toast({
+        title: "Not sent",
+        description: fnError.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (result?.alreadySent) {
+      toast({ title: "The family has already been told about this one." });
+      setMilestone(null);
+      setPendingMilestone((prev) => (prev === which ? null : prev));
+      return;
+    }
+    if (!result?.sent) {
+      toast({
+        title: "Not sent",
+        description: result?.reason ?? "No family text went out.",
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({
+      title: `Sent to ${result.sent} ${result.sent === 1 ? "recipient" : "recipients"}`,
+    });
+    setMilestone(null);
+    setPendingMilestone((prev) => (prev === which ? null : prev));
+  };
+
   const saveSkillState = async (skillId: string, next: SkillState): Promise<boolean> => {
+
     const { error: rpcError } = await supabase.rpc("staff_mark_skill", {
       p_swimmer_id: swimmerId,
       p_skill_id: skillId,
