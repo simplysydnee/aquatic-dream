@@ -88,7 +88,18 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
     setAuthorizerId("");
     setAuthorizerPin("");
     setDialogError(null);
+    setDialogSuccess(null);
     setLockedUntil(null);
+  };
+
+  const openSupervisor = (row: StaffPinStatusRow) => {
+    const inst: StaffInstructorForDate = {
+      instructor_id: row.instructor_id,
+      instructor_name: row.instructor_name,
+      lesson_count: 0,
+      first_lesson: null,
+    };
+    openTile(inst);
   };
 
   const closeDialog = () => {
@@ -97,6 +108,7 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
     setNewPin("");
     setAuthorizerPin("");
     setDialogError(null);
+    setDialogSuccess(null);
     setLockedUntil(null);
   };
 
