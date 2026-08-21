@@ -17,6 +17,7 @@ import LevelBadge from "@/components/LevelBadge";
 import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
 import { formatPhone, phoneHref } from "@/lib/phone";
 import { StaffSwimmerNotes } from "./StaffSwimmerNotes";
+import { StaffSkillCommentThread } from "./StaffSkillCommentThread";
 import {
   LEVEL_BORDER_CLASS,
   LEVEL_FILL_CLASS,
@@ -29,6 +30,7 @@ import {
   type StaffNoteRow,
   type StaffScheduleRow,
   type StaffSession,
+  type StaffSkillCommentRow,
   type StaffSkillStateRow,
   type StaffSwimmerHeaderRow,
 } from "./staffTypes";
