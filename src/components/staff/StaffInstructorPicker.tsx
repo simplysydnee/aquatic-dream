@@ -37,6 +37,7 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
   const [authorizerPin, setAuthorizerPin] = useState("");
   const [lockedUntil, setLockedUntil] = useState<string | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [dialogSuccess, setDialogSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -66,9 +67,14 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
     };
   }, [today]);
 
-  const authorizers = useMemo(
-    () => pinStatus.filter((p) => (p.role === "supervisor" || p.role === "admin") && p.has_pin),
+  const supervisorsAndAdmins = useMemo(
+    () => pinStatus.filter((p) => p.role === "supervisor" || p.role === "admin"),
     [pinStatus]
+  );
+
+  const authorizers = useMemo(
+    () => supervisorsAndAdmins.filter((p) => p.has_pin),
+    [supervisorsAndAdmins]
   );
 
   const statusFor = (instructorId: string) => pinStatus.find((p) => p.instructor_id === instructorId);
@@ -82,7 +88,18 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
     setAuthorizerId("");
     setAuthorizerPin("");
     setDialogError(null);
+    setDialogSuccess(null);
     setLockedUntil(null);
+  };
+
+  const openSupervisor = (row: StaffPinStatusRow) => {
+    const inst: StaffInstructorForDate = {
+      instructor_id: row.instructor_id,
+      instructor_name: row.instructor_name,
+      lesson_count: 0,
+      first_lesson: null,
+    };
+    openTile(inst);
   };
 
   const closeDialog = () => {
@@ -91,6 +108,7 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
     setNewPin("");
     setAuthorizerPin("");
     setDialogError(null);
+    setDialogSuccess(null);
     setLockedUntil(null);
   };
 
@@ -98,6 +116,7 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
     if (!selected || pin.length < 4) return;
     setSubmitting(true);
     setDialogError(null);
+    setDialogSuccess(null);
     const { data, error: rpcError } = await supabase.rpc("staff_pin_verify", {
       p_instructor_id: selected.instructor_id,
       p_pin: pin,
@@ -148,7 +167,8 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
     setPin("");
     setNewPin("");
     setAuthorizerPin("");
-    setDialogError("PIN set. Enter it now to sign in.");
+    setDialogError(null);
+    setDialogSuccess("PIN set. Enter it now to sign in.");
   };
 
   if (notAuthorized) {
@@ -213,6 +233,23 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
         </div>
       )}
 
+      {supervisorsAndAdmins.length > 0 && (
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          <span className="text-sm text-muted-foreground">Supervisor or admin sign-in</span>
+          {supervisorsAndAdmins.map((row) => (
+            <Button
+              key={row.instructor_id}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => openSupervisor(row)}
+            >
+              {row.instructor_name}
+            </Button>
+          ))}
+        </div>
+      )}
+
       <Dialog open={!!selected} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -229,6 +266,7 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
             <div className="space-y-4">
               <StaffPinPad value={pin} onChange={setPin} disabled={submitting} label="Enter your 4 digit PIN" />
               {dialogError && <p className="text-center text-sm text-destructive">{dialogError}</p>}
+              {dialogSuccess && <p className="text-center text-sm text-primary">{dialogSuccess}</p>}
               <Button className="h-14 w-full text-lg" disabled={pin.length < 4 || submitting} onClick={submitVerify}>
                 {submitting ? "Checking…" : "Sign in"}
               </Button>
@@ -263,6 +301,7 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
                 />
               </div>
               {dialogError && <p className="text-center text-sm text-destructive">{dialogError}</p>}
+              {dialogSuccess && <p className="text-center text-sm text-primary">{dialogSuccess}</p>}
               <Button
                 className="h-14 w-full text-lg"
                 disabled={newPin.length < 4 || !authorizerId || authorizerPin.length < 4 || submitting}
