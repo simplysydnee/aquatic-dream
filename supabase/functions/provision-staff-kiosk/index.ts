@@ -58,9 +58,11 @@ serve(async (req) => {
       return json({ error: "A label is required (max 120 characters)" }, 400);
     }
 
-    // Reuse an existing account rather than failing: the common re-run case is
-    // "user exists but the kiosk row was never written".
+    // Reuse an existing account if it exists, but always reset the password so
+    // re-provisioning actually changes the kiosk login. Track creation so the
+    // caller knows whether this was a new account or a reset.
     let userId: string | null = null;
+    let accountCreated = false;
     let page = 1;
     const perPage = 1000;
     while (userId === null) {
@@ -90,6 +92,14 @@ serve(async (req) => {
         return json({ error: createErr?.message ?? "Could not create kiosk user" }, 400);
       }
       userId = created.user.id;
+      accountCreated = true;
+    } else {
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password,
+      });
+      if (updateErr) {
+        return json({ error: updateErr.message ?? "Could not reset kiosk password" }, 400);
+      }
     }
 
     const { data: existingRow, error: rowErr } = await supabaseAdmin
@@ -110,7 +120,13 @@ serve(async (req) => {
       kioskRowCreated = true;
     }
 
-    return json({ user_id: userId, email, label, kiosk_row_created: kioskRowCreated });
+    return json({
+      user_id: userId,
+      email,
+      label,
+      account_created: accountCreated,
+      kiosk_row_created: kioskRowCreated,
+    });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Unexpected error" }, 500);
   }
