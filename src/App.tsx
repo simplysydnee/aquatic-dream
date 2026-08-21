@@ -40,6 +40,7 @@ import MembershipsAdmin from "./pages/admin/MembershipsAdmin";
 import PaymentReconciliation from "./pages/admin/PaymentReconciliation";
 import SwimmerMatchReviewAdmin from "./pages/admin/SwimmerMatchReviewAdmin";
 import ReadyToMoveAdmin from "./pages/admin/ReadyToMoveAdmin";
+import CurriculumAdmin from "./pages/admin/CurriculumAdmin";
 
 
 
@@ -138,6 +139,7 @@ const App = () => (
               <Route path="payment-reconciliation" element={<PaymentReconciliation />} />
               <Route path="swimmer-reviews" element={<SwimmerMatchReviewAdmin />} />
               <Route path="ready-to-move" element={<ReadyToMoveAdmin />} />
+              <Route path="curriculum" element={<CurriculumAdmin />} />
 
 
               <Route path="private-lessons" element={<PrivateLessonsAdmin />} />

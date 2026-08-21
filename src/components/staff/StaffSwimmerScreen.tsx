@@ -18,6 +18,7 @@ import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/
 import { formatPhone, phoneHref } from "@/lib/phone";
 import { StaffSwimmerNotes } from "./StaffSwimmerNotes";
 import { StaffSkillCommentThread } from "./StaffSkillCommentThread";
+import { StaffLevelCurriculum } from "./StaffLevelCurriculum";
 import {
   LEVEL_BORDER_CLASS,
   LEVEL_FILL_CLASS,
@@ -25,6 +26,7 @@ import {
   SKILL_KIND_LABELS,
   SKILL_STATE_LABELS,
   isNotAuthorized,
+  type LevelCurriculumRow,
   type SkillDefinition,
   type SkillState,
   type StaffNoteRow,
@@ -71,6 +73,9 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
 
   const [header, setHeader] = useState<StaffSwimmerHeaderRow | null>(null);
   const [definitions, setDefinitions] = useState<SkillDefinition[]>([]);
+  const [curriculum, setCurriculum] = useState<LevelCurriculumRow | null>(null);
+  const [openGoals, setOpenGoals] = useState<Record<string, boolean>>({});
+  const [openActivities, setOpenActivities] = useState<Record<string, boolean>>({});
   const [states, setStates] = useState<Record<string, StaffSkillStateRow>>({});
   const [notes, setNotes] = useState<StaffNoteRow[]>([]);
   const [skillComments, setSkillComments] = useState<StaffSkillCommentRow[]>([]);
@@ -124,24 +129,34 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     void load();
   }, [load]);
 
-  // skill_definitions is public reference data and the only direct table read here.
+  // skill_definitions and level_curriculum are public reference data and the only
+  // direct table reads here. Both load once per level in a single Promise.all.
   useEffect(() => {
     if (!level) {
       setDefinitions([]);
+      setCurriculum(null);
       return;
     }
     let cancelled = false;
-    void supabase
-      .from("skill_definitions")
-      .select("id, swim_level, position, kind, name, success_goal")
-      .eq("swim_level", level)
-      .eq("is_active", true)
-      .order("position", { ascending: true })
-      .then(({ data, error: defError }) => {
-        if (cancelled) return;
-        if (defError) setError(defError.message);
-        setDefinitions((data ?? []) as SkillDefinition[]);
-      });
+    void Promise.all([
+      supabase
+        .from("skill_definitions")
+        .select("id, swim_level, position, kind, name, success_goal, learning_activities")
+        .eq("swim_level", level)
+        .eq("is_active", true)
+        .order("position", { ascending: true }),
+      supabase
+        .from("level_curriculum")
+        .select("swim_level, equipment, review")
+        .eq("swim_level", level)
+        .maybeSingle(),
+    ]).then(([defRes, curRes]) => {
+      if (cancelled) return;
+      const refError = defRes.error ?? curRes.error;
+      if (refError) setError(refError.message);
+      setDefinitions((defRes.data ?? []) as SkillDefinition[]);
+      setCurriculum((curRes.data as LevelCurriculumRow | null) ?? null);
+    });
     return () => {
       cancelled = true;
     };
@@ -464,6 +479,8 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
         </Card>
       ) : (
         <div className="mt-6 space-y-3">
+          {/* Equipment and review render ONCE per level, never per skill. */}
+          <StaffLevelCurriculum curriculum={curriculum} />
           {!canMark && (
             <p className="rounded-lg bg-muted p-3 text-base font-medium">
               This lesson is {row.status}. Skills cannot be marked.
@@ -472,13 +489,29 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
           {definitions.map((def) => {
             const current = stateOf(def.id);
             const record = states[def.id];
+            const goalOpen = !!openGoals[def.id];
+            const activities = def.learning_activities ?? [];
+            const activitiesOpen = !!openActivities[def.id];
             return (
               <Card key={def.id} className={`border-l-8 p-4 ${LEVEL_BORDER_CLASS[level]}`}>
                 <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   {SKILL_KIND_LABELS[def.kind]}
                 </p>
                 <p className="mt-1 text-xl font-semibold">{def.name}</p>
-                {def.success_goal && <p className="mt-1 text-base text-muted-foreground">{def.success_goal}</p>}
+                {def.success_goal && (
+                  // Always visible pass criteria, clamped to 2 lines so the
+                  // three-state control below stays on screen. Tap to expand.
+                  <button
+                    type="button"
+                    onClick={() => setOpenGoals((prev) => ({ ...prev, [def.id]: !prev[def.id] }))}
+                    className={`mt-1 block w-full text-left text-base text-muted-foreground ${
+                      goalOpen ? "" : "line-clamp-2"
+                    }`}
+                  >
+                    {def.success_goal}
+                  </button>
+                )}
+
 
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {SKILL_STATES.map((s) => {
@@ -508,6 +541,25 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
                     {record?.met_by_first_name ? ` by ${record.met_by_first_name}` : ""}
                     {record?.met_at ? `, ${formatMetDate(record.met_at)}` : ""}
                   </p>
+                )}
+
+                {activities.length > 0 && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setOpenActivities((prev) => ({ ...prev, [def.id]: !prev[def.id] }))}
+                      className="text-sm font-medium text-muted-foreground underline underline-offset-4"
+                    >
+                      Teaching ideas
+                    </button>
+                    {activitiesOpen && (
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-base text-muted-foreground">
+                        {activities.map((a, i) => (
+                          <li key={`${def.id}-act-${i}`}>{a}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 )}
 
                 {swimmerId && (
