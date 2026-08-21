@@ -541,6 +541,25 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
                   </p>
                 )}
 
+                {activities.length > 0 && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setOpenActivities((prev) => ({ ...prev, [def.id]: !prev[def.id] }))}
+                      className="text-sm font-medium text-muted-foreground underline underline-offset-4"
+                    >
+                      Teaching ideas
+                    </button>
+                    {activitiesOpen && (
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-base text-muted-foreground">
+                        {activities.map((a, i) => (
+                          <li key={`${def.id}-act-${i}`}>{a}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
                 {swimmerId && (
                   <StaffSkillCommentThread
                     swimmerId={swimmerId}
