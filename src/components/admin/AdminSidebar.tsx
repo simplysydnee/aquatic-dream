@@ -26,6 +26,7 @@ import {
   Megaphone,
   ArrowRightLeft,
   UserSearch,
+  BookOpen,
 } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
