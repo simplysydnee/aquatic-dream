@@ -487,13 +487,29 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
           {definitions.map((def) => {
             const current = stateOf(def.id);
             const record = states[def.id];
+            const goalOpen = !!openGoals[def.id];
+            const activities = def.learning_activities ?? [];
+            const activitiesOpen = !!openActivities[def.id];
             return (
               <Card key={def.id} className={`border-l-8 p-4 ${LEVEL_BORDER_CLASS[level]}`}>
                 <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   {SKILL_KIND_LABELS[def.kind]}
                 </p>
                 <p className="mt-1 text-xl font-semibold">{def.name}</p>
-                {def.success_goal && <p className="mt-1 text-base text-muted-foreground">{def.success_goal}</p>}
+                {def.success_goal && (
+                  // Always visible pass criteria, clamped to 2 lines so the
+                  // three-state control below stays on screen. Tap to expand.
+                  <button
+                    type="button"
+                    onClick={() => setOpenGoals((prev) => ({ ...prev, [def.id]: !prev[def.id] }))}
+                    className={`mt-1 block w-full text-left text-base text-muted-foreground ${
+                      goalOpen ? "" : "line-clamp-2"
+                    }`}
+                  >
+                    {def.success_goal}
+                  </button>
+                )}
+
 
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {SKILL_STATES.map((s) => {
