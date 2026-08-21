@@ -56,6 +56,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import OAuthConsent from "./pages/OAuthConsent";
 import JoinMembership from "./pages/JoinMembership";
 import WelcomeBack from "./pages/WelcomeBack";
+import SwimmerChart from "./pages/SwimmerChart";
 import { isRecognizedOutreachSrc, hasSeenWelcomeBack, resolveJoinSrc } from "./lib/joinSrc";
 
 /**
