@@ -61,16 +61,26 @@ serve(async (req) => {
     // Reuse an existing account rather than failing: the common re-run case is
     // "user exists but the kiosk row was never written".
     let userId: string | null = null;
-    const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
-    if (listErr) return json({ error: "Could not read existing users" }, 500);
+    let page = 1;
+    const perPage = 1000;
+    while (userId === null) {
+      const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+      if (listErr) return json({ error: "Could not read existing users" }, 500);
 
-    const existing = list?.users?.find((u) => u.email?.toLowerCase() === email);
-    if (existing) {
-      userId = existing.id;
-    } else {
+      const users = list?.users ?? [];
+      const existing = users.find((u) => u.email?.toLowerCase() === email);
+      if (existing) {
+        userId = existing.id;
+        break;
+      }
+      if (users.length < perPage) break;
+      page++;
+    }
+
+    if (userId === null) {
       const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
