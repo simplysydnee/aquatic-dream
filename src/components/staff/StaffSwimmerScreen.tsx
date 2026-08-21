@@ -129,24 +129,34 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     void load();
   }, [load]);
 
-  // skill_definitions is public reference data and the only direct table read here.
+  // skill_definitions and level_curriculum are public reference data and the only
+  // direct table reads here. Both load once per level in a single Promise.all.
   useEffect(() => {
     if (!level) {
       setDefinitions([]);
+      setCurriculum(null);
       return;
     }
     let cancelled = false;
-    void supabase
-      .from("skill_definitions")
-      .select("id, swim_level, position, kind, name, success_goal")
-      .eq("swim_level", level)
-      .eq("is_active", true)
-      .order("position", { ascending: true })
-      .then(({ data, error: defError }) => {
-        if (cancelled) return;
-        if (defError) setError(defError.message);
-        setDefinitions((data ?? []) as SkillDefinition[]);
-      });
+    void Promise.all([
+      supabase
+        .from("skill_definitions")
+        .select("id, swim_level, position, kind, name, success_goal, learning_activities")
+        .eq("swim_level", level)
+        .eq("is_active", true)
+        .order("position", { ascending: true }),
+      supabase
+        .from("level_curriculum")
+        .select("swim_level, equipment, review")
+        .eq("swim_level", level)
+        .maybeSingle(),
+    ]).then(([defRes, curRes]) => {
+      if (cancelled) return;
+      const refError = defRes.error ?? curRes.error;
+      if (refError) setError(refError.message);
+      setDefinitions((defRes.data ?? []) as SkillDefinition[]);
+      setCurriculum((curRes.data as LevelCurriculumRow | null) ?? null);
+    });
     return () => {
       cancelled = true;
     };
