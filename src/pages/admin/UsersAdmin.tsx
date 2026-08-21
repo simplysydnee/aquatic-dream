@@ -11,6 +11,7 @@ type ProvisionResult = {
   user_id: string;
   email: string;
   label: string;
+  account_created: boolean;
   kiosk_row_created: boolean;
 };
 
@@ -43,7 +44,12 @@ const UsersAdmin = () => {
     // Clear the password immediately; it is never displayed or stored here.
     setPassword("");
     setResult(data as ProvisionResult);
-    toast({ title: "Kiosk account ready", description: "Staff mode can sign in on the tablet." });
+    const result = data as ProvisionResult;
+    if (result.account_created) {
+      toast({ title: "Kiosk account created", description: "Staff mode can sign in on the tablet." });
+    } else {
+      toast({ title: "Kiosk password reset", description: "The existing kiosk password has been updated." });
+    }
   };
 
   return (
@@ -130,6 +136,10 @@ const UsersAdmin = () => {
               <p className="font-medium text-foreground">{result.label}</p>
               <p className="text-muted-foreground">{result.email}</p>
               <p className="text-muted-foreground">
+                {result.account_created
+                  ? "New kiosk account created."
+                  : "Existing kiosk account password reset."}
+                {" "}
                 {result.kiosk_row_created
                   ? "Kiosk access row created."
                   : "Kiosk access row already existed."}
