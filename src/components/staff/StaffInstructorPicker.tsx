@@ -167,7 +167,8 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
     setPin("");
     setNewPin("");
     setAuthorizerPin("");
-    setDialogError("PIN set. Enter it now to sign in.");
+    setDialogError(null);
+    setDialogSuccess("PIN set. Enter it now to sign in.");
   };
 
   if (notAuthorized) {
