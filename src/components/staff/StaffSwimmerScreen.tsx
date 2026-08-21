@@ -222,7 +222,14 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     });
     setSendingMilestone(false);
 
-    const result = data as { sent?: number; alreadySent?: boolean; reason?: string } | null;
+    const result = data as {
+      sent?: number;
+      alreadySent?: boolean;
+      reason?: string;
+      advanced?: boolean;
+      from?: string;
+      to?: string;
+    } | null;
 
     if (fnError) {
       toast({
@@ -251,6 +258,14 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     });
     setMilestone(null);
     setPendingMilestone((prev) => (prev === which ? null : prev));
+
+    // A mastered send moves the swimmer up a level. Refetch so the screen shows
+    // the new level and its skills instead of a finished one.
+    if (result.advanced && result.to) {
+      const firstName = header?.first_name ?? "Swimmer";
+      toast({ title: `${firstName} advanced to ${LEVEL_GROUP_NAMES[result.to as SwimLevel] ?? result.to}.` });
+      await load();
+    }
   };
 
   const saveSkillState = async (skillId: string, next: SkillState): Promise<boolean> => {
