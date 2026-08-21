@@ -73,6 +73,9 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
 
   const [header, setHeader] = useState<StaffSwimmerHeaderRow | null>(null);
   const [definitions, setDefinitions] = useState<SkillDefinition[]>([]);
+  const [curriculum, setCurriculum] = useState<LevelCurriculumRow | null>(null);
+  const [openGoals, setOpenGoals] = useState<Record<string, boolean>>({});
+  const [openActivities, setOpenActivities] = useState<Record<string, boolean>>({});
   const [states, setStates] = useState<Record<string, StaffSkillStateRow>>({});
   const [notes, setNotes] = useState<StaffNoteRow[]>([]);
   const [skillComments, setSkillComments] = useState<StaffSkillCommentRow[]>([]);
