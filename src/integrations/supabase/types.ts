@@ -4365,7 +4365,15 @@ export type Database = {
           p_occurrence_id?: string
           p_swimmer_id: string
         }
-        Returns: string
+        Returns: {
+          audience: string
+          body: string
+          created_at: string
+          instructor_first_name: string
+          instructor_id: string
+          note_id: string
+          swim_level: string
+        }[]
       }
       staff_schedule: {
         Args: { p_date: string; p_instructor_id: string }
@@ -4411,6 +4419,30 @@ export type Database = {
           parent_phone: string
           plan_keys: string
           swimmer_id: string
+        }[]
+      }
+      staff_swimmer_notes: {
+        Args: { p_swimmer_id: string }
+        Returns: {
+          audience: string
+          body: string
+          created_at: string
+          instructor_first_name: string
+          instructor_id: string
+          note_id: string
+          swim_level: string
+        }[]
+      }
+      staff_swimmer_skills: {
+        Args: { p_level?: string; p_swimmer_id: string }
+        Returns: {
+          met_at: string
+          met_by_first_name: string
+          met_by_instructor_id: string
+          skill_id: string
+          state: Database["public"]["Enums"]["skill_state"]
+          swim_level: string
+          updated_at: string
         }[]
       }
       swimmer_has_active_waiver: {
