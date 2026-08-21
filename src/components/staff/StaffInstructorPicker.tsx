@@ -116,6 +116,7 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
     if (!selected || pin.length < 4) return;
     setSubmitting(true);
     setDialogError(null);
+    setDialogSuccess(null);
     const { data, error: rpcError } = await supabase.rpc("staff_pin_verify", {
       p_instructor_id: selected.instructor_id,
       p_pin: pin,
