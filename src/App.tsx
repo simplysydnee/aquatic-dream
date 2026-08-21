@@ -49,6 +49,7 @@ import InstructorMyRoster from "./pages/instructor/InstructorMyRoster";
 import NotFound from "./pages/NotFound";
 import PublicLayout from "./components/PublicLayout";
 import KioskCheckIn from "./pages/KioskCheckIn";
+import StaffMode from "./pages/staff/StaffMode";
 import Unsubscribe from "./pages/Unsubscribe";
 import UnsubscribeMarketing from "./pages/UnsubscribeMarketing";
 import ScrollToTop from "./components/ScrollToTop";
@@ -104,6 +105,7 @@ const App = () => (
               }
             />
             <Route path="/checkin" element={<KioskCheckIn />} />
+            <Route path="/staff" element={<StaffMode />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/unsubscribe-marketing" element={<UnsubscribeMarketing />} />
             <Route
