@@ -149,6 +149,15 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     () => definitions.filter((d) => states[d.id]?.state === "met").length,
     [definitions, states],
   );
+  /** Skill comments grouped by skill, newest first (RPC already orders). */
+  const commentsBySkill = useMemo(() => {
+    const map: Record<string, StaffSkillCommentRow[]> = {};
+    for (const c of skillComments) {
+      (map[c.skill_definition_id] ??= []).push(c);
+    }
+    return map;
+  }, [skillComments]);
+
   const total = definitions.length;
   const percent = total > 0 ? Math.round((masteredCount / total) * 100) : 0;
 
@@ -450,6 +459,19 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
                     {record?.met_by_first_name ? ` by ${record.met_by_first_name}` : ""}
                     {record?.met_at ? `, ${formatMetDate(record.met_at)}` : ""}
                   </p>
+                )}
+
+                {swimmerId && (
+                  <StaffSkillCommentThread
+                    swimmerId={swimmerId}
+                    skillId={def.id}
+                    occurrenceId={row.occurrence_id}
+                    session={session}
+                    comments={commentsBySkill[def.id] ?? []}
+                    expanded={!!openThreads[def.id]}
+                    onToggle={() => setOpenThreads((prev) => ({ ...prev, [def.id]: !prev[def.id] }))}
+                    onCommentAdded={(c) => setSkillComments((prev) => [c, ...prev])}
+                  />
                 )}
               </Card>
             );
