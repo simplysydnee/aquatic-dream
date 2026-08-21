@@ -18,6 +18,7 @@ import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/
 import { formatPhone, phoneHref } from "@/lib/phone";
 import { StaffSwimmerNotes } from "./StaffSwimmerNotes";
 import { StaffSkillCommentThread } from "./StaffSkillCommentThread";
+import { StaffLevelCurriculum } from "./StaffLevelCurriculum";
 import {
   LEVEL_BORDER_CLASS,
   LEVEL_FILL_CLASS,
@@ -25,6 +26,7 @@ import {
   SKILL_KIND_LABELS,
   SKILL_STATE_LABELS,
   isNotAuthorized,
+  type LevelCurriculumRow,
   type SkillDefinition,
   type SkillState,
   type StaffNoteRow,
