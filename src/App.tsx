@@ -159,6 +159,9 @@ const App = () => (
             <Route path="/join" element={<JoinEntry />} />
             <Route path="/welcome-back" element={<WelcomeBack />} />
 
+            {/* Public parent progress chart, share token is the credential */}
+            <Route path="/swimmer/:token" element={<SwimmerChart />} />
+
             <Route path="/cancel" element={<MembershipCancelRequest />} />
             <Route path="/manage/:token" element={<MembershipManage />} />
 
