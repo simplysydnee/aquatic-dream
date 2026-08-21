@@ -14,14 +14,12 @@ import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Loader2 } from "lucide-react";
 import LevelBadge from "@/components/LevelBadge";
-import {
-  LEVEL_BADGE_COLORS,
-  LEVEL_GROUP_NAMES,
-  type SwimLevel,
-} from "@/components/swim-enrollment/types";
+import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
 import { formatPhone, phoneHref } from "@/lib/phone";
 import { StaffSwimmerNotes } from "./StaffSwimmerNotes";
 import {
+  LEVEL_BORDER_CLASS,
+  LEVEL_FILL_CLASS,
   PLAN_LABELS,
   SKILL_KIND_LABELS,
   SKILL_STATE_LABELS,
@@ -38,14 +36,6 @@ import {
 const LEVEL_ORDER: SwimLevel[] = ["white", "red", "yellow", "blue", "green"];
 const SKILL_STATES: SkillState[] = ["not_started", "emerging", "met"];
 const UNDO_MS = 8000;
-
-/**
- * Progress bar / accent fill for a level.
- * White uses its ring token (gray-300) because its bg token (gray-50) is
- * invisible on a light card.
- */
-const levelFillClass = (level: SwimLevel): string => LEVEL_BADGE_COLORS[level].ring.replace("ring-", "bg-");
-const levelBorderClass = (level: SwimLevel): string => LEVEL_BADGE_COLORS[level].ring.replace("ring-", "border-");
 
 const ageFromDob = (dob: string | null): number | null => {
   if (!dob) return null;
@@ -177,16 +167,15 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     });
   };
 
-  /** Optimistic mark with rollback on failure, plus an 8 second undo. */
-  const markSkill = async (skillId: string, next: SkillState, options?: { isUndo?: boolean }) => {
-    if (!canMark) return;
-    const snapshot = states[skillId];
-    const previous: SkillState = snapshot?.state ?? "not_started";
-    if (previous === next) return;
+  const deleteState = (skillId: string) => {
+    setStates((prev) => {
+      const copy = { ...prev };
+      delete copy[skillId];
+      return copy;
+    });
+  };
 
-    applyState(skillId, next); // optimistic
-    setSavingSkillId(skillId);
-
+  const saveSkillState = async (skillId: string, next: SkillState): Promise<boolean> => {
     const { error: rpcError } = await supabase.rpc("staff_mark_skill", {
       p_swimmer_id: swimmerId,
       p_skill_id: skillId,
@@ -194,9 +183,32 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
       p_instructor_id: session.instructorId,
       p_occurrence_id: row.occurrence_id,
     });
+    if (rpcError) {
+      toast({
+        title: "Not saved",
+        description: `${rpcError.message}. Check the wifi and tap again.`,
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  /** Optimistic mark with rollback on failure, plus an 8 second undo. */
+  const markSkill = async (skillId: string, next: SkillState) => {
+    if (!canMark) return;
+    const snapshot = states[skillId];
+    const previous: SkillState = snapshot?.state ?? "not_started";
+    if (previous === next) return;
+
+    const prevCount = definitions.filter((d) => states[d.id]?.state === "met").length;
+
+    applyState(skillId, next); // optimistic
+    setSavingSkillId(skillId);
+    const saved = await saveSkillState(skillId, next);
     setSavingSkillId(null);
 
-    if (rpcError) {
+    if (!saved) {
       // rollback to the exact previous row
       setStates((prev) => {
         const copy = { ...prev };
@@ -204,33 +216,43 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
         else delete copy[skillId];
         return copy;
       });
-      toast({
-        title: "Not saved",
-        description: `${rpcError.message}. Check the wifi and tap again.`,
-        variant: "destructive",
-      });
       return;
     }
 
-    if (!options?.isUndo) {
-      toast({
-        title: `Marked ${SKILL_STATE_LABELS[next].toLowerCase()}`,
-        duration: UNDO_MS,
-        action: (
-          <ToastAction altText="Undo" onClick={() => void markSkill(skillId, previous, { isUndo: true })}>
-            Undo
-          </ToastAction>
-        ),
-      });
+    toast({
+      title: `Marked ${SKILL_STATE_LABELS[next].toLowerCase()}`,
+      duration: UNDO_MS,
+      action: (
+        <ToastAction
+          altText="Undo"
+          onClick={() => {
+            // Restore the captured previous state locally, then persist it.
+            if (previous === "not_started" && !snapshot) {
+              deleteState(skillId);
+            } else {
+              applyState(skillId, previous);
+            }
+            void saveSkillState(skillId, previous).then((ok) => {
+              if (!ok) {
+                // The undo itself failed; restore the value we just showed.
+                applyState(skillId, next);
+              }
+            });
+          }}
+        >
+          Undo
+        </ToastAction>
+      ),
+    });
 
-      // Milestone check on the recomputed mastered count for the current level.
-      const nextCount = definitions.filter((d) =>
-        d.id === skillId ? next === "met" : states[d.id]?.state === "met",
-      ).length;
-      if (nextCount === 3 || nextCount === 6) {
-        setMilestone(nextCount as 3 | 6);
-        setPendingMilestone(null);
-      }
+    // Milestone check on the recomputed mastered count for the current level.
+    // Only celebrate when the count INCREASES across a threshold.
+    const nextCount = definitions.filter((d) =>
+      d.id === skillId ? next === "met" : states[d.id]?.state === "met",
+    ).length;
+    if ((prevCount < 3 && nextCount === 3) || (prevCount < 6 && nextCount === 6)) {
+      setMilestone(nextCount as 3 | 6);
+      setPendingMilestone(null);
     }
   };
 
@@ -337,7 +359,7 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
             <div className="mt-3 flex items-center gap-3">
               <div className="h-3 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
-                  className={`h-full rounded-full transition-all ${levelFillClass(level)}`}
+                  className={`h-full rounded-full transition-all ${LEVEL_FILL_CLASS[level]}`}
                   style={{ width: `${percent}%` }}
                 />
               </div>
@@ -368,7 +390,7 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
                 type="button"
                 disabled={settingLevel}
                 onClick={() => void chooseLevel(lvl)}
-                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition hover:border-primary disabled:opacity-60 ${levelBorderClass(lvl)}`}
+                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition hover:border-primary disabled:opacity-60 ${LEVEL_BORDER_CLASS[lvl]}`}
               >
                 <LevelBadge level={lvl} size={56} />
                 <span className="text-sm font-semibold">{LEVEL_GROUP_NAMES[lvl]}</span>
@@ -387,7 +409,7 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
             const current = stateOf(def.id);
             const record = states[def.id];
             return (
-              <Card key={def.id} className={`border-l-8 p-4 ${levelBorderClass(level)}`}>
+              <Card key={def.id} className={`border-l-8 p-4 ${LEVEL_BORDER_CLASS[level]}`}>
                 <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   {SKILL_KIND_LABELS[def.kind]}
                 </p>

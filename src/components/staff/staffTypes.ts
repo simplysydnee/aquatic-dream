@@ -1,3 +1,5 @@
+import type { SwimLevel } from "@/components/swim-enrollment/types";
+
 export type StaffRole = "instructor" | "supervisor" | "admin";
 
 export interface StaffSession {
@@ -104,6 +106,27 @@ export const SKILL_STATE_LABELS: Record<SkillState, string> = {
 
 /** Hard cap on the parent-facing note. */
 export const PARENT_NOTE_MAX = 300;
+
+/**
+ * Literal Tailwind fill classes for progress bars per level.
+ * White uses its ring token (gray-300) because its bg token (gray-50) is invisible on a light card.
+ */
+export const LEVEL_FILL_CLASS: Record<SwimLevel, string> = {
+  white: "bg-gray-300",
+  red: "bg-red-300",
+  yellow: "bg-yellow-300",
+  blue: "bg-blue-300",
+  green: "bg-green-300",
+};
+
+/** Literal Tailwind border classes for skill card left borders per level. */
+export const LEVEL_BORDER_CLASS: Record<SwimLevel, string> = {
+  white: "border-gray-300",
+  red: "border-red-300",
+  yellow: "border-yellow-300",
+  blue: "border-blue-300",
+  green: "border-green-300",
+};
 
 /** True when the error looks like the "not authorized" raise from a staff_* RPC. */
 export const isNotAuthorized = (message: string | undefined | null): boolean =>
