@@ -56,6 +56,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import OAuthConsent from "./pages/OAuthConsent";
 import JoinMembership from "./pages/JoinMembership";
 import WelcomeBack from "./pages/WelcomeBack";
+import SwimmerChart from "./pages/SwimmerChart";
 import { isRecognizedOutreachSrc, hasSeenWelcomeBack, resolveJoinSrc } from "./lib/joinSrc";
 
 /**
@@ -158,6 +159,9 @@ const App = () => (
             {/* Standalone membership sign-up (no public chrome) */}
             <Route path="/join" element={<JoinEntry />} />
             <Route path="/welcome-back" element={<WelcomeBack />} />
+
+            {/* Public parent progress chart, share token is the credential */}
+            <Route path="/swimmer/:token" element={<SwimmerChart />} />
 
             <Route path="/cancel" element={<MembershipCancelRequest />} />
             <Route path="/manage/:token" element={<MembershipManage />} />
