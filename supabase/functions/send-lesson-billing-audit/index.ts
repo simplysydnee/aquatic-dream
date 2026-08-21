@@ -92,17 +92,15 @@ function paymentUrl(id: string): string {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Auth gate: service-role (pg_cron), CRON_SECRET, or a signed-in admin.
+  // Auth gate: service-role / CRON_INVOKE_SECRET (pg_cron), or a signed-in admin.
   const authHeader = req.headers.get("Authorization") || "";
   const bearer = authHeader.replace(/^Bearer\s+/i, "");
-  const cronSecret = Deno.env.get("CRON_SECRET");
-  const providedSecret = req.headers.get("x-cron-secret") || "";
-  const isServiceRole = !!bearer && bearer === SERVICE_ROLE;
-  const isCronSecret = !!cronSecret && providedSecret === cronSecret;
+  const isCron = isCronAuthorized(req);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, SERVICE_ROLE);
 
-  if (!isServiceRole && !isCronSecret) {
+  if (!isCron) {
+
     let allowed = false;
     if (bearer) {
       const { data: userData } = await supabase.auth.getUser(bearer);

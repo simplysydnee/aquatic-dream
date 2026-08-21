@@ -5,6 +5,7 @@
 //   is ever deleted, so the front desk can still look up a walk-in family.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { isCronAuthorized, unauthorizedResponse } from "../_shared/cron-guard.ts";
 import { formatPTTime, sendAndLogBookingConfirmation } from "../_shared/textmagic.ts";
 
 const supabase = createClient(
@@ -18,6 +19,10 @@ const REMINDER_AFTER_HOURS = 24;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // Service-role (pg_cron) or CRON_INVOKE_SECRET only. This job sends SMS.
+  if (!isCronAuthorized(req)) return unauthorizedResponse(corsHeaders);
+
 
   try {
     const nowMs = Date.now();

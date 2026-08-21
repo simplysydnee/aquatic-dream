@@ -8,6 +8,7 @@
 // purpose and collects the card in person.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { isCronAuthorized, unauthorizedResponse } from "../_shared/cron-guard.ts";
 
 const STALE_MINUTES = 15;
 
@@ -18,6 +19,10 @@ const supabase = createClient(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // Service-role (pg_cron) or CRON_INVOKE_SECRET only.
+  if (!isCronAuthorized(req)) return unauthorizedResponse(corsHeaders);
+
 
   try {
     const cutoff = new Date(Date.now() - STALE_MINUTES * 60 * 1000).toISOString();

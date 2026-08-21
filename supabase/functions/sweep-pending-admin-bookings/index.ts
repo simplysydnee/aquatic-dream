@@ -18,6 +18,8 @@
 // its text waits.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { isCronAuthorized, unauthorizedResponse } from "../_shared/cron-guard.ts";
+
 import { sendAndLogBookingConfirmation } from "../_shared/textmagic.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
