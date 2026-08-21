@@ -105,6 +105,7 @@ const App = () => (
               }
             />
             <Route path="/checkin" element={<KioskCheckIn />} />
+            <Route path="/staff" element={<StaffMode />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/unsubscribe-marketing" element={<UnsubscribeMarketing />} />
             <Route
