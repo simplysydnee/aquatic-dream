@@ -38,6 +38,8 @@ import StandingSlotsAdmin from "./pages/admin/StandingSlotsAdmin";
 import HolidaysAdmin from "./pages/admin/HolidaysAdmin";
 import MembershipsAdmin from "./pages/admin/MembershipsAdmin";
 import PaymentReconciliation from "./pages/admin/PaymentReconciliation";
+import SwimmerMatchReviewAdmin from "./pages/admin/SwimmerMatchReviewAdmin";
+import ReadyToMoveAdmin from "./pages/admin/ReadyToMoveAdmin";
 
 
 
@@ -134,6 +136,8 @@ const App = () => (
               <Route path="memberships" element={<MembershipsAdmin />} />
               <Route path="holidays" element={<HolidaysAdmin />} />
               <Route path="payment-reconciliation" element={<PaymentReconciliation />} />
+              <Route path="swimmer-reviews" element={<SwimmerMatchReviewAdmin />} />
+              <Route path="ready-to-move" element={<ReadyToMoveAdmin />} />
 
 
               <Route path="private-lessons" element={<PrivateLessonsAdmin />} />

@@ -24,6 +24,8 @@ import {
   BarChart3,
   Mail,
   Megaphone,
+  ArrowRightLeft,
+  UserSearch,
 } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
@@ -73,6 +75,8 @@ export function AdminSidebar() {
       items: [
         { title: "Memberships", url: "/admin/memberships", icon: IdCard, badge: 0 },
         { title: "Class times", url: "/admin/standing-slots", icon: CalendarClock, badge: 0 },
+        { title: "Ready to move", url: "/admin/ready-to-move", icon: ArrowRightLeft, badge: 0 },
+        { title: "Swimmer review", url: "/admin/swimmer-reviews", icon: UserSearch, badge: 0 },
         { title: "Holidays", url: "/admin/holidays", icon: CalendarOff, badge: 0 },
       ],
     },
