@@ -8,9 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { StaffInstructorPicker } from "@/components/staff/StaffInstructorPicker";
 import { StaffSchedule } from "@/components/staff/StaffSchedule";
+import { StaffSwimmerScreen } from "@/components/staff/StaffSwimmerScreen";
 import type { StaffScheduleRow, StaffSession } from "@/components/staff/staffTypes";
-import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
-import LevelBadge from "@/components/LevelBadge";
 
 /** Inactivity window before the shared tablet forgets who is signed in. */
 const INACTIVITY_MS = 20 * 60 * 1000; // 20 minutes
@@ -66,27 +65,6 @@ function KioskSignIn() {
             {busy ? "Signing in…" : "Sign in"}
           </Button>
         </form>
-      </Card>
-    </div>
-  );
-}
-
-/** Phase 3 fills this in. */
-function SwimmerPlaceholder({ row, onBack }: { row: StaffScheduleRow; onBack: () => void }) {
-  const level = row.current_level as SwimLevel | null;
-  const name = [row.swimmer_first, row.swimmer_last].filter(Boolean).join(" ") || "Swimmer";
-  return (
-    <div className="mx-auto max-w-2xl p-6">
-      <Button variant="outline" className="h-12 px-5 text-base" onClick={onBack}>
-        Back to schedule
-      </Button>
-      <Card className="mt-5 p-8 text-center">
-        <div className="flex flex-col items-center gap-3">
-          {level && <LevelBadge level={level} size={80} />}
-          <h1 className="text-3xl font-bold">{name}</h1>
-          {level && <p className="text-lg text-muted-foreground">{LEVEL_GROUP_NAMES[level]}</p>}
-        </div>
-        <p className="mt-8 text-lg text-muted-foreground">Skills tracking is coming next.</p>
       </Card>
     </div>
   );
@@ -192,7 +170,7 @@ export default function StaffMode() {
       {!staffSession ? (
         <StaffInstructorPicker onSignedIn={setStaffSession} />
       ) : openRow ? (
-        <SwimmerPlaceholder row={openRow} onBack={() => setOpenRow(null)} />
+        <StaffSwimmerScreen row={openRow} session={staffSession} onBack={() => setOpenRow(null)} />
       ) : (
         <StaffSchedule session={staffSession} onOpenSwimmer={setOpenRow} />
       )}
