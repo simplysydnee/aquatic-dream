@@ -966,7 +966,7 @@ function okResult(payload) {
 var cancel_membership_default = defineTool14({
   name: "cancel_membership",
   title: "Cancel membership",
-  description: "Mark a membership as canceled in the database and record a cancellation row. Does NOT cancel the Stripe subscription \u2014 do that separately in Stripe if needed. Requires confirm=true.",
+  description: "Mark a membership as canceled in the database, record a cancellation row, and cancel its future lessons (scheduled occurrences on/after the effective date; past lessons and holiday closures are untouched). Does NOT cancel the Stripe subscription \u2014 do that separately in Stripe if needed. Requires confirm=true.",
   inputSchema: {
     id: z14.string().uuid(),
     effective_date: z14.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Cancellation effective date (YYYY-MM-DD). Defaults to today."),

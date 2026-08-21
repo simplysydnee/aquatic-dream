@@ -6,7 +6,7 @@ export default defineTool({
   name: "cancel_membership",
   title: "Cancel membership",
   description:
-    "Mark a membership as canceled in the database and record a cancellation row. Does NOT cancel the Stripe subscription — do that separately in Stripe if needed. Requires confirm=true.",
+    "Mark a membership as canceled in the database, record a cancellation row, and cancel its future lessons (scheduled occurrences on/after the effective date; past lessons and holiday closures are untouched). Does NOT cancel the Stripe subscription — do that separately in Stripe if needed. Requires confirm=true.",
   inputSchema: {
     id: z.string().uuid(),
     effective_date: z
