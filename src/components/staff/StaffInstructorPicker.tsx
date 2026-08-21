@@ -233,6 +233,23 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
         </div>
       )}
 
+      {supervisorsAndAdmins.length > 0 && (
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          <span className="text-sm text-muted-foreground">Supervisor or admin sign-in</span>
+          {supervisorsAndAdmins.map((row) => (
+            <Button
+              key={row.instructor_id}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => openSupervisor(row)}
+            >
+              {row.instructor_name}
+            </Button>
+          ))}
+        </div>
+      )}
+
       <Dialog open={!!selected} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
