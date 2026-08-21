@@ -161,7 +161,9 @@ Deno.serve(async (req) => {
     return json({
       dryRun: true,
       mastered: masteredCount,
+      chartUrl,
       would_send: phones.map((p) => ({ phone_last4: p.slice(-4), message })),
+
     });
   }
 
