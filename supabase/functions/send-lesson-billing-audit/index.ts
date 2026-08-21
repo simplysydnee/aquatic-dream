@@ -9,8 +9,10 @@
 //   { dry_run: true }       return the JSON report without emailing
 //   { recipients: ["a@b.com"] }  override the default staff recipients
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { isCronAuthorized } from "../_shared/cron-guard.ts";
 import { createStripeClient, type StripeEnv } from "../_shared/stripe.ts";
 import { getPrivateLessonPrice } from "../_shared/private-lesson-pricing.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -92,17 +94,15 @@ function paymentUrl(id: string): string {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Auth gate: service-role (pg_cron), CRON_SECRET, or a signed-in admin.
+  // Auth gate: service-role / CRON_INVOKE_SECRET (pg_cron), or a signed-in admin.
   const authHeader = req.headers.get("Authorization") || "";
   const bearer = authHeader.replace(/^Bearer\s+/i, "");
-  const cronSecret = Deno.env.get("CRON_SECRET");
-  const providedSecret = req.headers.get("x-cron-secret") || "";
-  const isServiceRole = !!bearer && bearer === SERVICE_ROLE;
-  const isCronSecret = !!cronSecret && providedSecret === cronSecret;
+  const isCron = isCronAuthorized(req);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, SERVICE_ROLE);
 
-  if (!isServiceRole && !isCronSecret) {
+  if (!isCron) {
+
     let allowed = false;
     if (bearer) {
       const { data: userData } = await supabase.auth.getUser(bearer);

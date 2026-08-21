@@ -635,6 +635,7 @@ export type Database = {
           instructor_id: string
           locked_until: string | null
           pin_hash: string
+          role: string
           updated_at: string
         }
         Insert: {
@@ -642,6 +643,7 @@ export type Database = {
           instructor_id: string
           locked_until?: string | null
           pin_hash: string
+          role?: string
           updated_at?: string
         }
         Update: {
@@ -649,6 +651,7 @@ export type Database = {
           instructor_id?: string
           locked_until?: string | null
           pin_hash?: string
+          role?: string
           updated_at?: string
         }
         Relationships: [
@@ -1588,6 +1591,7 @@ export type Database = {
           end_time: string | null
           id: string
           instructor_id: string | null
+          instructor_override: boolean
           membership_id: string
           occurrence_date: string
           start_time: string | null
@@ -1603,6 +1607,7 @@ export type Database = {
           end_time?: string | null
           id?: string
           instructor_id?: string | null
+          instructor_override?: boolean
           membership_id: string
           occurrence_date: string
           start_time?: string | null
@@ -1618,6 +1623,7 @@ export type Database = {
           end_time?: string | null
           id?: string
           instructor_id?: string | null
+          instructor_override?: boolean
           membership_id?: string
           occurrence_date?: string
           start_time?: string | null
@@ -4255,6 +4261,18 @@ export type Database = {
         }[]
       }
       soundex: { Args: { "": string }; Returns: string }
+      staff_all_swimmers: {
+        Args: never
+        Returns: {
+          active_memberships: number
+          current_level: string
+          dob: string
+          first_name: string
+          last_name: string
+          mastered: number
+          swimmer_id: string
+        }[]
+      }
       staff_instructors_for_date: {
         Args: { p_date: string }
         Returns: {
@@ -4273,6 +4291,44 @@ export type Database = {
           p_swimmer_id: string
         }
         Returns: undefined
+      }
+      staff_pin_change: {
+        Args: {
+          p_current_pin: string
+          p_instructor_id: string
+          p_new_pin: string
+        }
+        Returns: boolean
+      }
+      staff_pin_enroll: {
+        Args: {
+          p_authorizer_id: string
+          p_authorizer_pin: string
+          p_instructor_id: string
+          p_new_pin: string
+        }
+        Returns: boolean
+      }
+      staff_pin_is_acceptable: { Args: { p_pin: string }; Returns: boolean }
+      staff_pin_status: {
+        Args: never
+        Returns: {
+          has_pin: boolean
+          instructor_id: string
+          instructor_name: string
+          locked: boolean
+          role: string
+        }[]
+      }
+      staff_pin_verify: {
+        Args: { p_instructor_id: string; p_pin: string }
+        Returns: {
+          instructor_id: string
+          instructor_name: string
+          locked_until: string
+          ok: boolean
+          role: string
+        }[]
       }
       staff_save_note: {
         Args: {
@@ -4309,6 +4365,10 @@ export type Database = {
           p_swimmer_id: string
         }
         Returns: undefined
+      }
+      staff_set_role: {
+        Args: { p_instructor_id: string; p_role: string }
+        Returns: boolean
       }
       staff_swimmer_header: {
         Args: { p_swimmer_id: string }
