@@ -1274,6 +1274,30 @@ export type Database = {
         }
         Relationships: []
       }
+      level_curriculum: {
+        Row: {
+          equipment: string[] | null
+          review: string[] | null
+          swim_level: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          equipment?: string[] | null
+          review?: string[] | null
+          swim_level: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          equipment?: string[] | null
+          review?: string[] | null
+          swim_level?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       marketing_campaign_recipients: {
         Row: {
           campaign_id: string
@@ -2610,30 +2634,39 @@ export type Database = {
           id: string
           is_active: boolean
           kind: Database["public"]["Enums"]["skill_kind"]
+          learning_activities: string[] | null
           name: string
           position: number
           success_goal: string | null
           swim_level: string
+          updated_at: string
+          updated_by: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           is_active?: boolean
           kind: Database["public"]["Enums"]["skill_kind"]
+          learning_activities?: string[] | null
           name: string
           position: number
           success_goal?: string | null
           swim_level: string
+          updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           is_active?: boolean
           kind?: Database["public"]["Enums"]["skill_kind"]
+          learning_activities?: string[] | null
           name?: string
           position?: number
           success_goal?: string | null
           swim_level?: string
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -3879,6 +3912,10 @@ export type Database = {
           target_id: string
         }[]
       }
+      admin_swap_skill_positions: {
+        Args: { p_skill_a: string; p_skill_b: string }
+        Returns: boolean
+      }
       admin_unlink_visitor_waiver: {
         Args: {
           _enrollment_id?: string
@@ -3886,6 +3923,37 @@ export type Database = {
           _waiver_id: string
         }
         Returns: number
+      }
+      admin_update_level_curriculum: {
+        Args: {
+          p_equipment?: string[]
+          p_review?: string[]
+          p_swim_level: string
+        }
+        Returns: {
+          equipment: string[]
+          review: string[]
+          swim_level: string
+        }[]
+      }
+      admin_update_skill: {
+        Args: {
+          p_is_active?: boolean
+          p_learning_activities?: string[]
+          p_name: string
+          p_skill_id: string
+          p_success_goal?: string
+        }
+        Returns: {
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["skill_kind"]
+          learning_activities: string[]
+          name: string
+          skill_position: number
+          success_goal: string
+          swim_level: string
+        }[]
       }
       apply_membership_cancellation: {
         Args: {
