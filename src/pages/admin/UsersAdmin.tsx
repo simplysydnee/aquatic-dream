@@ -136,6 +136,10 @@ const UsersAdmin = () => {
               <p className="font-medium text-foreground">{result.label}</p>
               <p className="text-muted-foreground">{result.email}</p>
               <p className="text-muted-foreground">
+                {result.account_created
+                  ? "New kiosk account created."
+                  : "Existing kiosk account password reset."}
+                {" "}
                 {result.kiosk_row_created
                   ? "Kiosk access row created."
                   : "Kiosk access row already existed."}
