@@ -1026,7 +1026,7 @@ import { z as z15 } from "npm:zod@^3.23.8";
 var set_membership_status_default = defineTool15({
   name: "set_membership_status",
   title: "Pause or resume membership",
-  description: "Set a membership's status to 'paused' or 'active'. Use cancel_membership to cancel. Requires confirm=true.",
+  description: "Set a membership's status to 'paused' or 'active'. Setting it back to 'active' also reverses a prior cancellation: future lessons that cancellation closed are restored to scheduled. Use cancel_membership to cancel. Requires confirm=true.",
   inputSchema: {
     id: z15.string().uuid(),
     status: z15.enum(["paused", "active"]),
