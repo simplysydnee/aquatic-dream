@@ -3854,6 +3854,10 @@ export type Database = {
         }
         Returns: string
       }
+      admin_resolve_swimmer_match: {
+        Args: { p_action: string; p_review_id: string }
+        Returns: string
+      }
       admin_search_link_targets: {
         Args: { _q: string }
         Returns: {
