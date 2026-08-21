@@ -14,11 +14,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Loader2 } from "lucide-react";
 import LevelBadge from "@/components/LevelBadge";
-import {
-  LEVEL_BADGE_COLORS,
-  LEVEL_GROUP_NAMES,
-  type SwimLevel,
-} from "@/components/swim-enrollment/types";
+import { LEVEL_GROUP_NAMES, type SwimLevel } from "@/components/swim-enrollment/types";
 import { formatPhone, phoneHref } from "@/lib/phone";
 import { StaffSwimmerNotes } from "./StaffSwimmerNotes";
 import {
@@ -363,7 +359,7 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
             <div className="mt-3 flex items-center gap-3">
               <div className="h-3 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
-                  className={`h-full rounded-full transition-all ${levelFillClass(level)}`}
+                  className={`h-full rounded-full transition-all ${LEVEL_FILL_CLASS[level]}`}
                   style={{ width: `${percent}%` }}
                 />
               </div>
@@ -394,7 +390,7 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
                 type="button"
                 disabled={settingLevel}
                 onClick={() => void chooseLevel(lvl)}
-                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition hover:border-primary disabled:opacity-60 ${levelBorderClass(lvl)}`}
+                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition hover:border-primary disabled:opacity-60 ${LEVEL_BORDER_CLASS[lvl]}`}
               >
                 <LevelBadge level={lvl} size={56} />
                 <span className="text-sm font-semibold">{LEVEL_GROUP_NAMES[lvl]}</span>
@@ -413,7 +409,7 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
             const current = stateOf(def.id);
             const record = states[def.id];
             return (
-              <Card key={def.id} className={`border-l-8 p-4 ${levelBorderClass(level)}`}>
+              <Card key={def.id} className={`border-l-8 p-4 ${LEVEL_BORDER_CLASS[level]}`}>
                 <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   {SKILL_KIND_LABELS[def.kind]}
                 </p>
