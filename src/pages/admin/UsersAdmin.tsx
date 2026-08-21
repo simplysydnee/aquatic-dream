@@ -44,7 +44,12 @@ const UsersAdmin = () => {
     // Clear the password immediately; it is never displayed or stored here.
     setPassword("");
     setResult(data as ProvisionResult);
-    toast({ title: "Kiosk account ready", description: "Staff mode can sign in on the tablet." });
+    const result = data as ProvisionResult;
+    if (result.account_created) {
+      toast({ title: "Kiosk account created", description: "Staff mode can sign in on the tablet." });
+    } else {
+      toast({ title: "Kiosk password reset", description: "The existing kiosk password has been updated." });
+    }
   };
 
   return (
