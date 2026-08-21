@@ -124,7 +124,9 @@ const SwimmerChart = () => {
   const priorLevels = useMemo(() => {
     if (!currentLevel) return [];
     const currentIndex = LEVEL_ORDER.indexOf(currentLevel);
-    return LEVEL_ORDER.slice(0, currentIndex).filter((level) => (byLevel.get(level) ?? []).length > 0);
+    return LEVEL_ORDER.slice(0, currentIndex).filter((level) =>
+      (byLevel.get(level) ?? []).some((s) => s.mastered)
+    );
   }, [currentLevel, byLevel]);
 
   if (loading) {
@@ -198,7 +200,7 @@ const SwimmerChart = () => {
 
         {priorLevels.length > 0 && (
           <section>
-            <h3 className="mb-3 text-lg font-semibold text-foreground">Levels completed</h3>
+            <h3 className="mb-3 text-lg font-semibold text-foreground">Earlier levels</h3>
             <div className="space-y-2">
               {priorLevels.map((level) => {
                 const skills = byLevel.get(level) ?? [];
