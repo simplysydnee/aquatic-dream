@@ -49,6 +49,14 @@ export interface SkillDefinition {
   kind: SkillKind;
   name: string;
   success_goal: string | null;
+  learning_activities: string[] | null;
+}
+
+/** Per level teaching material. One row per level, never duplicated onto skills. */
+export interface LevelCurriculumRow {
+  swim_level: string;
+  equipment: string[] | null;
+  review: string[] | null;
 }
 
 export interface StaffSwimmerHeaderRow {
