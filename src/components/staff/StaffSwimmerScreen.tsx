@@ -73,6 +73,8 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
   const [definitions, setDefinitions] = useState<SkillDefinition[]>([]);
   const [states, setStates] = useState<Record<string, StaffSkillStateRow>>({});
   const [notes, setNotes] = useState<StaffNoteRow[]>([]);
+  const [skillComments, setSkillComments] = useState<StaffSkillCommentRow[]>([]);
+  const [openThreads, setOpenThreads] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notAuthorized, setNotAuthorized] = useState(false);
@@ -90,12 +92,13 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     if (!swimmerId) return;
     setLoading(true);
     setError(null);
-    const [headerRes, skillsRes, notesRes] = await Promise.all([
+    const [headerRes, skillsRes, notesRes, commentsRes] = await Promise.all([
       supabase.rpc("staff_swimmer_header", { p_swimmer_id: swimmerId }),
       supabase.rpc("staff_swimmer_skills", { p_swimmer_id: swimmerId }),
       supabase.rpc("staff_swimmer_notes", { p_swimmer_id: swimmerId }),
+      supabase.rpc("staff_swimmer_skill_comments", { p_swimmer_id: swimmerId }),
     ]);
-    const rpcError = headerRes.error ?? skillsRes.error ?? notesRes.error;
+    const rpcError = headerRes.error ?? skillsRes.error ?? notesRes.error ?? commentsRes.error;
     if (isNotAuthorized(rpcError?.message)) {
       setNotAuthorized(true);
       setLoading(false);
@@ -111,6 +114,7 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
     const stateRows = (skillsRes.data ?? []) as StaffSkillStateRow[];
     setStates(Object.fromEntries(stateRows.map((s) => [s.skill_id, s])));
     setNotes((notesRes.data ?? []) as StaffNoteRow[]);
+    setSkillComments((commentsRes.data ?? []) as StaffSkillCommentRow[]);
     setLoading(false);
   }, [swimmerId]);
 
