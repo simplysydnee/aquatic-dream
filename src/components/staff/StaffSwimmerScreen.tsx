@@ -22,6 +22,8 @@ import {
 import { formatPhone, phoneHref } from "@/lib/phone";
 import { StaffSwimmerNotes } from "./StaffSwimmerNotes";
 import {
+  LEVEL_BORDER_CLASS,
+  LEVEL_FILL_CLASS,
   PLAN_LABELS,
   SKILL_KIND_LABELS,
   SKILL_STATE_LABELS,
@@ -38,14 +40,6 @@ import {
 const LEVEL_ORDER: SwimLevel[] = ["white", "red", "yellow", "blue", "green"];
 const SKILL_STATES: SkillState[] = ["not_started", "emerging", "met"];
 const UNDO_MS = 8000;
-
-/**
- * Progress bar / accent fill for a level.
- * White uses its ring token (gray-300) because its bg token (gray-50) is
- * invisible on a light card.
- */
-const levelFillClass = (level: SwimLevel): string => LEVEL_BADGE_COLORS[level].ring.replace("ring-", "bg-");
-const levelBorderClass = (level: SwimLevel): string => LEVEL_BADGE_COLORS[level].ring.replace("ring-", "border-");
 
 const ageFromDob = (dob: string | null): number | null => {
   if (!dob) return null;
