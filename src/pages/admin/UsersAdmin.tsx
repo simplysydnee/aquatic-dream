@@ -141,7 +141,9 @@ const UsersAdmin = () => {
               <p className="text-muted-foreground">
                 {result.account_created
                   ? "New kiosk account created."
-                  : "Existing kiosk account password reset."}
+                  : result.password_reset
+                    ? "Existing kiosk account password reset."
+                    : "Existing kiosk account reused (password unchanged)."}
                 {" "}
                 {result.kiosk_row_created
                   ? "Kiosk access row created."
