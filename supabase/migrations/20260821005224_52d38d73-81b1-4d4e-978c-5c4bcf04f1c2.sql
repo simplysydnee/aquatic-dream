@@ -1,1 +1,0 @@
-DELETE FROM public.instructor_pins WHERE instructor_id = '2f4a3923-7d34-4908-92f8-b7c3d060f2dd' AND role = 'instructor';
