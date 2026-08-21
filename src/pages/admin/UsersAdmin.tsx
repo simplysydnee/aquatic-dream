@@ -13,6 +13,7 @@ type ProvisionResult = {
   label: string;
   account_created: boolean;
   kiosk_row_created: boolean;
+  password_reset: boolean;
 };
 
 const UsersAdmin = () => {
@@ -87,7 +88,9 @@ const UsersAdmin = () => {
               <CardTitle>Pool deck kiosk login</CardTitle>
               <CardDescription>
                 Creates the shared tablet login for staff mode. The password is sent straight to the
-                backend and is never saved or shown here.
+                backend and is never saved or shown here. If the email already belongs to a kiosk
+                account, its password will be reset. If the email belongs to a non-kiosk account, it
+                will be refused.
               </CardDescription>
             </div>
           </div>
@@ -138,7 +141,9 @@ const UsersAdmin = () => {
               <p className="text-muted-foreground">
                 {result.account_created
                   ? "New kiosk account created."
-                  : "Existing kiosk account password reset."}
+                  : result.password_reset
+                    ? "Existing kiosk account password reset."
+                    : "Existing kiosk account reused (password unchanged)."}
                 {" "}
                 {result.kiosk_row_created
                   ? "Kiosk access row created."

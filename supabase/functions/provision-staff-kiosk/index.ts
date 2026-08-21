@@ -58,11 +58,13 @@ serve(async (req) => {
       return json({ error: "A label is required (max 120 characters)" }, 400);
     }
 
-    // Reuse an existing account if it exists, but always reset the password so
-    // re-provisioning actually changes the kiosk login. Track creation so the
-    // caller knows whether this was a new account or a reset.
+    // Look up the email first. A brand-new email gets a fresh auth user.
+    // An existing auth user is ONLY touched if it is already registered in
+    // staff_kiosk_accounts. Otherwise we refuse, so a typo cannot reset an
+    // owner/staff/parent password or co-opt their account as a kiosk.
     let userId: string | null = null;
     let accountCreated = false;
+    let passwordReset = false;
     let page = 1;
     const perPage = 1000;
     while (userId === null) {
@@ -94,12 +96,30 @@ serve(async (req) => {
       userId = created.user.id;
       accountCreated = true;
     } else {
+      const { data: kioskRow, error: rowErr } = await supabaseAdmin
+        .from("staff_kiosk_accounts")
+        .select("user_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (rowErr) return json({ error: "Could not read staff_kiosk_accounts" }, 500);
+
+      if (!kioskRow) {
+        return json(
+          {
+            error:
+              "An account with that email already exists and is not a kiosk account. Use a different email, or register it as a kiosk in the backend first.",
+          },
+          409,
+        );
+      }
+
       const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password,
       });
       if (updateErr) {
         return json({ error: updateErr.message ?? "Could not reset kiosk password" }, 400);
       }
+      passwordReset = true;
     }
 
     const { data: existingRow, error: rowErr } = await supabaseAdmin
@@ -126,6 +146,7 @@ serve(async (req) => {
       label,
       account_created: accountCreated,
       kiosk_row_created: kioskRowCreated,
+      password_reset: passwordReset,
     });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Unexpected error" }, 500);
