@@ -479,6 +479,8 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
         </Card>
       ) : (
         <div className="mt-6 space-y-3">
+          {/* Equipment and review render ONCE per level, never per skill. */}
+          <StaffLevelCurriculum curriculum={curriculum} />
           {!canMark && (
             <p className="rounded-lg bg-muted p-3 text-base font-medium">
               This lesson is {row.status}. Skills cannot be marked.
