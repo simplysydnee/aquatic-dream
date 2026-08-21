@@ -11,6 +11,7 @@ type ProvisionResult = {
   user_id: string;
   email: string;
   label: string;
+  account_created: boolean;
   kiosk_row_created: boolean;
 };
 
