@@ -993,14 +993,30 @@ var cancel_membership_default = defineTool14({
       cancel_effective_date: effective
     }).eq("id", id);
     if (upErr) return errResult(upErr.message);
-    const { error: insErr } = await supabase.from("membership_cancellations").insert({
+    const { data: cancelRow, error: insErr } = await supabase.from("membership_cancellations").insert({
       membership_id: id,
       effective_date: effective,
       reason: reason ?? null,
       reason_detail: reason_detail ?? null
-    });
+    }).select("id").maybeSingle();
     if (insErr) return errResult(`membership updated, but cancellation row failed: ${insErr.message}`);
-    return okResult({ id, status: "cancelled", effective_date: effective });
+    const { data: applied, error: occErr } = await supabase.rpc("apply_membership_cancellation", {
+      p_membership_id: id,
+      p_cancellation_id: cancelRow?.id ?? null,
+      p_effective_date: effective
+    });
+    if (occErr) {
+      return errResult(`membership cancelled, but future lessons were not closed: ${occErr.message}`);
+    }
+    const result = Array.isArray(applied) ? applied[0] : applied;
+    return okResult({
+      id,
+      status: "cancelled",
+      effective_date: effective,
+      cancellation_id: cancelRow?.id ?? null,
+      lessons_cancelled_from: result?.cutoff_date ?? effective,
+      lessons_cancelled: result?.cancelled_count ?? 0
+    });
   }
 });
 
