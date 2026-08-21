@@ -17,7 +17,10 @@ const LEVEL_GROUP_NAMES: Record<string, string> = {
   green: "Ocean Masters",
 };
 
-const SITE_URL = "https://aquaticdreamsswim.com";
+// Configurable so preview testing never emits live-domain links, and so a
+// missing secret falls back to the correct production domain.
+const SITE_URL = Deno.env.get("PUBLIC_SITE_URL") ?? "https://aquaticdreamsswim.com";
+
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -158,7 +161,9 @@ Deno.serve(async (req) => {
     return json({
       dryRun: true,
       mastered: masteredCount,
+      chartUrl,
       would_send: phones.map((p) => ({ phone_last4: p.slice(-4), message })),
+
     });
   }
 
