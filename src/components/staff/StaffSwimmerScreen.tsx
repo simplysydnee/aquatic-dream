@@ -555,6 +555,7 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
             <Button
               variant="outline"
               className="h-12 px-6 text-base"
+              disabled={sendingMilestone}
               onClick={() => {
                 setPendingMilestone(milestone);
                 setMilestone(null);
@@ -562,9 +563,15 @@ export function StaffSwimmerScreen({ row, session, onBack }: Props) {
             >
               Not yet
             </Button>
-            <Button className="h-12 px-6 text-base" onClick={() => setMilestone(null)}>
+            <Button
+              className="h-12 px-6 text-base"
+              disabled={sendingMilestone}
+              onClick={() => milestone && void sendMilestone(milestone)}
+            >
+              {sendingMilestone && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
               Send to family
             </Button>
+
           </DialogFooter>
         </DialogContent>
       </Dialog>
