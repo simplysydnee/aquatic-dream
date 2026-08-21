@@ -67,9 +67,14 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
     };
   }, [today]);
 
-  const authorizers = useMemo(
-    () => pinStatus.filter((p) => (p.role === "supervisor" || p.role === "admin") && p.has_pin),
+  const supervisorsAndAdmins = useMemo(
+    () => pinStatus.filter((p) => p.role === "supervisor" || p.role === "admin"),
     [pinStatus]
+  );
+
+  const authorizers = useMemo(
+    () => supervisorsAndAdmins.filter((p) => p.has_pin),
+    [supervisorsAndAdmins]
   );
 
   const statusFor = (instructorId: string) => pinStatus.find((p) => p.instructor_id === instructorId);
