@@ -266,6 +266,7 @@ export function StaffInstructorPicker({ onSignedIn }: Props) {
             <div className="space-y-4">
               <StaffPinPad value={pin} onChange={setPin} disabled={submitting} label="Enter your 4 digit PIN" />
               {dialogError && <p className="text-center text-sm text-destructive">{dialogError}</p>}
+              {dialogSuccess && <p className="text-center text-sm text-primary">{dialogSuccess}</p>}
               <Button className="h-14 w-full text-lg" disabled={pin.length < 4 || submitting} onClick={submitVerify}>
                 {submitting ? "Checking…" : "Sign in"}
               </Button>
