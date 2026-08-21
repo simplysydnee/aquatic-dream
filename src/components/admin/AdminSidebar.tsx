@@ -103,6 +103,7 @@ export function AdminSidebar() {
       label: "Setup",
       items: [
         { title: "Instructors", url: "/admin/instructors", icon: UserCheck, badge: 0 },
+        { title: "Curriculum", url: "/admin/curriculum", icon: BookOpen, badge: 0 },
         { title: "Users", url: "/admin/users", icon: Users, badge: 0 },
         { title: "Reports", url: "/admin/reports", icon: BarChart3, badge: 0 },
         { title: "Payment reconciliation", url: "/admin/payment-reconciliation", icon: Scale, badge: 0 },
