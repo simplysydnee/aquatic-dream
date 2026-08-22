@@ -1,47 +1,29 @@
-# Rolling occurrence generation
+# Demo the milestone texts on Weston Tickenoff
 
-Membership lesson dates currently stop at 2026-10-19. Each membership only got about 8 weeks of lessons at checkout and nothing extends them. This adds a nightly job that keeps every active roster stocked 12 weeks out.
+Goal: send you the two milestone texts (halfway and mastered) at 209-996-4423 so you can see exactly what a family receives.
 
-## What gets built
+## Current state (checked)
 
-A new backend job, `extend-membership-occurrences`, that runs every night and tops up lesson dates for memberships that are active or in their cancellation notice period. It never edits or removes existing lesson dates, only fills in missing future ones.
+- Weston Tickenoff's membership phone is 209-985-1538, SMS consent on.
+- He already advanced to Deep Sea Divers (blue) from the earlier test, and both yellow milestone texts are already logged as sent.
+- His six blue skills are all unmarked, so blue is a clean slate for a fresh halfway and mastered run.
 
-## Behavior
+## Steps
 
-For each membership with status `active` or `pending_cancel`:
+1. Change the phone on Weston Tickenoff's membership to 209-996-4423.
+2. Mark 3 of his 6 Deep Sea Divers skills as met, then trigger the halfway milestone. You get: "Weston is halfway through Deep Sea Divers! <chart link>".
+3. Mark the remaining 3 skills as met, then trigger the mastered milestone. You get: "Weston mastered every Deep Sea Divers skill! <chart link>".
+4. Report back the send-log rows (status, phone, timestamps) plus the exact message text.
 
-- No class time assigned: skipped, counted, and reported back. Not an error. (Currently zero such memberships.)
-- Reads the assigned class time for weekday, start, end, and instructor.
-- Loads studio closure dates and skips them, exactly as checkout does today.
-- Starts the day after that membership's latest existing lesson date; if it has none, starts today.
-- Generates forward to today + 12 weeks. The shared generator takes a lesson count, not an end date, and skips closures, so the count is computed from calendar weeks between the start and the horizon and the generator is called once. A long closure (Winter Break, Dec 24 to Jan 1) can push the last date slightly past the horizon. That is accepted; no looping or count reduction.
-- `pending_cancel`: no dates after `cancel_effective_date`.
-- Each membership runs in its own try/catch. One failure never aborts the sweep; failures are collected and returned.
+## Things to know before approving
 
-Response JSON: memberships processed, occurrences created, skipped for no class time, skipped for cancel date, and errors.
+- These are real texts to 209-996-4423, and the chart links point at the live domain.
+- The mastered send will auto-advance Weston from Deep Sea Divers to Ocean Masters (green) and add a level-history row, since that is now the built-in behavior.
+- Weston's blue skill marks will show as met on the staff screen and the parent chart. Say the word and I can clear the blue marks and set him back to blue afterward so his record looks untouched.
+- Nothing else is touched: no standing slots, no memberships beyond the phone field, no enrollment or capacity data.
 
-## Technical details
+## Technical notes
 
-- New function `supabase/functions/extend-membership-occurrences/index.ts`.
-- Auth: service-role bearer or `CRON_SECRET` header, matching `send-lesson-occurrence-reminders`. No anon JWT.
-- Imports `buildMembershipOccurrenceRows` from `supabase/functions/_shared/membership-occurrences.ts` unchanged, and `fetchClosureDateSet` from `supabase/functions/_shared/closure-schedule.ts` (already exposed) for the closure set.
-- Insert via upsert with `onConflict: "membership_id,occurrence_date"` and `ignoreDuplicates: true`. The existing unique index on `(membership_id, occurrence_date)` is the idempotency guard, so repeated or overlapping runs are safe.
-- `verify_jwt = false` entry in `supabase/config.toml`; the in-code guard does the auth.
-- pg_cron job `extend-membership-occurrences-daily` at `0 8 * * *`, using the same vault pattern as the existing reminder crons:
-
-```text
-Authorization: Bearer <vault secret email_queue_service_role_key>
-```
-
-  This runs before the reminder jobs at 14:00-17:00 UTC, so newly generated lessons are always visible to reminders. Scheduled with the data tool, not a migration, since it embeds project-specific values.
-
-## Out of scope
-
-No changes to `buildMembershipOccurrenceRows`, `memberships`, `standing_slots`, Stripe, or the payments webhook. No UPDATEs to existing `membership_occurrences` rows. No generation for `paused` or `cancelled`. Closed dates are skipped at generation, never written as closed rows.
-
-## Verification after build
-
-- Invoke once manually and confirm the summary counts.
-- Confirm `max(occurrence_date)` moves from 2026-10-19 to roughly 12 weeks out.
-- Invoke a second time and confirm zero occurrences created (idempotent).
-- Confirm no existing row was modified (row count for dates on or before 2026-10-19 unchanged).
+- Phone update: `memberships.parent_phone` on membership `bbbf604b-...` only.
+- Skill marks via the existing `staff_mark_skill` path; milestone sends via the deployed `send-skill-milestone` function with `milestone: "halfway"` then `"mastered"`.
+- The unique guard on `(swimmer_id, swim_level, milestone)` means each of these can only fire once for blue.
